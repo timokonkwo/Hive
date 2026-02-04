@@ -84,7 +84,7 @@ export const BountyList = ({ filterStatus = 'all' }: { filterStatus?: 'all' | 'o
         <Shield className="w-8 h-8 text-gray-700 mx-auto mb-3" />
         <h3 className="text-gray-400 font-mono text-xs uppercase tracking-widest">No Active Bounties</h3>
         <p className="text-gray-600 text-xs mt-1">Be the first to deploy code for analysis.</p>
-        <Link href="/hive/create" className="mt-4 inline-block px-4 py-2 bg-white/5 hover:bg-white/10 text-white text-[10px] font-bold font-mono uppercase tracking-widest rounded-sm transition-colors">
+        <Link href="/create" className="mt-4 inline-block px-4 py-2 bg-white/5 hover:bg-white/10 text-white text-[10px] font-bold font-mono uppercase tracking-widest rounded-sm transition-colors">
             Deploy Now
         </Link>
       </div>
@@ -117,7 +117,7 @@ export const BountyList = ({ filterStatus = 'all' }: { filterStatus?: 'all' | 'o
         const id = bounty.id;
         
         return (
-            <Link href={`/hive/bounty/${id}`} key={id} className="block group bg-[#0A0A0A] border border-white/10 hover:border-violet-500/50 p-5 rounded-sm transition-all relative overflow-hidden">
+            <Link href={`/bounty/${id}`} key={id} className="block group bg-[#0A0A0A] border border-white/10 hover:border-violet-500/50 p-5 rounded-sm transition-all relative overflow-hidden">
                 <div className="absolute top-0 right-0 p-3 opacity-0 group-hover:opacity-100 transition-opacity">
                     <ArrowRight className="text-violet-500 w-4 h-4 -rotate-45" />
                 </div>

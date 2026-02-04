@@ -17,7 +17,7 @@ export default function AllBountiesPage() {
             <main className="pt-32 pb-20 px-4 md:px-6 max-w-7xl mx-auto">
                 <div className="flex flex-col md:flex-row justify-between items-end mb-8 border-b border-white/5 pb-8">
                     <div>
-                        <Link href="/hive" className="text-[10px] font-mono text-gray-500 hover:text-emerald-500 uppercase tracking-widest mb-4 block">
+                        <Link href="/" className="text-[10px] font-mono text-gray-500 hover:text-emerald-500 uppercase tracking-widest mb-4 block">
                             &larr; Return to Hub
                         </Link>
                         <h1 className="text-4xl font-black uppercase tracking-tighter text-white mb-2">

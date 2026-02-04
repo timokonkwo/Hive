@@ -115,9 +115,9 @@ function AgentProfileContent() {
           
           {/* Referral Banner */}
           {referrer && (
-            <div className="mb-8 bg-purple-500/10 border border-purple-500/20 p-4 rounded-sm flex items-center gap-3">
-              <Users className="text-purple-500" size={20} />
-              <span className="text-purple-400 text-sm">
+            <div className="mb-8 bg-purple-500/10 border border-purple-500/20 p-4 rounded-sm flex items-center gap-3 overflow-hidden">
+              <Users className="text-purple-500 shrink-0" size={20} />
+              <span className="text-purple-400 text-sm truncate">
                 Referred by <span className="font-mono text-white">{referrer.slice(0, 6)}...{referrer.slice(-4)}</span>
               </span>
             </div>
@@ -125,17 +125,17 @@ function AgentProfileContent() {
 
           {/* Profile Header */}
           <div className="bg-[#0A0A0A] border border-white/10 rounded-sm p-8 mb-6">
-            <div className="flex items-start gap-6">
-              <div className="w-20 h-20 bg-emerald-500/10 border border-emerald-500/20 rounded-sm flex items-center justify-center">
+            <div className="flex flex-col md:flex-row items-center md:items-start gap-6 text-center md:text-left">
+              <div className="w-20 h-20 bg-emerald-500/10 border border-emerald-500/20 rounded-sm flex items-center justify-center shrink-0">
                 <Shield className="text-emerald-500" size={40} />
               </div>
-              <div className="flex-1">
-                <h1 className="text-3xl font-black font-mono uppercase">{agent[0] || "Unnamed Agent"}</h1>
-                <p className="text-gray-400 mt-2">{agent[1] || "No bio provided"}</p>
-                <p className="text-[10px] font-mono text-gray-600 mt-2">{address}</p>
+              <div className="flex-1 min-w-0 w-full">
+                <h1 className="text-3xl font-black font-mono uppercase truncate">{agent[0] || "Unnamed Agent"}</h1>
+                <p className="text-gray-400 mt-2 truncate">{agent[1] || "No bio provided"}</p>
+                <p className="text-[10px] font-mono text-gray-600 mt-2 break-all">{address}</p>
                 
                 {/* Badges */}
-                <div className="flex flex-wrap gap-2 mt-4">
+                <div className="flex flex-wrap justify-center md:justify-start gap-2 mt-4">
                   {badges.map((badge, i) => (
                     <span key={i} className={`px-2 py-1 text-[10px] font-bold uppercase rounded ${badge.bg} ${badge.color}`}>
                       {badge.label}
@@ -149,26 +149,26 @@ function AgentProfileContent() {
           {/* Stats Grid */}
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
             <div className="bg-[#0A0A0A] border border-white/10 p-4 rounded-sm text-center">
-              <div className="flex items-center justify-center gap-2 text-emerald-500 font-mono font-bold text-2xl">
-                <Star size={20} /> {reputation}
+              <div className="flex items-center justify-center gap-2 text-emerald-500 font-mono font-bold text-lg md:text-2xl truncate">
+                <Star size={20} className="shrink-0" /> <span title={reputation.toString()}>{reputation > 9999 ? `${(reputation / 1000).toFixed(1)}k` : reputation}</span>
               </div>
               <div className="text-[10px] text-gray-500 uppercase mt-1">Reputation</div>
             </div>
             <div className="bg-[#0A0A0A] border border-white/10 p-4 rounded-sm text-center">
-              <div className="flex items-center justify-center gap-2 text-orange-500 font-mono font-bold text-2xl">
-                <Flame size={20} /> {streak}
+              <div className="flex items-center justify-center gap-2 text-orange-500 font-mono font-bold text-lg md:text-2xl truncate">
+                <Flame size={20} className="shrink-0" /> {streak}
               </div>
               <div className="text-[10px] text-gray-500 uppercase mt-1">Day Streak</div>
             </div>
             <div className="bg-[#0A0A0A] border border-white/10 p-4 rounded-sm text-center">
-              <div className="text-white font-mono font-bold text-2xl">
-                {formatEther(agent[4])} ETH
+              <div className="text-white font-mono font-bold text-lg md:text-2xl truncate" title={formatEther(agent[4])}>
+                 {Number(formatEther(agent[4])) > 0 ? Number(formatEther(agent[4])).toFixed(4) : "0.0000"} <span className="text-sm text-gray-500">ETH</span>
               </div>
               <div className="text-[10px] text-gray-500 uppercase mt-1">Staked</div>
             </div>
             <div className="bg-[#0A0A0A] border border-white/10 p-4 rounded-sm text-center">
-              <div className="flex items-center justify-center gap-2 text-emerald-500 font-mono font-bold text-2xl">
-                <CheckCircle size={20} />
+              <div className="flex items-center justify-center gap-2 text-emerald-500 font-mono font-bold text-lg md:text-2xl truncate">
+                <CheckCircle size={20} className="shrink-0" />
               </div>
               <div className="text-[10px] text-gray-500 uppercase mt-1">Active</div>
             </div>
@@ -182,16 +182,16 @@ function AgentProfileContent() {
             <p className="text-gray-400 text-sm mb-4">
               Share your referral link and grow the HIVE network. When agents register using your link, you'll be displayed as their referrer.
             </p>
-            <div className="flex items-center gap-2">
+            <div className="flex flex-col sm:flex-row items-center gap-2">
               <input 
                 type="text" 
                 readOnly 
                 value={referralLink}
-                className="flex-1 bg-black border border-white/10 rounded-sm px-4 py-3 text-sm font-mono text-gray-300"
+                className="w-full bg-black border border-white/10 rounded-sm px-4 py-3 text-sm font-mono text-gray-300 truncate"
               />
               <button 
                 onClick={copyReferralLink}
-                className="px-4 py-3 bg-emerald-600 hover:bg-emerald-500 rounded-sm transition-colors"
+                className="w-full sm:w-auto px-4 py-3 bg-emerald-600 hover:bg-emerald-500 rounded-sm transition-colors flex justify-center items-center"
               >
                 {copied ? <CheckCircle size={18} /> : <Copy size={18} />}
               </button>

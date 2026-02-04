@@ -23,6 +23,17 @@ export const Navbar = () => {
     return () => clearInterval(timer);
   }, []);
 
+  // Auth Timeout Handler
+  const [authTimeout, setAuthTimeout] = useState(false);
+  useEffect(() => {
+    if (!ready) {
+      const timer = setTimeout(() => setAuthTimeout(true), 4000);
+      return () => clearTimeout(timer);
+    } else {
+      setAuthTimeout(false);
+    }
+  }, [ready]);
+
   // Check if user is owner (for admin link)
   const { data: ownerAddress } = useReadContract({
     address: process.env.NEXT_PUBLIC_AUDIT_BOUNTY_ADDRESS as `0x${string}`,
@@ -89,6 +100,12 @@ export const Navbar = () => {
               <Link href="/bounties" className="text-xs font-mono font-bold text-gray-400 hover:text-emerald-400 transition-colors uppercase tracking-wider">
                 Bounties
               </Link>
+              <Link href="/create" className="text-xs font-mono font-bold text-gray-400 hover:text-emerald-400 transition-colors uppercase tracking-wider">
+                Deploy
+              </Link>
+              <Link href="/dashboard" className="text-xs font-mono font-bold text-gray-400 hover:text-emerald-400 transition-colors uppercase tracking-wider">
+                Dashboard
+              </Link>
               <Link href="/feed" className="text-xs font-mono font-bold text-gray-400 hover:text-emerald-400 transition-colors uppercase tracking-wider">
                 Feed
               </Link>
@@ -130,12 +147,12 @@ export const Navbar = () => {
                 Luxen Shield <Shield size={10} />
               </a>
               <button 
-                disabled={!ready}
+                disabled={!ready && !authTimeout}
                 onClick={() => login()} 
-                className={`px-5 py-2 bg-white text-black font-bold font-mono text-xs uppercase tracking-widest transition-all flex items-center gap-2 ${!ready ? "opacity-50 cursor-not-allowed" : "hover:bg-emerald-400 hover:shadow-[0_0_15px_rgba(16,185,129,0.6)]"}`}
+                className={`px-5 py-2 bg-white text-black font-bold font-mono text-xs uppercase tracking-widest transition-all flex items-center gap-2 ${!ready && !authTimeout ? "opacity-50 cursor-not-allowed" : "hover:bg-emerald-400 hover:shadow-[0_0_15px_rgba(16,185,129,0.6)]"}`}
               >
                 <Terminal size={12} /> 
-                {!ready ? "Loading..." : "Connect Wallet"}
+                {authTimeout && !ready ? "Retry Connection" : !ready ? "Loading..." : "Connect Wallet"}
               </button>
             </div>
           )}
@@ -181,6 +198,8 @@ export const Navbar = () => {
               <div className="space-y-1">
                 <MobileNavLink href="/" icon={Shield} label="Marketplace" />
                 <MobileNavLink href="/bounties" icon={Terminal} label="Active Bounties" />
+                <MobileNavLink href="/create" icon={Shield} label="Deploy Bounty" />
+                <MobileNavLink href="/dashboard" icon={Activity} label="Validator Dashboard" />
                 <MobileNavLink href="/feed" icon={Rss} label="Live Feed" />
                 <MobileNavLink href="/leaderboard" icon={Trophy} label="Leaderboard" />
                 <MobileNavLink href="/docs" icon={Book} label="Documentation" />

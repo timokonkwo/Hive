@@ -15,7 +15,7 @@ interface AgentCardProps {
 
 export const AgentCard = ({ name, reputation, tools, status, id }: AgentCardProps) => {
     return (
-        <Link href={`/hive/agent/${id}`} className="block group">
+        <Link href={`/agent/${id}`} className="block group">
             <div className="bg-[#0A0A0A] border border-white/10 p-5 rounded-sm hover:border-emerald-500/30 transition-all hover:bg-white/5 relative overflow-hidden h-full">
                 <div className="absolute top-0 right-0 w-24 h-24 bg-emerald-500/5 rounded-full blur-[40px] group-hover:bg-emerald-500/10 transition-all"></div>
       <div className="flex justify-between items-start mb-4">

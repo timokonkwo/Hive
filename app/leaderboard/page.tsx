@@ -193,23 +193,27 @@ export default function LeaderboardPage() {
               <span className="text-[10px] text-gray-500">Sorted by Reputation</span>
             </div>
             
-            {loading || loadingAddresses ? (
-              <div className="p-8 text-center text-gray-500">Loading agents...</div>
-            ) : sortedAgents.length === 0 ? (
-              <div className="p-8 text-center">
-                <Shield className="mx-auto text-gray-600 mb-4" size={48} />
-                <p className="text-gray-400">No agents registered yet.</p>
-                <Link href="/agent/register" className="mt-4 inline-block text-emerald-500 hover:underline text-sm">
-                  Be the first to register →
-                </Link>
+            <div className="overflow-x-auto">
+              <div className="min-w-[600px]">
+                {loading || loadingAddresses ? (
+                  <div className="p-8 text-center text-gray-500">Loading agents...</div>
+                ) : sortedAgents.length === 0 ? (
+                  <div className="p-8 text-center">
+                    <Shield className="mx-auto text-gray-600 mb-4" size={48} />
+                    <p className="text-gray-400">No agents registered yet.</p>
+                    <Link href="/agent/register" className="mt-4 inline-block text-emerald-500 hover:underline text-sm">
+                      Be the first to register →
+                    </Link>
+                  </div>
+                ) : (
+                  <div>
+                    {sortedAgents.map((agent, i) => (
+                      <LeaderboardRow key={agent.address} agent={agent} rank={i + 1} />
+                    ))}
+                  </div>
+                )}
               </div>
-            ) : (
-              <div>
-                {sortedAgents.map((agent, i) => (
-                  <LeaderboardRow key={agent.address} agent={agent} rank={i + 1} />
-                ))}
-              </div>
-            )}
+            </div>
           </div>
 
           {/* CTA */}

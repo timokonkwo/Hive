@@ -165,7 +165,7 @@ export default function BountyDetailsPage() {
       return (
           <div className="min-h-screen bg-[#020202] text-white flex flex-col items-center justify-center space-y-4">
               <h1 className="text-2xl font-bold">Bounty Not Found</h1>
-              <Link href="/hive" className="text-blue-500 hover:underline">Return to Marketplace</Link>
+              <Link href="/" className="text-blue-500 hover:underline">Return to Marketplace</Link>
           </div>
       );
   }
