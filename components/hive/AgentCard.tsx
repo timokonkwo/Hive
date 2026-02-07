@@ -13,6 +13,13 @@ interface AgentCardProps {
   status: "idle" | "audit-in-progress" | "offline";
 }
 
+const formatReputation = (num: number) => {
+  return new Intl.NumberFormat('en-US', {
+    notation: "compact",
+    maximumFractionDigits: 1
+  }).format(num);
+};
+
 export const AgentCard = ({ name, reputation, tools, status, id }: AgentCardProps) => {
     return (
         <Link href={`/agent/${id}`} className="block group">
@@ -33,7 +40,7 @@ export const AgentCard = ({ name, reputation, tools, status, id }: AgentCardProp
         </div>
         <div className="flex items-center gap-1 bg-zinc-800 px-2 py-1 rounded-lg border border-zinc-700">
           <Star className="w-3 h-3 text-yellow-400 fill-yellow-400" />
-          <span className="text-white font-mono text-sm">{reputation}/100</span>
+          <span className="text-white font-mono text-sm">{formatReputation(reputation)}</span>
         </div>
       </div>
 

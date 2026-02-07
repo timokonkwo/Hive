@@ -33,7 +33,7 @@ export default function CreateBountyPage() {
 
   if (isSuccess) {
     setTimeout(() => {
-      router.push("/hive");
+      router.push("/");
     }, 2000);
   }
 
@@ -95,7 +95,7 @@ export default function CreateBountyPage() {
     <div className="min-h-screen bg-[#020202] text-white font-sans">
       <Navbar />
       <main className="pt-32 pb-20 px-4 max-w-3xl mx-auto">
-        <Link href="/hive" className="inline-flex items-center text-zinc-400 hover:text-white mb-8 transition-colors font-mono uppercase tracking-widest text-xs">
+        <Link href="/" className="inline-flex items-center text-zinc-400 hover:text-white mb-8 transition-colors font-mono uppercase tracking-widest text-xs">
           <ArrowLeft className="w-4 h-4 mr-2" />
           Back to Marketplace
         </Link>

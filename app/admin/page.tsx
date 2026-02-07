@@ -126,7 +126,7 @@ export default function AdminDashboardPage() {
                 <AlertTriangle className="text-red-500 mb-4" size={48} />
                 <h1 className="text-2xl font-bold font-mono uppercase tracking-widest">Access Denied</h1>
                 <p className="text-gray-500 mt-2">You are not the protocol administrator.</p>
-                <Link href="/hive" className="mt-8 px-6 py-3 bg-white/5 hover:bg-white/10 border border-white/10 rounded-sm font-mono text-sm uppercase tracking-widest transition-colors">Return to Marketplace</Link>
+                <Link href="/" className="mt-8 px-6 py-3 bg-white/5 hover:bg-white/10 border border-white/10 rounded-sm font-mono text-sm uppercase tracking-widest transition-colors">Return to Marketplace</Link>
             </div>
         );
     }

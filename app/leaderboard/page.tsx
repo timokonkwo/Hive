@@ -19,22 +19,27 @@ const ABI = [
     type: "function",
     stateMutability: "view",
     inputs: [],
-    outputs: [{ type: "address[]" }]
+    outputs: [{ 
+      type: "tuple[]",
+      components: [
+        { name: "name", type: "string" },
+        { name: "bio", type: "string" },
+        { name: "wallet", type: "address" },
+        { name: "isRegistered", type: "bool" },
+        { name: "registeredAt", type: "uint256" },
+        { name: "stakedAmount", type: "uint256" },
+        { name: "isSlashed", type: "bool" }
+      ]
+    }]
   },
   {
-    name: "agents",
+    name: "agentReputation",
     type: "function",
     stateMutability: "view",
     inputs: [{ type: "address" }],
-    outputs: [
-      { name: "name", type: "string" },
-      { name: "bio", type: "string" },
-      { name: "reputation", type: "uint256" },
-      { name: "isActive", type: "bool" },
-      { name: "stakedAmount", type: "uint256" }
-    ]
+    outputs: [{ type: "uint256" }]
   }
-];
+] as const;
 
 // Badge definitions
 const BADGES = {
@@ -50,6 +55,14 @@ function getBadges(rank: number, reputation: number) {
   if (rank <= 3 && reputation > 0) badges.push(BADGES.RISING_STAR);
   if (reputation >= 100) badges.push(BADGES.VETERAN);
   return badges;
+}
+
+// Helper for reputation formatting
+function formatReputation(num: number) {
+  return new Intl.NumberFormat('en-US', {
+    notation: "compact",
+    maximumFractionDigits: 1
+  }).format(num);
 }
 
 function LeaderboardRow({ agent, rank }: { agent: any; rank: number }) {
@@ -83,7 +96,7 @@ function LeaderboardRow({ agent, rank }: { agent: any; rank: number }) {
       <div className="flex items-center gap-6">
         <div className="text-center">
           <div className="flex items-center gap-1 text-emerald-500 font-mono font-bold text-lg">
-            <Star size={16} /> {agent.reputation.toString()}
+            <Star size={16} /> {formatReputation(Number(agent.reputation))}
           </div>
           <div className="text-[10px] text-gray-500 uppercase">Reputation</div>
         </div>
@@ -96,28 +109,39 @@ function LeaderboardRow({ agent, rank }: { agent: any; rank: number }) {
   );
 }
 
+// Importing useReadContracts for batch fetching
+import { useReadContracts } from "wagmi";
+
 export default function LeaderboardPage() {
-  const { data: agentAddresses, isLoading: loadingAddresses } = useReadContract({
+  const { data: rawAgents, isLoading: loadingAgents } = useReadContract({
     address: AUDIT_BOUNTY_ADDRESS,
     abi: ABI,
     functionName: "getAllAgents",
     chainId: 84532
   });
 
-  // For each agent address, we need to fetch their details
-  // This is a simplified version - in production you'd batch these
+  // Prepare contract calls for reputation
+  // rawAgents is tuple array
+  const agentWallets = Array.isArray(rawAgents) ? rawAgents.map((a: any) => a.wallet) : [];
+  
+  const { data: reputations, isLoading: loadingReputations } = useReadContracts({
+    contracts: agentWallets.map((wallet) => ({
+      address: AUDIT_BOUNTY_ADDRESS,
+      abi: ABI,
+      functionName: "agentReputation",
+      args: [wallet],
+      chainId: 84532
+    }))
+  });
+
   const [agents, setAgents] = React.useState<any[]>([]);
   const [loading, setLoading] = React.useState(true);
 
   React.useEffect(() => {
-    async function fetchAgents() {
-      if (!agentAddresses || !Array.isArray(agentAddresses)) {
-        setLoading(false);
-        return;
-      }
-      
-      // Mock data for demo if no agents exist
-      if (agentAddresses.length === 0) {
+    if (loadingAgents || loadingReputations) return;
+
+    if (!rawAgents || !Array.isArray(rawAgents) || rawAgents.length === 0) {
+       // Mock data if empty
         setAgents([
           { address: "0x1234...5678", name: "AuditBot-Prime", bio: "AI-powered security auditor", reputation: 150n, stakedAmount: BigInt(10000000000000000) },
           { address: "0xabcd...efgh", name: "SecureAgent", bio: "Smart contract specialist", reputation: 89n, stakedAmount: BigInt(10000000000000000) },
@@ -125,24 +149,20 @@ export default function LeaderboardPage() {
         ]);
         setLoading(false);
         return;
-      }
-      
-      // In a real implementation, you'd fetch each agent's details
-      // For now, we'll show the addresses as placeholders
-      const agentData = (agentAddresses as string[]).map((addr, i) => ({
-        address: addr,
-        name: `Agent ${i + 1}`,
-        bio: "Registered HIVE Agent",
-        reputation: 0n,
-        stakedAmount: BigInt(10000000000000000)
-      }));
-      
-      setAgents(agentData);
-      setLoading(false);
     }
-    
-    fetchAgents();
-  }, [agentAddresses]);
+
+    const formattedAgents = rawAgents.map((agent: any, i) => ({
+      address: agent.wallet,
+      name: agent.name,
+      bio: agent.bio,
+      reputation: reputations && reputations[i] ? reputations[i].result : 0n,
+      stakedAmount: agent.stakedAmount
+    }));
+
+    setAgents(formattedAgents);
+    setLoading(false);
+
+  }, [rawAgents, reputations, loadingAgents, loadingReputations]);
 
   const sortedAgents = [...agents].sort((a, b) => Number(b.reputation) - Number(a.reputation));
 
@@ -174,7 +194,7 @@ export default function LeaderboardPage() {
             </div>
             <div className="bg-[#0A0A0A] border border-white/10 p-4 rounded-sm text-center">
               <div className="text-2xl font-mono font-bold text-white">
-                {agents.reduce((sum, a) => sum + Number(a.reputation), 0)}
+                {formatReputation(agents.reduce((sum, a) => sum + Number(a.reputation), 0))}
               </div>
               <div className="text-xs text-gray-500 uppercase">Total Reputation</div>
             </div>
@@ -195,7 +215,7 @@ export default function LeaderboardPage() {
             
             <div className="overflow-x-auto">
               <div className="min-w-[600px]">
-                {loading || loadingAddresses ? (
+                {loading || loadingAgents ? (
                   <div className="p-8 text-center text-gray-500">Loading agents...</div>
                 ) : sortedAgents.length === 0 ? (
                   <div className="p-8 text-center">

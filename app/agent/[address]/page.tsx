@@ -24,10 +24,19 @@ const ABI = [
     outputs: [
       { name: "name", type: "string" },
       { name: "bio", type: "string" },
-      { name: "reputation", type: "uint256" },
-      { name: "isActive", type: "bool" },
-      { name: "stakedAmount", type: "uint256" }
+      { name: "wallet", type: "address" }, // Corrected from reputation (index 2 is wallet in contract)
+      { name: "isRegistered", type: "bool" },
+      { name: "registeredAt", type: "uint256" },
+      { name: "stakedAmount", type: "uint256" },
+      { name: "isSlashed", type: "bool" }
     ]
+  },
+  {
+    name: "agentReputation",
+    type: "function",
+    stateMutability: "view",
+    inputs: [{ type: "address" }],
+    outputs: [{ type: "uint256" }]
   }
 ];
 
@@ -48,6 +57,14 @@ function getBadges(reputation: number, streak: number) {
   return badges;
 }
 
+// Helper for reputation formatting
+function formatReputation(num: number) {
+  return new Intl.NumberFormat('en-US', {
+    notation: "compact",
+    maximumFractionDigits: 1
+  }).format(num);
+}
+
 function AgentProfileContent() {
   const params = useParams();
   const searchParams = useSearchParams();
@@ -55,7 +72,7 @@ function AgentProfileContent() {
   const referrer = searchParams.get("ref");
   const [copied, setCopied] = React.useState(false);
 
-  const { data: agentData, isLoading } = useReadContract({
+  const { data: agentData, isLoading: isLoadingAgent } = useReadContract({
     address: AUDIT_BOUNTY_ADDRESS,
     abi: ABI,
     functionName: "agents",
@@ -63,11 +80,26 @@ function AgentProfileContent() {
     chainId: 84532
   });
 
+  const { data: reputationData, isLoading: isLoadingReputation } = useReadContract({
+    address: AUDIT_BOUNTY_ADDRESS,
+    abi: ABI,
+    functionName: "agentReputation",
+    args: [address as `0x${string}`],
+    chainId: 84532
+  });
+
+  const isLoading = isLoadingAgent || isLoadingReputation;
+
   // Cast agentData to tuple type for proper indexing
-  const agent = agentData as [string, string, bigint, boolean, bigint] | undefined;
+  // Struct: name, bio, wallet, isRegistered, registeredAt, stakedAmount, isSlashed
+  const agent = agentData as [string, string, string, boolean, bigint, bigint, boolean] | undefined;
+  
+  // Debug log to check actual structure
+  console.log("Agent Data from Contract:", agent);
+
 
   const streak = getStreak(address);
-  const reputation = agent ? Number(agent[2]) : 0;
+  const reputation = reputationData ? Number(reputationData) : 0;
   const badges = getBadges(reputation, streak);
 
   const referralLink = typeof window !== "undefined" 
@@ -145,12 +177,11 @@ function AgentProfileContent() {
               </div>
             </div>
           </div>
-
           {/* Stats Grid */}
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
             <div className="bg-[#0A0A0A] border border-white/10 p-4 rounded-sm text-center">
               <div className="flex items-center justify-center gap-2 text-emerald-500 font-mono font-bold text-lg md:text-2xl truncate">
-                <Star size={20} className="shrink-0" /> <span title={reputation.toString()}>{reputation.toFixed(2)}</span>
+                <Star size={20} className="shrink-0" /> <span title={reputation.toLocaleString()}>{formatReputation(reputation)}</span>
               </div>
               <div className="text-[10px] text-gray-500 uppercase mt-1">Reputation</div>
             </div>
@@ -161,8 +192,8 @@ function AgentProfileContent() {
               <div className="text-[10px] text-gray-500 uppercase mt-1">Day Streak</div>
             </div>
             <div className="bg-[#0A0A0A] border border-white/10 p-4 rounded-sm text-center">
-              <div className="text-white font-mono font-bold text-lg md:text-2xl truncate" title={formatEther(agent[4])}>
-                 {Number(formatEther(agent[4])) > 0 ? Number(formatEther(agent[4])).toFixed(4) : "0.0000"} <span className="text-sm text-gray-500">ETH</span>
+              <div className="text-white font-mono font-bold text-lg md:text-2xl truncate" title={formatEther(agent[5])}>
+                 {Number(formatEther(agent[5])) > 0 ? Number(formatEther(agent[5])).toFixed(4) : "0.0000"} <span className="text-sm text-gray-500">ETH</span>
               </div>
               <div className="text-[10px] text-gray-500 uppercase mt-1">Staked</div>
             </div>

@@ -130,20 +130,33 @@ export const Navbar = () => {
 
           {/* Auth Action */}
           {authenticated ? (
-            <div className="flex items-center gap-3 group cursor-pointer" onClick={() => logout()}>
-              <div className="text-right hidden lg:block">
-                <div className="text-xs font-bold text-white font-mono tracking-wider">
-                  {displayAddress}
+            <div className="flex items-center gap-4">
+              <Link 
+                href={`/agent/${user?.wallet?.address}`}
+                className="flex items-center gap-3 group cursor-pointer"
+              >
+                <div className="text-right hidden lg:block">
+                  <div className="text-xs font-bold text-white font-mono tracking-wider">
+                    {displayAddress}
+                  </div>
+                  <div className="text-[9px] text-gray-500 font-mono uppercase tracking-widest group-hover:text-emerald-500 transition-colors">
+                    AGENT
+                  </div>
                 </div>
-                <div className="text-[9px] text-gray-500 font-mono uppercase tracking-widest group-hover:text-emerald-500 transition-colors">
-                  AGENT
+                
+                <div className="w-9 h-9 bg-[#1A1A1A] border border-white/20 group-hover:border-emerald-500 flex items-center justify-center text-white transition-colors relative">
+                  <span className="font-mono font-bold text-xs">{user?.wallet?.address?.[2] || "A"}</span>
+                  <div className="absolute -bottom-1 -right-1 w-2 h-2 bg-emerald-500 border border-black"></div>
                 </div>
-              </div>
-              
-              <div className="w-9 h-9 bg-[#1A1A1A] border border-white/20 group-hover:border-emerald-500 flex items-center justify-center text-white transition-colors relative">
-                <span className="font-mono font-bold text-xs">{user?.wallet?.address?.[2] || "A"}</span>
-                <div className="absolute -bottom-1 -right-1 w-2 h-2 bg-emerald-500 border border-black"></div>
-              </div>
+              </Link>
+
+              <button 
+                onClick={() => logout()}
+                className="p-2 text-gray-500 hover:text-red-500 hover:bg-red-500/10 rounded-sm transition-all border border-transparent hover:border-red-500/20"
+                title="Disconnect Wallet"
+              >
+                <LogOut size={16} />
+              </button>
             </div>
           ) : (
             <div className="flex items-center gap-6">
