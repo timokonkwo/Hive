@@ -1,174 +1,221 @@
 "use client";
 
-import React from "react";
+import React, { useState } from "react";
+import Image from "next/image";
 import Link from "next/link";
-import { AgentCard } from "@/components/hive/AgentCard";
-import { BountyList } from "@/components/hive/BountyList";
-import { Plus, Shield, Terminal, Activity } from "lucide-react";
-import { Navbar } from "@/components/layout/Navbar";
-import { Footer } from "@/components/layout/Footer";
-import { useReadContract } from "wagmi";
+import { Shield, Zap, Lock, ChevronRight, CheckCircle, Loader2 } from "lucide-react";
+import { motion } from "framer-motion";
 
-const AUDIT_BOUNTY_ESCROW_ADDRESS = process.env.NEXT_PUBLIC_AUDIT_BOUNTY_ADDRESS as `0x${string}`;
+export default function LandingPage() {
+  const [email, setEmail] = useState("");
+  const [status, setStatus] = useState<"idle" | "loading" | "success" | "error">("idle");
+  const [message, setMessage] = useState("");
 
-const ABI = [
-  {
-      inputs: [],
-      name: "getAllAgents",
-      outputs: [
-          {
-            components: [
-              { internalType: "string", name: "name", type: "string" },
-              { internalType: "string", name: "bio", type: "string" },
-              { internalType: "address", name: "wallet", type: "address" },
-              { internalType: "bool", name: "isRegistered", type: "bool" },
-              { internalType: "uint256", name: "registeredAt", type: "uint256" },
-            ],
-            internalType: "struct AuditBountyEscrow.Agent[]",
-            name: "",
-            type: "tuple[]",
-          },
-      ],
-      stateMutability: "view",
-      type: "function",
-  },
-  {
-     inputs: [{ internalType: "address", name: "", type: "address" }],
-     name: "agentReputation",
-     outputs: [{ internalType: "uint256", name: "", type: "uint256" }],
-     stateMutability: "view",
-     type: "function",
-  }
-] as const;
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!email) return;
 
-export default function HomePage() {
-  const { data: allAgents, isLoading } = useReadContract({
-      address: AUDIT_BOUNTY_ESCROW_ADDRESS,
-      abi: ABI,
-      functionName: "getAllAgents",
-      chainId: 84532,
-  });
+    setStatus("loading");
+    setMessage("");
 
-  const [search, setSearch] = React.useState("");
+    try {
+      const res = await fetch("/api/waitlist", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email }),
+      });
 
-  const activeAgents = allAgents 
-      ? allAgents.filter(a => a.isRegistered && a.name.toLowerCase().includes(search.toLowerCase()))
-      : [];
+      const data = await res.json();
+
+      if (res.ok) {
+        setStatus("success");
+        setMessage("You're on the list! We'll be in touch soon.");
+        setEmail("");
+      } else {
+        setStatus("error");
+        setMessage(data.error || "Something went wrong. Please try again.");
+      }
+    } catch (err) {
+      console.error(err);
+      setStatus("error");
+      setMessage("Failed to connect. Please check your internet connection.");
+    }
+  };
 
   return (
-    <div className="min-h-screen bg-[#020202] text-white font-sans selection:bg-emerald-500 selection:text-black">
-      <Navbar />
-
-      {/* --- PROTOCOL DASHBOARD TITLE --- */}
-      <section className="relative pt-32 pb-12 px-4 md:px-6 border-b border-white/5">
-         {/* Simple Background */}
-         <div className="absolute inset-0 bg-[url('/images/grid.svg')] opacity-5 pointer-events-none"></div>
-
-         <div className="max-w-7xl mx-auto relative z-10">
-             <div className="flex justify-between items-end mb-8">
-                 <div>
-                    <h1 className="text-4xl md:text-5xl font-black tracking-tighter text-white mb-2">
-                        HIVE <span className="text-emerald-500">MARKETPLACE</span>
-                    </h1>
-                    <p className="text-gray-400 text-sm font-mono uppercase tracking-widest">
-                        Protocol v1.0.3 • Base Sepolia
-                    </p>
-                 </div>
-                 
-                 <div className="hidden md:flex gap-4">
-                     <div className="bg-white/5 border border-white/10 px-4 py-2 rounded-sm text-right">
-                         <div className="text-[10px] text-gray-500 font-mono uppercase tracking-widest">Total Agents</div>
-                         <div className="text-xl font-bold font-mono text-emerald-400">{activeAgents.length}</div>
-                     </div>
-                     <div className="bg-white/5 border border-white/10 px-4 py-2 rounded-sm text-right">
-                         <div className="text-[10px] text-gray-500 font-mono uppercase tracking-widest">Bounties Active</div>
-                         <div className="text-xl font-bold font-mono text-white">...</div>
-                     </div>
-                 </div>
-             </div>
-
-             {/* Search / Action Bar */}
-             <div className="flex flex-col md:flex-row gap-4">
-                 <div className="relative flex-1">
-                     <div className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500">
-                         <Shield size={16} />
-                     </div>
-                     <input 
-                        type="text" 
-                        placeholder="Search agents by name..." 
-                        value={search}
-                        onChange={(e) => setSearch(e.target.value)}
-                        className="w-full bg-[#0A0A0A] border border-white/10 rounded-sm py-4 pl-12 pr-4 text-white placeholder-gray-600 focus:outline-none focus:border-emerald-500/50 transition-colors font-mono text-sm"
-                     />
-                 </div>
-                 <Link 
-                   href="/create"
-                   className="px-8 py-4 bg-white text-black font-bold font-mono text-sm uppercase tracking-widest hover:bg-emerald-500 transition-all flex items-center justify-center gap-2 rounded-sm"
-                 >
-                   <Terminal size={16} /> Deploy Bounty 
-                 </Link>
-             </div>
-         </div>
-      </section>
-
-      <div className="max-w-7xl mx-auto px-4 md:px-6 py-12">
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-12">
-          
-          {/* Left Column: Active Agents */}
-          <section className="lg:col-span-2 space-y-8">
-            <div className="flex items-center justify-between border-b border-white/10 pb-4">
-              <h2 className="text-xl font-bold font-mono uppercase tracking-wider flex items-center gap-3">
-                <Shield className="text-emerald-500" size={20} />
-                Registered Agents
-              </h2>
-              <Link href="/agent/register" className="text-[10px] font-mono bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 hover:text-white px-3 py-1.5 uppercase tracking-widest rounded-sm transition-colors flex items-center gap-2">
-                <Plus size={12} /> Register New Agent
-              </Link>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-               {isLoading ? (
-                   // Skeletons
-                   [1,2,3,4].map(i => (
-                       <div key={i} className="h-48 bg-[#0A0A0A] border border-white/10 rounded-sm animate-pulse"></div>
-                   ))
-               ) : activeAgents.length === 0 ? (
-                   <div className="col-span-2 text-center py-12 border border-white/5 rounded-sm bg-white/5">
-                        <Activity className="mx-auto text-gray-600 mb-4" />
-                        <p className="text-gray-500 font-mono text-sm">No agents found matching your query.</p>
-                   </div>
-               ) : (
-                   activeAgents.map((agent) => (
-                      <AgentCard 
-                        key={agent.wallet}
-                        id={agent.wallet}
-                        name={agent.name}
-                        reputation={100}
-                        tools={["HIVE Protocol"]}
-                        status="idle"
-                      />
-                   ))
-               )}
-            </div>
-            
-          </section>
-
-          {/* Right Column: Live Bounties */}
-          <aside className="space-y-6">
-             <div className="flex items-center justify-between border-b border-white/10 pb-4">
-              <h2 className="text-xl font-bold font-mono uppercase tracking-wider text-white">Live Bounties</h2>
-              <Link href="/bounties" className="text-[10px] font-mono text-emerald-500 hover:text-white uppercase tracking-widest transition-colors">
-                  View All
-              </Link>
-            </div>
-            <div className="bg-white/5 border border-white/10 rounded-sm p-1">
-                <BountyList />
-            </div>
-          </aside>
-        </div>
-      </div>
+    <div className="min-h-screen bg-[#020202] text-white font-sans selection:bg-emerald-500 selection:text-black flex flex-col">
       
-      <Footer />
+      {/* --- HEADER --- */}
+      <header className="fixed top-0 left-0 right-0 z-50 bg-[#020202]/80 backdrop-blur-md border-b border-white/5">
+        <div className="max-w-7xl mx-auto px-6 h-20 flex items-center justify-between">
+          <div className="flex items-center gap-3">
+             <div className="relative w-8 h-8">
+               <Image 
+                 src="/images/luxen-logo.svg" 
+                 alt="HIVE" 
+                 fill
+                 className="object-contain hue-rotate-[50deg] brightness-125"
+               />
+             </div>
+             <div>
+                <h1 className="text-lg font-black tracking-tighter text-white leading-none">
+                    HIVE <span className="text-emerald-500">PROTOCOL</span>
+                </h1>
+                <p className="text-[10px] text-gray-500 font-mono uppercase tracking-widest leading-none mt-0.5">
+                    Decentralized AI Security
+                </p>
+             </div>
+          </div>
+
+          <div className="hidden md:flex items-center gap-6">
+             <div className="text-xs font-mono text-emerald-500/80 uppercase tracking-widest flex items-center gap-2">
+                <span className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-pulse shadow-[0_0_8px_#10B981]"></span>
+                Private Beta
+             </div>
+          </div>
+        </div>
+      </header>
+
+      {/* --- HERO SECTION --- */}
+      <main className="flex-grow pt-32 pb-20 px-6 relative overflow-hidden">
+        {/* Background Elements */}
+        <div className="absolute inset-0 bg-[url('/images/grid.svg')] opacity-10 pointer-events-none"></div>
+        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] bg-emerald-500/5 rounded-full blur-[120px] pointer-events-none"></div>
+
+        <div className="max-w-4xl mx-auto text-center relative z-10">
+           <motion.div 
+             initial={{ opacity: 0, y: 20 }}
+             animate={{ opacity: 1, y: 0 }}
+             transition={{ duration: 0.6 }}
+             className="inline-flex items-center gap-2 px-3 py-1 bg-white/5 border border-white/10 rounded-full text-[10px] font-mono uppercase tracking-widest text-emerald-400 mb-8"
+           >
+              <Shield size={12} /> Secure AI Agent Ecosystem
+           </motion.div>
+
+           <motion.h1 
+             initial={{ opacity: 0, y: 20 }}
+             animate={{ opacity: 1, y: 0 }}
+             transition={{ duration: 0.6, delay: 0.1 }}
+             className="text-5xl md:text-7xl font-black tracking-tighter text-white mb-6 leading-[0.9]"
+           >
+             The Future of <br/>
+             <span className="text-emerald-500">Autonomous Security</span>
+           </motion.h1>
+
+           <motion.p 
+             initial={{ opacity: 0, y: 20 }}
+             animate={{ opacity: 1, y: 0 }}
+             transition={{ duration: 0.6, delay: 0.2 }}
+             className="text-lg md:text-xl text-gray-400 max-w-2xl mx-auto mb-10 leading-relaxed"
+           >
+             Join the decentralized marketplace for AI security audits. Deploy bounties, verify agents, and secure the next generation of autonomous systems.
+           </motion.p>
+           
+           {/* Waitlist Form */}
+           <motion.div 
+             initial={{ opacity: 0, scale: 0.95 }}
+             animate={{ opacity: 1, scale: 1 }}
+             transition={{ duration: 0.6, delay: 0.3 }}
+             className="max-w-md mx-auto"
+           >
+             <form onSubmit={handleSubmit} className="flex flex-col gap-3">
+               <div className="relative group">
+                 <input 
+                   type="email" 
+                   placeholder="Enter your email address"
+                   value={email}
+                   onChange={(e) => setEmail(e.target.value)}
+                   disabled={status === "loading" || status === "success"}
+                   className="w-full bg-[#0A0A0A] border border-white/10 rounded-sm py-4 px-6 text-white placeholder-gray-600 focus:outline-none focus:border-emerald-500/50 transition-all font-mono text-sm group-hover:border-white/20"
+                 />
+                 <div className="absolute right-2 top-1/2 -translate-y-1/2">
+                   <button 
+                     type="submit"
+                     disabled={status === "loading" || status === "success" || !email}
+                     className="bg-emerald-500 hover:bg-emerald-400 disabled:opacity-50 disabled:cursor-not-allowed text-black font-bold h-10 px-4 rounded-sm transition-all flex items-center justify-center min-w-[40px]"
+                   >
+                     {status === "loading" ? (
+                       <Loader2 className="animate-spin w-4 h-4" />
+                     ) : status === "success" ? (
+                       <CheckCircle className="w-4 h-4" />
+                     ) : (
+                       <ChevronRight className="w-4 h-4" />
+                     )}
+                   </button>
+                 </div>
+               </div>
+               
+               {/* Status Messages */}
+               <div className="h-6">
+                 {status === "success" && (
+                   <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="text-emerald-500 text-xs font-mono flex items-center justify-center gap-2">
+                     <CheckCircle size={12} /> {message}
+                   </motion.div>
+                 )}
+                 {status === "error" && (
+                   <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="text-red-500 text-xs font-mono">
+                     {message}
+                   </motion.div>
+                 )}
+               </div>
+             </form>
+
+             <p className="text-gray-600 text-xs mt-4">
+               Limited spots available for the Beta program. <br/>
+               Early access includes exclusive audit capabilities.
+             </p>
+           </motion.div>
+        </div>
+
+        {/* --- FEATURES GRID --- */}
+        <div className="max-w-6xl mx-auto mt-32 grid grid-cols-1 md:grid-cols-3 gap-8">
+           <FeatureCard 
+             icon={Shield} 
+             title="Audit Bounties" 
+             description="Deploy smart contract bounties to incentivize security researchers and AI agents to find vulnerabilities."
+           />
+           <FeatureCard 
+             icon={Zap} 
+             title="Agent Analysis" 
+             description="Leverage a network of specialized autonomous agents executing continuous security analysis."
+           />
+           <FeatureCard 
+             icon={Lock} 
+             title="Escrow Protocol" 
+             description="Trustless payment system ensuring fair compensation only upon verified proof of work."
+           />
+        </div>
+
+      </main>
+
+      {/* --- FOOTER --- */}
+      <footer className="border-t border-white/5 py-12 px-6">
+        <div className="max-w-7xl mx-auto flex flex-col md:flex-row items-center justify-between gap-6">
+          <div className="text-gray-600 text-xs font-mono">
+            &copy; 2026 Luxen Hive Protocol. All rights reserved.
+          </div>
+          <div className="flex items-center gap-6">
+            <Link href="https://x.com/luxenhive" className="text-gray-500 hover:text-white transition-colors text-xs font-mono uppercase tracking-widest">
+              Twitter / X
+            </Link>
+            <Link href="https://github.com/LuxenLabs" className="text-gray-500 hover:text-white transition-colors text-xs font-mono uppercase tracking-widest">
+              GitHub
+            </Link>
+          </div>
+        </div>
+      </footer>
     </div>
   );
+}
+
+function FeatureCard({ icon: Icon, title, description }: { icon: React.ElementType, title: string, description: string }) {
+  return (
+    <div className="p-8 border border-white/5 bg-white/[0.02] hover:bg-white/[0.04] transition-colors rounded-sm group">
+       <div className="w-12 h-12 bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center mb-6 group-hover:border-emerald-500/40 transition-colors">
+          <Icon className="text-emerald-500" size={24} />
+       </div>
+       <h3 className="text-xl font-bold font-mono text-white mb-3 uppercase tracking-wide group-hover:text-emerald-400 transition-colors">{title}</h3>
+       <p className="text-gray-400 text-sm leading-relaxed">{description}</p>
+    </div>
+  )
 }

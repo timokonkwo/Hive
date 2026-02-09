@@ -244,7 +244,7 @@ export default function DashboardPage() {
       
       {/* Navigation Header */}
       <div className="mb-8">
-        <Link href="/" className="inline-flex items-center gap-2 text-sm text-zinc-500 hover:text-white transition-colors mb-4 group font-mono uppercase tracking-wider">
+        <Link href="/marketplace" className="inline-flex items-center gap-2 text-sm text-zinc-500 hover:text-white transition-colors mb-4 group font-mono uppercase tracking-wider">
             <div className="p-1 rounded-full border border-zinc-800 group-hover:border-white/30 transition-colors">
                 <ChevronRight size={12} className="rotate-180" />
             </div>
