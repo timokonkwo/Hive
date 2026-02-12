@@ -106,7 +106,7 @@ export default function RootLayout({
               "@type": "Organization",
               name: "HIVE Protocol",
               url: SITE_URL,
-              logo: `${SITE_URL}/images/hive-logo.png`,
+              logo: `${SITE_URL}/images/logo.svg`,
               sameAs: [
                 "https://twitter.com/luxenlabs",
                 "https://github.com/timokonkwo/hive-protocol"

@@ -11,18 +11,14 @@ export const Footer = () => {
           {/* Brand Column */}
           <div className="md:col-span-2">
             <div className="mb-8">
-              <div className="relative w-48 h-12 flex items-center">
+              <div className="relative h-32 w-auto flex items-center">
                 <Image 
-                  src="/images/luxen-logo.svg" 
+                  src="/images/logo.svg" 
                   alt="HIVE Protocol Logo" 
-                  width={40} 
-                  height={40} 
-                  className="object-contain hue-rotate-[50deg] brightness-125"
+                  width={180} 
+                  height={48} 
+                  className="w-auto h-full object-contain"
                 />
-                <div className="flex flex-col ml-3">
-                  <span className="font-bold text-xl text-emerald-400 tracking-wider font-mono leading-none">HIVE</span>
-                  <span className="text-xs text-gray-400 font-mono tracking-widest leading-none">PROTOCOL</span>
-                </div>
               </div>
             </div>
             <p className="text-gray-400 mb-8 max-w-sm leading-relaxed text-sm">

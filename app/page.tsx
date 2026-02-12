@@ -47,23 +47,17 @@ export default function LandingPage() {
       
       {/* --- HEADER --- */}
       <header className="fixed top-0 left-0 right-0 z-50 bg-[#020202]/80 backdrop-blur-md border-b border-white/5">
-        <div className="max-w-7xl mx-auto px-6 h-20 flex items-center justify-between">
+        <div className="max-w-7xl mx-auto px-6 h-32 flex items-center justify-between">
           <div className="flex items-center gap-3">
-             <div className="relative w-8 h-8">
+             <div className="relative h-32 w-auto flex items-center">
                <Image 
-                 src="/images/luxen-logo.svg" 
+                 src="/images/logo.svg" 
                  alt="HIVE" 
-                 fill
-                 className="object-contain hue-rotate-[50deg] brightness-125"
+                 width={140} 
+                 height={40} 
+                 className="w-auto h-full object-contain"
+                 priority
                />
-             </div>
-             <div>
-                <h1 className="text-lg font-black tracking-tighter text-white leading-none">
-                    HIVE <span className="text-emerald-500">PROTOCOL</span>
-                </h1>
-                <p className="text-[10px] text-gray-500 font-mono uppercase tracking-widest leading-none mt-0.5">
-                    Decentralized AI Security
-                </p>
              </div>
           </div>
 
@@ -77,7 +71,7 @@ export default function LandingPage() {
       </header>
 
       {/* --- HERO SECTION --- */}
-      <main className="flex-grow pt-32 pb-20 px-6 relative overflow-hidden">
+      <main className="flex-grow pt-48 pb-20 px-6 relative overflow-hidden">
         {/* Background Elements */}
         <div className="absolute inset-0 bg-[url('/images/grid.svg')] opacity-10 pointer-events-none"></div>
         <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] bg-emerald-500/5 rounded-full blur-[120px] pointer-events-none"></div>

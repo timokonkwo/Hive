@@ -57,27 +57,20 @@ export const Navbar = () => {
       {/* Top Status Bar */}
       <div className="h-[2px] w-full bg-gradient-to-r from-emerald-900/50 via-emerald-500/50 to-emerald-900/50"></div>
 
-      <div className="max-w-7xl mx-auto px-4 md:px-6 h-16 flex items-center justify-between">
+      <div className="max-w-7xl mx-auto px-4 md:px-6 h-24 flex items-center justify-between">
         
         {/* Left: Brand & Status */}
         <div className="flex items-center gap-6">
           <Link href="/" className="hover:opacity-80 transition-opacity flex items-center gap-2 group">
-            <div className="relative w-8 h-8 flex items-center justify-center transition-transform group-hover:scale-105">
+            <div className="relative h-20 w-auto flex items-center justify-center transition-transform group-hover:scale-105">
               <Image 
-                src="/images/luxen-logo.svg" 
+                src="/images/logo.svg" 
                 alt="HIVE Protocol" 
-                width={32} 
-                height={32} 
-                className="w-full h-full object-contain hue-rotate-[50deg] brightness-125"
+                width={140} 
+                height={40} 
+                className="w-auto h-full object-contain"
+                priority
               />
-            </div>
-            <div className="flex flex-col">
-              <span className="font-bold text-sm tracking-wider font-mono leading-none text-emerald-400">
-                HIVE
-              </span>
-              <span className="text-[10px] text-gray-500 font-mono tracking-widest leading-none">
-                PROTOCOL
-              </span>
             </div>
           </Link>
           
