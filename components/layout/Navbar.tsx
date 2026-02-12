@@ -62,12 +62,12 @@ export const Navbar = () => {
         {/* Left: Brand & Status */}
         <div className="flex items-center gap-6">
           <Link href="/" className="hover:opacity-80 transition-opacity flex items-center gap-2 group">
-            <div className="relative h-20 w-auto flex items-center justify-center transition-transform group-hover:scale-105">
+            <div className="relative h-[60px] w-auto flex items-center justify-center transition-transform group-hover:scale-105">
               <Image 
                 src="/images/logo.svg" 
                 alt="HIVE Protocol" 
-                width={140} 
-                height={40} 
+                width={105} 
+                height={30} 
                 className="w-auto h-full object-contain"
                 priority
               />
