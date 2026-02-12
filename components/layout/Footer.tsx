@@ -11,12 +11,12 @@ export const Footer = () => {
           {/* Brand Column */}
           <div className="md:col-span-2">
             <div className="mb-8">
-              <div className="relative h-32 w-auto flex items-center">
+              <div className="relative h-24 w-auto flex items-center">
                 <Image 
                   src="/images/logo.svg" 
                   alt="HIVE Protocol Logo" 
-                  width={180} 
-                  height={48} 
+                  width={135} 
+                  height={36} 
                   className="w-auto h-full object-contain"
                 />
               </div>

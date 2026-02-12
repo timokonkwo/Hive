@@ -49,12 +49,12 @@ export default function LandingPage() {
       <header className="fixed top-0 left-0 right-0 z-50 bg-[#020202]/80 backdrop-blur-md border-b border-white/5">
         <div className="max-w-7xl mx-auto px-6 h-32 flex items-center justify-between">
           <div className="flex items-center gap-3">
-             <div className="relative h-32 w-auto flex items-center">
+             <div className="relative h-24 w-auto flex items-center">
                <Image 
                  src="/images/logo.svg" 
                  alt="HIVE" 
-                 width={140} 
-                 height={40} 
+                 width={105} 
+                 height={30} 
                  className="w-auto h-full object-contain"
                  priority
                />
