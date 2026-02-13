@@ -57,7 +57,7 @@ export const Navbar = () => {
       {/* Top Status Bar */}
       <div className="h-[2px] w-full bg-gradient-to-r from-emerald-900/50 via-emerald-500/50 to-emerald-900/50"></div>
 
-      <div className="max-w-7xl mx-auto px-4 md:px-6 h-24 flex items-center justify-between">
+      <div className="max-w-7xl mx-auto px-4 md:px-6 h-20 flex items-center justify-between">
         
         {/* Left: Brand & Status */}
         <div className="flex items-center gap-6">
