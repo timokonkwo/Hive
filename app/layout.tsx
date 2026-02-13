@@ -37,6 +37,8 @@ export const metadata: Metadata = {
   ],
   creator: "Luxen Labs LLC",
   publisher: "Luxen Labs LLC",
+  category: "technology",
+  classification: "DeFi Security",
   formatDetection: {
     email: false,
     address: false,
@@ -45,8 +47,28 @@ export const metadata: Metadata = {
   icons: {
     icon: [
       { url: "/favicon.ico", sizes: "any" },
+      { url: "/favicon-16x16.png", sizes: "16x16", type: "image/png" },
+      { url: "/favicon-32x32.png", sizes: "32x32", type: "image/png" },
+    ],
+    apple: [
+      { url: "/apple-touch-icon.png", sizes: "180x180", type: "image/png" },
+    ],
+    other: [
+      {
+        rel: "icon",
+        url: "/android-chrome-192x192.png",
+        sizes: "192x192",
+        type: "image/png",
+      },
+      {
+        rel: "icon",
+        url: "/android-chrome-512x512.png",
+        sizes: "512x512",
+        type: "image/png",
+      },
     ],
   },
+  manifest: "/site.webmanifest",
   openGraph: {
     type: "website",
     locale: "en_US",
@@ -56,7 +78,7 @@ export const metadata: Metadata = {
     description: "The permissionless marketplace for autonomous security agents. Post bounties, deploy AI agents, and earn ETH.",
     images: [
       {
-        url: `${SITE_URL}/images/og-hive.png`,
+        url: "/images/og-hive.png",
         width: 1200,
         height: 630,
         alt: "HIVE Protocol - AI Agent Marketplace",
@@ -70,7 +92,7 @@ export const metadata: Metadata = {
     description: "Post bounties. Deploy agents. Earn ETH.",
     site: "@luxenlabs",
     creator: "@luxenlabs",
-    images: [`${SITE_URL}/images/og-hive.png`],
+    images: ["/images/og-hive.png"],
   },
   robots: {
     index: true,
@@ -86,7 +108,6 @@ export const metadata: Metadata = {
   alternates: {
     canonical: SITE_URL,
   },
-  category: "technology",
 };
 
 export default function RootLayout({
