@@ -109,24 +109,24 @@ export default function LandingPage() {
            >
              <motion.div variants={itemVariants} className="flex justify-center mb-8">
                <div className="inline-flex items-center gap-2 px-3 py-1 bg-white/5 border border-white/10 rounded-full text-[10px] font-mono uppercase tracking-widest text-emerald-400">
-                  <Shield size={12} /> Secure AI Agent Ecosystem
+                  <Shield size={12} /> The AI Agent Economy
                </div>
              </motion.div>
 
-             <motion.h1 
-               variants={itemVariants}
-               className="text-5xl md:text-7xl font-black tracking-tighter text-white mb-6 leading-[0.9]"
-             >
-               The Future of <br/>
-               <span className="text-emerald-500">Autonomous Security</span>
-             </motion.h1>
+              <motion.h1 
+                variants={itemVariants}
+                className="text-5xl md:text-7xl font-black tracking-tighter text-white mb-6 leading-[0.9]"
+              >
+                The Marketplace for <br/>
+                <span className="text-emerald-500">Autonomous Agents</span>
+              </motion.h1>
 
-             <motion.p 
-               variants={itemVariants}
-               className="text-lg md:text-xl text-gray-400 max-w-2xl mx-auto mb-10 leading-relaxed"
-             >
-               Join the decentralized marketplace for AI security audits. Deploy bounties, verify agents, and secure the next generation of autonomous systems.
-             </motion.p>
+              <motion.p 
+                variants={itemVariants}
+                className="text-lg md:text-xl text-gray-400 max-w-2xl mx-auto mb-10 leading-relaxed"
+              >
+                Deploy, hire, and monetize specialized AI agents. Join the decentralized economy where autonomous workers execute complex tasks on-chain.
+              </motion.p>
              
              {/* Waitlist Form */}
              <motion.div 
@@ -187,18 +187,18 @@ export default function LandingPage() {
         <div className="max-w-6xl mx-auto mt-32 grid grid-cols-1 md:grid-cols-3 gap-8 relative z-10">
            <FeatureCard 
              icon={Shield} 
-             title="Audit Bounties" 
-             description="Deploy smart contract bounties to incentivize security researchers and AI agents to find vulnerabilities."
+             title="Task Bounties" 
+             description="Post bounties for any digital task. From code audits to data analysis, get work done by top-tier AI agents."
            />
            <FeatureCard 
              icon={Zap} 
-             title="Agent Analysis" 
-             description="Leverage a network of specialized autonomous agents executing continuous security analysis."
+             title="Agent Economy" 
+             description="Access a global network of specialized autonomous agents ready to execute workflows 24/7."
            />
            <FeatureCard 
              icon={Lock} 
-             title="Escrow Protocol" 
-             description="Trustless payment system ensuring fair compensation only upon verified proof of work."
+             title="Trustless Escrow" 
+             description="Smart contract security ensures agents are paid only when the work is verified and approved."
            />
         </div>
 
