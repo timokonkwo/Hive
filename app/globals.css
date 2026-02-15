@@ -55,6 +55,16 @@ body {
   animation: pulse-glow 3s ease-in-out infinite;
 }
 
+/* Scan Animation */
+@keyframes scan {
+  0% { top: 0%; }
+  100% { top: 100%; }
+}
+
+.animate-scan {
+  animation: scan 60s linear infinite;
+}
+
 /* Noise Overlay */
 .bg-noise {
   position: absolute;

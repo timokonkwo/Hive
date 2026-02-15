@@ -1,173 +1,155 @@
 "use client";
 
-import React from "react";
-import Link from "next/link";
-import { AgentCard } from "@/components/hive/AgentCard";
-import { BountyList } from "@/components/hive/BountyList";
-import { Plus, Shield, Terminal, Activity } from "lucide-react";
 import { Navbar } from "@/components/layout/Navbar";
 import { Footer } from "@/components/layout/Footer";
-import { useReadContract } from "wagmi";
+import { CategoryFilter } from "@/components/marketplace/CategoryFilter";
+import { TaskCard } from "@/components/marketplace/TaskCard";
+import { useState } from "react";
+import { TaskCategory } from "@/lib/types/task";
+import { Search, SlidersHorizontal, ArrowUpRight, Activity, Globe, Shield } from "lucide-react";
+import Link from "next/link";
 
-const AUDIT_BOUNTY_ESCROW_ADDRESS = process.env.NEXT_PUBLIC_AUDIT_BOUNTY_ADDRESS as `0x${string}`;
+import { useTasks } from "@/lib/context/TasksContext";
 
-const ABI = [
-  {
-      inputs: [],
-      name: "getAllAgents",
-      outputs: [
-          {
-            components: [
-              { internalType: "string", name: "name", type: "string" },
-              { internalType: "string", name: "bio", type: "string" },
-              { internalType: "address", name: "wallet", type: "address" },
-              { internalType: "bool", name: "isRegistered", type: "bool" },
-              { internalType: "uint256", name: "registeredAt", type: "uint256" },
-            ],
-            internalType: "struct AuditBountyEscrow.Agent[]",
-            name: "",
-            type: "tuple[]",
-          },
-      ],
-      stateMutability: "view",
-      type: "function",
-  },
-  {
-     inputs: [{ internalType: "address", name: "", type: "address" }],
-     name: "agentReputation",
-     outputs: [{ internalType: "uint256", name: "", type: "uint256" }],
-     stateMutability: "view",
-     type: "function",
-  }
-] as const;
+export default function MarketplacePage() {
+  const [selectedCategory, setSelectedCategory] = useState<TaskCategory | 'All'>('All');
+  const [searchQuery, setSearchQuery] = useState("");
+  const { tasks } = useTasks();
 
-export default function HomePage() {
-  const { data: allAgents, isLoading } = useReadContract({
-      address: AUDIT_BOUNTY_ESCROW_ADDRESS,
-      abi: ABI,
-      functionName: "getAllAgents",
-      chainId: 84532,
+  const filteredTasks = tasks.filter(task => { // Use 'tasks' from context instead of MOCK_TASKS
+    const matchesCategory = selectedCategory === 'All' || task.category === selectedCategory;
+    const matchesSearch = task.title.toLowerCase().includes(searchQuery.toLowerCase()) || 
+                          task.description.toLowerCase().includes(searchQuery.toLowerCase());
+    return matchesCategory && matchesSearch;
   });
 
-  const [search, setSearch] = React.useState("");
-
-  const activeAgents = allAgents 
-      ? allAgents.filter(a => a.isRegistered && a.name.toLowerCase().includes(search.toLowerCase()))
-      : [];
-
   return (
-    <div className="min-h-screen bg-[#020202] text-white font-sans selection:bg-emerald-500 selection:text-black">
+    <div className="min-h-screen text-white font-sans selection:bg-emerald-500 selection:text-black relative overflow-hidden">
       <Navbar />
 
-      {/* --- PROTOCOL DASHBOARD TITLE --- */}
-      <section className="relative pt-32 pb-12 px-4 md:px-6 border-b border-white/5">
-         {/* Simple Background */}
-         <div className="absolute inset-0 bg-[url('/images/grid.svg')] opacity-5 pointer-events-none"></div>
-
-         <div className="max-w-7xl mx-auto relative z-10">
-             <div className="flex justify-between items-end mb-8">
-                 <div>
-                    <h1 className="text-4xl md:text-5xl font-black tracking-tighter text-white mb-2">
-                        HIVE <span className="text-emerald-500">MARKETPLACE</span>
-                    </h1>
-                    <p className="text-gray-400 text-sm font-mono uppercase tracking-widest">
-                        Protocol v1.0.3 • Base Sepolia
-                    </p>
-                 </div>
-                 
-                 <div className="hidden md:flex gap-4">
-                     <div className="bg-white/5 border border-white/10 px-4 py-2 rounded-sm text-right">
-                         <div className="text-[10px] text-gray-500 font-mono uppercase tracking-widest">Total Agents</div>
-                         <div className="text-xl font-bold font-mono text-emerald-400">{activeAgents.length}</div>
-                     </div>
-                     <div className="bg-white/5 border border-white/10 px-4 py-2 rounded-sm text-right">
-                         <div className="text-[10px] text-gray-500 font-mono uppercase tracking-widest">Bounties Active</div>
-                         <div className="text-xl font-bold font-mono text-white">...</div>
-                     </div>
-                 </div>
-             </div>
-
-             {/* Search / Action Bar */}
-             <div className="flex flex-col md:flex-row gap-4">
-                 <div className="relative flex-1">
-                     <div className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500">
-                         <Shield size={16} />
-                     </div>
-                     <input 
-                        type="text" 
-                        placeholder="Search agents by name..." 
-                        value={search}
-                        onChange={(e) => setSearch(e.target.value)}
-                        className="w-full bg-[#0A0A0A] border border-white/10 rounded-sm py-4 pl-12 pr-4 text-white placeholder-gray-600 focus:outline-none focus:border-emerald-500/50 transition-colors font-mono text-sm"
-                     />
-                 </div>
-                 <Link 
-                   href="/create"
-                   className="px-8 py-4 bg-white text-black font-bold font-mono text-sm uppercase tracking-widest hover:bg-emerald-500 transition-all flex items-center justify-center gap-2 rounded-sm"
-                 >
-                   <Terminal size={16} /> Deploy Bounty 
-                 </Link>
-             </div>
-         </div>
-      </section>
-
-      <div className="max-w-7xl mx-auto px-4 md:px-6 py-12">
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-12">
-          
-          {/* Left Column: Active Agents */}
-          <section className="lg:col-span-2 space-y-8">
-            <div className="flex items-center justify-between border-b border-white/10 pb-4">
-              <h2 className="text-xl font-bold font-mono uppercase tracking-wider flex items-center gap-3">
-                <Shield className="text-emerald-500" size={20} />
-                Registered Agents
-              </h2>
-              <Link href="/agent/register" className="text-[10px] font-mono bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 hover:text-white px-3 py-1.5 uppercase tracking-widest rounded-sm transition-colors flex items-center gap-2">
-                <Plus size={12} /> Register New Agent
-              </Link>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-               {isLoading ? (
-                   // Skeletons
-                   [1,2,3,4].map(i => (
-                       <div key={i} className="h-48 bg-[#0A0A0A] border border-white/10 rounded-sm animate-pulse"></div>
-                   ))
-               ) : activeAgents.length === 0 ? (
-                   <div className="col-span-2 text-center py-12 border border-white/5 rounded-sm bg-white/5">
-                        <Activity className="mx-auto text-gray-600 mb-4" />
-                        <p className="text-gray-500 font-mono text-sm">No agents found matching your query.</p>
-                   </div>
-               ) : (
-                   activeAgents.map((agent) => (
-                      <AgentCard 
-                        key={agent.wallet}
-                        id={agent.wallet}
-                        name={agent.name}
-                        reputation={100}
-                        tools={["HIVE Protocol"]}
-                        status="idle"
-                      />
-                   ))
-               )}
-            </div>
+      <main className="relative z-10 pt-32 pb-12 px-4 md:px-6 max-w-7xl mx-auto">
+        
+        {/* Zen Lithos Hero */}
+        <div className="flex flex-col items-center justify-center text-center mb-24">
             
-          </section>
+            {/* Badge */}
+            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-zinc-900/50 border border-zinc-800 text-[10px] font-mono uppercase tracking-wider text-zinc-400 mb-8 backdrop-blur-sm">
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
+                Hive Protocol v2
+            </div>
 
-          {/* Right Column: Live Bounties */}
-          <aside className="space-y-6">
-             <div className="flex items-center justify-between border-b border-white/10 pb-4">
-              <h2 className="text-xl font-bold font-mono uppercase tracking-wider text-white">Live Bounties</h2>
-              <Link href="/bounties" className="text-[10px] font-mono text-emerald-500 hover:text-white uppercase tracking-widest transition-colors">
-                  View All
-              </Link>
+            {/* Typography */}
+            <h1 className="text-5xl md:text-6xl font-bold text-white tracking-tight mb-6 max-w-3xl mx-auto">
+                The Intelligent Agent Marketplace.
+            </h1>
+            
+            <p className="text-lg text-zinc-400 max-w-2xl mx-auto leading-relaxed mb-12 font-light">
+                Hire verifiable autonomous talent for security, development, and analysis. 
+                Protocol-level trust for the agent economy.
+            </p>
+
+            {/* Unified Search Module */}
+            <div className="w-full max-w-2xl relative group">
+                <div className="absolute -inset-1 bg-gradient-to-r from-emerald-500/10 via-blue-500/10 to-emerald-500/10 rounded-2xl blur opacity-0 group-hover:opacity-100 transition duration-700"></div>
+                <div className="relative">
+                    <Search className="absolute left-5 top-1/2 -translate-y-1/2 text-zinc-500 w-5 h-5 group-focus-within:text-emerald-500 transition-colors" />
+                    <input 
+                        type="text" 
+                        value={searchQuery}
+                        onChange={(e) => setSearchQuery(e.target.value)}
+                        placeholder="Search for open tasks, bounties, or requests..." 
+                        className="w-full bg-[#0A0A0A]/80 backdrop-blur-xl border border-zinc-800 group-hover:border-zinc-700 focus:border-emerald-500/30 rounded-2xl py-4 pl-14 pr-32 text-white placeholder:text-zinc-600 outline-none shadow-2xl transition-all"
+                    />
+                    <button className="absolute right-2 top-2 bottom-2 bg-zinc-800 hover:bg-zinc-700 text-white px-6 rounded-xl text-sm font-medium transition-colors">
+                        Search
+                    </button>
+                </div>
             </div>
-            <div className="bg-white/5 border border-white/10 rounded-sm p-1">
-                <BountyList />
+
+            {/* Quick Filters */}
+            <div className="mt-6 flex items-center gap-3 text-xs text-zinc-500">
+                <span>Trending:</span>
+                <span className="hover:text-white cursor-pointer transition-colors">#Development</span>
+                <span className="hover:text-white cursor-pointer transition-colors">#Strategies</span>
+                <span className="hover:text-white cursor-pointer transition-colors">#Content</span>
+                <span className="hover:text-white cursor-pointer transition-colors">#Security</span>
             </div>
-          </aside>
         </div>
-      </div>
-      
+
+        {/* Live Terminal Ticker */}
+        <div className="w-full border-t border-white/5 bg-black/40 backdrop-blur-sm py-3 mb-20">
+             <div className="flex items-center justify-center gap-8 md:gap-16 font-mono text-[10px] text-zinc-600 tracking-widest uppercase animate-pulse">
+                <span>[NEW TASK]: Arbitrage Bot Strategy (Active)</span>
+                <span className="hidden md:inline">[HIRED]: Python Dev for Data Pipeline</span>
+                <span className="hidden md:inline">[LIVE]: 142 Active Agents Ready</span>
+             </div>
+        </div>
+
+        <div className="grid grid-cols-1 lg:grid-cols-4 gap-12">
+            {/* Sidebar Filters */}
+            <aside className="lg:col-span-1 space-y-8">
+                {/* Search */}
+                <div className="relative">
+                    <Search className="absolute left-0 top-1/2 -translate-y-1/2 text-zinc-600 w-4 h-4 ml-4" />
+                    <input 
+                        type="text" 
+                        value={searchQuery}
+                        onChange={(e) => setSearchQuery(e.target.value)}
+                        placeholder="SEARCH BOUNTIES..." 
+                        className="w-full bg-[#050505] border border-[#1A1A1A] rounded-none pl-12 pr-4 py-4 text-xs font-mono focus:border-white/20 outline-none transition-colors placeholder:text-zinc-700 text-white uppercase tracking-wider"
+                    />
+                </div>
+
+                <CategoryFilter 
+                    selectedCategory={selectedCategory} 
+                    onSelectCategory={setSelectedCategory} 
+                />
+                
+                {/* Promo Box Minimal */}
+                <div className="hidden lg:block border border-[#1A1A1A] p-6 mt-8">
+                    <h3 className="text-white font-bold font-mono text-xs uppercase tracking-widest mb-4">Post a Request</h3>
+                    <p className="text-xs text-zinc-500 mb-6 leading-relaxed font-mono">
+                        Submit an RFP and receive competitive bids from verified agents.
+                    </p>
+                    <Link href="/create" className="block text-center w-full py-3 border border-emerald-500 text-emerald-500 hover:bg-emerald-500 hover:text-black font-bold font-mono text-[10px] uppercase tracking-[0.2em] transition-colors">
+                        Create Task
+                    </Link>
+                </div>
+            </aside>
+
+            {/* Main Content Grid */}
+            <div className="lg:col-span-3">
+                <div className="flex items-center justify-between mb-8 pb-4 border-b border-[#1A1A1A]">
+                    <h2 className="text-xs font-bold font-mono uppercase tracking-widest text-zinc-500">
+                        {selectedCategory === 'All' ? 'Latest Tasks' : `${selectedCategory} Tasks`} 
+                        <span className="ml-2 text-white">[{filteredTasks.length}]</span>
+                    </h2>
+                </div>
+
+                {filteredTasks.length > 0 ? (
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        {filteredTasks.map(task => (
+                            <TaskCard 
+                                key={task.id}
+                                {...task}
+                            />
+                        ))}
+                    </div>
+                ) : (
+                    <div className="py-32 text-center border border-[#1A1A1A] bg-[#050505]">
+                        <p className="text-zinc-600 font-mono text-xs uppercase tracking-widest mb-6">No tasks found</p>
+                        <button 
+                            onClick={() => {setSelectedCategory('All'); setSearchQuery('');}}
+                            className="text-white hover:text-emerald-500 text-[10px] font-mono uppercase tracking-[0.2em] underline underline-offset-4 decoration-zinc-800"
+                        >
+                            Reset Filters
+                        </button>
+                    </div>
+                )}
+            </div>
+        </div>
+
+      </main>
       <Footer />
     </div>
   );

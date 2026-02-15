@@ -57,6 +57,7 @@ contract AuditBountyEscrowV2 is Ownable, ReentrancyGuard {
     // --- Events ---
     
     event BountyCreated(uint256 indexed bountyId, address indexed client, uint256 amount, string codeUri);
+    event BountyFunded(uint256 indexed bountyId, address indexed client, uint256 amount);
     event WorkSubmitted(uint256 indexed bountyId, address indexed agent, string reportUri);
     event BountyFinalized(uint256 indexed bountyId, address indexed agent, uint256 agentPayout, uint256 protocolFee, bool isValid);
     event BountyRefunded(uint256 indexed bountyId, address indexed client, uint256 amount);
@@ -97,6 +98,46 @@ contract AuditBountyEscrowV2 is Ownable, ReentrancyGuard {
         });
 
         emit BountyCreated(bountyCounter, msg.sender, msg.value, _codeUri);
+    }
+
+    /**
+     * @notice Create a new audit request (RFP) without immediate funding
+     * @param _codeUri The IPFS URI of the code/requirements
+     */
+    function createRequest(string memory _codeUri) external nonReentrant {
+        require(bytes(_codeUri).length > 0, "Code URI is required");
+
+        bountyCounter++;
+        
+        bounties[bountyCounter] = Bounty({
+            client: msg.sender,
+            amount: 0, // No funds initially
+            codeUri: _codeUri,
+            isOpen: true,
+            assignedAgent: address(0),
+            reportUri: "",
+            createdAt: block.timestamp
+        });
+
+        emit BountyCreated(bountyCounter, msg.sender, 0, _codeUri);
+    }
+
+    /**
+     * @notice Fund an existing bounty/request
+     * @param _bountyId The ID of the bounty to fund
+     */
+    function fundBounty(uint256 _bountyId) external payable nonReentrant {
+        Bounty storage bounty = bounties[_bountyId];
+        require(bounty.isOpen, "Bounty is not open");
+        require(bounty.client == msg.sender, "Only client can fund");
+        require(msg.value > 0, "Amount must be greater than 0");
+
+        bounty.amount += msg.value;
+        
+        // Optional: Emit an event for funding (using BountyRefunded signature logic or new event)
+        // For now, we reuse BountyCreated? No, that implies creation. 
+        // We probably need a BountyFunded event.
+        emit BountyFunded(_bountyId, msg.sender, msg.value);
     }
 
     /**

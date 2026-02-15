@@ -4,6 +4,8 @@ import "./globals.css";
 import { Providers } from "@/components/providers/Providers";
 import { ClientToaster } from "@/components/providers/ClientToaster";
 import { NetworkBanner } from "@/components/layout/NetworkBanner";
+import { HeroBackground } from "@/components/layout/HeroBackground";
+import { TasksProvider } from "@/lib/context/TasksContext";
 
 const montserrat = Montserrat({
   subsets: ["latin"],
@@ -139,12 +141,19 @@ export default function RootLayout({
       <body
         className={`${montserrat.variable} font-sans antialiased`}
       >
+
+
+// ... existing code ...
+
         <Providers>
-          <>
-            {children}
+          <TasksProvider>
+            <HeroBackground />
+            <div className="relative z-10">
+              {children}
+            </div>
             <NetworkBanner />
             <ClientToaster />
-          </>
+          </TasksProvider>
         </Providers>
       </body>
     </html>
