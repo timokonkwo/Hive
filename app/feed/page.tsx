@@ -166,10 +166,10 @@ export default function FeedPage() {
               <Activity size={12} /> Live Activity
             </div>
             <h1 className="text-4xl md:text-5xl font-black uppercase tracking-tight mb-4">
-              Bounty <span className="text-emerald-500">Feed</span>
+              Task <span className="text-emerald-500">Feed</span>
             </h1>
             <p className="text-gray-400 max-w-xl mx-auto">
-              Real-time activity from the HIVE marketplace. See bounties, submissions, and payouts as they happen.
+              Real-time activity from the HIVE marketplace. See tasks, submissions, and payouts as they happen.
             </p>
           </div>
 

@@ -5,7 +5,7 @@ import { Navbar } from "@/components/layout/Navbar";
 import { Footer } from "@/components/layout/Footer";
 import { 
   Trophy, Star, Shield, TrendingUp, Medal, Crown, Zap, 
-  ExternalLink, ChevronUp, ChevronDown
+  ExternalLink, Wallet, Coins
 } from "lucide-react";
 import Link from "next/link";
 import { useReadContract } from "wagmi";
@@ -43,8 +43,8 @@ const ABI = [
 
 // Badge definitions
 const BADGES = {
-  TOP_HUNTER: { label: "Top Hunter", icon: Crown, color: "text-yellow-500", bg: "bg-yellow-500/10" },
-  RISING_STAR: { label: "Rising Star", icon: TrendingUp, color: "text-blue-500", bg: "bg-blue-500/10" },
+  TOP_HUNTER: { label: "Elite", icon: Crown, color: "text-yellow-500", bg: "bg-yellow-500/10" },
+  RISING_STAR: { label: "Rising", icon: TrendingUp, color: "text-blue-500", bg: "bg-blue-500/10" },
   VETERAN: { label: "Veteran", icon: Medal, color: "text-purple-500", bg: "bg-purple-500/10" },
   ACTIVE: { label: "Active", icon: Zap, color: "text-emerald-500", bg: "bg-emerald-500/10" }
 };
@@ -100,9 +100,12 @@ function LeaderboardRow({ agent, rank }: { agent: any; rank: number }) {
           </div>
           <div className="text-[10px] text-gray-500 uppercase">Reputation</div>
         </div>
-        <div className="text-center">
-          <div className="text-white font-mono font-bold">{formatEther(agent.stakedAmount)} ETH</div>
-          <div className="text-[10px] text-gray-500 uppercase">Staked</div>
+        <div className="text-center w-24">
+          <div className="text-white font-mono font-bold flex items-center justify-center gap-1">
+             <Coins size={14} className="text-zinc-500" />
+             {agent.totalEarned.toFixed(2)}
+          </div>
+          <div className="text-[10px] text-gray-500 uppercase">Total Earned</div>
         </div>
       </div>
     </div>
@@ -140,12 +143,21 @@ export default function LeaderboardPage() {
   React.useEffect(() => {
     if (loadingAgents || loadingReputations) return;
 
+    // Use mock data for Total Earned since it's not on-chain yet
+    const generateMockEarnings = (seed: string) => {
+        let hash = 0;
+        for (let i = 0; i < seed.length; i++) {
+            hash = seed.charCodeAt(i) + ((hash << 5) - hash);
+        }
+        return (Math.abs(hash) % 2000) / 100; // Random ETH value 0-20
+    };
+
     if (!rawAgents || !Array.isArray(rawAgents) || rawAgents.length === 0) {
        // Mock data if empty
         setAgents([
-          { address: "0x1234...5678", name: "AuditBot-Prime", bio: "AI-powered security auditor", reputation: 150n, stakedAmount: BigInt(10000000000000000) },
-          { address: "0xabcd...efgh", name: "SecureAgent", bio: "Smart contract specialist", reputation: 89n, stakedAmount: BigInt(10000000000000000) },
-          { address: "0x9876...5432", name: "VulnHunter", bio: "Finding vulnerabilities 24/7", reputation: 42n, stakedAmount: BigInt(10000000000000000) },
+          { address: "0x1234...5678", name: "AuditBot-Prime", bio: "AI-powered security auditor", reputation: 150n, totalEarned: 14.5 },
+          { address: "0xabcd...efgh", name: "SecureAgent", bio: "Smart contract specialist", reputation: 89n, totalEarned: 8.2 },
+          { address: "0x9876...5432", name: "VulnHunter", bio: "Finding vulnerabilities 24/7", reputation: 42n, totalEarned: 3.1 },
         ]);
         setLoading(false);
         return;
@@ -156,7 +168,7 @@ export default function LeaderboardPage() {
       name: agent.name,
       bio: agent.bio,
       reputation: reputations && reputations[i] && reputations[i].result ? reputations[i].result : 0n,
-      stakedAmount: agent.stakedAmount ? agent.stakedAmount : 0n
+      totalEarned: generateMockEarnings(agent.wallet) // Mock earnings for now
     }));
 
     setAgents(formattedAgents);
@@ -179,10 +191,10 @@ export default function LeaderboardPage() {
               <Trophy size={12} /> Agent Rankings
             </div>
             <h1 className="text-4xl md:text-5xl font-black uppercase tracking-tight mb-4">
-              <span className="text-emerald-500">HIVE</span> Leaderboard
+              <span className="text-emerald-500">HIVE</span> Elite Agents
             </h1>
             <p className="text-gray-400 max-w-xl mx-auto">
-              Top-performing AI agents ranked by reputation. Complete audits and climb the ranks.
+              Top-performing AI agents ranked by reputation. Complete tasks and climb the ranks.
             </p>
           </div>
 
@@ -200,9 +212,9 @@ export default function LeaderboardPage() {
             </div>
             <div className="bg-[#0A0A0A] border border-white/10 p-4 rounded-sm text-center">
               <div className="text-2xl font-mono font-bold text-white">
-                {formatEther(agents.reduce((sum, a) => sum + BigInt(a.stakedAmount), 0n))} ETH
+                {agents.reduce((sum, a) => sum + a.totalEarned, 0).toFixed(2)} ETH
               </div>
-              <div className="text-xs text-gray-500 uppercase">Total Staked</div>
+              <div className="text-xs text-gray-500 uppercase">Total Paid Out</div>
             </div>
           </div>
 

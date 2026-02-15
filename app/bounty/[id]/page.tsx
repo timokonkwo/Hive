@@ -1,15 +1,17 @@
 "use client";
 
-import React from "react";
+import React, { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import { Navbar } from "@/components/layout/Navbar";
 import { Footer } from "@/components/layout/Footer";
 import { useReadContract, usePublicClient, useWriteContract } from "wagmi";
 import { formatEther, parseAbiItem } from "viem";
-import { Loader2, ArrowLeft, Shield, CheckCircle, Clock, FileCode, UploadCloud, User, FileKey, ExternalLink } from "lucide-react";
+import { Loader2, ArrowLeft, Shield, CheckCircle, Clock, FileCode, UploadCloud, User, FileKey, ExternalLink, Tag } from "lucide-react";
 import Link from "next/link";
 import { useAuth } from "@/hooks/useAuth";
 import { toast } from "sonner";
+import { parseMetadata } from "@/lib/ipfs";
+import { TaskMetadata } from "@/lib/types/task";
 
 const AUDIT_BOUNTY_ESCROW_ADDRESS = process.env.NEXT_PUBLIC_AUDIT_BOUNTY_ADDRESS as `0x${string}`;
 
@@ -38,7 +40,7 @@ const ABI = [
   },
 ] as const;
 
-export default function BountyDetailsPage() {
+export default function TaskDetailsPage() {
   const params = useParams();
   const id = params.id as string;
   const bountyId = BigInt(id);
@@ -51,6 +53,23 @@ export default function BountyDetailsPage() {
     args: [bountyId],
     chainId: 84532,
   });
+
+  /* --- METADATA FETCHING --- */
+  const [metadata, setMetadata] = useState<TaskMetadata | null>(null);
+  const [loadingMetadata, setLoadingMetadata] = useState(false);
+
+  useEffect(() => {
+    if (bounty?.codeUri) {
+        setLoadingMetadata(true);
+        // The helper parseMetadata handles generic or legacy URIs
+        const meta = parseMetadata(bounty.codeUri); 
+        if (meta) {
+            setMetadata(meta);
+        }
+        setLoadingMetadata(false);
+    }
+  }, [bounty?.codeUri]);
+
 
   /* --- SUBMISSION LOGIC --- */
   const { user } = useAuth();
@@ -160,10 +179,10 @@ export default function BountyDetailsPage() {
       fetchClosedTime();
   }, [bounty, publicClient, id]);
 
-  if (isLoading) {
+  if (isLoading || (bounty && loadingMetadata)) {
       return (
           <div className="min-h-screen bg-[#020202] flex items-center justify-center">
-              <Loader2 className="w-8 h-8 animate-spin text-violet-500" />
+              <Loader2 className="w-8 h-8 animate-spin text-emerald-500" />
           </div>
       );
   }
@@ -171,49 +190,68 @@ export default function BountyDetailsPage() {
   if (!bounty || bounty.client === "0x0000000000000000000000000000000000000000") {
       return (
           <div className="min-h-screen bg-[#020202] text-white flex flex-col items-center justify-center space-y-4">
-              <h1 className="text-2xl font-bold">Bounty Not Found</h1>
+              <h1 className="text-2xl font-bold">Task Not Found</h1>
               <Link href="/" className="text-blue-500 hover:underline">Return to Marketplace</Link>
           </div>
       );
   }
 
+  // Fallback title if metadata fails or is legacy
+  const displayTitle = metadata?.title || "Legacy Task";
+  const displayDesc = metadata?.description || "No description provided.";
+  const displayCategory = metadata?.category || "Other";
+
   return (
-    <div className="min-h-screen bg-[#020202] text-white font-sans selection:bg-violet-600 selection:text-white">
+    <div className="min-h-screen bg-[#020202] text-white font-sans selection:bg-emerald-600 selection:text-white">
       <Navbar />
 
       <main className="pt-32 pb-20 px-4 md:px-6 max-w-5xl mx-auto">
         <Link href="/bounties" className="inline-flex items-center text-gray-400 hover:text-white mb-8 transition-colors font-mono text-xs uppercase tracking-widest">
             <ArrowLeft className="w-4 h-4 mr-2" />
-            Back to Bounties
+            Back to Marketplace
         </Link>
 
         {/* Header */}
         <div className="flex flex-col md:flex-row md:items-start justify-between gap-6 mb-12">
             <div>
                 <div className="flex items-center gap-3 mb-2">
-                    <h1 className="text-3xl md:text-5xl font-black text-white font-mono">BOUNTY #{id}</h1>
+                    <span className="px-2 py-1 bg-white/10 rounded text-[10px] font-mono font-bold uppercase text-emerald-400 tracking-wide">
+                        {displayCategory}
+                    </span>
+                    {metadata?.tags?.map(tag => (
+                        <span key={tag} className="px-2 py-1 bg-white/5 rounded text-[10px] font-mono font-bold uppercase text-gray-500 tracking-wide border border-white/5">
+                            {tag}
+                        </span>
+                    ))}
+                </div>
+                
+                <h1 className="text-3xl md:text-5xl font-black text-white font-mono mb-4">{displayTitle}</h1>
+
+                <div className="flex items-center gap-4 text-sm font-mono">
                     {bounty.isOpen ? (
                         bounty.assignedAgent !== "0x0000000000000000000000000000000000000000" ? (
-                            <span className="px-3 py-1 bg-yellow-500/10 text-yellow-500 border border-yellow-500/20 text-xs font-bold font-mono uppercase tracking-widest rounded-sm flex items-center gap-2">
-                                <Loader2 size={12} className="animate-spin" /> In Review
+                            <span className="px-3 py-1 bg-yellow-500/10 text-yellow-500 border border-yellow-500/20 text-xs font-bold uppercase tracking-widest rounded-sm flex items-center gap-2">
+                                <Loader2 size={12} className="animate-spin" /> In Progress
                             </span>
                         ) : (
-                            <span className="px-3 py-1 bg-emerald-500/10 text-emerald-500 border border-emerald-500/20 text-xs font-bold font-mono uppercase tracking-widest rounded-sm">
-                                Open
+                            <span className="px-3 py-1 bg-emerald-500/10 text-emerald-500 border border-emerald-500/20 text-xs font-bold uppercase tracking-widest rounded-sm">
+                                Open for Agents
                             </span>
                         )
                     ) : (
-                        <span className="px-3 py-1 bg-gray-500/10 text-gray-500 border border-gray-500/20 text-xs font-bold font-mono uppercase tracking-widest rounded-sm">
+                        <span className="px-3 py-1 bg-gray-500/10 text-gray-500 border border-gray-500/20 text-xs font-bold uppercase tracking-widest rounded-sm">
                             Closed
                         </span>
                     )}
-                </div>
-                <div className="flex items-center gap-2 text-gray-400 text-sm font-mono">
-                    <User size={14} /> Created by <span className="text-white">{bounty.client.slice(0, 6)}...{bounty.client.slice(-4)}</span>
+                    
+                    <div className="flex items-center gap-2 text-gray-400">
+                        <User size={14} /> Created by <span className="text-white">{bounty.client.slice(0, 6)}...{bounty.client.slice(-4)}</span>
+                    </div>
                 </div>
             </div>
+
             <div className="text-right">
-                <div className="text-gray-500 text-xs font-mono uppercase tracking-widest mb-1">Total Reward</div>
+                <div className="text-gray-500 text-xs font-mono uppercase tracking-widest mb-1">Reward</div>
                 <div className="text-4xl font-bold font-mono text-white flex items-center gap-2 justify-end">
                     {formatEther(bounty.amount)} <span className="text-xl text-gray-500">ETH</span>
                 </div>
@@ -223,29 +261,43 @@ export default function BountyDetailsPage() {
         {/* Content */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
             <div className="lg:col-span-2 space-y-6">
+                
+                {/* Description Box */}
                 <div className="bg-[#0A0A0A] border border-white/10 p-8 rounded-sm">
                     <h2 className="text-lg font-bold font-mono uppercase tracking-widest mb-6 flex items-center gap-2 text-white">
-                        <FileKey size={18} className="text-violet-500" /> Target Codebase
+                        <FileCode size={18} className="text-emerald-500" /> Task Description
                     </h2>
-                    
-                    <div className="bg-black p-4 rounded-sm border border-white/5 font-mono text-sm text-gray-300 break-all mb-4">
-                        {bounty.codeUri}
+                    <div className="prose prose-invert max-w-none text-sm text-gray-300 leading-relaxed whitespace-pre-wrap font-mono">
+                        {displayDesc}
                     </div>
-
-                    <a 
-                        href={bounty.codeUri.startsWith('http') ? bounty.codeUri : `https://ipfs.io/ipfs/${bounty.codeUri}`} 
-                        target="_blank" 
-                        rel="noopener noreferrer"
-                        className="inline-flex items-center gap-2 text-violet-400 hover:text-white transition-colors text-sm font-bold font-mono uppercase tracking-widest"
-                    >
-                        View Source <ExternalLink size={14} />
-                    </a>
                 </div>
+
+                {/* Target/Resource Box */}
+                {(metadata?.targetUri || (bounty.codeUri && !bounty.codeUri.startsWith("data:"))) && (
+                    <div className="bg-[#0A0A0A] border border-white/10 p-8 rounded-sm">
+                        <h2 className="text-lg font-bold font-mono uppercase tracking-widest mb-6 flex items-center gap-2 text-white">
+                            <FileKey size={18} className="text-emerald-500" /> Target Resource
+                        </h2>
+                        
+                        <div className="bg-black p-4 rounded-sm border border-white/5 font-mono text-sm text-gray-300 break-all mb-4">
+                            {metadata?.targetUri || bounty.codeUri}
+                        </div>
+
+                        <a 
+                            href={(metadata?.targetUri || bounty.codeUri).startsWith('http') ? (metadata?.targetUri || bounty.codeUri) : `https://ipfs.io/ipfs/${metadata?.targetUri || bounty.codeUri}`} 
+                            target="_blank" 
+                            rel="noopener noreferrer"
+                            className="inline-flex items-center gap-2 text-emerald-400 hover:text-white transition-colors text-sm font-bold font-mono uppercase tracking-widest"
+                        >
+                            Open Resource <ExternalLink size={14} />
+                        </a>
+                    </div>
+                )}
 
                  <div className="bg-[#0A0A0A] border border-white/10 p-8 rounded-sm">
                     <div className="flex items-center justify-between mb-6">
                         <h2 className="text-lg font-bold font-mono uppercase tracking-widest flex items-center gap-2 text-white">
-                            <Shield size={18} className="text-violet-500" /> Audit Reports
+                            <UploadCloud size={18} className="text-emerald-500" /> Deliverables
                         </h2>
                         {/* Submit Button for Agents */}
                         {bounty.isOpen && isRegisteredAgent && !isSlashed && (
@@ -253,23 +305,23 @@ export default function BountyDetailsPage() {
                                 onClick={() => setIsSubmitOpen(!isSubmitOpen)}
                                 className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white font-bold font-mono uppercase tracking-widest text-xs rounded-sm transition-colors flex items-center gap-2"
                              >
-                                 <UploadCloud size={14} /> {isSubmitOpen ? "Cancel" : "Submit Work"}
+                                 <CheckCircle size={14} /> {isSubmitOpen ? "Cancel" : "Submit Work"}
                              </button>
                         )}
                     </div>
-
+                    
                     {/* Submission Form */}
                     {isSubmitOpen && (
                         <div className="mb-8 bg-emerald-900/10 border border-emerald-500/20 p-6 rounded-sm animate-in fade-in slide-in-from-top-2">
                             <h3 className="text-emerald-400 font-bold font-mono text-sm uppercase tracking-widest mb-4">New Submission</h3>
                             <div className="space-y-4">
                                 <div>
-                                    <label className="block text-xs font-mono text-gray-500 mb-2 uppercase">Report URI (IPFS / PDF Link)</label>
+                                    <label className="block text-xs font-mono text-gray-500 mb-2 uppercase">Proof of Work URI</label>
                                     <input 
                                         type="text" 
                                         value={reportUri}
                                         onChange={(e) => setReportUri(e.target.value)}
-                                        placeholder="ipfs://..."
+                                        placeholder="ipfs://... or https://..."
                                         className="w-full bg-black border border-white/10 rounded-sm p-3 text-sm text-white font-mono focus:border-emerald-500 outline-none transition-colors"
                                     />
                                 </div>
@@ -290,9 +342,9 @@ export default function BountyDetailsPage() {
                             <div className="bg-emerald-900/10 border border-emerald-500/20 p-4 rounded-sm">
                                  <div className="flex items-center justify-between">
                                      <div>
-                                         <h3 className="text-emerald-400 font-bold text-sm mb-1">Report Submitted</h3>
+                                         <h3 className="text-emerald-400 font-bold text-sm mb-1">Work Submitted</h3>
                                          <p className="text-gray-400 text-xs font-mono">
-                                             Submitted by: {bounty.assignedAgent.slice(0,6)}...{bounty.assignedAgent.slice(-4)}
+                                             By: {bounty.assignedAgent.slice(0,6)}...{bounty.assignedAgent.slice(-4)}
                                              {bounty.assignedAgent === user?.wallet?.address && " (You)"}
                                          </p>
                                      </div>
@@ -302,16 +354,16 @@ export default function BountyDetailsPage() {
                                         rel="noopener noreferrer"
                                         className="px-4 py-2 bg-emerald-500 text-black font-bold text-xs uppercase tracking-widest rounded-sm hover:bg-emerald-400 transition-colors"
                                      >
-                                         View Report
+                                         View Proof
                                      </a>
                                  </div>
                             </div>
                         ) : (
                             <div className="bg-yellow-900/10 border border-yellow-500/20 p-6 rounded-sm text-center">
                                 <Loader2 className="w-8 h-8 text-yellow-500 mx-auto mb-3 animate-spin" />
-                                <h3 className="text-yellow-500 font-bold font-mono text-sm uppercase tracking-widest mb-1">Report Under Review</h3>
+                                <h3 className="text-yellow-500 font-bold font-mono text-sm uppercase tracking-widest mb-1">Work Under Review</h3>
                                 <p className="text-gray-500 text-xs font-mono max-w-xs mx-auto">
-                                    The assigned agent has submitted their work. The client is currently reviewing the audit report.
+                                    The agent has submitted their work. The client is currently reviewing the deliverables.
                                 </p>
                             </div>
                         )
@@ -319,14 +371,14 @@ export default function BountyDetailsPage() {
                          <div className="text-center py-8">
                              {bounty.isOpen ? (
                                 <>
-                                    <p className="text-gray-500 text-sm mb-2">No reports submitted yet.</p>
+                                    <p className="text-gray-500 text-sm mb-2">No submissions yet.</p>
                                     <div className="text-xs text-violet-500 font-mono uppercase tracking-widest animate-pulse">
-                                        Agents are analyzing...
+                                        Agents are working...
                                     </div>
                                 </>
                              ) : (
                                 <p className="text-gray-500 text-sm font-mono uppercase tracking-widest">
-                                    Bounty Closed
+                                    Task Closed
                                 </p>
                              )}
                          </div>
@@ -341,7 +393,7 @@ export default function BountyDetailsPage() {
                          <div className="flex gap-3">
                              <div className="w-2 h-2 mt-1.5 rounded-full bg-blue-500"></div>
                              <div>
-                                 <div className="text-sm font-bold text-white">Bounty Created</div>
+                                 <div className="text-sm font-bold text-white">Task Created</div>
                                  <div className="text-xs text-gray-500 font-mono">{new Date(Number(bounty.createdAt) * 1000).toLocaleString()}</div>
                              </div>
                          </div>
@@ -358,7 +410,7 @@ export default function BountyDetailsPage() {
                              <div className="flex gap-3">
                                 <div className="w-2 h-2 mt-1.5 rounded-full bg-emerald-500"></div>
                                 <div>
-                                    <div className="text-sm font-bold text-white">Report Verified</div>
+                                    <div className="text-sm font-bold text-white">Work Accepted</div>
                                     <div className="text-xs text-gray-500 font-mono">
                                         {closedAt ? new Date(closedAt).toLocaleString() : "Recently"}
                                     </div>

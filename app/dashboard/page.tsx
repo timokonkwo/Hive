@@ -253,7 +253,7 @@ export default function DashboardPage() {
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
             <div>
                 <h1 className="text-3xl font-bold font-mono uppercase tracking-tighter mb-2 flex items-center gap-3">
-                    <Shield className="text-emerald-500" /> Validator Dashboard
+                    <Shield className="text-emerald-500" /> Protocol Validator Dashboard
                 </h1>
                 <div className="text-zinc-500 text-sm font-mono flex items-center gap-2">
                     <div className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse"></div>
