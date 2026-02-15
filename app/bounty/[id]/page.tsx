@@ -85,6 +85,13 @@ export default function BountyDetailsPage() {
   const isRegisteredAgent = agentData?.[3] === true;
   const isSlashed = agentData?.[6] === true;
 
+  // Access Control: Only Client and Assigned Agent can view report while open
+  const isClient = bounty && user?.wallet?.address?.toLowerCase() === bounty.client.toLowerCase();
+  const isAssignedAgent = bounty && user?.wallet?.address?.toLowerCase() === bounty.assignedAgent.toLowerCase();
+  
+  // If bounty isOpen, restricted. If not isOpen (Closed/Paid), public.
+  const canViewReport = isClient || isAssignedAgent || (bounty && !bounty.isOpen);
+
   const [reportUri, setReportUri] = React.useState("");
   const [isSubmitOpen, setIsSubmitOpen] = React.useState(false);
 
@@ -279,25 +286,35 @@ export default function BountyDetailsPage() {
                     )}
                     
                     {bounty.reportUri ? (
-                        <div className="bg-emerald-900/10 border border-emerald-500/20 p-4 rounded-sm">
-                             <div className="flex items-center justify-between">
-                                 <div>
-                                     <h3 className="text-emerald-400 font-bold text-sm mb-1">Report Submitted</h3>
-                                     <p className="text-gray-400 text-xs font-mono">
-                                         Submitted by: {bounty.assignedAgent.slice(0,6)}...{bounty.assignedAgent.slice(-4)}
-                                         {bounty.assignedAgent === user?.wallet?.address && " (You)"}
-                                     </p>
+                        canViewReport ? (
+                            <div className="bg-emerald-900/10 border border-emerald-500/20 p-4 rounded-sm">
+                                 <div className="flex items-center justify-between">
+                                     <div>
+                                         <h3 className="text-emerald-400 font-bold text-sm mb-1">Report Submitted</h3>
+                                         <p className="text-gray-400 text-xs font-mono">
+                                             Submitted by: {bounty.assignedAgent.slice(0,6)}...{bounty.assignedAgent.slice(-4)}
+                                             {bounty.assignedAgent === user?.wallet?.address && " (You)"}
+                                         </p>
+                                     </div>
+                                     <a 
+                                        href={bounty.reportUri.startsWith('http') ? bounty.reportUri : `https://ipfs.io/ipfs/${bounty.reportUri}`}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className="px-4 py-2 bg-emerald-500 text-black font-bold text-xs uppercase tracking-widest rounded-sm hover:bg-emerald-400 transition-colors"
+                                     >
+                                         View Report
+                                     </a>
                                  </div>
-                                 <a 
-                                    href={bounty.reportUri.startsWith('http') ? bounty.reportUri : `https://ipfs.io/ipfs/${bounty.reportUri}`}
-                                    target="_blank"
-                                    rel="noopener noreferrer"
-                                    className="px-4 py-2 bg-emerald-500 text-black font-bold text-xs uppercase tracking-widest rounded-sm hover:bg-emerald-400 transition-colors"
-                                 >
-                                     View Report
-                                 </a>
-                             </div>
-                        </div>
+                            </div>
+                        ) : (
+                            <div className="bg-yellow-900/10 border border-yellow-500/20 p-6 rounded-sm text-center">
+                                <Loader2 className="w-8 h-8 text-yellow-500 mx-auto mb-3 animate-spin" />
+                                <h3 className="text-yellow-500 font-bold font-mono text-sm uppercase tracking-widest mb-1">Report Under Review</h3>
+                                <p className="text-gray-500 text-xs font-mono max-w-xs mx-auto">
+                                    The assigned agent has submitted their work. The client is currently reviewing the audit report.
+                                </p>
+                            </div>
+                        )
                     ) : (
                          <div className="text-center py-8">
                              {bounty.isOpen ? (

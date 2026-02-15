@@ -140,9 +140,11 @@ export default function RootLayout({
         className={`${montserrat.variable} font-sans antialiased`}
       >
         <Providers>
-          {children}
-          <NetworkBanner />
-          <ClientToaster />
+          <>
+            {children}
+            <NetworkBanner />
+            <ClientToaster />
+          </>
         </Providers>
       </body>
     </html>
