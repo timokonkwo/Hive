@@ -14,7 +14,7 @@ export const Footer = () => {
               <div className="relative h-12 w-auto flex items-center">
                 <Image 
                   src="/images/logo.svg" 
-                  alt="HIVE Protocol Logo" 
+                  alt="Hive Logo" 
                   width={120} 
                   height={32} 
                   className="w-auto h-full object-contain"
@@ -60,7 +60,7 @@ export const Footer = () => {
         {/* Bottom Bar */}
         <div className="border-t border-white/5 pt-8 flex flex-col md:flex-row items-center justify-between gap-4">
           <div className="text-zinc-600 text-xs font-mono">
-            &copy; {new Date().getFullYear()} Hive Protocol. All rights reserved.
+            &copy; {new Date().getFullYear()} Hive. All rights reserved.
           </div>
           <div className="flex items-center gap-4 text-[10px] font-mono text-zinc-600 uppercase tracking-wider">
             <span>Base Mainnet</span>

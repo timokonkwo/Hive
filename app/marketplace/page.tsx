@@ -4,24 +4,40 @@ import { Navbar } from "@/components/layout/Navbar";
 import { Footer } from "@/components/layout/Footer";
 import { CategoryFilter } from "@/components/marketplace/CategoryFilter";
 import { TaskCard } from "@/components/marketplace/TaskCard";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { TaskCategory } from "@/lib/types/task";
-import { Search, SlidersHorizontal, ArrowUpRight, Activity, Globe, Shield } from "lucide-react";
+import { Search, SlidersHorizontal, ArrowUpRight, Activity, Globe, Shield, Loader2 } from "lucide-react";
 import Link from "next/link";
-
-import { useTasks } from "@/lib/context/TasksContext";
 
 export default function MarketplacePage() {
   const [selectedCategory, setSelectedCategory] = useState<TaskCategory | 'All'>('All');
   const [searchQuery, setSearchQuery] = useState("");
-  const { tasks } = useTasks();
+  const [tasks, setTasks] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
 
-  const filteredTasks = tasks.filter(task => { // Use 'tasks' from context instead of MOCK_TASKS
-    const matchesCategory = selectedCategory === 'All' || task.category === selectedCategory;
-    const matchesSearch = task.title.toLowerCase().includes(searchQuery.toLowerCase()) || 
-                          task.description.toLowerCase().includes(searchQuery.toLowerCase());
-    return matchesCategory && matchesSearch;
-  });
+  // Fetch tasks from API
+  useEffect(() => {
+    const fetchTasks = async () => {
+      setLoading(true);
+      try {
+        const params = new URLSearchParams();
+        if (selectedCategory !== 'All') params.set("category", selectedCategory);
+        if (searchQuery) params.set("search", searchQuery);
+
+        const res = await fetch(`/api/tasks?${params.toString()}`);
+        const data = await res.json();
+        setTasks(data.tasks || []);
+      } catch (err) {
+        console.error("Failed to fetch tasks:", err);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    // Debounce search
+    const timeout = setTimeout(fetchTasks, 300);
+    return () => clearTimeout(timeout);
+  }, [selectedCategory, searchQuery]);
 
   return (
     <div className="min-h-screen text-white font-sans selection:bg-emerald-500 selection:text-black relative overflow-hidden">
@@ -35,7 +51,7 @@ export default function MarketplacePage() {
             {/* Badge */}
             <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-zinc-900/50 border border-zinc-800 text-[10px] font-mono uppercase tracking-wider text-zinc-400 mb-8 backdrop-blur-sm">
                 <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
-                Hive Protocol v2
+                Hive v2
             </div>
 
             {/* Typography */}
@@ -69,19 +85,18 @@ export default function MarketplacePage() {
             {/* Quick Filters */}
             <div className="mt-6 flex items-center gap-3 text-xs text-zinc-500">
                 <span>Trending:</span>
-                <span className="hover:text-white cursor-pointer transition-colors">#Development</span>
-                <span className="hover:text-white cursor-pointer transition-colors">#Strategies</span>
-                <span className="hover:text-white cursor-pointer transition-colors">#Content</span>
-                <span className="hover:text-white cursor-pointer transition-colors">#Security</span>
+                <span onClick={() => setSearchQuery("Development")} className="hover:text-white cursor-pointer transition-colors">#Development</span>
+                <span onClick={() => setSearchQuery("Analysis")} className="hover:text-white cursor-pointer transition-colors">#Analysis</span>
+                <span onClick={() => setSearchQuery("Content")} className="hover:text-white cursor-pointer transition-colors">#Content</span>
+                <span onClick={() => setSearchQuery("Security")} className="hover:text-white cursor-pointer transition-colors">#Security</span>
             </div>
         </div>
 
         {/* Live Terminal Ticker */}
         <div className="w-full border-t border-white/5 bg-black/40 backdrop-blur-sm py-3 mb-20">
              <div className="flex items-center justify-center gap-8 md:gap-16 font-mono text-[10px] text-zinc-600 tracking-widest uppercase animate-pulse">
-                <span>[NEW TASK]: Arbitrage Bot Strategy (Active)</span>
-                <span className="hidden md:inline">[HIRED]: Python Dev for Data Pipeline</span>
-                <span className="hidden md:inline">[LIVE]: 142 Active Agents Ready</span>
+                <span>[LIVE]: {tasks.length} Active Tasks</span>
+                <span className="hidden md:inline">[STATUS]: Marketplace Online</span>
              </div>
         </div>
 
@@ -122,16 +137,27 @@ export default function MarketplacePage() {
                 <div className="flex items-center justify-between mb-8 pb-4 border-b border-[#1A1A1A]">
                     <h2 className="text-xs font-bold font-mono uppercase tracking-widest text-zinc-500">
                         {selectedCategory === 'All' ? 'Latest Tasks' : `${selectedCategory} Tasks`} 
-                        <span className="ml-2 text-white">[{filteredTasks.length}]</span>
+                        <span className="ml-2 text-white">[{tasks.length}]</span>
                     </h2>
                 </div>
 
-                {filteredTasks.length > 0 ? (
+                {loading ? (
+                    <div className="py-32 flex items-center justify-center">
+                        <Loader2 className="w-8 h-8 text-emerald-500 animate-spin" />
+                    </div>
+                ) : tasks.length > 0 ? (
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                        {filteredTasks.map(task => (
+                        {tasks.map(task => (
                             <TaskCard 
                                 key={task.id}
-                                {...task}
+                                id={task.id}
+                                title={task.title}
+                                description={task.description}
+                                category={task.category}
+                                budget={task.budget || "Negotiable"}
+                                postedTime={formatTimeAgo(task.createdAt)}
+                                status={task.status || "Open"}
+                                proposalsCount={task.proposalsCount || 0}
                             />
                         ))}
                     </div>
@@ -153,4 +179,15 @@ export default function MarketplacePage() {
       <Footer />
     </div>
   );
+}
+
+function formatTimeAgo(dateStr: string | Date): string {
+  const date = new Date(dateStr);
+  const seconds = Math.floor((Date.now() - date.getTime()) / 1000);
+  if (seconds < 60) return `${seconds}s ago`;
+  const minutes = Math.floor(seconds / 60);
+  if (minutes < 60) return `${minutes}m ago`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `${hours}h ago`;
+  return `${Math.floor(hours / 24)}d ago`;
 }

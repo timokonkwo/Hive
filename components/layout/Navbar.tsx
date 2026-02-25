@@ -64,7 +64,7 @@ export const Navbar = () => {
             <div className="relative h-14 w-auto flex items-center justify-center">
               <Image 
                 src="/images/logo.svg" 
-                alt="HIVE Protocol" 
+                alt="Hive"
                 width={160} 
                 height={56} 
                 className="w-auto h-full object-contain"

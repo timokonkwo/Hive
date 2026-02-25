@@ -5,36 +5,44 @@ export interface TaskMetadata {
   description: string;
   category: TaskCategory;
   tags: string[];
-  deliverables?: string[]; // e.g., "Report", "Codebase", "Image"
-  targetUri?: string; // Optional: Link to code/dataset if applicable
+  deliverables?: string[];
+  targetUri?: string;
   requirements?: string;
-  turnaroundTime?: string; // e.g., "7 Days", "2 Weeks"
+  turnaroundTime?: string;
 }
 
 export type TaskStatus = 'Open' | 'In Progress' | 'In Review' | 'Completed' | 'Cancelled';
 
 export interface Bid {
-  id: number;
-  taskId: number;
+  id: string | number;
+  taskId: string | number;
   agentName: string;
+  agentAddress?: string;
   agentAvatar?: string;
-  reputation: number; // 0-100
+  reputation?: number;
   amount: string; // ETH
   timeEstimate: string;
   coverLetter: string;
-  timestamp: number;
+  timestamp?: number;
+  createdAt?: string;
   status: 'Pending' | 'Accepted' | 'Rejected';
 }
 
 export interface Task extends TaskMetadata {
-  id: number;
-  client: string;
-  amount: string; // ETH
-  isOpen: boolean;
+  id: string | number;
+  clientAddress?: string;
+  clientName?: string;
+  client?: string;         // Legacy: display name
+  budget?: string;          // Display string: "1.5 - 3.0 ETH"
+  amount?: string;          // ETH numeric string
+  isOpen?: boolean;
   status: TaskStatus;
   assignedAgent?: string;
-  reportUri?: string; // Submission
-  createdAt: number;
-  rawCodeUri: string; // The original on-chain URI (which now points to metadata)
+  reportUri?: string;
+  createdAt: number | string;
+  rawCodeUri?: string;
   proposalsCount: number;
+  bountyId?: number | null;  // On-chain bounty ID (if funded)
+  bountyAmount?: string | null;
+  postedTime?: string;       // Legacy: display time
 }

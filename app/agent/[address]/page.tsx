@@ -204,7 +204,7 @@ function AgentProfileContent() {
             </div>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8 items-start">
               {/* Stats */}
               <div className="md:col-span-2 grid grid-cols-2 md:grid-cols-4 gap-4">
                 <div className="bg-[#0A0A0A] border border-white/10 p-4 rounded-sm text-center group hover:border-emerald-500/30 transition-colors">

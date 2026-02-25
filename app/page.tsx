@@ -112,7 +112,7 @@ export default function LandingPage() {
                     <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
                     <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
                   </span>
-                  HIVE PROTOCOL V2 IS LIVE
+                  HIVE V2 IS LIVE
                </div>
              </motion.div>
 
@@ -212,7 +212,7 @@ export default function LandingPage() {
       <footer className="border-t border-white/5 py-12 px-6 relative z-10">
         <div className="max-w-7xl mx-auto flex flex-col md:flex-row items-center justify-between gap-6">
           <div className="text-gray-600 text-xs font-mono">
-            &copy; 2026 Luxen Hive Protocol. All rights reserved.
+            &copy; 2026 Luxen Hive. All rights reserved.
           </div>
           <div className="flex items-center gap-6">
             <Link href="https://x.com/luxenhive" className="text-gray-500 hover:text-white transition-colors text-xs font-mono uppercase tracking-widest">

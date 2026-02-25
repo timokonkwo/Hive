@@ -12,13 +12,10 @@ import { toast } from "sonner";
 import { Navbar } from "@/components/layout/Navbar";
 import { Footer } from "@/components/layout/Footer";
 import { TaskCategory, TaskMetadata } from "@/lib/types/task";
-import { uploadMetadata } from "@/lib/ipfs";
-import { useTasks } from "@/lib/context/TasksContext";
 
 export default function CreateTaskPage() {
   const router = useRouter();
-  const { authenticated, login } = useAuth();
-  const { addTask } = useTasks();
+  const { authenticated, login, user } = useAuth();
   
   // Mock transaction states since we are moving to RFP model (no immediate eth)
   const [isPending, setIsPending] = useState(false);
@@ -39,37 +36,32 @@ export default function CreateTaskPage() {
     setIsPending(true);
 
     try {
-      const newTask: TaskMetadata & any = {
-        id: Date.now(), // Simple ID generation
-        title: formData.title!,
-        description: formData.description!,
-        category: (formData.category as TaskCategory) || 'Development',
-        tags: formData.tags || [],
-        budget: formData.budget, // Keep budget string for display
-        amount: formData.budget, // Map to amount
-        postedTime: "Just now",
-        status: "Open",
-        proposalsCount: 0,
-        client: "You (0x12..34)", // Mock client
-        isOpen: true,
-        createdAt: Date.now(),
-        requirements: formData.requirements,
-        targetUri: formData.targetUri
-      };
+      // Get wallet address from auth
+      const walletAddress = user?.wallet?.address || "0x0000";
 
-      // 1. Upload Metadata to IPFS (Mock)
-      const metadataUri = await uploadMetadata(newTask);
-      console.log("Metadata uploaded:", metadataUri);
+      const response = await fetch("/api/tasks", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          title: formData.title,
+          description: formData.description,
+          category: formData.category || "Development",
+          tags: formData.tags || [],
+          requirements: formData.requirements || "",
+          budget: `${formData.budget} ETH`,
+          clientAddress: walletAddress,
+          clientName: `${walletAddress.slice(0, 6)}...${walletAddress.slice(-4)}`,
+        }),
+      });
 
-      // 2. Add to Context (Client Persistence)
-      addTask(newTask);
+      if (!response.ok) {
+        const err = await response.json();
+        throw new Error(err.error || "Failed to create task");
+      }
 
-      // 3. Simulate On-Chain "Request" creation
-      setTimeout(() => {
-        setIsPending(false);
-        setIsSuccess(true);
-        toast.success("Request Posted!", { description: "Agents will now be able to bid on your task." });
-      }, 1000);
+      setIsPending(false);
+      setIsSuccess(true);
+      toast.success("Request Posted!", { description: "Agents will now be able to bid on your task." });
 
     } catch (error: any) {
       setIsPending(false);
@@ -133,7 +125,7 @@ export default function CreateTaskPage() {
                       <button
                         key={cat.id}
                         onClick={() => {
-                            setFormData({ ...formData, category: cat.id });
+                            setFormData({ ...formData, category: cat.id as TaskCategory });
                             setStep(2);
                         }}
                         className={`p-4 border rounded-sm text-left transition-all group hover:bg-zinc-800/50 flex items-start gap-4 ${

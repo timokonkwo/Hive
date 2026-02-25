@@ -5,7 +5,7 @@ import { Providers } from "@/components/providers/Providers";
 import { ClientToaster } from "@/components/providers/ClientToaster";
 import { NetworkBanner } from "@/components/layout/NetworkBanner";
 import { HeroBackground } from "@/components/layout/HeroBackground";
-import { TasksProvider } from "@/lib/context/TasksContext";
+
 
 const montserrat = Montserrat({
   subsets: ["latin"],
@@ -13,13 +13,13 @@ const montserrat = Montserrat({
 });
 
 const SITE_URL = "https://hive.luxenlabs.com";
-const SITE_NAME = "HIVE Protocol";
+const SITE_NAME = "Hive";
 
 export const metadata: Metadata = {
   metadataBase: new URL(SITE_URL),
   title: {
-    default: "HIVE Protocol | Decentralized AI Agent Marketplace",
-    template: "%s | HIVE Protocol"
+    default: "Hive | Decentralized AI Agent Marketplace",
+    template: "%s | Hive"
   },
   description: "The permissionless marketplace for autonomous security agents. Post bounties, deploy AI agents, and earn ETH for smart contract audits.",
   applicationName: SITE_NAME,
@@ -76,25 +76,25 @@ export const metadata: Metadata = {
     locale: "en_US",
     url: SITE_URL,
     siteName: SITE_NAME,
-    title: "HIVE Protocol | Decentralized AI Agent Marketplace",
+    title: "Hive | Decentralized AI Agent Marketplace",
     description: "The permissionless marketplace for autonomous security agents. Post bounties, deploy AI agents, and earn ETH.",
     images: [
       {
-        url: "/images/og-hive.png",
+        url: "/og.png",
         width: 1200,
         height: 630,
-        alt: "HIVE Protocol - AI Agent Marketplace",
+        alt: "Hive - AI Agent Marketplace",
         type: "image/png",
       },
     ],
   },
   twitter: {
     card: "summary_large_image",
-    title: "HIVE Protocol | AI Agent Marketplace",
+    title: "Hive | AI Agent Marketplace",
     description: "Post bounties. Deploy agents. Earn ETH.",
     site: "@luxenlabs",
     creator: "@luxenlabs",
-    images: ["/images/og-hive.png"],
+    images: ["/og.png"],
   },
   robots: {
     index: true,
@@ -127,7 +127,7 @@ export default function RootLayout({
             __html: JSON.stringify({
               "@context": "https://schema.org",
               "@type": "Organization",
-              name: "HIVE Protocol",
+              name: "Hive",
               url: SITE_URL,
               logo: `${SITE_URL}/images/logo.svg`,
               sameAs: [
@@ -146,14 +146,12 @@ export default function RootLayout({
 // ... existing code ...
 
         <Providers>
-          <TasksProvider>
             <HeroBackground />
             <div className="relative z-10">
               {children}
             </div>
             <NetworkBanner />
             <ClientToaster />
-          </TasksProvider>
         </Providers>
       </body>
     </html>

@@ -5,7 +5,7 @@ import { Shield, Code, Cpu, PenTool, Layout, Search, Megaphone, Scale, Languages
 import Link from "next/link";
 
 interface TaskCardProps {
-  id: number;
+  id: string | number;
   title: string;
   description: string;
   category: TaskCategory;

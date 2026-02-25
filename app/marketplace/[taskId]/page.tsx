@@ -1,47 +1,125 @@
 "use client";
 
-import { use, useState } from "react";
+import { use, useState, useEffect } from "react";
 import { Navbar } from "@/components/layout/Navbar";
 import { Footer } from "@/components/layout/Footer";
-import { useTasks } from "@/lib/context/TasksContext";
-import { ArrowLeft, Shield, Clock, Coins, CheckCircle, Upload, X } from "lucide-react";
+import { useAuth } from "@/hooks/useAuth";
+import { ArrowLeft, Shield, Clock, Coins, CheckCircle, Upload, X, Loader2 } from "lucide-react";
 import Link from "next/link";
-import { notFound } from "next/navigation";
 import { toast } from "sonner";
 
-// Use 'use' to unwrap params in Next.js 15
-// cast to any to avoid type issues with next15 params/async
 export default function TaskDetailsPage({ params }: { params: Promise<{ taskId: string }> }) {
-  // Unwrap params using hook
   const resolvedParams = use(params);
-  const taskId = parseInt(resolvedParams.taskId);
-  const { tasks, bids: allBids } = useTasks();
-  const task = tasks.find(t => t.id === taskId);
-  
+  const taskId = resolvedParams.taskId;
+  const { authenticated, login, user } = useAuth();
+
+  const [task, setTask] = useState<any>(null);
+  const [bids, setBids] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
   const [isBidModalOpen, setIsBidModalOpen] = useState(false);
   const [bidAmount, setBidAmount] = useState("");
   const [bidDays, setBidDays] = useState("");
   const [coverLetter, setCoverLetter] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  if (!task) {
-    notFound();
-  }
-
-  const bids = allBids.filter(b => b.taskId === taskId);
+  // Fetch task + bids from API
+  useEffect(() => {
+    async function fetchData() {
+      setLoading(true);
+      try {
+        const [taskRes, bidsRes] = await Promise.all([
+          fetch(`/api/tasks/${taskId}`),
+          fetch(`/api/tasks/${taskId}/bids`),
+        ]);
+        if (taskRes.ok) {
+          setTask(await taskRes.json());
+        }
+        if (bidsRes.ok) {
+          const data = await bidsRes.json();
+          setBids(data.bids || []);
+        }
+      } catch (err) {
+        console.error("Failed to fetch task:", err);
+      } finally {
+        setLoading(false);
+      }
+    }
+    fetchData();
+  }, [taskId]);
 
   const handleBidSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!authenticated) {
+      login();
+      return;
+    }
+
     setIsSubmitting(true);
-    
-    // Simulate network delay
-    setTimeout(() => {
-        setIsSubmitting(false);
-        setIsBidModalOpen(false);
-        toast.success("Proposal Submitted", { description: "The client has been notified of your bid." });
-        setBidAmount("");
-        setCoverLetter("");
-    }, 1500);
+    try {
+      const walletAddress = user?.wallet?.address || "0x0000";
+
+      const res = await fetch(`/api/tasks/${taskId}/bids`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          agentAddress: walletAddress,
+          agentName: `${walletAddress.slice(0, 6)}...${walletAddress.slice(-4)}`,
+          amount: bidAmount,
+          timeEstimate: `${bidDays} days`,
+          coverLetter,
+        }),
+      });
+
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.error || "Failed to submit bid");
+      }
+
+      const newBid = await res.json();
+      setBids((prev) => [newBid, ...prev]);
+      setIsBidModalOpen(false);
+      toast.success("Proposal Submitted", { description: "The client has been notified of your bid." });
+      setBidAmount("");
+      setBidDays("");
+      setCoverLetter("");
+    } catch (error: any) {
+      toast.error("Error", { description: error.message });
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="min-h-screen text-white font-sans">
+        <Navbar />
+        <main className="pt-32 pb-24 px-4 md:px-6 max-w-7xl mx-auto flex items-center justify-center">
+          <Loader2 className="w-8 h-8 text-emerald-500 animate-spin" />
+        </main>
+      </div>
+    );
+  }
+
+  if (!task) {
+    return (
+      <div className="min-h-screen text-white font-sans">
+        <Navbar />
+        <main className="pt-32 pb-24 px-4 md:px-6 max-w-7xl mx-auto text-center">
+          <h1 className="text-2xl font-bold mb-4">Task Not Found</h1>
+          <Link href="/marketplace" className="text-emerald-500 hover:underline">Back to Marketplace</Link>
+        </main>
+      </div>
+    );
+  }
+
+  const formatTimeAgo = (dateStr: string) => {
+    const seconds = Math.floor((Date.now() - new Date(dateStr).getTime()) / 1000);
+    if (seconds < 60) return `${seconds}s ago`;
+    const minutes = Math.floor(seconds / 60);
+    if (minutes < 60) return `${minutes}m ago`;
+    const hours = Math.floor(minutes / 60);
+    if (hours < 24) return `${hours}h ago`;
+    return `${Math.floor(hours / 24)}d ago`;
   };
 
   return (
@@ -76,10 +154,10 @@ export default function TaskDetailsPage({ params }: { params: Promise<{ taskId: 
                     <h1 className="text-3xl md:text-4xl font-bold text-white mb-4 leading-tight">{task.title}</h1>
                     <div className="flex items-center gap-6 text-sm text-zinc-500 font-mono">
                         <span className="flex items-center gap-2">
-                            <Clock className="w-4 h-4" /> Posted {task.postedTime}
+                            <Clock className="w-4 h-4" /> Posted {formatTimeAgo(task.createdAt)}
                         </span>
                         <span>•</span>
-                        <span>ID: #{task.id.toString().padStart(4, '0')}</span>
+                        <span>ID: {task.id.slice(0, 8)}...</span>
                     </div>
                 </div>
 
@@ -91,7 +169,7 @@ export default function TaskDetailsPage({ params }: { params: Promise<{ taskId: 
                     </p>
                 </div>
 
-                {/* Requirements (Mock) */}
+                {/* Requirements */}
                 <div>
                     <h3 className="text-sm font-bold font-mono uppercase tracking-widest text-zinc-400 mb-4">Requirements & Scope</h3>
                     <ul className="space-y-3 text-zinc-400">
@@ -103,7 +181,7 @@ export default function TaskDetailsPage({ params }: { params: Promise<{ taskId: 
                         ) : (
                              <li className="flex items-start gap-3">
                                 <CheckCircle className="w-5 h-5 text-emerald-500 shrink-0 mt-0.5" />
-                                <span>Standard Hive Protocol verification required.</span>
+                                <span>Standard Hive verification required.</span>
                             </li>
                         )}
                          <li className="flex items-start gap-3">
@@ -114,16 +192,18 @@ export default function TaskDetailsPage({ params }: { params: Promise<{ taskId: 
                 </div>
 
                 {/* Tags */}
+                {task.tags?.length > 0 && (
                 <div>
                      <h3 className="text-sm font-bold font-mono uppercase tracking-widest text-zinc-400 mb-4">Tech Stack</h3>
                      <div className="flex flex-wrap gap-2">
-                        {task.tags?.map(tag => (
+                        {task.tags.map((tag: string) => (
                             <span key={tag} className="px-3 py-1.5 bg-zinc-900 border border-zinc-800 rounded text-xs text-zinc-400">
                                 {tag}
                             </span>
                         ))}
                      </div>
                 </div>
+                )}
 
                 {/* Proposals List */}
                 <div className="pt-12 border-t border-zinc-900">
@@ -139,12 +219,7 @@ export default function TaskDetailsPage({ params }: { params: Promise<{ taskId: 
                                         {bid.agentName.substring(0,2).toUpperCase()}
                                     </div>
                                     <div>
-                                        <h4 className="font-bold text-white flex items-center gap-2">
-                                            {bid.agentName}
-                                            <span className="px-1.5 py-0.5 bg-emerald-500/10 text-emerald-500 rounded text-[10px] border border-emerald-500/20">
-                                                Rep: {bid.reputation}
-                                            </span>
-                                        </h4>
+                                        <h4 className="font-bold text-white">{bid.agentName}</h4>
                                         <p className="text-xs text-zinc-500 mt-1">{bid.timeEstimate} • {bid.amount} ETH</p>
                                     </div>
                                 </div>
@@ -172,7 +247,7 @@ export default function TaskDetailsPage({ params }: { params: Promise<{ taskId: 
                             <span className="text-xs font-mono uppercase text-zinc-500">Budget</span>
                             <span className="text-xl font-bold text-white font-mono flex items-center gap-2">
                                 <Coins className="w-4 h-4 text-emerald-500" />
-                                {task.amount} ETH
+                                {task.budget || "Negotiable"}
                             </span>
                         </div>
                         
@@ -183,7 +258,7 @@ export default function TaskDetailsPage({ params }: { params: Promise<{ taskId: 
                             Submit Proposal
                         </button>
                         <p className="text-[10px] text-center text-zinc-500">
-                            Requires 0.05 ETH staked bond.
+                            No upfront cost required.
                         </p>
                     </div>
 
@@ -193,18 +268,8 @@ export default function TaskDetailsPage({ params }: { params: Promise<{ taskId: 
                         <div className="flex items-center gap-3 mb-4">
                             <div className="w-8 h-8 rounded bg-gradient-to-br from-indigo-500 to-purple-500"></div>
                             <div>
-                                <p className="text-sm font-bold text-white">{task.client}</p>
-                                <p className="text-xs text-zinc-500">Verified Entity</p>
-                            </div>
-                        </div>
-                        <div className="grid grid-cols-2 gap-4 text-xs">
-                            <div>
-                                <p className="text-zinc-600 mb-1">Total Spent</p>
-                                <p className="text-zinc-300 font-mono">145 ETH</p>
-                            </div>
-                            <div>
-                                <p className="text-zinc-600 mb-1">Tasks Posted</p>
-                                <p className="text-zinc-300 font-mono">23</p>
+                                <p className="text-sm font-bold text-white">{task.clientName || "Anonymous"}</p>
+                                <p className="text-xs text-zinc-500">Wallet Connected</p>
                             </div>
                         </div>
                     </div>
