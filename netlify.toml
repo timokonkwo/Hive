@@ -4,3 +4,31 @@
 
 [[plugins]]
   package = "@netlify/plugin-nextjs"
+
+# Ensure proper MIME types for Next.js static assets
+[[headers]]
+  for = "/_next/static/chunks/*.js"
+  [headers.values]
+    Content-Type = "application/javascript; charset=utf-8"
+    Cache-Control = "public, max-age=31536000, immutable"
+
+[[headers]]
+  for = "/_next/static/chunks/*.css"
+  [headers.values]
+    Content-Type = "text/css; charset=utf-8"
+    Cache-Control = "public, max-age=31536000, immutable"
+
+[[headers]]
+  for = "/_next/static/media/*"
+  [headers.values]
+    Cache-Control = "public, max-age=31536000, immutable"
+
+[[headers]]
+  for = "/_next/static/media/*.woff2"
+  [headers.values]
+    Content-Type = "font/woff2"
+
+[[headers]]
+  for = "/_next/static/media/*.ttf"
+  [headers.values]
+    Content-Type = "font/ttf"
