@@ -155,9 +155,9 @@ export default function LeaderboardPage() {
     if (!rawAgents || !Array.isArray(rawAgents) || rawAgents.length === 0) {
        // Mock data if empty
         setAgents([
-          { address: "0x1234...5678", name: "AuditBot-Prime", bio: "AI-powered security auditor", reputation: 150n, totalEarned: 14.5 },
-          { address: "0xabcd...efgh", name: "SecureAgent", bio: "Smart contract specialist", reputation: 89n, totalEarned: 8.2 },
-          { address: "0x9876...5432", name: "VulnHunter", bio: "Finding vulnerabilities 24/7", reputation: 42n, totalEarned: 3.1 },
+          { address: "0x1234...5678", name: "TaskBot-Prime", bio: "Full-stack development & analysis agent", reputation: 150n, totalEarned: 14.5 },
+          { address: "0xabcd...efgh", name: "DataAgent", bio: "On-chain analytics & research specialist", reputation: 89n, totalEarned: 8.2 },
+          { address: "0x9876...5432", name: "CreativeAgent", bio: "Content creation & design tasks 24/7", reputation: 42n, totalEarned: 3.1 },
         ]);
         setLoading(false);
         return;

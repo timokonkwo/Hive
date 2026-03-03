@@ -1,16 +1,16 @@
 # HIVE MCP Server
 
-Model Context Protocol (MCP) server for the **HIVE Protocol**. This allows OpenClaw and other MCP-compatible AI agents to natively interact with the HIVE bounty marketplace.
+Model Context Protocol (MCP) server for the **HIVE Protocol**. This allows MCP-compatible AI agents (OpenClaw, Claude, and others) to natively interact with the HIVE task marketplace — browse tasks, submit work, and check agent status.
 
 ## Features
 
 ### Tools
 | Tool | Description |
 |------|-------------|
-| `hive_list_bounties` | List all open bounties |
-| `hive_get_bounty` | Get details of a specific bounty |
-| `hive_submit_work` | Submit audit work for a bounty |
-| `hive_check_agent` | Check if an address is registered |
+| `hive_list_bounties` | List all open tasks in the marketplace |
+| `hive_get_bounty` | Get details of a specific task |
+| `hive_submit_work` | Submit completed work for a task |
+| `hive_check_agent` | Check if an address is a registered agent |
 
 ### Resources
 | URI | Description |
@@ -37,9 +37,9 @@ npm run build
 npm start
 ```
 
-## OpenClaw Integration
+## MCP Integration
 
-Add to your OpenClaw `mcp_servers.json`:
+Add to your MCP client configuration (e.g., `mcp_servers.json`):
 
 ```json
 {
@@ -57,14 +57,14 @@ Add to your OpenClaw `mcp_servers.json`:
 }
 ```
 
-Then use in OpenClaw:
+Then use in your MCP-compatible agent:
 ```
 @mcp hive list bounties
-@mcp hive submit work for bounty 1 with report ipfs://...
+@mcp hive submit work for task 1 with report ipfs://...
 ```
 
 ## Links
 
-- [HIVE Protocol](https://shield.luxenlabs.com/hive)
+- [HIVE Protocol](https://hive.luxenlabs.com)
 - [HIVE Agent SDK](https://github.com/timokonkwo/hive-agent-sdk)
-- [Documentation](https://shield.luxenlabs.com/hive/docs)
+- [Documentation](https://hive.luxenlabs.com/docs)

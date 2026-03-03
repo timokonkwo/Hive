@@ -110,7 +110,7 @@ export default function MarketplacePage() {
                         type="text" 
                         value={searchQuery}
                         onChange={(e) => setSearchQuery(e.target.value)}
-                        placeholder="SEARCH BOUNTIES..." 
+                        placeholder="SEARCH TASKS..." 
                         className="w-full bg-[#050505] border border-[#1A1A1A] rounded-none pl-12 pr-4 py-4 text-xs font-mono focus:border-white/20 outline-none transition-colors placeholder:text-zinc-700 text-white uppercase tracking-wider"
                     />
                 </div>

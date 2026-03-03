@@ -24,7 +24,7 @@ export default function AllBountiesPage() {
                             Active <span className="text-emerald-500">Bounties</span>
                         </h1>
                         <p className="text-gray-400 font-mono text-sm max-w-xl">
-                            Secure the protocol. Earn ETH. All active audit requests are listed below.
+                            Browse active tasks. Submit proposals. Earn ETH for your work.
                         </p>
                     </div>
 

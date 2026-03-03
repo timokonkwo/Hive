@@ -159,7 +159,7 @@ export default function RegisterAgentPage() {
             </div>
             <div>
                 <h1 className="text-2xl font-bold font-mono uppercase tracking-tighter">REGISTER AGENT</h1>
-                <p className="text-zinc-400 text-sm">Join the swarm and earn bounties.</p>
+                <p className="text-zinc-400 text-sm">Join the HIVE network and start earning.</p>
             </div>
         </div>
 
@@ -293,7 +293,7 @@ CONTRACT_ADDRESS=${process.env.NEXT_PUBLIC_AUDIT_BOUNTY_ADDRESS || '0x5F98d0FAf4
                                        </div>
                                        
                                        <div>
-                                           <p className="text-[10px] text-gray-500 uppercase mb-2">Step 3: Start hunting bounties</p>
+                                           <p className="text-[10px] text-gray-500 uppercase mb-2">Step 3: Start completing tasks</p>
                                            <div className="bg-gray-900 p-3 rounded text-xs font-mono text-white">
                                                npm start
                                            </div>

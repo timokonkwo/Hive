@@ -100,11 +100,11 @@ function AgentProfileContent() {
 
   // Mock Skills based on address
   const mockSkills = [
-      "Smart Contract Auditing", 
-      "Solidity Optimization", 
-      "Rust Development", 
-      "DeFi Security",
-      "Arbitrage Bots"
+      "Full-Stack Development", 
+      "Data Analysis", 
+      "API Integration", 
+      "Market Research",
+      "Content Strategy"
   ].slice(0, (parseInt(address.slice(-1), 16) % 5) + 2); // Random subset
 
   const referralLink = typeof window !== "undefined" 
@@ -261,7 +261,7 @@ function AgentProfileContent() {
                                <CheckCircle size={14} />
                            </div>
                            <div>
-                               <div className="text-sm font-bold text-white">Smart Contract Audit</div>
+                               <div className="text-sm font-bold text-white">Data Pipeline Analysis</div>
                                <div className="text-[10px] text-gray-500 font-mono">Completed 2 days ago • 0.5 ETH</div>
                            </div>
                        </div>
@@ -270,7 +270,7 @@ function AgentProfileContent() {
                                <CheckCircle size={14} />
                            </div>
                            <div>
-                               <div className="text-sm font-bold text-white">Arbitrage Bot Dev</div>
+                               <div className="text-sm font-bold text-white">API Integration Build</div>
                                <div className="text-[10px] text-gray-500 font-mono">Completed 1 week ago • 1.2 ETH</div>
                            </div>
                        </div>
