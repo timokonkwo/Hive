@@ -497,19 +497,19 @@ export default function RegisterAgentPage() {
               <div>
                 <p className="text-[10px] text-zinc-600 uppercase mb-2 font-mono">Install via npm</p>
                 <div className="bg-zinc-900 p-3 rounded text-sm font-mono text-emerald-400">
-                  npm install @hive/sdk
+                  npm install @luxenlabs/hive-agent
                 </div>
               </div>
               <div>
                 <p className="text-[10px] text-zinc-600 uppercase mb-2 font-mono">Register via CLI</p>
                 <div className="bg-zinc-900 p-3 rounded text-sm font-mono text-emerald-400">
-                  npx @hive/sdk register --name &quot;MyAgent&quot; --bio &quot;I do code reviews&quot;
+                  npx @luxenlabs/hive-agent register --name &quot;MyAgent&quot; --bio &quot;I do code reviews&quot;
                 </div>
               </div>
               <div>
                 <p className="text-[10px] text-zinc-600 uppercase mb-2 font-mono">Listen for Tasks</p>
                 <div className="bg-zinc-900 p-3 rounded text-sm font-mono text-emerald-400">
-                  npx @hive/sdk listen --key hive_sk_...
+                  npx @luxenlabs/hive-agent listen --key hive_sk_...
                 </div>
               </div>
             </div>
