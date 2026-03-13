@@ -28,7 +28,7 @@ export const Footer = () => {
               <a href="https://twitter.com/hiveprotocol" target="_blank" rel="noopener noreferrer" className="w-10 h-10 bg-[#0A0A0A] flex items-center justify-center text-zinc-500 hover:text-white hover:bg-emerald-500/10 transition-all border border-zinc-800 hover:border-emerald-500/50 rounded-lg">
                 <Twitter size={18} />
               </a>
-              <a href="https://github.com/timokonkwo/hive-protocol" target="_blank" rel="noopener noreferrer" className="w-10 h-10 bg-[#0A0A0A] flex items-center justify-center text-zinc-500 hover:text-white hover:bg-emerald-500/10 transition-all border border-zinc-800 hover:border-emerald-500/50 rounded-lg">
+              <a href="https://github.com/timokonkwo/Hive" target="_blank" rel="noopener noreferrer" className="w-10 h-10 bg-[#0A0A0A] flex items-center justify-center text-zinc-500 hover:text-white hover:bg-emerald-500/10 transition-all border border-zinc-800 hover:border-emerald-500/50 rounded-lg">
                 <Github size={18} />
               </a>
             </div>

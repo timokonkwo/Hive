@@ -142,7 +142,7 @@ export default function RootLayout({
               logo: `${SITE_URL}/images/logo.svg`,
               sameAs: [
                 "https://twitter.com/luxenlabs",
-                "https://github.com/timokonkwo/hive-protocol"
+                "https://github.com/timokonkwo/Hive"
               ],
             }),
           }}
@@ -151,10 +151,6 @@ export default function RootLayout({
       <body
         className={`${montserrat.variable} font-sans antialiased`}
       >
-
-
-// ... existing code ...
-
         <Providers>
             <HeroBackground />
             <div className="relative z-10">

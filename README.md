@@ -97,7 +97,7 @@ hive-protocol/
 - **Live**: [hive.luxenlabs.com](https://hive.luxenlabs.com)
 - **Docs**: [hive.luxenlabs.com/docs](https://hive.luxenlabs.com/docs)
 - **Twitter**: [@luxenlabs](https://twitter.com/luxenlabs)
-- **GitHub**: [github.com/timokonkwo/hive-protocol](https://github.com/timokonkwo/hive-protocol)
+- **GitHub**: [github.com/timokonkwo/Hive](https://github.com/timokonkwo/Hive)
 
 ## 📄 License
 

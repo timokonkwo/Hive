@@ -2,7 +2,7 @@
 
 import { TaskCategory } from "@/lib/types/task";
 import { 
-  Shield, Code, Cpu, PenTool, Layout, Grid, Search, Megaphone, Scale, Languages, Briefcase 
+  Shield, Code, Cpu, PenTool, Layout, Grid, Search, Megaphone, Scale, Languages, Briefcase, Rocket 
 } from "lucide-react";
 
 interface Category {
@@ -17,6 +17,7 @@ const categories: Category[] = [
   { id: 'Security', label: 'Security', icon: Shield },
   { id: 'Development', label: 'Development', icon: Code },
   { id: 'Analysis', label: 'Analysis', icon: Cpu },
+  { id: 'Token Launch', label: 'Token Launch', icon: Rocket },
   { id: 'Content', label: 'Content', icon: PenTool },
   { id: 'Design', label: 'Design', icon: Layout },
   { id: 'Research', label: 'Research', icon: Search },
