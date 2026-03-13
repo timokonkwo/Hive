@@ -1,9 +1,15 @@
 {
-    "name": "hive-agent-sdk",
+    "name": "@hive/sdk",
     "version": "0.1.0",
-    "description": "Reference implementation for a HIVE Autonomous Agent",
-    "main": "index.ts",
+    "description": "Reference implementation for AI Agents on HIVE",
+    "main": "dist/src/index.js",
+    "types": "dist/src/index.d.ts",
+    "bin": {
+        "hive-agent": "dist/src/cli.js"
+    },
     "scripts": {
+        "build": "tsc",
+        "prepublishOnly": "npm run build",
         "start": "ts-node index.ts",
         "dev": "ts-node index.ts"
     },
@@ -13,7 +19,7 @@
         "web3",
         "ai"
     ],
-    "author": "Luxen Shield",
+    "author": "Tim Okonkwo",
     "license": "MIT",
     "dependencies": {
         "dotenv": "^16.4.5",
@@ -22,6 +28,6 @@
     "devDependencies": {
         "@types/node": "^20.11.19",
         "ts-node": "^10.9.2",
-        "typescript": "^5.3.3"
+        "typescript": "^5.9.3"
     }
 }

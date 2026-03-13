@@ -2,8 +2,6 @@ import {
   createPublicClient,
   createWalletClient,
   http,
-  PublicClient,
-  WalletClient,
   Account
 } from 'viem'
 import { privateKeyToAccount } from 'viem/accounts'
@@ -12,45 +10,67 @@ import { AUDIT_BOUNTY_ESCROW_ABI } from './contracts/abi'
 import type { HiveClientConfig, Agent, Bounty, TransactionResult } from './types'
 
 export class HiveClient {
-  private publicClient: any
-  private walletClient: any
-  private account: Account
-  private contractAddress: `0x${string}`
+  private publicClient?: any
+  private walletClient?: any
+  private account?: Account
+  private contractAddress?: `0x${string}`
+  public apiKey?: string
+  public baseUrl: string
 
   constructor(config: HiveClientConfig) {
-    this.contractAddress = config.contractAddress
-    this.account = privateKeyToAccount(config.privateKey as `0x${string}`)
+    this.apiKey = config.apiKey
+    this.baseUrl = config.baseUrl || 'https://hive.luxenlabs.com'
 
-    this.publicClient = createPublicClient({
-      chain: baseSepolia,
-      transport: http(config.rpcUrl)
-    })
+    if (config.contractAddress && config.privateKey && config.rpcUrl) {
+      this.contractAddress = config.contractAddress
+      this.account = privateKeyToAccount(config.privateKey as `0x${string}`)
 
-    this.walletClient = createWalletClient({
-      chain: baseSepolia,
-      transport: http(config.rpcUrl),
-      account: this.account
-    })
+      this.publicClient = createPublicClient({
+        chain: baseSepolia,
+        transport: http(config.rpcUrl)
+      })
+
+      this.walletClient = createWalletClient({
+        chain: baseSepolia,
+        transport: http(config.rpcUrl),
+        account: this.account
+      })
+    }
   }
 
-  /**
-   * Get the agent's wallet address
-   */
-  getAddress(): string {
-    return this.account.address
+  getAddress(): string | undefined {
+    return this.account?.address
   }
 
-  /**
-   * Register as an agent on the HIVE marketplace
-   */
+  // API Key Flow Methods
+  async listTasks(params?: Record<string, string>) {
+    const url = new URL('/api/tasks', this.baseUrl)
+    if (params) {
+      Object.entries(params).forEach(([k, v]) => url.searchParams.append(k, v))
+    }
+    const headers: any = {}
+    if (this.apiKey) headers['x-hive-api-key'] = this.apiKey
+    
+    const res = await fetch(url.toString(), { headers })
+    if (!res.ok) throw new Error(`HTTP ${res.status}: ${await res.text()}`)
+    return res.json()
+  }
+
+  // On-chain / Legacy Methods below
+
   async registerAgent(name: string, bio: string): Promise<TransactionResult> {
+    if (!this.walletClient || !this.publicClient || !this.contractAddress) {
+      throw new Error("On-chain configuration missing")
+    }
+    
     try {
       const hash = await this.walletClient.writeContract({
         address: this.contractAddress,
         abi: AUDIT_BOUNTY_ESCROW_ABI,
         functionName: 'registerAgent',
         args: [name, bio],
-        chain: baseSepolia
+        chain: baseSepolia,
+        account: this.account!
       })
 
       const receipt = await this.publicClient.waitForTransactionReceipt({ hash })
@@ -61,17 +81,24 @@ export class HiveClient {
     }
   }
 
-  /**
-   * Get the current agent's profile
-   */
   async getMyProfile(): Promise<Agent | null> {
+    if (this.apiKey) {
+      const res = await fetch(`${this.baseUrl}/api/agents/me`, {
+        headers: { 'x-hive-api-key': this.apiKey }
+      })
+      if (!res.ok) throw new Error('Failed to fetch profile via API')
+      return res.json()
+    }
+    
+    if (!this.account) throw new Error("No wallet or API key provided")
     return this.getAgentProfile(this.account.address)
   }
 
-  /**
-   * Get an agent's profile by address
-   */
   async getAgentProfile(address: string): Promise<Agent | null> {
+    if (!this.publicClient || !this.contractAddress) {
+      throw new Error("On-chain config missing to fetch agent by address")
+    }
+
     try {
       const [name, bio, wallet, isRegistered, registeredAt] = await this.publicClient.readContract({
         address: this.contractAddress,
@@ -103,10 +130,11 @@ export class HiveClient {
     }
   }
 
-  /**
-   * Get all registered agents
-   */
   async getAllAgents(): Promise<Agent[]> {
+    if (!this.publicClient || !this.contractAddress) {
+      throw new Error("On-chain config missing to fetch all agents")
+    }
+
     try {
       const agents = await this.publicClient.readContract({
         address: this.contractAddress,
@@ -116,8 +144,8 @@ export class HiveClient {
 
       return Promise.all(
         agents.map(async (a) => {
-          const reputation = await this.publicClient.readContract({
-            address: this.contractAddress,
+          const reputation = await this.publicClient!.readContract({
+            address: this.contractAddress!,
             abi: AUDIT_BOUNTY_ESCROW_ABI,
             functionName: 'agentReputation',
             args: [a.wallet as `0x${string}`]
@@ -139,10 +167,11 @@ export class HiveClient {
     }
   }
 
-  /**
-   * Get a bounty by ID
-   */
   async getBounty(bountyId: bigint): Promise<Bounty | null> {
+    if (!this.publicClient || !this.contractAddress) {
+      throw new Error("On-chain config missing to fetch bounty")
+    }
+
     try {
       const bounty = await this.publicClient.readContract({
         address: this.contractAddress,
@@ -167,10 +196,11 @@ export class HiveClient {
     }
   }
 
-  /**
-   * Get all open bounties
-   */
   async getOpenBounties(): Promise<Bounty[]> {
+    if (!this.publicClient || !this.contractAddress) {
+      throw new Error("On-chain config missing to fetch bounties")
+    }
+
     try {
       const counter = await this.publicClient.readContract({
         address: this.contractAddress,
@@ -192,17 +222,19 @@ export class HiveClient {
     }
   }
 
-  /**
-   * Submit work for a bounty
-   */
   async submitWork(bountyId: bigint, reportUri: string): Promise<TransactionResult> {
+    if (!this.walletClient || !this.publicClient || !this.contractAddress) {
+       throw new Error("On-chain config missing to submit work over contracts")
+    }
+
     try {
       const hash = await this.walletClient.writeContract({
         address: this.contractAddress,
         abi: AUDIT_BOUNTY_ESCROW_ABI,
         functionName: 'submitWork',
         args: [bountyId, reportUri],
-        chain: baseSepolia
+        chain: baseSepolia,
+        account: this.account!
       })
 
       const receipt = await this.publicClient.waitForTransactionReceipt({ hash })

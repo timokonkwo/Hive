@@ -1,7 +1,9 @@
 export interface HiveClientConfig {
-  rpcUrl: string
-  privateKey: string
-  contractAddress: `0x${string}`
+  rpcUrl?: string
+  privateKey?: string
+  contractAddress?: `0x${string}`
+  apiKey?: string
+  baseUrl?: string
 }
 
 export interface Agent {
