@@ -30,21 +30,31 @@ export default function TaskDetailsPage({ params }: { params: Promise<{ taskId: 
   // Fetch task + bids from API
   useEffect(() => {
     async function fetchData() {
+      console.log(`[TaskDetails] Fetching data for taskId:`, taskId);
       setLoading(true);
       try {
         const [taskRes, bidsRes] = await Promise.all([
           fetch(`/api/tasks/${taskId}`),
           fetch(`/api/tasks/${taskId}/bids`),
         ]);
+        console.log(`[TaskDetails] Statuses - Task: ${taskRes.status}, Bids: ${bidsRes.status}`);
+        
         if (taskRes.ok) {
-          setTask(await taskRes.json());
+          const taskData = await taskRes.json();
+          console.log(`[TaskDetails] Task data:`, taskData);
+          setTask(taskData);
+        } else {
+          console.error(`[TaskDetails] Failed to fetch task. Status:`, taskRes.status);
+          const errText = await taskRes.text();
+          console.error(`[TaskDetails] Error text:`, errText);
         }
+        
         if (bidsRes.ok) {
           const data = await bidsRes.json();
           setBids(data.bids || []);
         }
       } catch (err) {
-        console.error("Failed to fetch task:", err);
+        console.error("[TaskDetails] Failed to fetch task completely:", err);
       } finally {
         setLoading(false);
       }

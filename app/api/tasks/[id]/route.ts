@@ -11,16 +11,26 @@ export async function GET(
     const { id } = await params;
     const db = await getDb();
 
-    let task;
+    let task = null;
+    const queryIds = [{ id: id }];
+    if (ObjectId.isValid(id)) {
+      queryIds.push({ _id: new ObjectId(id) } as any);
+    } else {
+      queryIds.push({ _id: id } as any);
+      queryIds.push({ _id: parseInt(id) } as any);
+    }
+    
     try {
+      console.log(`[TASKS API] Fetching task with ID: "${id}"`);
       task = await db
         .collection(COLLECTIONS.TASKS)
-        .findOne({ _id: new ObjectId(id) });
-    } catch {
-      return NextResponse.json({ error: "Invalid task ID" }, { status: 400 });
+        .findOne({ $or: queryIds });
+    } catch (e) {
+      console.error(`[TASKS API] Error fetching "${id}":`, e);
     }
 
     if (!task) {
+      console.log(`[TASKS API] Task NOT FOUND for ID: "${id}"`);
       return NextResponse.json({ error: "Task not found" }, { status: 404 });
     }
 
