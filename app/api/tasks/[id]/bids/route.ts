@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getDb, COLLECTIONS } from "@/lib/db";
 import { ObjectId } from "mongodb";
+import { checkRateLimit, getClientIp, RATE_LIMITS } from "@/lib/rate-limit";
 
 // GET /api/tasks/[id]/bids — List bids for a task
 export async function GET(
@@ -40,6 +41,17 @@ export async function POST(
 ) {
   try {
     const { id } = await params;
+
+    // Rate limit: 10 bids per minute per IP
+    const ip = getClientIp(request);
+    const rl = checkRateLimit(`submit-bid:${ip}`, RATE_LIMITS.SUBMIT_BID);
+    if (!rl.allowed) {
+      return NextResponse.json(
+        { error: `Rate limited. Try again in ${rl.resetInSeconds}s.` },
+        { status: 429, headers: { 'Retry-After': String(rl.resetInSeconds) } }
+      );
+    }
+
     const db = await getDb();
     const body = await request.json();
 

@@ -1,207 +1,259 @@
 "use client";
 
-import React from "react";
-import { useReadContract, useWriteContract, useReadContracts } from "wagmi";
-import { formatEther, parseAbiItem } from "viem";
+import React, { useState, useEffect } from "react";
 import { Navbar } from "@/components/layout/Navbar";
-import { Footer } from "@/components/layout/Footer";
-import { Shield, Loader2, CheckCircle, XCircle, AlertTriangle, ExternalLink } from "lucide-react";
-import { toast } from "sonner";
-import Link from "next/link";
 import { useAuth } from "@/hooks/useAuth";
+import {
+  Loader2, Shield, Users, FileText, CheckCircle,
+  Clock, BarChart3, ChevronRight, AlertTriangle, Inbox, Zap
+} from "lucide-react";
+import Link from "next/link";
 
-const AUDIT_BOUNTY_ESCROW_ADDRESS = process.env.NEXT_PUBLIC_AUDIT_BOUNTY_ADDRESS as `0x${string}`;
-
-const BOUNTY_ABI = [
-  {
-    inputs: [{ internalType: "uint256", name: "_bountyId", type: "uint256" }],
-    name: "getBounty",
-    outputs: [
-      {
-        components: [
-          { internalType: "address", name: "client", type: "address" },
-          { internalType: "uint256", name: "amount", type: "uint256" },
-          { internalType: "string", name: "codeUri", type: "string" },
-          { internalType: "bool", name: "isOpen", type: "bool" },
-          { internalType: "address", name: "assignedAgent", type: "address" },
-          { internalType: "string", name: "reportUri", type: "string" },
-          { internalType: "uint256", name: "createdAt", type: "uint256" },
-        ],
-        internalType: "struct AuditBountyEscrow.Bounty",
-        name: "",
-        type: "tuple",
-      },
-    ],
-    stateMutability: "view",
-    type: "function",
-  },
-  {
-      inputs: [],
-      name: "owner",
-      outputs: [{ internalType: "address", name: "", type: "address" }],
-      stateMutability: "view",
-      type: "function"
-  },
-  {
-      inputs: [
-          { internalType: "uint256", name: "_bountyId", type: "uint256" },
-          { internalType: "address", name: "_agent", type: "address" },
-          { internalType: "bool", name: "_isValid", type: "bool" },
-          { internalType: "uint256", name: "_scoreToAdd", type: "uint256" }
-      ],
-      name: "finalizeBounty",
-      outputs: [],
-      stateMutability: "nonpayable",
-      type: "function"
-  }
-] as const;
-
-// Define Bounty interface
-interface Bounty {
-    client: string;
-    amount: bigint;
-    codeUri: string;
-    isOpen: boolean;
-    assignedAgent: string;
-    reportUri: string;
-    createdAt: bigint;
-}
+type AdminTab = "overview" | "tasks" | "agents" | "activity";
 
 export default function AdminDashboardPage() {
-    const { user } = useAuth();
-    const { writeContract, isPending: isFinalizing } = useWriteContract();
-    
-    // Check owner
-    const { data: ownerAddress } = useReadContract({
-        address: AUDIT_BOUNTY_ESCROW_ADDRESS,
-        abi: BOUNTY_ABI,
-        functionName: "owner",
-        chainId: 84532
-    });
+  const { user, authenticated, login, ready } = useAuth();
+  const [data, setData] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
+  const [activeTab, setActiveTab] = useState<AdminTab>("overview");
 
-    // TODO: Fetch all bounties and filter for those needing review (assignedAgent != 0 and isOpen == true)
-    // For now, we might iterate IDs 0-20 as a simple indexer
-    const bountyIds = Array.from({ length: 20 }, (_, i) => BigInt(i));
-    
-    const { data: bountiesData, isLoading } = useReadContracts({
-        contracts: bountyIds.map(id => ({
-            address: AUDIT_BOUNTY_ESCROW_ADDRESS,
-            abi: BOUNTY_ABI,
-            functionName: "getBounty",
-            args: [id],
-            chainId: 84532
-        }))
-    });
+  const isAdmin = user?.wallet?.address?.toLowerCase() === process.env.NEXT_PUBLIC_ADMIN_ADDRESS?.toLowerCase();
 
-    const pendingBounties = bountiesData?.map((result, index) => {
-        const bounty = result.result as unknown as Bounty;
-        return {
-            id: index,
-            data: bounty
-        };
-    }).filter(b => 
-        b.data && 
-        b.data.isOpen && 
-        b.data.assignedAgent !== "0x0000000000000000000000000000000000000000"
-    );
+  useEffect(() => {
+    if (!isAdmin) return;
 
-    const handleFinalize = (bountyId: number, agent: string, isValid: boolean) => {
-        writeContract({
-            address: AUDIT_BOUNTY_ESCROW_ADDRESS,
-            abi: BOUNTY_ABI,
-            functionName: "finalizeBounty",
-            args: [BigInt(bountyId), agent as `0x${string}`, isValid, BigInt(10)], // Default 10 score points
-            chainId: 84532
-        }, {
-            onSuccess: () => toast.success(`Bounty #${bountyId} finalized as ${isValid ? "Valid" : "Invalid"}`),
-            onError: (err) => toast.error("Finalization failed: " + (err as any).message)
-        });
+    const fetchData = async () => {
+      setLoading(true);
+      try {
+        const res = await fetch(`/api/admin/stats?address=${user?.wallet?.address}`);
+        if (res.ok) setData(await res.json());
+      } catch (err) {
+        console.error("Admin fetch error:", err);
+      } finally {
+        setLoading(false);
+      }
     };
 
-    if (isLoading) return <div className="min-h-screen bg-[#020202] flex items-center justify-center"><Loader2 className="animate-spin text-emerald-500" /></div>;
+    fetchData();
+  }, [isAdmin, user?.wallet?.address]);
 
-    if (user?.wallet?.address !== ownerAddress) {
-        return (
-            <div className="min-h-screen bg-[#020202] text-white flex flex-col items-center justify-center">
-                <AlertTriangle className="text-red-500 mb-4" size={48} />
-                <h1 className="text-2xl font-bold font-mono uppercase tracking-widest">Access Denied</h1>
-                <p className="text-gray-500 mt-2">You are not the protocol administrator.</p>
-                <Link href="/" className="mt-8 px-6 py-3 bg-white/5 hover:bg-white/10 border border-white/10 rounded-sm font-mono text-sm uppercase tracking-widest transition-colors">Return to Marketplace</Link>
-            </div>
-        );
-    }
-
+  // Access denied
+  if (!authenticated || !isAdmin) {
     return (
-        <div className="min-h-screen bg-[#020202] text-white font-sans selection:bg-emerald-500 selection:text-black">
-            <Navbar />
-            
-            <main className="pt-32 pb-20 px-4 md:px-6 max-w-7xl mx-auto">
-                <div className="flex items-center justify-between mb-12">
-                    <h1 className="text-3xl font-black font-mono uppercase tracking-tight flex items-center gap-3">
-                        <Shield size={32} className="text-emerald-500" /> Admin Validation
-                    </h1>
-                    <div className="px-3 py-1 bg-emerald-500/10 text-emerald-500 border border-emerald-500/20 rounded-sm text-xs font-mono font-bold uppercase tracking-widest">
-                        Protocol Admin
-                    </div>
-                </div>
-
-                <div className="grid grid-cols-1 gap-6">
-                    {pendingBounties && pendingBounties.length > 0 ? (
-                        pendingBounties.map((bounty) => (
-                            <div key={bounty.id} className="bg-[#0A0A0A] border border-white/10 rounded-sm p-6 flex flex-col md:flex-row gap-6">
-                                <div className="flex-1">
-                                    <div className="flex items-center gap-3 mb-4">
-                                        <span className="text-emerald-500 font-mono font-bold text-lg">#{bounty.id}</span>
-                                        <span className="bg-yellow-500/10 text-yellow-500 px-2 py-0.5 rounded-sm text-[10px] font-mono uppercase tracking-widest border border-yellow-500/20">Needs Review</span>
-                                    </div>
-                                    
-                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-                                        <div className="bg-black p-3 rounded-sm border border-white/5">
-                                            <div className="text-[10px] text-gray-500 font-mono uppercase tracking-widest mb-1">Target Code</div>
-                                            <div className="text-xs text-white font-mono truncate">{bounty.data?.codeUri}</div>
-                                            <a href={bounty.data?.codeUri.startsWith('http') ? bounty.data?.codeUri : `https://ipfs.io/ipfs/${bounty.data?.codeUri}`} target="_blank" className="text-[10px] text-emerald-500 hover:underline mt-1 block">View Code</a>
-                                        </div>
-                                        <div className="bg-black p-3 rounded-sm border border-white/5">
-                                            <div className="text-[10px] text-gray-500 font-mono uppercase tracking-widest mb-1">Submitted Report</div>
-                                            <div className="text-xs text-white font-mono truncate">{bounty.data?.reportUri}</div>
-                                            <a href={bounty.data?.reportUri.startsWith('http') ? bounty.data?.reportUri : `https://ipfs.io/ipfs/${bounty.data?.reportUri}`} target="_blank" className="text-[10px] text-emerald-500 hover:underline mt-1 block">View Report</a>
-                                        </div>
-                                    </div>
-
-                                    <div className="flex items-center gap-2 text-xs text-gray-500 font-mono">
-                                        <span>Agent: {bounty.data?.assignedAgent}</span>
-                                        <span>•</span>
-                                        <span>Reward: {formatEther(bounty.data?.amount || 0n)} ETH</span>
-                                    </div>
-                                </div>
-
-                                <div className="flex flex-col justify-center gap-3 border-l border-white/10 pl-6 border-t md:border-t-0 pt-6 md:pt-0">
-                                    <button 
-                                        onClick={() => handleFinalize(bounty.id, bounty.data!.assignedAgent, true)}
-                                        disabled={isFinalizing}
-                                        className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white font-bold font-mono uppercase tracking-widest text-xs rounded-sm transition-colors flex items-center justify-center gap-2"
-                                    >
-                                        <CheckCircle size={14} /> Approve & Pay
-                                    </button>
-                                    <button 
-                                        onClick={() => handleFinalize(bounty.id, bounty.data!.assignedAgent, false)}
-                                        disabled={isFinalizing}
-                                        className="px-4 py-2 bg-red-900/20 hover:bg-red-900/40 text-red-500 border border-red-500/20 hover:border-red-500/40 font-bold font-mono uppercase tracking-widest text-xs rounded-sm transition-colors flex items-center justify-center gap-2"
-                                    >
-                                        <XCircle size={14} /> Reject
-                                    </button>
-                                </div>
-                            </div>
-                        ))
-                    ) : (
-                        <div className="text-center py-20 bg-[#0A0A0A] border border-white/10 rounded-sm">
-                            <CheckCircle size={48} className="mx-auto text-emerald-500/20 mb-6" />
-                            <h2 className="text-xl font-bold font-mono uppercase tracking-widest text-white mb-2">All Caught Up</h2>
-                            <p className="text-gray-500 text-sm">No pending submissions found.</p>
-                        </div>
-                    )}
-                </div>
-            </main>
-        </div>
+      <div className="min-h-screen text-white flex flex-col items-center justify-center">
+        <Navbar />
+        <AlertTriangle className="text-red-500 mb-4" size={48} />
+        <h1 className="text-2xl font-bold font-mono uppercase tracking-widest">Access Denied</h1>
+        <p className="text-gray-500 mt-2 text-sm">You are not a platform administrator.</p>
+        {!authenticated && (
+          <button onClick={login} disabled={!ready} className="mt-6 px-6 py-3 bg-emerald-500 text-black font-bold font-mono uppercase transition-colors hover:bg-emerald-400 disabled:opacity-50">
+            Sign In
+          </button>
+        )}
+        <Link href="/marketplace" className="mt-4 text-zinc-500 hover:text-white text-xs font-mono uppercase underline">Return to Marketplace</Link>
+      </div>
     );
+  }
+
+  if (loading) {
+    return (
+      <>
+        <Navbar />
+        <div className="min-h-screen flex items-center justify-center">
+          <Loader2 className="w-8 h-8 text-emerald-500 animate-spin" />
+        </div>
+      </>
+    );
+  }
+
+  const stats = data?.stats || {};
+
+  return (
+    <div className="min-h-screen text-white font-sans pt-24 pb-12 px-4 md:px-8 max-w-7xl mx-auto">
+      <Navbar />
+
+      {/* Header */}
+      <div className="flex items-center justify-between mb-8">
+        <div>
+          <h1 className="text-3xl font-bold font-mono uppercase tracking-tighter flex items-center gap-3">
+            <Shield className="text-emerald-500" /> Admin Panel
+          </h1>
+          <p className="text-zinc-500 text-sm font-mono mt-1">Platform management and analytics</p>
+        </div>
+        <div className="px-3 py-1 bg-emerald-500/10 text-emerald-500 border border-emerald-500/20 rounded text-xs font-mono font-bold uppercase">
+          Admin
+        </div>
+      </div>
+
+      {/* Stats Grid */}
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4 mb-8">
+        <StatCard label="Total Tasks" value={stats.totalTasks} icon={<FileText size={16} />} />
+        <StatCard label="Open" value={stats.openTasks} icon={<Clock size={16} />} color="text-yellow-500" />
+        <StatCard label="In Progress" value={stats.inProgressTasks} icon={<Zap size={16} />} color="text-blue-500" />
+        <StatCard label="Completed" value={stats.completedTasks} icon={<CheckCircle size={16} />} color="text-green-500" />
+        <StatCard label="Agents" value={stats.totalAgents} icon={<Users size={16} />} color="text-purple-500" />
+      </div>
+
+      <div className="grid grid-cols-3 gap-4 mb-8">
+        <StatCard label="Total Proposals" value={stats.totalBids} icon={<Inbox size={16} />} />
+        <StatCard label="Pending" value={stats.pendingBids} icon={<Clock size={16} />} color="text-yellow-500" />
+        <StatCard label="Accepted" value={stats.acceptedBids} icon={<CheckCircle size={16} />} color="text-emerald-500" />
+      </div>
+
+      {/* Tabs */}
+      <div className="flex border-b border-zinc-800 mb-8 gap-1">
+        {(["overview", "tasks", "agents", "activity"] as AdminTab[]).map((tab) => (
+          <button
+            key={tab}
+            onClick={() => setActiveTab(tab)}
+            className={`px-4 py-3 text-xs font-mono uppercase tracking-widest transition-colors border-b-2 ${
+              activeTab === tab ? "border-emerald-500 text-white" : "border-transparent text-zinc-500 hover:text-zinc-300"
+            }`}
+          >
+            {tab}
+          </button>
+        ))}
+      </div>
+
+      {/* Tab Content */}
+      {activeTab === "overview" && (
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+          {/* Recent Tasks */}
+          <div className="bg-zinc-900/30 border border-zinc-800 rounded-lg p-6">
+            <h3 className="text-sm font-bold font-mono uppercase tracking-widest text-zinc-400 mb-4">Recent Tasks</h3>
+            <div className="space-y-3">
+              {data?.recentTasks?.slice(0, 8).map((task: any) => (
+                <Link key={task.id} href={`/marketplace/${task.id}`} className="block">
+                  <div className="flex items-center justify-between p-3 bg-black/30 rounded hover:bg-black/50 transition-colors group">
+                    <div className="flex-1 min-w-0">
+                      <div className="text-sm text-white font-medium truncate group-hover:text-emerald-400 transition-colors">{task.title}</div>
+                      <div className="text-[10px] text-zinc-600 font-mono">{task.category} • {task.status} • {task.proposalsCount || 0} proposals</div>
+                    </div>
+                    <ChevronRight size={14} className="text-zinc-700 shrink-0" />
+                  </div>
+                </Link>
+              ))}
+            </div>
+          </div>
+
+          {/* Recent Agents */}
+          <div className="bg-zinc-900/30 border border-zinc-800 rounded-lg p-6">
+            <h3 className="text-sm font-bold font-mono uppercase tracking-widest text-zinc-400 mb-4">Registered Agents</h3>
+            <div className="space-y-3">
+              {data?.recentAgents?.slice(0, 8).map((agent: any) => (
+                <div key={agent.id} className="flex items-center gap-3 p-3 bg-black/30 rounded">
+                  <div className="w-8 h-8 rounded-full bg-zinc-800 flex items-center justify-center text-zinc-400 text-xs font-bold">
+                    {(agent.name || "AG").substring(0, 2).toUpperCase()}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="text-sm text-white font-medium truncate">{agent.name || "Unnamed"}</div>
+                    <div className="text-[10px] text-zinc-600 font-mono">{agent.walletAddress?.slice(0, 10)}... • Rep: {agent.reputation || 0}</div>
+                  </div>
+                </div>
+              ))}
+              {(!data?.recentAgents || data.recentAgents.length === 0) && (
+                <div className="text-zinc-600 text-sm text-center py-4">No agents registered yet</div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {activeTab === "tasks" && (
+        <div className="space-y-3">
+          {data?.recentTasks?.map((task: any) => (
+            <Link key={task.id} href={`/marketplace/${task.id}`} className="block">
+              <div className="p-4 bg-zinc-900/30 border border-zinc-800 rounded-lg hover:border-zinc-700 transition-colors group">
+                <div className="flex items-center justify-between">
+                  <div className="flex-1">
+                    <div className="flex items-center gap-3 mb-1">
+                      <span className="text-white font-medium group-hover:text-emerald-400 transition-colors">{task.title}</span>
+                      <StatusBadge status={task.status} />
+                    </div>
+                    <div className="text-xs text-zinc-600 font-mono">
+                      {task.category} • Budget: {task.budget || "Negotiable"} • {task.proposalsCount || 0} proposals • Posted by {task.clientName || task.clientAddress?.slice(0, 10)}
+                    </div>
+                  </div>
+                  <ChevronRight size={14} className="text-zinc-700 shrink-0" />
+                </div>
+              </div>
+            </Link>
+          ))}
+        </div>
+      )}
+
+      {activeTab === "agents" && (
+        <div className="space-y-3">
+          {data?.recentAgents?.map((agent: any) => (
+            <div key={agent.id} className="p-4 bg-zinc-900/30 border border-zinc-800 rounded-lg">
+              <div className="flex items-center gap-4">
+                <div className="w-10 h-10 rounded-full bg-zinc-800 flex items-center justify-center text-zinc-400 font-bold text-sm">
+                  {(agent.name || "AG").substring(0, 2).toUpperCase()}
+                </div>
+                <div className="flex-1">
+                  <div className="text-white font-medium">{agent.name || "Unnamed Agent"}</div>
+                  <div className="text-xs text-zinc-600 font-mono">
+                    {agent.walletAddress} • Reputation: {agent.reputation || 0} • Verified: {agent.isVerified ? "Yes" : "No"}
+                  </div>
+                  {agent.bio && <div className="text-xs text-zinc-500 mt-1">{agent.bio}</div>}
+                </div>
+              </div>
+            </div>
+          ))}
+          {(!data?.recentAgents || data.recentAgents.length === 0) && (
+            <div className="py-12 text-center text-zinc-600 border border-dashed border-zinc-800 rounded-lg">No agents found</div>
+          )}
+        </div>
+      )}
+
+      {activeTab === "activity" && (
+        <div className="space-y-3">
+          {data?.recentActivity?.map((item: any) => (
+            <div key={item.id} className="p-4 bg-zinc-900/30 border border-zinc-800 rounded-lg flex items-center gap-4">
+              <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold ${
+                item.type === "TaskCreated" ? "bg-blue-500/10 text-blue-500" :
+                item.type === "BidSubmitted" ? "bg-yellow-500/10 text-yellow-500" :
+                item.type === "ProposalAccepted" ? "bg-emerald-500/10 text-emerald-500" :
+                "bg-zinc-800 text-zinc-400"
+              }`}>
+                {item.type === "TaskCreated" ? "T" : item.type === "BidSubmitted" ? "B" : item.type === "ProposalAccepted" ? "✓" : "?"}
+              </div>
+              <div className="flex-1">
+                <div className="text-sm text-white">{item.type.replace(/([A-Z])/g, " $1").trim()}</div>
+                <div className="text-[10px] text-zinc-600 font-mono">
+                  {item.actorName || item.actorAddress?.slice(0, 10)} • {item.metadata?.taskTitle || ""} • {new Date(item.createdAt).toLocaleString()}
+                </div>
+              </div>
+            </div>
+          ))}
+          {(!data?.recentActivity || data.recentActivity.length === 0) && (
+            <div className="py-12 text-center text-zinc-600 border border-dashed border-zinc-800 rounded-lg">No activity yet</div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function StatCard({ label, value, icon, color = "text-white" }: { label: string; value: number; icon: React.ReactNode; color?: string }) {
+  return (
+    <div className="bg-zinc-900/30 border border-zinc-800 p-4 rounded-lg">
+      <div className={`flex items-center gap-2 ${color} mb-1`}>{icon}<span className="text-[10px] text-zinc-500 uppercase font-mono">{label}</span></div>
+      <div className="text-2xl font-bold font-mono text-white">{value || 0}</div>
+    </div>
+  );
+}
+
+function StatusBadge({ status }: { status: string }) {
+  const styles: Record<string, string> = {
+    Open: "bg-emerald-500/10 text-emerald-500 border-emerald-500/20",
+    "In Progress": "bg-blue-500/10 text-blue-500 border-blue-500/20",
+    Completed: "bg-green-500/10 text-green-500 border-green-500/20",
+  };
+
+  return (
+    <span className={`inline-flex px-2 py-0.5 rounded-full border text-[10px] font-bold uppercase ${styles[status] || "bg-zinc-800 text-zinc-400 border-zinc-700"}`}>
+      {status}
+    </span>
+  );
 }

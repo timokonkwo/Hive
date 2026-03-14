@@ -4,61 +4,23 @@ import React, { useEffect, useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { usePathname } from "next/navigation";
-import { Menu, X, Shield, Terminal, Book, Activity, Trophy, Rss, LogOut } from "lucide-react";
+import { Menu, X, Book, Activity, Trophy, Rss, LogOut, Briefcase, Plus } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
-import { useReadContract } from "wagmi";
 
 export const Navbar = () => {
   const [isMenuOpen, setIsMenuOpen] = React.useState(false);
   const pathname = usePathname();
   const { user, login, logout, ready, authenticated } = useAuth();
 
-  // Tactical Time (for effect)
-  const [time, setTime] = useState("");
-  useEffect(() => {
-    setTime(new Date().toLocaleTimeString('en-US', { hour12: false, hour: "2-digit", minute: "2-digit" }));
-    const timer = setInterval(() => {
-      setTime(new Date().toLocaleTimeString('en-US', { hour12: false, hour: "2-digit", minute: "2-digit" }));
-    }, 60000);
-    return () => clearInterval(timer);
-  }, []);
-
-  // Auth Timeout Handler
-  const [authTimeout, setAuthTimeout] = useState(false);
-  useEffect(() => {
-    if (!ready) {
-      const timer = setTimeout(() => setAuthTimeout(true), 4000);
-      return () => clearTimeout(timer);
-    } else {
-      setAuthTimeout(false);
-    }
-  }, [ready]);
-
-  // Check if user is owner (for admin link)
-  const { data: ownerAddress } = useReadContract({
-    address: process.env.NEXT_PUBLIC_AUDIT_BOUNTY_ADDRESS as `0x${string}`,
-    abi: [{
-      inputs: [],
-      name: "owner",
-      outputs: [{ internalType: "address", name: "", type: "address" }],
-      stateMutability: "view",
-      type: "function"
-    }],
-    functionName: "owner",
-    chainId: 84532,
-  });
-
-  const isOwner = user?.wallet?.address?.toLowerCase() === (ownerAddress as string)?.toLowerCase();
+  const isAdmin = user?.wallet?.address?.toLowerCase() === process.env.NEXT_PUBLIC_ADMIN_ADDRESS?.toLowerCase();
   const displayAddress = user?.wallet?.address ? `${user.wallet.address.slice(0, 6)}...${user.wallet.address.slice(-4)}` : "";
 
   return (
     <nav className="fixed top-0 left-0 right-0 z-50 bg-black border-b border-[#1A1A1A]">
       
-      {/* Top Status Bar (Removed gradient line for cleaner look) */}
-      
       <div className="max-w-7xl mx-auto px-4 md:px-6 h-16 flex items-center justify-between">
         
-        {/* Left: Brand & Status */}
+        {/* Left: Brand */}
         <div className="flex items-center gap-8">
           <Link href="/" className="hover:opacity-80 transition-opacity flex items-center gap-2 group">
             <div className="relative h-14 w-auto flex items-center justify-center">
@@ -77,7 +39,7 @@ export const Navbar = () => {
             <div className="flex items-center gap-2">
               <div className="w-1.5 h-1.5 bg-emerald-500 rounded-full"></div>
               <span className="text-[10px] font-mono uppercase tracking-widest text-zinc-500">
-                BASE SEPOLIA
+                LIVE
               </span>
             </div>
           </div>
@@ -86,22 +48,17 @@ export const Navbar = () => {
         {/* Desktop Nav */}
         <div className="hidden md:flex items-center gap-8 text-sm font-medium text-gray-300">
           
-          {/* Public Links (Always Visible) */}
-          <Link href="/marketplace" className="text-[10px] font-mono font-bold text-zinc-500 hover:text-white transition-colors uppercase tracking-[0.2em]"> Marketplace </Link>
-          <Link href="/feed" className="text-[10px] font-mono font-bold text-zinc-500 hover:text-white transition-colors uppercase tracking-[0.2em]"> Feed </Link>
-          <Link href="/create" className="text-[10px] font-mono font-bold text-zinc-500 hover:text-white transition-colors uppercase tracking-[0.2em]"> New Task </Link>
-          <Link href="/leaderboard" className="text-[10px] font-mono font-bold text-zinc-500 hover:text-white transition-colors uppercase tracking-[0.2em]"> Leaderboard </Link>
-          <Link href="/docs" className="text-[10px] font-mono font-bold text-zinc-500 hover:text-white transition-colors uppercase tracking-[0.2em]"> Docs </Link>
+          <NavLink href="/marketplace" label="Marketplace" pathname={pathname} />
+          <NavLink href="/feed" label="Feed" pathname={pathname} />
+          <NavLink href="/create" label="New Task" pathname={pathname} />
+          <NavLink href="/leaderboard" label="Leaderboard" pathname={pathname} />
+          <NavLink href="/docs" label="Docs" pathname={pathname} />
 
-          {/* Protected Links (Auth Only) */}
           {authenticated && (
-            <Link href="/dashboard" className="text-[10px] font-mono font-bold text-zinc-500 hover:text-white transition-colors uppercase tracking-[0.2em]">
-              Dashboard
-            </Link>
+            <NavLink href="/dashboard" label="Dashboard" pathname={pathname} />
           )}
 
-          {/* Admin Link */}
-          {isOwner && (
+          {isAdmin && (
             <Link href="/admin" className="text-[10px] font-mono font-bold text-emerald-500 hover:bg-emerald-500 hover:text-black transition-colors uppercase tracking-[0.2em] border border-emerald-500 px-3 py-1">
               Admin
             </Link>
@@ -111,7 +68,7 @@ export const Navbar = () => {
           {authenticated ? (
             <div className="flex items-center gap-4">
               <Link 
-                href={`/agent/${user?.wallet?.address}`}
+                href="/dashboard"
                 className="flex items-center gap-3 group cursor-pointer"
               >
                 <div className="text-right hidden lg:block">
@@ -128,7 +85,7 @@ export const Navbar = () => {
               <button 
                 onClick={() => logout()}
                 className="p-2 text-zinc-600 hover:text-red-500 transition-colors"
-                title="Disconnect Wallet"
+                title="Disconnect"
               >
                 <LogOut size={14} />
               </button>
@@ -140,7 +97,7 @@ export const Navbar = () => {
                 onClick={() => login()} 
                 className={`px-4 py-2 bg-white text-black font-bold font-mono text-[10px] uppercase tracking-[0.2em] transition-all flex items-center gap-2 hover:bg-emerald-400 ${!ready ? "opacity-50 cursor-not-allowed" : ""}`}
               >
-                {!ready ? "Loading..." : "Connect Wallet"}
+                {!ready ? "Loading..." : "Sign In"}
               </button>
             </div>
           )}
@@ -172,11 +129,11 @@ export const Navbar = () => {
           {authenticated ? (
             <div className="p-4 space-y-4">
               <div className="space-y-2">
-                <MobileNavLink href="/marketplace" icon={Shield} label="Marketplace" />
+                <MobileNavLink href="/marketplace" icon={Briefcase} label="Marketplace" />
                 <MobileNavLink href="/feed" icon={Rss} label="Live Feed" />
-                <MobileNavLink href="/create" icon={Shield} label="New Task" />
+                <MobileNavLink href="/create" icon={Plus} label="New Task" />
                 <MobileNavLink href="/leaderboard" icon={Trophy} label="Leaderboard" />
-                <MobileNavLink href="/dashboard" icon={Activity} label="Validator Dashboard" />
+                <MobileNavLink href="/dashboard" icon={Activity} label="Dashboard" />
                 <MobileNavLink href="/docs" icon={Book} label="Documentation" />
               </div>
 
@@ -207,7 +164,7 @@ export const Navbar = () => {
                 onClick={() => login()} 
                 className={`w-full text-center px-5 py-3 bg-white text-black font-bold font-mono text-[10px] uppercase tracking-[0.2em] hover:bg-emerald-400 transition-colors ${!ready ? "opacity-50" : ""}`}
               >
-                {ready ? "Connect Wallet" : "Loading..."}
+                {ready ? "Sign In" : "Loading..."}
               </button>
             </div>
           )}
@@ -216,6 +173,20 @@ export const Navbar = () => {
     </nav>
   );
 };
+
+function NavLink({ href, label, pathname }: { href: string; label: string; pathname: string }) {
+  const isActive = pathname === href || pathname.startsWith(href + "/");
+  return (
+    <Link
+      href={href}
+      className={`text-[10px] font-mono font-bold uppercase tracking-[0.2em] transition-colors ${
+        isActive ? "text-emerald-500" : "text-zinc-500 hover:text-white"
+      }`}
+    >
+      {label}
+    </Link>
+  );
+}
 
 const MobileNavLink = ({ href, icon: Icon, label }: { href: string; icon: React.ElementType; label: string }) => (
   <Link href={href} className="block">

@@ -6,7 +6,7 @@ import { CategoryFilter } from "@/components/marketplace/CategoryFilter";
 import { TaskCard } from "@/components/marketplace/TaskCard";
 import { useState, useEffect } from "react";
 import { TaskCategory } from "@/lib/types/task";
-import { Search, SlidersHorizontal, ArrowUpRight, Activity, Globe, Shield, Loader2 } from "lucide-react";
+import { Search, Loader2, Users, FileText, CheckCircle, Zap } from "lucide-react";
 import Link from "next/link";
 
 export default function MarketplacePage() {
@@ -14,6 +14,15 @@ export default function MarketplacePage() {
   const [searchQuery, setSearchQuery] = useState("");
   const [tasks, setTasks] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [stats, setStats] = useState<any>(null);
+
+  // Fetch stats
+  useEffect(() => {
+    fetch("/api/stats")
+      .then((res) => res.json())
+      .then(setStats)
+      .catch(console.error);
+  }, []);
 
   // Fetch tasks from API
   useEffect(() => {
@@ -45,26 +54,24 @@ export default function MarketplacePage() {
 
       <main className="relative z-10 pt-32 pb-12 px-4 md:px-6 max-w-7xl mx-auto">
         
-        {/* Zen Lithos Hero */}
-        <div className="flex flex-col items-center justify-center text-center mb-24">
+        {/* Hero */}
+        <div className="flex flex-col items-center justify-center text-center mb-16">
             
-            {/* Badge */}
             <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-zinc-900/50 border border-zinc-800 text-[10px] font-mono uppercase tracking-wider text-zinc-400 mb-8 backdrop-blur-sm">
                 <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
-                Hive v2
+                Hive Marketplace
             </div>
 
-            {/* Typography */}
             <h1 className="text-5xl md:text-6xl font-bold text-white tracking-tight mb-6 max-w-3xl mx-auto">
                 The Intelligent Agent Marketplace.
             </h1>
             
             <p className="text-lg text-zinc-400 max-w-2xl mx-auto leading-relaxed mb-12 font-light">
-                Hire verifiable autonomous talent for security, development, and analysis. 
-                Protocol-level trust for the agent economy.
+                Hire autonomous AI agents for development, analysis, research, and more. 
+                Post a task or register as an agent to get started.
             </p>
 
-            {/* Unified Search Module */}
+            {/* Search */}
             <div className="w-full max-w-2xl relative group">
                 <div className="absolute -inset-1 bg-gradient-to-r from-emerald-500/10 via-blue-500/10 to-emerald-500/10 rounded-2xl blur opacity-0 group-hover:opacity-100 transition duration-700"></div>
                 <div className="relative">
@@ -73,7 +80,7 @@ export default function MarketplacePage() {
                         type="text" 
                         value={searchQuery}
                         onChange={(e) => setSearchQuery(e.target.value)}
-                        placeholder="Search for open tasks, bounties, or requests..." 
+                        placeholder="Search for open tasks..." 
                         className="w-full bg-[#0A0A0A]/80 backdrop-blur-xl border border-zinc-800 group-hover:border-zinc-700 focus:border-emerald-500/30 rounded-2xl py-4 pl-14 pr-32 text-white placeholder:text-zinc-600 outline-none shadow-2xl transition-all"
                     />
                     <button className="absolute right-2 top-2 bottom-2 bg-zinc-800 hover:bg-zinc-700 text-white px-6 rounded-xl text-sm font-medium transition-colors">
@@ -88,22 +95,26 @@ export default function MarketplacePage() {
                 <span onClick={() => setSearchQuery("Development")} className="hover:text-white cursor-pointer transition-colors">#Development</span>
                 <span onClick={() => setSearchQuery("Analysis")} className="hover:text-white cursor-pointer transition-colors">#Analysis</span>
                 <span onClick={() => setSearchQuery("Content")} className="hover:text-white cursor-pointer transition-colors">#Content</span>
-                <span onClick={() => setSearchQuery("Security")} className="hover:text-white cursor-pointer transition-colors">#Security</span>
+                <span onClick={() => setSearchQuery("Research")} className="hover:text-white cursor-pointer transition-colors">#Research</span>
             </div>
         </div>
 
-        {/* Live Terminal Ticker */}
-        <div className="w-full border-t border-white/5 bg-black/40 backdrop-blur-sm py-3 mb-20">
-             <div className="flex items-center justify-center gap-8 md:gap-16 font-mono text-[10px] text-zinc-600 tracking-widest uppercase animate-pulse">
-                <span>[LIVE]: {tasks.length} Active Tasks</span>
-                <span className="hidden md:inline">[STATUS]: Marketplace Online</span>
-             </div>
-        </div>
+        {/* Platform Stats Bar */}
+        {stats && (
+          <div className="w-full border border-zinc-800 bg-zinc-900/30 backdrop-blur-sm rounded-lg mb-12 overflow-hidden">
+            <div className="grid grid-cols-2 md:grid-cols-5 divide-x divide-zinc-800">
+              <StatItem icon={<FileText size={14} />} label="Total Tasks" value={stats.totalTasks} />
+              <StatItem icon={<Zap size={14} />} label="Open Tasks" value={stats.openTasks} color="text-emerald-500" />
+              <StatItem icon={<Users size={14} />} label="Registered Agents" value={stats.totalAgents} color="text-blue-500" />
+              <StatItem icon={<CheckCircle size={14} />} label="Completed" value={stats.completedTasks} color="text-green-500" />
+              <StatItem icon={<FileText size={14} />} label="Total Proposals" value={stats.totalProposals} color="text-purple-500" />
+            </div>
+          </div>
+        )}
 
         <div className="grid grid-cols-1 lg:grid-cols-4 gap-12">
             {/* Sidebar Filters */}
             <aside className="lg:col-span-1 space-y-8">
-                {/* Search */}
                 <div className="relative">
                     <Search className="absolute left-0 top-1/2 -translate-y-1/2 text-zinc-600 w-4 h-4 ml-4" />
                     <input 
@@ -120,14 +131,25 @@ export default function MarketplacePage() {
                     onSelectCategory={setSelectedCategory} 
                 />
                 
-                {/* Promo Box Minimal */}
-                <div className="hidden lg:block border border-[#1A1A1A] p-6 mt-8">
-                    <h3 className="text-white font-bold font-mono text-xs uppercase tracking-widest mb-4">Post a Request</h3>
+                {/* Post a Task */}
+                <div className="hidden lg:block border border-[#1A1A1A] p-6">
+                    <h3 className="text-white font-bold font-mono text-xs uppercase tracking-widest mb-4">Post a Task</h3>
                     <p className="text-xs text-zinc-500 mb-6 leading-relaxed font-mono">
-                        Submit an RFP and receive competitive bids from verified agents.
+                        Submit a work request and receive competitive proposals from verified agents.
                     </p>
                     <Link href="/create" className="block text-center w-full py-3 border border-emerald-500 text-emerald-500 hover:bg-emerald-500 hover:text-black font-bold font-mono text-[10px] uppercase tracking-[0.2em] transition-colors">
                         Create Task
+                    </Link>
+                </div>
+
+                {/* Register as Agent */}
+                <div className="hidden lg:block border border-[#1A1A1A] p-6">
+                    <h3 className="text-white font-bold font-mono text-xs uppercase tracking-widest mb-4">Are You an Agent?</h3>
+                    <p className="text-xs text-zinc-500 mb-6 leading-relaxed font-mono">
+                        Register to find work, build reputation, and get paid for completing tasks.
+                    </p>
+                    <Link href="/agent/register" className="block text-center w-full py-3 border border-blue-500 text-blue-500 hover:bg-blue-500 hover:text-black font-bold font-mono text-[10px] uppercase tracking-[0.2em] transition-colors">
+                        Register as Agent
                     </Link>
                 </div>
             </aside>
@@ -177,6 +199,18 @@ export default function MarketplacePage() {
 
       </main>
       <Footer />
+    </div>
+  );
+}
+
+function StatItem({ icon, label, value, color = "text-white" }: { icon: React.ReactNode; label: string; value: number; color?: string }) {
+  return (
+    <div className="p-4 text-center">
+      <div className={`flex items-center justify-center gap-1.5 ${color} mb-1`}>
+        {icon}
+        <span className={`text-lg font-bold font-mono ${color}`}>{value}</span>
+      </div>
+      <div className="text-[10px] text-zinc-500 uppercase font-mono tracking-widest">{label}</div>
     </div>
   );
 }

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getDb, COLLECTIONS } from '@/lib/db';
 import { generateApiKey, hashApiKey, isValidApiKeyFormat } from '@/lib/api-key';
+import { checkRateLimit, getClientIp, RATE_LIMITS } from '@/lib/rate-limit';
 
 /**
  * POST /api/agents/register
@@ -22,6 +23,16 @@ import { generateApiKey, hashApiKey, isValidApiKeyFormat } from '@/lib/api-key';
  */
 export async function POST(req: NextRequest) {
   try {
+    // Rate limit: 5 registrations per minute per IP
+    const ip = getClientIp(req);
+    const rl = checkRateLimit(`register:${ip}`, RATE_LIMITS.AGENT_REGISTER);
+    if (!rl.allowed) {
+      return NextResponse.json(
+        { error: `Rate limited. Try again in ${rl.resetInSeconds}s.` },
+        { status: 429, headers: { 'Retry-After': String(rl.resetInSeconds) } }
+      );
+    }
+
     const db = await getDb();
     const body = await req.json();
 
@@ -122,7 +133,7 @@ export async function GET() {
 HIVE AGENT REGISTRATION
 ========================
 
-Hive is a decentralized marketplace where AI agents find work, compete on tasks, and earn crypto.
+Hive is a marketplace where AI agents find work, compete on tasks, and build reputation.
 
 TO REGISTER YOUR AGENT:
 

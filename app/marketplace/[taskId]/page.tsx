@@ -4,7 +4,7 @@ import { use, useState, useEffect } from "react";
 import { Navbar } from "@/components/layout/Navbar";
 import { Footer } from "@/components/layout/Footer";
 import { useAuth } from "@/hooks/useAuth";
-import { ArrowLeft, Shield, Clock, Coins, CheckCircle, Upload, X, Loader2 } from "lucide-react";
+import { ArrowLeft, Clock, Coins, CheckCircle, X, Loader2, ChevronDown, ChevronUp, UserCheck, XCircle } from "lucide-react";
 import Link from "next/link";
 import { toast } from "sonner";
 
@@ -21,6 +21,11 @@ export default function TaskDetailsPage({ params }: { params: Promise<{ taskId: 
   const [bidDays, setBidDays] = useState("");
   const [coverLetter, setCoverLetter] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [expandedBid, setExpandedBid] = useState<string | null>(null);
+  const [processingBid, setProcessingBid] = useState<string | null>(null);
+
+  const userAddress = user?.wallet?.address?.toLowerCase();
+  const isTaskPoster = task?.clientAddress?.toLowerCase() === userAddress;
 
   // Fetch task + bids from API
   useEffect(() => {
@@ -72,13 +77,13 @@ export default function TaskDetailsPage({ params }: { params: Promise<{ taskId: 
 
       if (!res.ok) {
         const err = await res.json();
-        throw new Error(err.error || "Failed to submit bid");
+        throw new Error(err.error || "Failed to submit proposal");
       }
 
       const newBid = await res.json();
       setBids((prev) => [newBid, ...prev]);
       setIsBidModalOpen(false);
-      toast.success("Proposal Submitted", { description: "The client has been notified of your bid." });
+      toast.success("Proposal Submitted", { description: "The client has been notified." });
       setBidAmount("");
       setBidDays("");
       setCoverLetter("");
@@ -86,6 +91,43 @@ export default function TaskDetailsPage({ params }: { params: Promise<{ taskId: 
       toast.error("Error", { description: error.message });
     } finally {
       setIsSubmitting(false);
+    }
+  };
+
+  const handleBidAction = async (bidId: string, status: "accepted" | "rejected") => {
+    setProcessingBid(bidId);
+    try {
+      const res = await fetch(`/api/tasks/${taskId}/bids/${bidId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ status, clientAddress: user?.wallet?.address }),
+      });
+
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.error || "Failed to update proposal");
+      }
+
+      // Update local state
+      if (status === "accepted") {
+        setBids((prev) =>
+          prev.map((b) => ({
+            ...b,
+            status: b.id === bidId ? "accepted" : "rejected",
+          }))
+        );
+        setTask((prev: any) => prev ? { ...prev, status: "In Progress" } : prev);
+        toast.success("Proposal Accepted!", { description: "The agent has been assigned to this task." });
+      } else {
+        setBids((prev) =>
+          prev.map((b) => (b.id === bidId ? { ...b, status: "rejected" } : b))
+        );
+        toast.info("Proposal Rejected");
+      }
+    } catch (error: any) {
+      toast.error("Error", { description: error.message });
+    } finally {
+      setProcessingBid(null);
     }
   };
 
@@ -122,6 +164,17 @@ export default function TaskDetailsPage({ params }: { params: Promise<{ taskId: 
     return `${Math.floor(hours / 24)}d ago`;
   };
 
+  const getStatusBadge = (status: string) => {
+    switch (status) {
+      case "accepted":
+        return <span className="px-2 py-0.5 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-500 text-[10px] font-bold uppercase">Accepted</span>;
+      case "rejected":
+        return <span className="px-2 py-0.5 rounded-full bg-red-500/10 border border-red-500/20 text-red-500 text-[10px] font-bold uppercase">Rejected</span>;
+      default:
+        return <span className="px-2 py-0.5 rounded-full bg-yellow-500/10 border border-yellow-500/20 text-yellow-500 text-[10px] font-bold uppercase">Pending</span>;
+    }
+  };
+
   return (
     <div className="min-h-screen text-white font-sans selection:bg-emerald-500 selection:text-black">
       <Navbar />
@@ -147,7 +200,12 @@ export default function TaskDetailsPage({ params }: { params: Promise<{ taskId: 
                         {task.status === 'Open' && (
                             <span className="px-3 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-[10px] uppercase tracking-wider text-emerald-500 font-bold font-mono flex items-center gap-1">
                                 <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
-                                Open for Bids
+                                Open for Proposals
+                            </span>
+                        )}
+                        {task.status === 'In Progress' && (
+                            <span className="px-3 py-1 rounded-full bg-blue-500/10 border border-blue-500/20 text-[10px] uppercase tracking-wider text-blue-500 font-bold font-mono">
+                                In Progress
                             </span>
                         )}
                     </div>
@@ -157,7 +215,7 @@ export default function TaskDetailsPage({ params }: { params: Promise<{ taskId: 
                             <Clock className="w-4 h-4" /> Posted {formatTimeAgo(task.createdAt)}
                         </span>
                         <span>•</span>
-                        <span>ID: {task.id.slice(0, 8)}...</span>
+                        <span>ID: {task.id?.slice(0, 8) || taskId.slice(0, 8)}...</span>
                     </div>
                 </div>
 
@@ -209,27 +267,92 @@ export default function TaskDetailsPage({ params }: { params: Promise<{ taskId: 
                 <div className="pt-12 border-t border-zinc-900">
                     <div className="flex items-center justify-between mb-8">
                         <h2 className="text-xl font-bold font-mono uppercase tracking-widest">Proposals <span className="text-zinc-600">[{bids.length}]</span></h2>
+                        {isTaskPoster && bids.length > 0 && (
+                            <span className="text-xs text-emerald-500 font-mono">You are the task poster — review proposals below</span>
+                        )}
                     </div>
 
                     <div className="space-y-4">
                         {bids.length > 0 ? bids.map(bid => (
-                            <div key={bid.id} className="p-6 bg-[#0A0A0A] border border-zinc-900 rounded-xl flex flex-col md:flex-row gap-6 items-start md:items-center justify-between hover:border-zinc-800 transition-colors">
-                                <div className="flex items-center gap-4">
-                                    <div className="w-10 h-10 rounded-full bg-zinc-800 flex items-center justify-center text-zinc-400 font-bold">
-                                        {bid.agentName.substring(0,2).toUpperCase()}
+                            <div key={bid.id} className="bg-[#0A0A0A] border border-zinc-900 rounded-xl overflow-hidden hover:border-zinc-800 transition-colors">
+                                {/* Bid Header */}
+                                <div 
+                                    className="p-6 flex flex-col md:flex-row gap-4 items-start md:items-center justify-between cursor-pointer"
+                                    onClick={() => setExpandedBid(expandedBid === bid.id ? null : bid.id)}
+                                >
+                                    <div className="flex items-center gap-4">
+                                        <div className="w-10 h-10 rounded-full bg-zinc-800 flex items-center justify-center text-zinc-400 font-bold">
+                                            {(bid.agentName || "AG").substring(0,2).toUpperCase()}
+                                        </div>
+                                        <div>
+                                            <div className="flex items-center gap-3">
+                                                <h4 className="font-bold text-white">{bid.agentName}</h4>
+                                                {getStatusBadge(bid.status)}
+                                            </div>
+                                            <p className="text-xs text-zinc-500 mt-1">{bid.timeEstimate} • {bid.amount}</p>
+                                        </div>
                                     </div>
-                                    <div>
-                                        <h4 className="font-bold text-white">{bid.agentName}</h4>
-                                        <p className="text-xs text-zinc-500 mt-1">{bid.timeEstimate} • {bid.amount} ETH</p>
+                                    <div className="flex items-center gap-3">
+                                        <button className="text-xs text-zinc-500 hover:text-white flex items-center gap-1 transition-colors">
+                                            {expandedBid === bid.id ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+                                            {expandedBid === bid.id ? "Hide" : "View"} Proposal
+                                        </button>
                                     </div>
                                 </div>
-                                <div className="text-right w-full md:w-auto">
-                                    <button className="text-xs text-zinc-500 hover:text-white underline decoration-zinc-800">View Proposal</button>
-                                </div>
+
+                                {/* Expanded Proposal */}
+                                {expandedBid === bid.id && (
+                                    <div className="px-6 pb-6 border-t border-zinc-900">
+                                        <div className="pt-4 space-y-4">
+                                            <div>
+                                                <h5 className="text-xs font-mono uppercase text-zinc-500 mb-2">Cover Letter / Strategy</h5>
+                                                <p className="text-zinc-300 text-sm leading-relaxed whitespace-pre-wrap bg-zinc-900/50 p-4 rounded-lg border border-zinc-800">
+                                                    {bid.coverLetter || "No cover letter provided."}
+                                                </p>
+                                            </div>
+
+                                            <div className="grid grid-cols-3 gap-4 text-center">
+                                                <div className="bg-zinc-900 p-3 rounded-lg">
+                                                    <div className="text-white font-bold font-mono">{bid.amount}</div>
+                                                    <div className="text-[10px] text-zinc-500 uppercase">Amount</div>
+                                                </div>
+                                                <div className="bg-zinc-900 p-3 rounded-lg">
+                                                    <div className="text-white font-bold font-mono">{bid.timeEstimate}</div>
+                                                    <div className="text-[10px] text-zinc-500 uppercase">Timeline</div>
+                                                </div>
+                                                <div className="bg-zinc-900 p-3 rounded-lg">
+                                                    <div className="text-white font-bold font-mono">{formatTimeAgo(bid.createdAt)}</div>
+                                                    <div className="text-[10px] text-zinc-500 uppercase">Submitted</div>
+                                                </div>
+                                            </div>
+
+                                            {/* Accept/Reject buttons — only visible to task poster and if bid is pending */}
+                                            {isTaskPoster && bid.status === "Pending" && (
+                                                <div className="flex items-center gap-3 pt-4 border-t border-zinc-800">
+                                                    <button
+                                                        onClick={(e) => { e.stopPropagation(); handleBidAction(bid.id, "rejected"); }}
+                                                        disabled={!!processingBid}
+                                                        className="flex-1 py-2.5 rounded-lg border border-red-500/30 text-red-500 hover:bg-red-500/10 font-bold font-mono text-xs uppercase tracking-widest transition-all disabled:opacity-50 flex items-center justify-center gap-2"
+                                                    >
+                                                        <XCircle size={14} /> Reject
+                                                    </button>
+                                                    <button
+                                                        onClick={(e) => { e.stopPropagation(); handleBidAction(bid.id, "accepted"); }}
+                                                        disabled={!!processingBid}
+                                                        className="flex-1 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white font-bold font-mono text-xs uppercase tracking-widest rounded-lg flex items-center justify-center gap-2 shadow-[0_0_10px_rgba(16,185,129,0.3)] transition-all disabled:opacity-50"
+                                                    >
+                                                        {processingBid === bid.id ? <Loader2 size={14} className="animate-spin" /> : <UserCheck size={14} />}
+                                                        Accept & Assign
+                                                    </button>
+                                                </div>
+                                            )}
+                                        </div>
+                                    </div>
+                                )}
                             </div>
                         )) : (
                             <div className="p-12 text-center border border-dashed border-zinc-900 rounded-xl text-zinc-600 font-mono text-sm">
-                                No proposals yet. Be the first to bid.
+                                No proposals yet. Be the first to submit one.
                             </div>
                         )}
                     </div>
@@ -251,25 +374,34 @@ export default function TaskDetailsPage({ params }: { params: Promise<{ taskId: 
                             </span>
                         </div>
                         
-                        <button 
-                            onClick={() => setIsBidModalOpen(true)}
-                            className="w-full py-3 bg-emerald-500 hover:bg-emerald-400 text-black font-bold font-mono text-xs uppercase tracking-widest rounded transition-colors mb-3"
-                        >
-                            Submit Proposal
-                        </button>
-                        <p className="text-[10px] text-center text-zinc-500">
-                            No upfront cost required.
+                        {task.status === "Open" && !isTaskPoster && (
+                            <button 
+                                onClick={() => setIsBidModalOpen(true)}
+                                className="w-full py-3 bg-emerald-500 hover:bg-emerald-400 text-black font-bold font-mono text-xs uppercase tracking-widest rounded transition-colors mb-3"
+                            >
+                                Submit Proposal
+                            </button>
+                        )}
+
+                        {isTaskPoster && (
+                            <div className="text-center py-3 bg-zinc-800/50 border border-zinc-700 rounded text-xs font-mono text-zinc-400 uppercase tracking-widest">
+                                Your Task — Review proposals below
+                            </div>
+                        )}
+
+                        <p className="text-[10px] text-center text-zinc-500 mt-3">
+                            {bids.length} proposal{bids.length !== 1 ? "s" : ""} submitted
                         </p>
                     </div>
 
                     {/* Client Info */}
                     <div className="p-6 border border-zinc-900 rounded-xl">
-                        <h4 className="text-xs font-mono uppercase text-zinc-500 mb-4">Client Info</h4>
+                        <h4 className="text-xs font-mono uppercase text-zinc-500 mb-4">Posted By</h4>
                         <div className="flex items-center gap-3 mb-4">
                             <div className="w-8 h-8 rounded bg-gradient-to-br from-indigo-500 to-purple-500"></div>
                             <div>
                                 <p className="text-sm font-bold text-white">{task.clientName || "Anonymous"}</p>
-                                <p className="text-xs text-zinc-500">Wallet Connected</p>
+                                <p className="text-xs text-zinc-500">{task.clientAddress ? `${task.clientAddress.slice(0,6)}...${task.clientAddress.slice(-4)}` : "No wallet"}</p>
                             </div>
                         </div>
                     </div>
@@ -292,20 +424,19 @@ export default function TaskDetailsPage({ params }: { params: Promise<{ taskId: 
                 </button>
 
                 <h2 className="text-xl font-bold font-mono uppercase mb-1">Submit Proposal</h2>
-                <p className="text-sm text-zinc-500 mb-6">Bid on: {task.title}</p>
+                <p className="text-sm text-zinc-500 mb-6">For: {task.title}</p>
 
                 <form onSubmit={handleBidSubmit} className="space-y-6">
                     <div className="grid grid-cols-2 gap-4">
                         <div className="space-y-2">
-                            <label className="text-xs text-zinc-400 font-mono uppercase">Bid Amount (ETH)</label>
+                            <label className="text-xs text-zinc-400 font-mono uppercase">Your Price</label>
                             <input 
                                 required
-                                type="number" 
-                                step="0.01"
+                                type="text" 
                                 value={bidAmount}
                                 onChange={e => setBidAmount(e.target.value)}
                                 className="w-full bg-zinc-900 border border-zinc-800 rounded p-3 text-sm text-white focus:border-emerald-500/50 outline-none"
-                                placeholder="0.00"
+                                placeholder="e.g. $500 or 0.5 ETH"
                             />
                         </div>
                         <div className="space-y-2">
@@ -333,14 +464,13 @@ export default function TaskDetailsPage({ params }: { params: Promise<{ taskId: 
                         />
                     </div>
 
-                    <div className="flex items-center justify-between pt-4 border-t border-zinc-900">
-                        <span className="text-xs text-zinc-500">Service Fee: 2%</span>
+                    <div className="flex items-center justify-end pt-4 border-t border-zinc-900">
                         <button 
                             type="submit"
                             disabled={isSubmitting}
                             className="bg-emerald-500 hover:bg-emerald-400 text-black px-6 py-2 rounded font-bold text-sm transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                         >
-                            {isSubmitting ? 'Submitting...' : 'Place Bid'}
+                            {isSubmitting ? 'Submitting...' : 'Submit Proposal'}
                         </button>
                     </div>
                 </form>

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getDb, COLLECTIONS } from "@/lib/db";
 import { ObjectId } from "mongodb";
+import { checkRateLimit, getClientIp, RATE_LIMITS } from "@/lib/rate-limit";
 
 // GET /api/tasks — List tasks with optional filters
 export async function GET(request: NextRequest) {
@@ -19,10 +20,12 @@ export async function GET(request: NextRequest) {
     if (category && category !== "All") query.category = category;
     if (status && status !== "All") query.status = status;
     if (search) {
+      // Escape regex special characters to prevent injection
+      const escaped = search.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
       query.$or = [
-        { title: { $regex: search, $options: "i" } },
-        { description: { $regex: search, $options: "i" } },
-        { tags: { $elemMatch: { $regex: search, $options: "i" } } },
+        { title: { $regex: escaped, $options: "i" } },
+        { description: { $regex: escaped, $options: "i" } },
+        { tags: { $elemMatch: { $regex: escaped, $options: "i" } } },
       ];
     }
 
@@ -59,6 +62,16 @@ export async function GET(request: NextRequest) {
 // POST /api/tasks — Create a new task
 export async function POST(request: NextRequest) {
   try {
+    // Rate limit: 10 task creations per minute per IP
+    const ip = getClientIp(request);
+    const rl = checkRateLimit(`create-task:${ip}`, RATE_LIMITS.CREATE_TASK);
+    if (!rl.allowed) {
+      return NextResponse.json(
+        { error: `Rate limited. Try again in ${rl.resetInSeconds}s.` },
+        { status: 429, headers: { 'Retry-After': String(rl.resetInSeconds) } }
+      );
+    }
+
     const db = await getDb();
     const body = await request.json();
 
