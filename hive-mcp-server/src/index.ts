@@ -25,6 +25,8 @@ import {
   ReadResourceRequestSchema,
 } from "@modelcontextprotocol/sdk/types.js";
 
+import * as fs from "fs";
+import * as path from "path";
 import { createPublicClient, createWalletClient, http, formatEther } from "viem";
 import { privateKeyToAccount } from "viem/accounts";
 import { baseSepolia } from "viem/chains";
@@ -170,12 +172,26 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
           },
           required: ["address"]
         }
+      },
+      {
+        name: "hive_upload_deliverable",
+        description: "Upload a locally generated file (PDF, ZIP, DOCX) directly to the Hive platform. Returns the public URL to be used in the submit work tool.",
+        inputSchema: {
+          type: "object",
+          properties: {
+            filePath: {
+              type: "string",
+              description: "The absolute local path to the file you want to upload."
+            }
+          },
+          required: ["filePath"]
+        }
       }
     ]
   };
 });
 
-server.setRequestHandler(CallToolRequestSchema, async (request) => {
+server.setRequestHandler(CallToolRequestSchema, async (request: any) => {
   const { name, arguments: args } = request.params;
 
   if (name === "hive_list_bounties") {
@@ -317,6 +333,48 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
     }
   }
 
+  if (name === "hive_upload_deliverable") {
+    try {
+      const filePath = (args as any).filePath as string;
+      const absolutePath = path.resolve(filePath);
+
+      if (!fs.existsSync(absolutePath)) {
+        return { content: [{ type: "text", text: `Error: File not found at ${absolutePath}` }] };
+      }
+
+      // Read file into a Blob-like structure to send as FormData
+      const fileBuffer = fs.readFileSync(absolutePath);
+      const filename = path.basename(absolutePath);
+      
+      const formData = new FormData();
+      const blob = new Blob([fileBuffer], { type: 'application/octet-stream' });
+      formData.append('file', blob, filename);
+
+      const API_URL = process.env.HIVE_BASE_URL || "https://hive.luxenlabs.com";
+      const response = await fetch(`${API_URL}/api/upload`, {
+        method: "POST",
+        body: formData,
+      });
+
+      if (!response.ok) {
+        const errorData = (await response.json().catch(() => ({}))) as any;
+        throw new Error(errorData.error || `Upload failed with status: ${response.status}`);
+      }
+
+      const data = (await response.json()) as any;
+      return {
+        content: [
+          {
+            type: "text",
+            text: `✅ File successfully uploaded to Hive!\n\nURL: ${data.url}\n\nPlease use this URL as the reportUri when calling hive_submit_work or deliver.`
+          }
+        ]
+      };
+    } catch (error: any) {
+      return { content: [{ type: "text", text: `Error during upload: ${error.message}` }] };
+    }
+  }
+
   return { content: [{ type: "text", text: `Unknown tool: ${name}` }] };
 });
 
@@ -335,7 +393,7 @@ server.setRequestHandler(ListResourcesRequestSchema, async () => {
   };
 });
 
-server.setRequestHandler(ReadResourceRequestSchema, async (request) => {
+server.setRequestHandler(ReadResourceRequestSchema, async (request: any) => {
   const { uri } = request.params;
 
   if (uri === "hive://config") {

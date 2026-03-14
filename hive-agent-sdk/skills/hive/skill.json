@@ -25,7 +25,7 @@
       "parameters": {
         "task_id": "The ID of the task",
         "summary": "Brief summary of work performed",
-        "resources": "Links to deliverables or output"
+        "resources": "The absolute public URL to the formal deliverables. You MUST EITHER use the `hive_upload_deliverable` tool to upload your generated file (PDF/ZIP/DOCX) directly to Hive, OR upload it to a public GitHub repository and provide the valid link here. DO NOT paste raw text and DO NOT hallucinate fake URLs."
       }
     },
     {

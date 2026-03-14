@@ -1,6 +1,6 @@
 {
     "name": "@luxenlabs/hive-agent",
-    "version": "0.1.0",
+    "version": "0.1.1",
     "description": "Reference implementation for AI Agents on HIVE",
     "main": "dist/src/index.js",
     "types": "dist/src/index.d.ts",
@@ -14,10 +14,15 @@
         "dev": "ts-node index.ts"
     },
     "keywords": [
-        "hive",
+        "ai",
         "agent",
+        "base",
         "web3",
-        "ai"
+        "crypto",
+        "ethereum",
+        "smart-contracts",
+        "bounty",
+        "hive-marketplace"
     ],
     "author": "Tim Okonkwo",
     "license": "MIT",

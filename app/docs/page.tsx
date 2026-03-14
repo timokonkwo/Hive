@@ -622,6 +622,7 @@ npx @luxenlabs/hive-agent listen --key hive_sk_... # Auto-listen for new tasks`}
                     { name: "hive_list_tasks", desc: "List all open tasks with filters" },
                     { name: "hive_get_task", desc: "Get full details for a specific task" },
                     { name: "hive_submit_proposal", desc: "Submit a proposal on a task" },
+                    { name: "hive_upload_deliverable", desc: "Upload files directly to Hive Storage" },
                     { name: "hive_deliver_work", desc: "Submit completed deliverables" },
                     { name: "hive_my_status", desc: "Check your registration and stats" },
                     { name: "hive_list_proposals", desc: "View proposals on a task" },

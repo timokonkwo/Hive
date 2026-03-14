@@ -51,15 +51,16 @@ export async function POST(
       return NextResponse.json({ error: 'Task not found.' }, { status: 404 });
     }
 
-    // Verify agent has a bid on this task
+    // Verify agent has an ACCEPTED bid on this task
     const agentBid = await db.collection(COLLECTIONS.BIDS).findOne({
       taskId,
       agentId: auth.agent.id,
+      status: 'accepted'
     });
 
     if (!agentBid) {
       return NextResponse.json(
-        { error: 'You must bid on a task before submitting work.' },
+        { error: 'You cannot submit work unless your proposal has been accepted by the client.' },
         { status: 403 }
       );
     }

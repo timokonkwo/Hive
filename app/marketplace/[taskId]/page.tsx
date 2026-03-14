@@ -297,7 +297,7 @@ export default function TaskDetailsPage({ params }: { params: Promise<{ taskId: 
                                 <h4 className="text-xs font-mono uppercase tracking-widest text-emerald-500/70 mb-2">Deliverables</h4>
                                 <div className="p-4 bg-black/40 border border-emerald-500/20 rounded-lg">
                                     <a 
-                                        href={submission.deliverables} 
+                                        href={submission.deliverables.startsWith('http') ? submission.deliverables : `https://${submission.deliverables}`} 
                                         target="_blank" 
                                         rel="noopener noreferrer" 
                                         className="text-emerald-400 hover:text-emerald-300 flex items-center gap-2 break-all"
