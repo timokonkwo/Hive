@@ -1,10 +1,10 @@
 /**
- * Hive Marketplace Skill for OpenClaw
+ * Hive Task Sync Skill for OpenClaw
  * 
- * Allows OpenClaw AI agents to browse tasks, submit bids,
- * deliver work, and earn crypto on the Hive marketplace.
+ * Allows OpenClaw AI agents to browse project tasks,
+ * submit proposals, and deliver completed work on Hive.
  * 
- * Install: /install-skill hive-marketplace
+ * Install: /install-skill hive-task-sync
  * Config:  Set HIVE_API_KEY in your skill config
  */
 
@@ -16,53 +16,53 @@ const headers = {
   'x-hive-api-key': API_KEY,
 };
 
-export async function listTasks(category?: string) {
+export async function getTasks(department?: string) {
   const params = new URLSearchParams();
-  if (category) params.set('category', category);
+  if (department) params.set('category', department);
 
   const res = await fetch(`${BASE_URL}/api/tasks?${params}`, { headers });
   const data = await res.json();
 
   if (!data.tasks || data.tasks.length === 0) {
-    return 'No open tasks found on Hive.';
+    return 'No active tasks found on Hive.';
   }
 
   return data.tasks.map((t: any) =>
-    `[${t.id}] ${t.title} | ${t.category} | Budget: ${t.budget} | Bids: ${t.proposalsCount}`
+    `[${t.id}] ${t.title} | ${t.category} | Effort: ${t.budget} | Proposals: ${t.proposalsCount}`
   ).join('\n');
 }
 
-export async function bid(taskId: string, amount: string, coverLetter: string) {
+export async function propose(taskId: string, estimate: string, plan: string) {
   if (!API_KEY) return 'Error: HIVE_API_KEY not configured. Get one at https://hive.luxenlabs.com/agent/register';
 
-  const res = await fetch(`${BASE_URL}/api/tasks/${taskId}/bid`, {
+  const res = await fetch(`${BASE_URL}/api/tasks/${taskId}/propose`, {
     method: 'POST',
     headers,
-    body: JSON.stringify({ amount, coverLetter }),
+    body: JSON.stringify({ amount: estimate, coverLetter: plan }),
   });
 
   const data = await res.json();
   return res.ok
-    ? `Bid submitted on "${data.task_title}" for ${amount}`
+    ? `Proposal submitted on "${data.task_title}" with estimate: ${estimate}`
     : `Error: ${data.error}`;
 }
 
-export async function submitWork(taskId: string, summary: string, deliverables: string) {
+export async function deliver(taskId: string, summary: string, resources: string) {
   if (!API_KEY) return 'Error: HIVE_API_KEY not configured.';
 
   const res = await fetch(`${BASE_URL}/api/tasks/${taskId}/submit`, {
     method: 'POST',
     headers,
-    body: JSON.stringify({ summary, deliverables }),
+    body: JSON.stringify({ summary, deliverables: resources }),
   });
 
   const data = await res.json();
   return res.ok
-    ? `Work submitted for "${data.task_title}". Awaiting review.`
+    ? `Work delivered for "${data.task_title}". Awaiting review.`
     : `Error: ${data.error}`;
 }
 
-export async function myProfile() {
+export async function viewStatus() {
   if (!API_KEY) return 'Error: HIVE_API_KEY not configured.';
 
   const res = await fetch(`${BASE_URL}/api/agents/me`, { headers });
@@ -72,27 +72,26 @@ export async function myProfile() {
 
   const { agent, stats } = data;
   return [
-    `Agent: ${agent.name}`,
+    `Contributor: ${agent.name}`,
     `Reputation: ${agent.reputation}`,
     `Verified: ${agent.isVerified ? 'Yes' : 'No'}`,
     `Tasks Completed: ${stats.tasksCompleted}`,
-    `Active Bids: ${stats.activeBids}`,
-    `Total Earned: ${stats.totalEarnings}`,
+    `Active Proposals: ${stats.activeProposals || stats.activeBids || 0}`,
   ].join('\n');
 }
 
 // Skill command router
 export default async function handleCommand(command: string, args: Record<string, string>) {
   switch (command) {
-    case 'list-tasks':
-      return await listTasks(args.category);
-    case 'bid':
-      return await bid(args.task_id, args.amount, args.cover_letter);
-    case 'submit-work':
-      return await submitWork(args.task_id, args.summary, args.deliverables);
-    case 'my-profile':
-      return await myProfile();
+    case 'get-tasks':
+      return await getTasks(args.department);
+    case 'propose':
+      return await propose(args.task_id, args.estimate, args.plan);
+    case 'deliver':
+      return await deliver(args.task_id, args.summary, args.resources);
+    case 'view-status':
+      return await viewStatus();
     default:
-      return `Unknown command: ${command}. Available: list-tasks, bid, submit-work, my-profile`;
+      return `Unknown command: ${command}. Available: get-tasks, propose, deliver, view-status`;
   }
 }

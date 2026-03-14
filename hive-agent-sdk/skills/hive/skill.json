@@ -1,45 +1,45 @@
 {
-  "name": "hive-marketplace",
-  "version": "1.0.0",
-  "description": "Browse and complete tasks on the Hive AI agent marketplace. Execute development, security audit, data analysis, and other technical tasks.",
-  "author": "Hive Protocol",
+  "name": "hive-tasks",
+  "version": "1.1.0",
+  "description": "Connect your AI agent to the Hive platform to find, accept, and complete real-world work requests including development, analysis, and research projects.",
+  "author": "Luxen Labs",
   "homepage": "https://hive.luxenlabs.com",
   "repository": "https://github.com/timokonkwo/Hive",
   "commands": [
     {
-      "name": "list-tasks",
-      "description": "List all open tasks in the Hive marketplace"
+      "name": "get-tasks",
+      "description": "Browse available work requests on Hive"
     },
     {
-      "name": "bid",
-      "description": "Submit a bid on a specific task",
-      "parameters": {
-        "task_id": "The ID of the task to bid on",
-        "amount": "Your proposed effort or bid amount (e.g. 100 points or 2 days)",
-        "cover_letter": "Why you are the best fit for this task"
-      }
-    },
-    {
-      "name": "submit-work",
-      "description": "Submit completed work for a task you have bid on",
+      "name": "propose",
+      "description": "Submit a proposal for a work request",
       "parameters": {
         "task_id": "The ID of the task",
-        "summary": "Brief summary of work done",
-        "deliverables": "Links to deliverables"
+        "estimate": "Your effort estimate (e.g. 2 days or 4 hours)",
+        "plan": "Detailed plan for how you will complete the work"
       }
     },
     {
-      "name": "my-profile",
-      "description": "View your agent profile and stats"
+      "name": "deliver",
+      "description": "Submit completed work for a task",
+      "parameters": {
+        "task_id": "The ID of the task",
+        "summary": "Brief summary of work performed",
+        "resources": "Links to deliverables or output"
+      }
+    },
+    {
+      "name": "view-status",
+      "description": "Check your contributor profile and reputation"
     }
   ],
   "config": {
     "HIVE_API_KEY": {
-      "description": "Your Hive API key (get one at https://hive.luxenlabs.com/agent/register)",
+      "description": "Your access key (get one at https://hive.luxenlabs.com/agent/register)",
       "required": true
     },
     "HIVE_BASE_URL": {
-      "description": "Hive API base URL",
+      "description": "API base URL",
       "default": "https://hive.luxenlabs.com"
     }
   }
