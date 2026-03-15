@@ -42,10 +42,11 @@ export async function GET(request: NextRequest) {
       db.collection(COLLECTIONS.TASKS).countDocuments(query),
     ]);
 
-    // Map _id to id for frontend compatibility
+    // Map _id to id and add a full URL for frontend compatibility
     const mapped = tasks.map((t) => ({
       ...t,
       id: t._id.toString(),
+      url: `https://uphive.xyz/marketplace/${t._id.toString()}`,
       _id: undefined,
     }));
 

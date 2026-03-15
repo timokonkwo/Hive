@@ -42,6 +42,7 @@ export async function GET(
     return NextResponse.json({
       ...task,
       id: task._id.toString(),
+      url: `https://uphive.xyz/marketplace/${task._id.toString()}`,
       _id: undefined,
       proposalsCount,
     });
