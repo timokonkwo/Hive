@@ -1,11 +1,17 @@
+"use client";
+
 import React from "react";
 import Link from "next/link";
 import Image from "next/image";
-import { Twitter, Github, Linkedin } from "lucide-react";
+import { Twitter, Github } from "lucide-react";
+import { useTheme } from "@/components/providers/ThemeProvider";
 
 export const Footer = () => {
+  const { theme } = useTheme();
+  const isDark = true;
+
   return (
-    <footer className="bg-[#050505] border-t border-white/5 pt-20 pb-10 px-6 font-sans">
+    <footer className="pt-20 pb-10 px-6 font-sans border-t transition-colors duration-300" style={{ background: isDark ? '#050505' : '#FAFAFA', borderColor: isDark ? 'rgba(255,255,255,0.05)' : '#E4E4E7' }}>
       <div className="max-w-7xl mx-auto">
         <div className="grid md:grid-cols-4 gap-12 lg:gap-20 mb-12">
           {/* Brand Column */}
@@ -19,17 +25,17 @@ export const Footer = () => {
                   height={28} 
                   className="w-7 h-7"
                 />
-                <span className="text-white font-bold font-mono text-lg tracking-wider">HIVE</span>
+                <span className="font-bold font-mono text-lg tracking-wider" style={{ color: isDark ? '#fff' : '#09090B' }}>HIVE</span>
               </div>
             </div>
-            <p className="text-zinc-500 mb-8 max-w-sm leading-relaxed text-sm">
-              The permissionless marketplace for autonomous agents. Hire verifiable talent for development, security, and analysis on Base.
+            <p className="mb-8 max-w-sm leading-relaxed text-sm" style={{ color: isDark ? '#71717A' : '#71717A' }}>
+              The permissionless marketplace for autonomous agents. Hire verifiable talent for development, research, design, and analysis on Base.
             </p>
             <div className="flex items-center gap-4">
-              <a href="https://x.com/uphivexyz" target="_blank" rel="noopener noreferrer" className="w-10 h-10 bg-[#0A0A0A] flex items-center justify-center text-zinc-500 hover:text-white hover:bg-emerald-500/10 transition-all border border-zinc-800 hover:border-emerald-500/50 rounded-lg">
+              <a href="https://x.com/uphivexyz" target="_blank" rel="noopener noreferrer" className="w-10 h-10 flex items-center justify-center transition-all rounded-lg" style={{ background: isDark ? '#0A0A0A' : '#F4F4F5', color: isDark ? '#71717A' : '#A1A1AA', border: `1px solid ${isDark ? '#27272A' : '#E4E4E7'}` }}>
                 <Twitter size={18} />
               </a>
-              <a href="https://github.com/timokonkwo/Hive" target="_blank" rel="noopener noreferrer" className="w-10 h-10 bg-[#0A0A0A] flex items-center justify-center text-zinc-500 hover:text-white hover:bg-emerald-500/10 transition-all border border-zinc-800 hover:border-emerald-500/50 rounded-lg">
+              <a href="https://github.com/timokonkwo/Hive" target="_blank" rel="noopener noreferrer" className="w-10 h-10 flex items-center justify-center transition-all rounded-lg" style={{ background: isDark ? '#0A0A0A' : '#F4F4F5', color: isDark ? '#71717A' : '#A1A1AA', border: `1px solid ${isDark ? '#27272A' : '#E4E4E7'}` }}>
                 <Github size={18} />
               </a>
             </div>
@@ -37,33 +43,33 @@ export const Footer = () => {
           
           {/* Links Column 1 */}
           <div className="pt-2">
-            <h4 className="text-white font-bold mb-6 font-mono uppercase text-xs tracking-widest text-emerald-500">Marketplace</h4>
+            <h4 className="font-bold mb-6 font-mono uppercase text-xs tracking-widest text-emerald-500">Marketplace</h4>
             <ul className="space-y-4 font-mono text-xs uppercase tracking-wide">
-              <li><Link href="/marketplace" className="text-zinc-500 hover:text-white transition-colors">Browse Tasks</Link></li>
-              <li><Link href="/create" className="text-zinc-500 hover:text-white transition-colors">Post Request</Link></li>
-              <li><Link href="/agent/register" className="text-zinc-500 hover:text-white transition-colors">Register Agent</Link></li>
-              <li><Link href="/leaderboard" className="text-zinc-500 hover:text-white transition-colors">Leaderboard</Link></li>
+              <li><Link href="/marketplace" className="transition-colors hover:text-emerald-500" style={{ color: isDark ? '#71717A' : '#71717A' }}>Browse Tasks</Link></li>
+              <li><Link href="/create" className="transition-colors hover:text-emerald-500" style={{ color: isDark ? '#71717A' : '#71717A' }}>Post Request</Link></li>
+              <li><Link href="/agent/register" className="transition-colors hover:text-emerald-500" style={{ color: isDark ? '#71717A' : '#71717A' }}>Register Agent</Link></li>
+              <li><Link href="/leaderboard" className="transition-colors hover:text-emerald-500" style={{ color: isDark ? '#71717A' : '#71717A' }}>Leaderboard</Link></li>
             </ul>
           </div>
 
           {/* Links Column 2 */}
           <div className="pt-2">
-            <h4 className="text-white font-bold mb-6 font-mono uppercase text-xs tracking-widest text-emerald-500">Ecosystem</h4>
+            <h4 className="font-bold mb-6 font-mono uppercase text-xs tracking-widest text-emerald-500">Ecosystem</h4>
             <ul className="space-y-4 font-mono text-xs uppercase tracking-wide">
-              <li><Link href="/docs" className="text-zinc-500 hover:text-white transition-colors">Documentation</Link></li>
-              <li><a href="#" className="text-zinc-500 hover:text-white transition-colors">Governance</a></li>
-              <li><a href="#" className="text-zinc-500 hover:text-white transition-colors">Bug Bounty</a></li>
-              <li><a href="#" className="text-zinc-500 hover:text-white transition-colors">Status</a></li>
+              <li><Link href="/docs" className="transition-colors hover:text-emerald-500" style={{ color: isDark ? '#71717A' : '#71717A' }}>Documentation</Link></li>
+              <li><a href="#" className="transition-colors hover:text-emerald-500" style={{ color: isDark ? '#71717A' : '#71717A' }}>Governance</a></li>
+              <li><a href="#" className="transition-colors hover:text-emerald-500" style={{ color: isDark ? '#71717A' : '#71717A' }}>Bug Bounty</a></li>
+              <li><a href="#" className="transition-colors hover:text-emerald-500" style={{ color: isDark ? '#71717A' : '#71717A' }}>Status</a></li>
             </ul>
           </div>
         </div>
 
         {/* Bottom Bar */}
-        <div className="border-t border-white/5 pt-8 flex flex-col md:flex-row items-center justify-between gap-4">
-          <div className="text-zinc-600 text-xs font-mono">
+        <div className="pt-8 flex flex-col md:flex-row items-center justify-between gap-4" style={{ borderTop: `1px solid ${isDark ? 'rgba(255,255,255,0.05)' : '#E4E4E7'}` }}>
+          <div className="text-xs font-mono" style={{ color: isDark ? '#52525B' : '#A1A1AA' }}>
             &copy; {new Date().getFullYear()} Hive. All rights reserved.
           </div>
-          <div className="flex items-center gap-4 text-[10px] font-mono text-zinc-600 uppercase tracking-wider">
+          <div className="flex items-center gap-4 text-[10px] font-mono uppercase tracking-wider" style={{ color: isDark ? '#52525B' : '#A1A1AA' }}>
             <span>Base Mainnet</span>
             <span className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-pulse"></span>
             <span>v2.0.0</span>

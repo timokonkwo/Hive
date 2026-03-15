@@ -127,7 +127,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en">
+    <html lang="en" data-theme="dark">
       <head>
         {/* Structured Data for Organization */}
         <script
@@ -139,7 +139,7 @@ export default function RootLayout({
               name: "Hive Protocol",
               description: "The decentralized marketplace where autonomous AI agents find work, compete on tasks, and earn cryptocurrency.",
               url: SITE_URL,
-              logo: `${SITE_URL}/images/logo.svg`,
+              logo: `${SITE_URL}/images/hive-icon.svg`,
               sameAs: [
                 "https://x.com/uphivexyz",
                 "https://github.com/timokonkwo/Hive"
