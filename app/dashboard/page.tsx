@@ -130,10 +130,9 @@ export default function DashboardPage() {
       </div>
 
       {/* Stats Grid */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
+      <div className="grid grid-cols-2 md:grid-cols-3 gap-4 mb-8">
         <StatCard label="Tasks Posted" value={stats.totalPosted || 0} icon={<FileText size={16} />} />
         <StatCard label="Open Tasks" value={stats.openTasks || 0} icon={<Clock size={16} />} color="text-yellow-500" />
-        <StatCard label="Proposals Sent" value={stats.totalBidsSubmitted || 0} icon={<Send size={16} />} color="text-blue-500" />
         <StatCard label="Pending Reviews" value={stats.pendingReviews || 0} icon={<Inbox size={16} />} color="text-purple-500" />
       </div>
 
@@ -144,12 +143,6 @@ export default function DashboardPage() {
           onClick={() => setActiveTab("posted")}
           label="My Tasks"
           count={stats.totalPosted}
-        />
-        <TabButton
-          active={activeTab === "proposals"}
-          onClick={() => setActiveTab("proposals")}
-          label="My Proposals"
-          count={stats.totalBidsSubmitted}
         />
         <TabButton
           active={activeTab === "incoming"}
@@ -192,43 +185,6 @@ export default function DashboardPage() {
               message="You haven't posted any tasks yet."
               actionLabel="Post Your First Task"
               actionHref="/create"
-            />
-          )}
-        </div>
-      )}
-
-      {activeTab === "proposals" && (
-        <div className="space-y-4">
-          {data?.myBids?.length > 0 ? (
-            data.myBids.map((bid: any) => (
-              <Link key={bid.id} href={`/marketplace/${bid.taskId}`} className="block">
-                <div className="p-5 bg-zinc-900/30 border border-zinc-800 rounded-lg hover:border-zinc-700 transition-colors group">
-                  <div className="flex items-start justify-between">
-                    <div>
-                      <div className="flex items-center gap-3 mb-2">
-                        <h3 className="font-bold text-white group-hover:text-emerald-400 transition-colors">{bid.taskTitle}</h3>
-                        <StatusBadge status={bid.status} />
-                      </div>
-                      <p className="text-sm text-zinc-500 line-clamp-1">{bid.coverLetter}</p>
-                      <div className="flex items-center gap-4 mt-3 text-xs text-zinc-600 font-mono">
-                        <span>Amount: {bid.amount}</span>
-                        <span>•</span>
-                        <span>{bid.timeEstimate}</span>
-                        <span>•</span>
-                        <span>Submitted {formatTimeAgo(bid.createdAt)}</span>
-                      </div>
-                    </div>
-                    <ChevronRight className="text-zinc-700 group-hover:text-white transition-colors shrink-0 mt-1" size={16} />
-                  </div>
-                </div>
-              </Link>
-            ))
-          ) : (
-            <EmptyState
-              icon={<Send size={40} />}
-              message="You haven't submitted any proposals yet."
-              actionLabel="Browse Open Tasks"
-              actionHref="/marketplace"
             />
           )}
         </div>

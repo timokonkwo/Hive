@@ -16,11 +16,6 @@ export default function TaskDetailsPage({ params }: { params: Promise<{ taskId: 
   const [task, setTask] = useState<any>(null);
   const [bids, setBids] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
-  const [isBidModalOpen, setIsBidModalOpen] = useState(false);
-  const [bidAmount, setBidAmount] = useState("");
-  const [bidDays, setBidDays] = useState("");
-  const [coverLetter, setCoverLetter] = useState("");
-  const [isSubmitting, setIsSubmitting] = useState(false);
   const [expandedBid, setExpandedBid] = useState<string | null>(null);
   const [processingBid, setProcessingBid] = useState<string | null>(null);
   const [submission, setSubmission] = useState<any>(null);
@@ -89,48 +84,6 @@ export default function TaskDetailsPage({ params }: { params: Promise<{ taskId: 
       })
       .catch(() => setIsRegisteredAgent(false));
   }, [userAddress, isTaskPoster]);
-
-  const handleBidSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!authenticated) {
-      login();
-      return;
-    }
-
-    setIsSubmitting(true);
-    try {
-      const walletAddress = user?.wallet?.address || "0x0000";
-
-      const res = await fetch(`/api/tasks/${taskId}/bids`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          agentAddress: walletAddress,
-          agentName: `${walletAddress.slice(0, 6)}...${walletAddress.slice(-4)}`,
-          amount: bidAmount,
-          timeEstimate: `${bidDays} days`,
-          coverLetter,
-        }),
-      });
-
-      if (!res.ok) {
-        const err = await res.json();
-        throw new Error(err.error || "Failed to submit proposal");
-      }
-
-      const newBid = await res.json();
-      setBids((prev) => [newBid, ...prev]);
-      setIsBidModalOpen(false);
-      toast.success("Proposal Submitted", { description: "The client has been notified." });
-      setBidAmount("");
-      setBidDays("");
-      setCoverLetter("");
-    } catch (error: any) {
-      toast.error("Error", { description: error.message });
-    } finally {
-      setIsSubmitting(false);
-    }
-  };
 
   const handleBidAction = async (bidId: string, status: "accepted" | "rejected") => {
     setProcessingBid(bidId);
@@ -527,24 +480,11 @@ export default function TaskDetailsPage({ params }: { params: Promise<{ taskId: 
                             </span>
                         </div>
                         
-                        {task.status === "Open" && !isTaskPoster && isRegisteredAgent === true && (
-                            <button 
-                                onClick={() => setIsBidModalOpen(true)}
-                                className="w-full py-3 bg-emerald-500 hover:bg-emerald-400 text-black font-bold font-mono text-xs uppercase tracking-widest rounded transition-colors mb-3"
-                            >
-                                Submit Proposal
-                            </button>
-                        )}
-
-                        {task.status === "Open" && !isTaskPoster && isRegisteredAgent === false && (
-                            <div className="text-center space-y-3">
-                                <p className="text-xs text-zinc-400 font-mono">Only registered agents can submit proposals.</p>
-                                <Link href="/agent/register" className="block w-full py-3 border border-blue-500 text-blue-400 hover:bg-blue-500 hover:text-black font-bold font-mono text-xs uppercase tracking-widest rounded transition-colors">
-                                    Register as Agent
-                                </Link>
+                        {task.status === "Open" && !isTaskPoster && (
+                            <div className="text-center py-3 bg-zinc-800/50 border border-zinc-700 rounded text-xs font-mono text-zinc-400 uppercase tracking-widest">
+                                Awaiting Agent Proposals
                             </div>
                         )}
-
                         {isTaskPoster && task.status === 'Open' && (
                             <div className="text-center py-3 bg-zinc-800/50 border border-zinc-700 rounded text-xs font-mono text-zinc-400 uppercase tracking-widest">
                                 Your Task — Review proposals below
@@ -590,73 +530,6 @@ export default function TaskDetailsPage({ params }: { params: Promise<{ taskId: 
             </aside>
         </div>
       </main>
-
-      {/* Bid Modal */}
-      {isBidModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-             <div className="absolute inset-0 bg-black/80 backdrop-blur-sm" onClick={() => setIsBidModalOpen(false)}></div>
-             <div className="relative z-10 w-full max-w-lg bg-[#0A0A0A] border border-zinc-800 rounded-xl shadow-2xl p-8 animate-in zoom-in-95 duration-200">
-                <button 
-                    onClick={() => setIsBidModalOpen(false)}
-                    className="absolute top-4 right-4 text-zinc-500 hover:text-white transition-colors"
-                >
-                    <X className="w-5 h-5" />
-                </button>
-
-                <h2 className="text-xl font-bold font-mono uppercase mb-1">Submit Proposal</h2>
-                <p className="text-sm text-zinc-500 mb-6">For: {task.title}</p>
-
-                <form onSubmit={handleBidSubmit} className="space-y-6">
-                    <div className="grid grid-cols-2 gap-4">
-                        <div className="space-y-2">
-                            <label className="text-xs text-zinc-400 font-mono uppercase">Your Price</label>
-                            <input 
-                                required
-                                type="text" 
-                                value={bidAmount}
-                                onChange={e => setBidAmount(e.target.value)}
-                                className="w-full bg-zinc-900 border border-zinc-800 rounded p-3 text-sm text-white focus:border-emerald-500/50 outline-none"
-                                placeholder="e.g. $500"
-                            />
-                        </div>
-                        <div className="space-y-2">
-                            <label className="text-xs text-zinc-400 font-mono uppercase">Delivery (Days)</label>
-                            <input 
-                                required
-                                type="number" 
-                                value={bidDays}
-                                onChange={e => setBidDays(e.target.value)}
-                                className="w-full bg-zinc-900 border border-zinc-800 rounded p-3 text-sm text-white focus:border-emerald-500/50 outline-none"
-                                placeholder="7"
-                            />
-                        </div>
-                    </div>
-
-                    <div className="space-y-2">
-                        <label className="text-xs text-zinc-400 font-mono uppercase">Cover Letter / Strategy</label>
-                        <textarea 
-                            required
-                            rows={4}
-                            value={coverLetter}
-                            onChange={e => setCoverLetter(e.target.value)}
-                            className="w-full bg-zinc-900 border border-zinc-800 rounded p-3 text-sm text-white focus:border-emerald-500/50 outline-none resize-none"
-                            placeholder="Briefly explain your approach..."
-                        />
-                    </div>
-
-                    <div className="flex items-center justify-end pt-4 border-t border-zinc-900">
-                        <button 
-                            type="submit"
-                            disabled={isSubmitting}
-                            className="bg-emerald-500 hover:bg-emerald-400 text-black px-6 py-2 rounded font-bold text-sm transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                        >
-                            {isSubmitting ? 'Submitting...' : 'Submit Proposal'}
-                        </button>
-                    </div>
-                </form>
-             </div>
-        </div>
-      )}
     </div>
   );
 }
