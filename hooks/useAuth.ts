@@ -18,10 +18,11 @@ export function useAuth() {
   const { address: wagmiAddress, isConnected: wagmiConnected } = useAccount();
   const mockAuthEnabled = process.env.NEXT_PUBLIC_MOCK_AUTH === "true";
   
-  const [isReady, setIsReady] = useState(false);
+  const [isReady, setIsReady] = useState(privy.ready || mockAuthEnabled);
   const [useFallback, setUseFallback] = useState(false);
-  const [mockAuthenticated, setMockAuthenticated] = useState(false);
+  const [mockAuthenticated, setMockAuthenticated] = useState(mockAuthEnabled);
   const [prevAddress, setPrevAddress] = useState<string | null>(null);
+  const [authStabilized, setAuthStabilized] = useState(false);
 
   // Privy readiness / fallback timer
   useEffect(() => {
@@ -50,13 +51,37 @@ export function useAuth() {
     return () => clearTimeout(timer);
   }, [privy.ready, mockAuthEnabled]);
 
+  // Stabilization delay: after Privy authenticates, wait for wagmi to sync
+  // This prevents the wallet switch detection from firing too early
+  // (especially for email sign-in where an embedded wallet is created)
+  useEffect(() => {
+    if (!privy.authenticated) {
+      setAuthStabilized(false);
+      return;
+    }
+
+    // Give wagmi 3 seconds to sync with the new Privy session
+    const timer = setTimeout(() => {
+      setAuthStabilized(true);
+    }, 3000);
+
+    return () => clearTimeout(timer);
+  }, [privy.authenticated]);
+
+  // Check if user has an embedded wallet (email/social sign-in)
+  const hasEmbeddedWallet = privy.user?.linkedAccounts?.some(
+    (account: any) => account.type === 'wallet' && account.walletClientType === 'privy'
+  );
+
   // Detect MetaMask wallet switches via wagmi
-  // When the user switches wallets in MetaMask, wagmi picks it up immediately
-  // but Privy's session still references the old wallet. We log them out
-  // so they get a clean reconnect with the new wallet.
+  // Only runs for external wallet users (not email/social sign-in)
+  // and only after auth has stabilized (wagmi has had time to sync)
   useEffect(() => {
     if (mockAuthEnabled || useFallback) return;
     if (!privy.authenticated || !wagmiAddress) return;
+    if (!authStabilized) return;
+    // Skip for embedded wallet users — they don't use MetaMask
+    if (hasEmbeddedWallet) return;
 
     const currentPrivyAddress = privy.user?.wallet?.address?.toLowerCase();
     const currentWagmiAddress = wagmiAddress?.toLowerCase();
@@ -77,18 +102,21 @@ export function useAuth() {
         setPrevAddress(null);
       });
     }
-  }, [wagmiAddress, privy.authenticated, privy.user?.wallet?.address, mockAuthEnabled, useFallback]);
+  }, [wagmiAddress, privy.authenticated, privy.user?.wallet?.address, mockAuthEnabled, useFallback, authStabilized, hasEmbeddedWallet]);
 
   // Handle disconnect from wagmi side (user disconnected in MetaMask)
+  // Skip for embedded wallet users — their wallet is managed by Privy, not wagmi
   useEffect(() => {
     if (mockAuthEnabled || useFallback) return;
+    if (!authStabilized) return;
+    if (hasEmbeddedWallet) return;
     if (privy.authenticated && prevAddress && !wagmiConnected) {
       console.log("Wallet disconnected externally");
       privy.logout().then(() => {
         setPrevAddress(null);
       });
     }
-  }, [wagmiConnected, privy.authenticated, prevAddress, mockAuthEnabled, useFallback]);
+  }, [wagmiConnected, privy.authenticated, prevAddress, mockAuthEnabled, useFallback, authStabilized, hasEmbeddedWallet]);
 
   // Mock/Fallback mode
   if (mockAuthEnabled || useFallback) {

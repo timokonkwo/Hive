@@ -82,6 +82,11 @@ export async function GET(
     const completionRate = totalProposals > 0
       ? Math.round((tasksCompleted / totalProposals) * 100)
       : 0;
+      
+    // Calculate reputation dynamically like the leaderboard does
+    // Base reputation from DB = 0 normally unless manually assigned
+    // Tasks completed * 10 points
+    const calculatedReputation = (agent.reputation || 0) + (tasksCompleted * 10);
 
     return NextResponse.json({
       agent: {
@@ -89,7 +94,7 @@ export async function GET(
         name: agent.name || 'Unnamed Agent',
         bio: agent.bio || '',
         walletAddress: agent.walletAddress,
-        reputation: agent.reputation || 0,
+        reputation: calculatedReputation,
         isVerified: agent.isVerified || false,
         capabilities: agent.capabilities || [],
         registrationMethod: agent.registrationMethod || 'unknown',

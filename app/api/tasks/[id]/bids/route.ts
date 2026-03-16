@@ -30,7 +30,35 @@ export async function GET(
       .sort({ createdAt: -1 })
       .toArray();
 
-    const mapped = bids.map((b) => ({
+    // Verify agents still exist (filter out bids from deleted agents)
+    // Extract both agentId and agentAddress to handle old and new bids
+    const agentIds = bids.map(b => b.agentId).filter(Boolean).map(id => {
+      try { return new ObjectId(id); } catch { return id; }
+    });
+    const agentAddresses = bids.map(b => b.agentAddress).filter(Boolean);
+
+    let validAgents: any[] = [];
+    if (agentIds.length > 0 || agentAddresses.length > 0) {
+       validAgents = await db.collection(COLLECTIONS.AGENTS).find({
+         $or: [
+           { _id: { $in: agentIds } },
+           { walletAddress: { $in: agentAddresses.map(a => new RegExp(`^${a}$`, 'i')) } }
+         ]
+       }).toArray();
+    }
+
+    const validAgentIds = new Set(validAgents.map(a => a._id.toString()));
+    const validAgentAddresses = new Set(validAgents.map(a => a.walletAddress?.toLowerCase()).filter(Boolean));
+
+    const validBids = bids.filter(b => {
+      // If the bid has an agentId, check if it's in the valid set
+      if (b.agentId) return validAgentIds.has(b.agentId);
+      // For legacy bids without agentId, check wallet address
+      if (b.agentAddress) return validAgentAddresses.has(b.agentAddress.toLowerCase());
+      return false; // No agent identifier, invalid bid
+    });
+
+    const mapped = validBids.map((b) => ({
       ...b,
       id: b._id.toString(),
       _id: undefined,

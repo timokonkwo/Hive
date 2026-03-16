@@ -108,21 +108,16 @@ function AgentProfileContent() {
         <div className="max-w-4xl mx-auto px-6">
           
           {/* Profile Header */}
-          <div className="bg-[#0A0A0A] border border-white/10 rounded-sm p-8 mb-6 relative overflow-hidden">
-            <div className="absolute top-0 right-0 p-4">
-              <Link href={`/create?agent=${agent.walletAddress || agent.id}`} className="px-4 py-2 bg-white text-black font-bold font-mono text-xs uppercase tracking-widest hover:bg-gray-200 transition-colors rounded-sm flex items-center gap-2">
-                <Zap size={14} /> Hire Agent
-              </Link>
-            </div>
+          <div className="bg-[#0A0A0A] border border-white/10 rounded-sm p-4 sm:p-8 mb-6 relative overflow-hidden">
 
-            <div className="flex flex-col md:flex-row items-center md:items-start gap-6 text-center md:text-left mt-4 md:mt-0">
+            <div className="flex flex-col md:flex-row items-center md:items-start gap-4 sm:gap-6 text-center md:text-left">
               <div className="w-24 h-24 bg-emerald-500/10 border border-emerald-500/20 rounded-sm flex items-center justify-center shrink-0 relative group">
                 <Bot className="text-emerald-500" size={48} />
                 <div className="absolute inset-0 bg-emerald-500/20 opacity-0 group-hover:opacity-100 transition-opacity blur-xl"></div>
               </div>
               <div className="flex-1 min-w-0 w-full">
                 <div className="flex flex-col md:flex-row md:items-center gap-3 mb-2">
-                  <h1 className="text-3xl font-black font-mono uppercase truncate text-white">{agent.name}</h1>
+                  <h1 className="text-xl sm:text-3xl font-black font-mono uppercase truncate text-white">{agent.name}</h1>
                   {agent.isVerified && (
                     <span className="inline-flex items-center gap-1 text-xs font-mono text-emerald-500 uppercase tracking-widest">
                       <CheckCircle size={12} /> Verified
@@ -143,9 +138,6 @@ function AgentProfileContent() {
                   <span className="flex items-center gap-1.5">
                     <Calendar size={12} /> Joined {joinDate}
                   </span>
-                  <span className="flex items-center gap-1.5 capitalize">
-                    <Shield size={12} /> {agent.registrationMethod} registration
-                  </span>
                 </div>
 
                 {/* Badges */}
@@ -156,13 +148,20 @@ function AgentProfileContent() {
                     </span>
                   ))}
                 </div>
+
+                {/* Hire button — inline for all screens */}
+                <div className="mt-4">
+                  <Link href={`/create?agent=${agent.walletAddress || agent.id}`} className="inline-flex px-4 py-2 bg-white text-black font-bold font-mono text-xs uppercase tracking-widest hover:bg-gray-200 transition-colors rounded-sm items-center gap-2">
+                    <Zap size={14} /> Hire Agent
+                  </Link>
+                </div>
               </div>
             </div>
           </div>
 
           {/* Stats & Skills */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8 items-start">
-            <div className="md:col-span-2 grid grid-cols-2 md:grid-cols-4 gap-4">
+            <div className="md:col-span-2 grid grid-cols-2 gap-3 sm:gap-4 md:grid-cols-4">
               <div className="bg-[#0A0A0A] border border-white/10 p-4 rounded-sm text-center group hover:border-emerald-500/30 transition-colors">
                 <div className="flex items-center justify-center gap-2 text-emerald-500 font-mono font-bold text-2xl group-hover:scale-110 transition-transform">
                   <Star size={20} className="shrink-0" /> {agent.reputation}

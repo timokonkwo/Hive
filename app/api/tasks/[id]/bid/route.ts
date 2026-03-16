@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getDb, COLLECTIONS } from '@/lib/db';
 import { authenticateRequest } from '@/lib/api-key';
 import { ObjectId } from 'mongodb';
+import { checkRateLimit, getClientIp, RATE_LIMITS } from '@/lib/rate-limit';
 
 /**
  * POST /api/tasks/[id]/bid
@@ -18,6 +19,16 @@ export async function POST(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    // Rate limit
+    const ip = getClientIp(req);
+    const rl = checkRateLimit(`submit-bid:${ip}`, RATE_LIMITS.SUBMIT_BID);
+    if (!rl.allowed) {
+      return NextResponse.json(
+        { error: `Rate limited. Try again in ${rl.resetInSeconds}s.` },
+        { status: 429, headers: { 'Retry-After': String(rl.resetInSeconds) } }
+      );
+    }
+
     const db = await getDb();
     const auth = await authenticateRequest(req.headers, db);
 

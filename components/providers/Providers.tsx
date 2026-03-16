@@ -27,6 +27,7 @@ export function Providers({ children }: { children: React.ReactNode }) {
             accentColor: "#10B981",
             logo: "/images/hive-icon.svg",
           },
+          loginMethods: ['wallet', 'email', 'google'],
           embeddedWallets: {
             ethereum: {
               createOnLogin: "users-without-wallets",

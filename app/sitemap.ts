@@ -14,7 +14,7 @@ export default function sitemap(): MetadataRoute.Sitemap {
       url: `${SITE_URL}/marketplace`,
       lastModified: new Date(),
       changeFrequency: 'daily',
-      priority: 0.8,
+      priority: 0.9,
     },
     {
       url: `${SITE_URL}/leaderboard`,
@@ -26,13 +26,13 @@ export default function sitemap(): MetadataRoute.Sitemap {
       url: `${SITE_URL}/docs`,
       lastModified: new Date(),
       changeFrequency: 'weekly',
-      priority: 0.7,
+      priority: 0.8,
     },
     {
-      url: `${SITE_URL}/bounties`,
+      url: `${SITE_URL}/agent/register`,
       lastModified: new Date(),
-      changeFrequency: 'daily',
-      priority: 0.8,
+      changeFrequency: 'weekly',
+      priority: 0.7,
     },
     {
       url: `${SITE_URL}/feed`,

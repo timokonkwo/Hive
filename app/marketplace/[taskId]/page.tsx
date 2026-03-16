@@ -241,6 +241,10 @@ export default function TaskDetailsPage({ params }: { params: Promise<{ taskId: 
     if (bidStatus === "rejected") {
       return <span className="px-2 py-0.5 rounded-full bg-red-500/10 border border-red-500/20 text-red-500 text-[10px] font-bold uppercase">Rejected</span>;
     }
+    // If the task is no longer Open and the bid wasn't accepted, it's effectively closed/not selected
+    if (bidStatus === "Pending" && task && task.status !== "Open") {
+      return <span className="px-2 py-0.5 rounded-full bg-zinc-500/10 border border-zinc-500/20 text-zinc-500 text-[10px] font-bold uppercase">Not Selected</span>;
+    }
     return <span className="px-2 py-0.5 rounded-full bg-yellow-500/10 border border-yellow-500/20 text-yellow-500 text-[10px] font-bold uppercase">Pending</span>;
   };
 
@@ -431,7 +435,11 @@ export default function TaskDetailsPage({ params }: { params: Promise<{ taskId: 
                                         </div>
                                         <div>
                                             <div className="flex items-center gap-3">
-                                                <h4 className="font-bold text-white">{bid.agentName}</h4>
+                                                <h4 className="font-bold text-white hover:text-emerald-400 transition-colors">
+                                                    <Link href={`/agent/${encodeURIComponent(bid.agentName || "Unknown")}`} onClick={(e) => e.stopPropagation()}>
+                                                        {bid.agentName}
+                                                    </Link>
+                                                </h4>
                                                 {getStatusBadge(bid.status)}
                                             </div>
                                             <p className="text-xs text-zinc-500 mt-1">{bid.timeEstimate} • {bid.amount}</p>

@@ -69,3 +69,92 @@ export async function GET(req: NextRequest) {
     );
   }
 }
+
+/**
+ * PATCH /api/agents/me
+ * Update own profile. Agents can link a wallet, update bio, or capabilities.
+ * Wallet can only be set if currently null (prevents hijacking).
+ */
+export async function PATCH(req: NextRequest) {
+  try {
+    const ip = getClientIp(req);
+    const rl = checkRateLimit(`agents-me-patch:${ip}`, RATE_LIMITS.MANAGE_BID);
+    if (!rl.allowed) {
+      return NextResponse.json(
+        { error: `Rate limited. Try again in ${rl.resetInSeconds}s.` },
+        { status: 429, headers: { 'Retry-After': String(rl.resetInSeconds) } }
+      );
+    }
+
+    const db = await getDb();
+    const auth = await authenticateRequest(req.headers, db);
+
+    if (!auth) {
+      return NextResponse.json(
+        { error: 'Authentication required. Provide x-hive-api-key header.' },
+        { status: 401 }
+      );
+    }
+
+    const body = await req.json();
+    const { walletAddress, bio, capabilities } = body;
+
+    const updates: Record<string, any> = { updatedAt: new Date() };
+    const messages: string[] = [];
+
+    // Wallet linking — only if currently null
+    if (walletAddress) {
+      if (typeof walletAddress !== 'string' || !/^0x[a-fA-F0-9]{40}$/.test(walletAddress)) {
+        return NextResponse.json({ error: 'Invalid wallet address format.' }, { status: 400 });
+      }
+      if (auth.agent.walletAddress) {
+        return NextResponse.json(
+          { error: 'Wallet already linked. Cannot change wallet address.' },
+          { status: 409 }
+        );
+      }
+      updates.walletAddress = walletAddress;
+      messages.push('Wallet linked');
+    }
+
+    // Bio update
+    if (bio !== undefined) {
+      if (typeof bio !== 'string' || bio.length > 1000) {
+        return NextResponse.json({ error: 'Bio must be a string of 1000 chars or less.' }, { status: 400 });
+      }
+      updates.bio = bio;
+      messages.push('Bio updated');
+    }
+
+    // Capabilities update
+    if (capabilities !== undefined) {
+      if (!Array.isArray(capabilities) || capabilities.length === 0 || capabilities.length > 10) {
+        return NextResponse.json({ error: 'Capabilities must be an array of 1-10 items.' }, { status: 400 });
+      }
+      updates.capabilities = capabilities;
+      messages.push('Capabilities updated');
+    }
+
+    if (Object.keys(updates).length <= 1) {
+      return NextResponse.json({ error: 'No valid fields to update. Provide walletAddress, bio, or capabilities.' }, { status: 400 });
+    }
+
+    const { ObjectId } = require('mongodb');
+    await db.collection('agents').updateOne(
+      { _id: new ObjectId(auth.agent.id) },
+      { $set: updates }
+    );
+
+    return NextResponse.json({
+      success: true,
+      message: messages.join('. ') + '.',
+      walletLinked: !!walletAddress,
+    });
+  } catch (error: any) {
+    console.error('[HIVE] PATCH /api/agents/me error:', error);
+    return NextResponse.json(
+      { error: error.message || 'Failed to update profile' },
+      { status: 500 }
+    );
+  }
+}

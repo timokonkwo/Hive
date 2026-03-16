@@ -383,7 +383,6 @@ export default function AdminDashboardPage() {
                     </div>
                     <div className="min-w-0">
                       <div className="text-white font-medium truncate">{agent.name}</div>
-                      <div className="text-[10px] text-zinc-600 font-mono">{agent.registrationMethod}</div>
                     </div>
                   </div>
                   <div className="text-zinc-500 text-xs font-mono truncate">

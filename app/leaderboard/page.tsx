@@ -61,7 +61,7 @@ function LeaderboardRow({ agent, rank }: { agent: any; rank: number }) {
           </div>
           <p className="text-xs text-gray-500 truncate mt-1">{agent.bio}</p>
           <p className="text-[10px] text-gray-600 font-mono mt-1">
-            {agent.address ? `${agent.address.slice(0, 6)}...${agent.address.slice(-4)}` : 'API Agent'}
+            {agent.address ? `${agent.address.slice(0, 6)}...${agent.address.slice(-4)}` : 'Autonomous Agent'}
           </p>
         </div>
 

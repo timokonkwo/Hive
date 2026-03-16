@@ -4,7 +4,7 @@ import React from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { usePathname } from "next/navigation";
-import { Menu, X, Book, Activity, Trophy, Rss, LogOut, Briefcase, Plus, Sun, Moon } from "lucide-react";
+import { Menu, X, Book, Activity, Trophy, Rss, LogOut, Briefcase, Plus, Sun, Moon, Bot } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { useTheme } from "@/components/providers/ThemeProvider";
 
@@ -63,6 +63,7 @@ export const Navbar = () => {
         <div className="hidden md:flex items-center gap-6 text-sm font-medium">
           
           <NavLink href="/marketplace" label="Marketplace" pathname={pathname} isDark={isDark} />
+          <NavLink href="/agents" label="Agents" pathname={pathname} isDark={isDark} />
           <NavLink href="/feed" label="Feed" pathname={pathname} isDark={isDark} />
           <NavLink href="/create" label="New Task" pathname={pathname} isDark={isDark} />
           <NavLink href="/leaderboard" label="Leaderboard" pathname={pathname} isDark={isDark} />
@@ -147,6 +148,7 @@ export const Navbar = () => {
             <div className="p-4 space-y-4">
               <div className="space-y-2">
                 <MobileNavLink href="/marketplace" icon={Briefcase} label="Marketplace" isDark={isDark} />
+                <MobileNavLink href="/agents" icon={Bot} label="Agents" isDark={isDark} />
                 <MobileNavLink href="/feed" icon={Rss} label="Live Feed" isDark={isDark} />
                 <MobileNavLink href="/create" icon={Plus} label="New Task" isDark={isDark} />
                 <MobileNavLink href="/leaderboard" icon={Trophy} label="Leaderboard" isDark={isDark} />
@@ -168,6 +170,9 @@ export const Navbar = () => {
             <div className="p-6 flex flex-col gap-4">
               <Link href="/marketplace" className="flex items-center justify-between p-3 transition-all" style={{ color: isDark ? '#A1A1AA' : '#52525B', borderBottom: `1px solid ${isDark ? '#1A1A1A' : '#E4E4E7'}` }}>
                 <span className="font-mono text-[10px] uppercase tracking-widest">Marketplace</span> 
+              </Link>
+              <Link href="/agents" className="flex items-center justify-between p-3 transition-all" style={{ color: isDark ? '#A1A1AA' : '#52525B', borderBottom: `1px solid ${isDark ? '#1A1A1A' : '#E4E4E7'}` }}>
+                <span className="font-mono text-[10px] uppercase tracking-widest">Agents</span> 
               </Link>
               <Link href="/leaderboard" className="flex items-center justify-between p-3 transition-all" style={{ color: isDark ? '#A1A1AA' : '#52525B', borderBottom: `1px solid ${isDark ? '#1A1A1A' : '#E4E4E7'}` }}>
                 <span className="font-mono text-[10px] uppercase tracking-widest">Leaderboard</span> 
