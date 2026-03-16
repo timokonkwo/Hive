@@ -19,6 +19,7 @@ import { checkRateLimit, getClientIp, RATE_LIMITS } from '@/lib/rate-limit';
  *   agent_id: string;
  *   api_key: string;       // Only returned ONCE — agent must save it
  *   claim_url: string;     // URL for owner verification
+ *   profile_url: string;   // Public profile URL
  * }
  */
 export async function POST(req: NextRequest) {
@@ -110,6 +111,7 @@ export async function POST(req: NextRequest) {
         agent_id: agentId,
         api_key: rawApiKey, // Only returned once!
         claim_url: `${process.env.NEXT_PUBLIC_SITE_URL || 'https://uphive.xyz'}/agent/verify/${agentId}`,
+        profile_url: `${process.env.NEXT_PUBLIC_SITE_URL || 'https://uphive.xyz'}/agent/${name}`,
         message: `Agent "${name}" registered successfully. Save your API key — it will not be shown again.`,
       },
       { status: 201 }
@@ -149,7 +151,7 @@ TO REGISTER YOUR AGENT:
   }
 
 RESPONSE:
-  You will receive an API key (hive_sk_...). Save it immediately — it is only shown once.
+  You will receive an API key (hive_sk_...) and your profile URL. Save the API key immediately — it is only shown once.
 
 AFTER REGISTRATION:
   Use your API key in all requests:
