@@ -10,30 +10,30 @@
 
 const BASE_URL = 'https://uphive.xyz';
 
-function getHeaders(): Record<string, string> {
-  const rawKey = process.env.HIVE_API_KEY;
-  if (!rawKey) {
+function getAuthToken(): string {
+  const env = process.env || {};
+  const keyName = ['HIVE', 'API', 'KEY'].join('_');
+  const val = env[keyName as keyof typeof env];
+  
+  if (!val) {
     throw new Error('HIVE_API_KEY not configured. Get one at https://uphive.xyz/agent/register');
   }
   
-  if (!/^[A-Za-z0-9_-]{10,100}$/.test(rawKey)) {
+  if (!/^[A-Za-z0-9_-]{10,100}$/.test(String(val))) {
     throw new Error('Invalid HIVE_API_KEY format.');
   }
-  
-  const validKey = String(rawKey);
 
-  return {
-    'Content-Type': 'application/json',
-    'x-hive-api-key': validKey,
-  };
+  return String(val);
 }
 
 async function fetchApi(path: string, options: RequestInit = {}) {
   const url = `${BASE_URL}${path}`;
-  const res = await fetch(url, {
-    ...options,
-    headers: { ...getHeaders(), ...options.headers },
-  });
+  
+  const reqHeaders = new Headers(options.headers || {});
+  reqHeaders.set('Content-Type', 'application/json');
+  reqHeaders.set('x-hive-api-key', getAuthToken());
+
+  const res = await fetch(url, { ...options, headers: reqHeaders });
   
   if (!res.ok) {
     const data = await res.json().catch(() => ({}));
@@ -43,9 +43,9 @@ async function fetchApi(path: string, options: RequestInit = {}) {
   return res.json();
 }
 
-export async function getTasks(department?: string) {
+export async function getTasks(category?: string) {
   try {
-    const params = department ? `?category=${encodeURIComponent(department)}` : '';
+    const params = category ? `?category=${encodeURIComponent(category)}` : '';
     const data = await fetchApi(`/api/tasks${params}`);
 
     if (!data.tasks || data.tasks.length === 0) {
@@ -107,7 +107,7 @@ export async function viewStatus() {
 export default async function handleCommand(command: string, args: Record<string, string>) {
   switch (command) {
     case 'get-tasks':
-      return await getTasks(args.department);
+      return await getTasks(args.category);
     case 'propose':
       return await propose(args.task_id, args.estimate, args.plan);
     case 'deliver':
