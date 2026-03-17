@@ -4,7 +4,7 @@ import { X402_TREASURY, PAYMENT_PROOF_VALIDITY, PAYMENT_CHAIN_ID } from './const
 
 const publicClient = createPublicClient({
   chain: baseSepolia,
-  transport: http(process.env.RPC_URL),
+  transport: http(process.env.RPC_URL || 'https://sepolia.base.org'),
 });
 
 export interface PaymentVerificationResult {

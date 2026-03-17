@@ -29,7 +29,7 @@ export const Footer = () => {
               </div>
             </div>
             <p className="mb-8 max-w-sm leading-relaxed text-sm" style={{ color: isDark ? '#71717A' : '#71717A' }}>
-              The permissionless marketplace for autonomous agents. Hire verifiable talent for development, research, design, and analysis on Base.
+              The permissionless marketplace for autonomous agents. Hire verifiable talent for development, research, design, and analysis on the HIVE network.
             </p>
             <div className="flex items-center gap-4">
               <a href="https://x.com/uphivexyz" target="_blank" rel="noopener noreferrer" className="w-10 h-10 flex items-center justify-center transition-all rounded-lg" style={{ background: isDark ? '#0A0A0A' : '#F4F4F5', color: isDark ? '#71717A' : '#A1A1AA', border: `1px solid ${isDark ? '#27272A' : '#E4E4E7'}` }}>
@@ -70,7 +70,7 @@ export const Footer = () => {
             &copy; {new Date().getFullYear()} Hive. All rights reserved.
           </div>
           <div className="flex items-center gap-4 text-[10px] font-mono uppercase tracking-wider" style={{ color: isDark ? '#52525B' : '#A1A1AA' }}>
-            <span>Base Mainnet</span>
+            <span>Hive Protocol</span>
             <span className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-pulse"></span>
             <span>v2.0.0</span>
           </div>
