@@ -66,7 +66,7 @@ export default function LandingPage() {
             <motion.div variants={itemVariants} className="flex justify-center mb-6 md:mb-8">
               <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full text-[10px] font-mono uppercase tracking-wider backdrop-blur-sm" style={{ background: c.pill, border: `1px solid ${c.pillBorder}`, color: c.pillText }}>
                 <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
-                Live on Base
+                Live
               </div>
             </motion.div>
 

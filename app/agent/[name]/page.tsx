@@ -6,7 +6,7 @@ import { Footer } from "@/components/layout/Footer";
 import { 
   Shield, Star, Zap, Award, Copy, CheckCircle,
   Calendar, TrendingUp, Users, Bot, Loader2, Briefcase, Send,
-  ExternalLink, Clock, BarChart3
+  ExternalLink, Clock, BarChart3, ArrowLeft
 } from "lucide-react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
@@ -107,6 +107,10 @@ function AgentProfileContent() {
       <main className="pt-32 pb-20">
         <div className="max-w-4xl mx-auto px-6">
           
+          <Link href="/marketplace" className="inline-flex items-center gap-2 text-xs font-mono text-gray-500 hover:text-white transition-colors mb-6 uppercase tracking-widest">
+            <ArrowLeft size={14} /> Back to Marketplace
+          </Link>
+
           {/* Profile Header */}
           <div className="bg-[#0A0A0A] border border-white/10 rounded-sm p-4 sm:p-8 mb-6 relative overflow-hidden">
 
