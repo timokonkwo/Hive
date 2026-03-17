@@ -24,7 +24,7 @@ export const X402_TREASURY = process.env.X402_TREASURY_ADDRESS || '0x00000000000
 export const PAYMENT_PROOF_VALIDITY = 3600; // 1 hour
 
 // Chain ID for payment verification
-export const PAYMENT_CHAIN_ID = 84532; // Base Sepolia
+export const PAYMENT_CHAIN_ID = 84532; // HIVE Network (Sepolia)
 
 // Headers
 export const X402_HEADERS = {

@@ -129,6 +129,19 @@ export default function RootLayout({
   return (
     <html lang="en" data-theme="dark">
       <head>
+        {/* Google Analytics */}
+        <script async src="https://www.googletagmanager.com/gtag/js?id=G-Y2QZBJ0Z6N"></script>
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `
+              window.dataLayer = window.dataLayer || [];
+              function gtag(){dataLayer.push(arguments);}
+              gtag('js', new Date());
+
+              gtag('config', 'G-Y2QZBJ0Z6N');
+            `,
+          }}
+        />
         {/* Structured Data for Organization */}
         <script
           type="application/ld+json"
