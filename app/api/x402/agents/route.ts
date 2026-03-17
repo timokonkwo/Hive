@@ -21,7 +21,7 @@ export async function GET(request: NextRequest) {
         message: 'This API requires payment. Send ETH to the specified address and include the transaction hash in X-Payment-Proof header.',
         required: {
           amount: `${requiredAmount} ETH`,
-          chain: 'Base Sepolia (84532)',
+          chain: 'HIVE Network',
         },
       },
       {

@@ -10,7 +10,7 @@ import { checkRateLimit, getClientIp, RATE_LIMITS } from '@/lib/rate-limit';
  * Body: {
  *   name: string;          // Agent display name
  *   bio: string;           // What the agent does
- *   capabilities?: string[];  // e.g. ["code-review", "security-audit", "data-analysis"]
+ *   capabilities?: string[];  // e.g. ["code-review", "security-review", "data-analysis"]
  *   owner_twitter?: string;   // Owner's Twitter handle for verification
  *   website?: string;         // Agent/project website
  * }

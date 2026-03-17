@@ -42,7 +42,7 @@ export async function GET(
        validAgents = await db.collection(COLLECTIONS.AGENTS).find({
          $or: [
            { _id: { $in: agentIds } },
-           { walletAddress: { $in: agentAddresses.map(a => new RegExp(`^${a}$`, 'i')) } }
+           { walletAddress: { $in: agentAddresses.map(a => new RegExp(`^${a.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i')) } }
          ]
        }).toArray();
     }
@@ -127,22 +127,21 @@ export async function POST(
 
     // Try API key auth first, then fall back to wallet address lookup
     let agent: any = null;
-    let resolvedAgentAddress = agentAddress;
 
     // Try authenticateRequest (API key or wallet header)
     const auth = await authenticateRequest(request.headers, db);
     if (auth) {
       agent = auth.agent;
-      resolvedAgentAddress = agent.walletAddress || agentAddress || agent.id;
     }
 
     // Fall back to wallet address lookup for backward compat
     if (!agent && agentAddress) {
+      const escapedAddr = agentAddress.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
       agent = await db.collection(COLLECTIONS.AGENTS).findOne({
-        walletAddress: { $regex: new RegExp(`^${agentAddress}$`, 'i') },
+        walletAddress: { $regex: new RegExp(`^${escapedAddr}$`, 'i') },
       });
       if (agent) {
-        agent = { ...agent, id: agent._id.toString(), _id: undefined };
+        agent = { ...agent, id: agent._id.toString() };
       }
     }
 
@@ -153,13 +152,15 @@ export async function POST(
       );
     }
 
-    // Use the agent's real registered name
-    const resolvedAgentName = agent.name || agentName || `Agent ${agentAddress.slice(0, 6)}`;
+    // Resolve fields safely — agentAddress may be undefined for API key auth
+    const resolvedAgentId = agent.id || agent._id?.toString();
+    const resolvedAgentAddress = agent.walletAddress || agentAddress || resolvedAgentId;
+    const resolvedAgentName = agent.name || agentName || `Agent ${(resolvedAgentAddress || 'unknown').slice(0, 8)}`;
 
     const bid = {
       taskId: id,
-      agentAddress,
-      agentId: agent._id.toString(),
+      agentAddress: resolvedAgentAddress,
+      agentId: resolvedAgentId,
       agentName: resolvedAgentName,
       amount,
       timeEstimate: timeEstimate || "TBD",
@@ -179,8 +180,8 @@ export async function POST(
     await db.collection(COLLECTIONS.ACTIVITY).insertOne({
       type: "BidSubmitted",
       taskId: new ObjectId(id),
-      actorAddress: agentAddress,
-      actorName: agentName || `Agent ${agentAddress.slice(0, 6)}`,
+      actorAddress: resolvedAgentAddress,
+      actorName: resolvedAgentName,
       metadata: { amount, timeEstimate, taskTitle: task.title },
       createdAt: new Date(),
     });

@@ -67,8 +67,9 @@ export async function authenticateRequest(
   // Try wallet auth (from Privy session or header)
   const walletAddress = headers.get('x-wallet-address');
   if (walletAddress) {
+    const escapedWallet = walletAddress.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
     const agent = await db.collection('agents').findOne({
-      walletAddress: { $regex: new RegExp(`^${walletAddress}$`, 'i') },
+      walletAddress: { $regex: new RegExp(`^${escapedWallet}$`, 'i') },
     });
     if (agent) {
       return {

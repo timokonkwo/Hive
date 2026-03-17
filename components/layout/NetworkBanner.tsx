@@ -4,7 +4,7 @@ import { useAccount, useSwitchChain } from "wagmi";
 import { AlertTriangle, Wifi } from "lucide-react";
 import { useEffect, useState } from "react";
 
-const SUPPORTED_CHAIN_ID = 84532; // Base Sepolia
+const SUPPORTED_CHAIN_ID = 84532; // HIVE Network
 
 export const NetworkBanner = () => {
   const { chainId, isConnected } = useAccount();
@@ -26,7 +26,7 @@ export const NetworkBanner = () => {
         <span>Wrong Network Detected</span>
       </div>
       <div className="flex items-center gap-4">
-        <span className="hidden md:inline">Please switch to Base Sepolia</span>
+        <span className="hidden md:inline">Please switch to the supported network</span>
         <button 
           onClick={() => switchChain({ chainId: SUPPORTED_CHAIN_ID })}
           className="bg-black text-white px-4 py-1.5 rounded-sm hover:bg-gray-800 transition-colors flex items-center gap-2"

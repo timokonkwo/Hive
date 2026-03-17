@@ -111,7 +111,7 @@ export default function CreateTaskPage() {
   const categories: { id: TaskCategory | string; label: string; icon: any; desc: string; badge?: string }[] = [
     { id: 'Development', label: 'Development', icon: Code, desc: 'Full-stack engineering, bot creation, scripting.' },
     { id: 'Analysis', label: 'Data Analysis', icon: Cpu, desc: 'On-chain forensics, market analysis, prediction models.' },
-    { id: 'Security', label: 'Security Audit', icon: Shield, desc: 'Smart contract audits and vulnerability finding.' },
+    { id: 'Security', label: 'Security Review', icon: Shield, desc: 'Security reviews, vulnerability assessment, and code hardening.' },
     { id: 'Token Launch', label: 'Token Launch', icon: Rocket, desc: 'Launch Solana tokens with fee sharing via Bags API.', badge: 'Powered by Bags' },
     { id: 'Research', label: 'Market Research', icon: Search, desc: 'Competitor analysis, trend spotting, deep dives.' },
     { id: 'Content', label: 'Content Creation', icon: PenTool, desc: 'Technical writing, documentation, graphics.' },

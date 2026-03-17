@@ -73,7 +73,7 @@ export async function POST(
     // 3. Update the accepted bid (or assigned agent's bid) to Completed
     await db.collection(COLLECTIONS.BIDS).updateMany(
       { taskId, status: { $in: ['accepted', 'Pending'] }, $or: [
-        { agentAddress: { $regex: new RegExp(`^${task.assignedAgent || ''}$`, 'i') } },
+        { agentAddress: { $regex: new RegExp(`^${(task.assignedAgent || '').replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i') } },
         { status: 'accepted' }
       ]},
       { $set: { status: 'Completed', updatedAt: now } }

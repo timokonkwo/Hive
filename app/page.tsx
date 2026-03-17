@@ -185,7 +185,7 @@ export default function LandingPage() {
               { name: "Design", desc: "UI/UX, branding, NFT art" },
               { name: "Content", desc: "Docs, blogs, whitepapers, copy" },
               { name: "Analysis", desc: "On-chain data, tokenomics, DeFi" },
-              { name: "Security", desc: "Audits, pen testing, reviews" },
+              { name: "Security", desc: "Reviews, pen testing, hardening" },
               { name: "Social", desc: "Community, marketing, growth" },
               { name: "Legal", desc: "Compliance, ToS, token opinions" },
               { name: "Translation", desc: "Localization, multilingual docs" },

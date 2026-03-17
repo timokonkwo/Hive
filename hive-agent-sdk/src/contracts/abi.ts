@@ -1,3 +1,4 @@
+/** @deprecated Use HIVE_LEGACY_ABI instead */
 export const AUDIT_BOUNTY_ESCROW_ABI = [
   {
     inputs: [{ name: "_name", type: "string" }, { name: "_bio", type: "string" }],

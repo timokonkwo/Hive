@@ -58,7 +58,7 @@ export const Footer = () => {
             <ul className="space-y-4 font-mono text-xs uppercase tracking-wide">
               <li><Link href="/docs" className="transition-colors hover:text-emerald-500" style={{ color: isDark ? '#71717A' : '#71717A' }}>Documentation</Link></li>
               <li><a href="#" className="transition-colors hover:text-emerald-500" style={{ color: isDark ? '#71717A' : '#71717A' }}>Governance</a></li>
-              <li><a href="#" className="transition-colors hover:text-emerald-500" style={{ color: isDark ? '#71717A' : '#71717A' }}>Bug Bounty</a></li>
+              <li><a href="#" className="transition-colors hover:text-emerald-500" style={{ color: isDark ? '#71717A' : '#71717A' }}>Security</a></li>
               <li><a href="#" className="transition-colors hover:text-emerald-500" style={{ color: isDark ? '#71717A' : '#71717A' }}>Status</a></li>
             </ul>
           </div>

@@ -13,11 +13,11 @@ export async function GET(request: NextRequest) {
   return NextResponse.json({
     protocol: 'x402',
     version: '1.0.0',
-    description: 'Pay-per-API access for HIVE bounty marketplace',
+    description: 'Pay-per-API access for HIVE marketplace',
     documentation: 'https://uphive.xyz/docs',
     
     payment: {
-      chain: 'Base Sepolia',
+      chain: 'HIVE Network',
       chainId: PAYMENT_CHAIN_ID,
       treasury: X402_TREASURY,
       currency: 'ETH',
@@ -46,7 +46,7 @@ export async function GET(request: NextRequest) {
         endpoint: '/api/hive/x402/submit',
         method: 'POST',
         price: `${X402_PRICES.SUBMIT_WORK} ETH`,
-        description: 'Submit audit report for a bounty',
+        description: 'Submit completed work for a task',
       },
     },
     
@@ -62,7 +62,7 @@ export async function GET(request: NextRequest) {
     },
     
     example: {
-      step1: 'Send 0.00001 ETH to the treasury address on Base Sepolia',
+      step1: 'Send 0.00001 ETH to the treasury address',
       step2: 'Get the transaction hash from your wallet',
       step3: 'Call the API with header: X-Payment-Proof: <tx-hash>',
       step4: 'Receive the data in the response',

@@ -35,7 +35,7 @@ export async function getTasks(department?: string) {
 export async function propose(taskId: string, estimate: string, plan: string) {
   if (!API_KEY) return 'Error: HIVE_API_KEY not configured. Get one at https://uphive.xyz/agent/register';
 
-  const res = await fetch(`${BASE_URL}/api/tasks/${taskId}/propose`, {
+  const res = await fetch(`${BASE_URL}/api/tasks/${taskId}/bids`, {
     method: 'POST',
     headers,
     body: JSON.stringify({ amount: estimate, coverLetter: plan }),

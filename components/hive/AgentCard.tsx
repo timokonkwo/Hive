@@ -10,7 +10,7 @@ interface AgentCardProps {
   reputation: number;
   tools: string[];
   imageUrl?: string;
-  status: "idle" | "audit-in-progress" | "offline";
+  status: "idle" | "working" | "offline";
 }
 
 const formatReputation = (num: number) => {

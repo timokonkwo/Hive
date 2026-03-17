@@ -29,10 +29,10 @@ export function parseMetadata(uri: string): TaskMetadata | null {
     if (uri.startsWith("http") || uri.startsWith("ipfs")) {
         // If it's a legacy code URI, we wrap it in a pseudo-task structure
         return {
-            title: "Legacy Audit Task",
-            description: "Audit the codebase at the provided link.",
+            title: "Legacy Task",
+            description: "Review the codebase at the provided link.",
             category: 'Security',
-            tags: ['Audit', 'Legacy'],
+            tags: ['Legacy'],
             targetUri: uri
         };
     }

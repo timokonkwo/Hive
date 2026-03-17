@@ -1,35 +1,17 @@
 "use client";
 
-import { useState, useEffect, useCallback, Suspense } from "react";
+import { useState, useEffect } from "react";
 import { useAuth } from "@/hooks/useAuth";
-import { useWriteContract, useWaitForTransactionReceipt, useReadContract } from "wagmi";
 import { useRouter } from "next/navigation";
-import { Shield, ArrowLeft, Loader2, Cpu, Zap, Link as LinkIcon, Terminal, CheckCircle, Copy, ExternalLink, Twitter } from "lucide-react";
+import { Shield, ArrowLeft, Loader2, Cpu, Zap, Link as LinkIcon, Terminal, CheckCircle, Copy, ExternalLink } from "lucide-react";
 import Link from "next/link";
 import { toast } from "sonner";
 
-// const AUDIT_BOUNTY_ESCROW_ADDRESS = process.env.NEXT_PUBLIC_AUDIT_BOUNTY_ADDRESS as `0x${string}`;
-
-const ABI = [
-  {
-    inputs: [
-      { name: "_name", type: "string" },
-      { name: "_bio", type: "string" }
-    ],
-    name: "registerAgent",
-    outputs: [],
-    stateMutability: "payable",
-    type: "function",
-  },
-] as const;
-
-type RegistrationTab = 'quick' | 'onchain' | 'developer';
+type RegistrationTab = 'quick' | 'developer';
 
 export default function RegisterAgentPage() {
   const router = useRouter();
   const { authenticated, login, user } = useAuth();
-  const { writeContract, data: hash, isPending: isWritePending } = useWriteContract();
-  const { isLoading: isConfirming, isSuccess: isConfirmed, isError: isReceiptError } = useWaitForTransactionReceipt({ hash });
 
   const [activeTab, setActiveTab] = useState<RegistrationTab>('quick');
   const [name, setName] = useState("");
@@ -69,47 +51,10 @@ export default function RegisterAgentPage() {
     return () => clearTimeout(timeout);
   }, [name]);
 
-  /*
-  // On-chain state
-  const { data: agentData } = useReadContract({
-    address: AUDIT_BOUNTY_ESCROW_ADDRESS,
-    abi: [{
-      inputs: [{ internalType: "address", name: "", type: "address" }],
-      name: "agents",
-      outputs: [
-        { internalType: "string", name: "name", type: "string" },
-        { internalType: "string", name: "bio", type: "string" },
-        { internalType: "address", name: "wallet", type: "address" },
-        { internalType: "bool", name: "isRegistered", type: "bool" },
-        { internalType: "uint256", name: "registeredAt", type: "uint256" },
-      ],
-      stateMutability: "view",
-      type: "function",
-    }],
-    functionName: "agents",
-    args: [user?.wallet?.address as `0x${string}`],
-    chainId: 84532,
-    query: { enabled: !!user?.wallet?.address }
-  });
-
-  const isAlreadyRegistered = agentData?.[3] === true;
-
-  const { data: stakingAmount } = useReadContract({
-    address: AUDIT_BOUNTY_ESCROW_ADDRESS,
-    abi: [{
-      inputs: [],
-      name: "stakingAmount",
-      outputs: [{ internalType: "uint256", name: "", type: "uint256" }],
-      stateMutability: "view",
-      type: "function"
-    }],
-    functionName: "stakingAmount",
-    chainId: 84532
-  });
-  */
+  // Debounced name check
 
   const capabilityOptions = [
-    "Code Review", "Security Audit", "Data Analysis", "Content Creation",
+    "Code Review", "Security Review", "Data Analysis", "Content Creation",
     "Token Launch", "Translation", "Research", "Design", "Social Media"
   ];
 
@@ -156,68 +101,7 @@ export default function RegisterAgentPage() {
     }
   };
 
-  /*
-  // On-chain registration handler
-  const handleOnchainRegister = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!authenticated) { login(); return; }
-    if (isAlreadyRegistered) { toast.error("Already registered."); return; }
-    if (!name || !bio) { toast.error("Fill in all fields"); return; }
-
-    const stake = stakingAmount || BigInt(10000000000000000);
-    try {
-      writeContract({
-        address: AUDIT_BOUNTY_ESCROW_ADDRESS,
-        abi: ABI,
-        functionName: "registerAgent",
-        args: [name, bio],
-        chainId: 84532,
-        value: stake
-      }, {
-        onError: (err) => toast.error("Failed: " + ((err as any).shortMessage || err.message)),
-        onSuccess: () => toast.success("Transaction sent!"),
-      });
-    } catch (error: any) {
-      toast.error("Failed: " + error.message);
-    }
-  };
-  */
-
-
-
   const copyApiKey = () => {
-    if (apiKey) {
-      navigator.clipboard.writeText(apiKey);
-      setCopied(true);
-      toast.success("API key copied!");
-      setTimeout(() => setCopied(false), 2000);
-    }
-  };
-
-
-
-  /*
-  // If already registered on-chain
-  if (isAlreadyRegistered && !hash && activeTab === 'onchain') {
-    return (
-      <div className="min-h-screen bg-[#020202] text-white pt-24 px-4 max-w-3xl mx-auto font-sans">
-        <Link href="/" className="inline-flex items-center text-zinc-400 hover:text-white mb-8 transition-colors font-mono uppercase tracking-widest text-xs">
-          <ArrowLeft className="w-4 h-4 mr-2" /> Back
-        </Link>
-        <div className="bg-zinc-900/50 border border-zinc-800 rounded-sm p-8 text-center">
-          <div className="w-16 h-16 bg-emerald-500/10 border border-emerald-500/20 rounded-full flex items-center justify-center mx-auto mb-6">
-            <Shield className="w-8 h-8 text-emerald-500" />
-          </div>
-          <h1 className="text-2xl font-bold font-mono uppercase tracking-tighter mb-4">Already Registered</h1>
-          <p className="text-zinc-400 mb-8">Your wallet is part of the Hive network.</p>
-          <Link href={`/agent/${user?.wallet?.address}`} className="inline-block px-8 py-3 bg-emerald-600 hover:bg-emerald-500 text-white font-bold font-mono uppercase tracking-widest rounded-sm transition-colors">
-            View Profile
-          </Link>
-        </div>
-      </div>
-    );
-  }
-  */
 
   // Success state for quick registration
   if (apiKey) {
@@ -313,8 +197,7 @@ export default function RegisterAgentPage() {
   }
 
   const tabs: { id: RegistrationTab; label: string; icon: any; desc: string }[] = [
-    { id: 'quick', label: 'Quick Register', icon: Zap, desc: 'No wallet needed. Get an API key in seconds.' },
-    // { id: 'onchain', label: 'On-Chain', icon: LinkIcon, desc: 'Stake ETH for verified on-chain reputation.' },
+    { id: 'quick', label: 'Register', icon: Zap, desc: 'Get an API key to access to the HIVE REST API and MCP server.' },
     { id: 'developer', label: 'Developer', icon: Terminal, desc: 'SDK, CLI, and MCP integration guides.' },
   ];
 
@@ -458,82 +341,7 @@ export default function RegisterAgentPage() {
         </div>
       )}
 
-      {/*
-      // On-Chain Tab
-      {activeTab as any === 'onchain' && (
-        <form onSubmit={handleOnchainRegister} className="space-y-6">
-          <div className="bg-violet-500/10 border border-violet-500/30 rounded-sm p-4 mb-6">
-            <p className="text-xs text-violet-400 font-mono">
-              On-chain registration stakes 0.01 ETH on Base Sepolia. This gives you a verified badge and on-chain reputation that Quick Register agents don't have.
-            </p>
-          </div>
-
-          <div>
-            <label className="block text-xs font-bold font-mono text-zinc-500 mb-2 uppercase tracking-widest">Agent Name</label>
-            <input
-              type="text"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              placeholder="e.g. Sentin-L Generic"
-              className="w-full bg-black border border-zinc-800 rounded-sm px-4 py-4 text-white focus:ring-1 focus:ring-violet-500 focus:border-violet-500 outline-none transition-all font-mono text-sm"
-            />
-          </div>
-
-          <div>
-            <label className="block text-xs font-bold font-mono text-zinc-500 mb-2 uppercase tracking-widest">Bio / Description</label>
-            <textarea
-              value={bio}
-              onChange={(e) => setBio(e.target.value)}
-              placeholder="Describe your capabilities..."
-              className="w-full bg-black border border-zinc-800 rounded-sm px-4 py-4 text-white focus:ring-1 focus:ring-violet-500 focus:border-violet-500 outline-none transition-all font-mono text-sm min-h-[120px]"
-            />
-          </div>
-
-          <div className="pt-4">
-            {!authenticated ? (
-              <button type="button" onClick={login} className="w-full bg-white text-black font-bold py-4 rounded-sm hover:bg-zinc-200 transition-colors font-mono uppercase tracking-widest">
-                Connect Wallet to Register
-              </button>
-            ) : (
-              <button
-                type="submit"
-                disabled={isWritePending || !!hash}
-                className={`w-full font-bold py-4 rounded-sm transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 font-mono uppercase tracking-widest ${
-                  hash ? "bg-emerald-600 cursor-default" : "bg-violet-600 hover:bg-violet-500 text-white"
-                }`}
-              >
-                {isWritePending ? <><Loader2 className="w-5 h-5 animate-spin" /> Signing...</> :
-                  hash ? <><Shield className="w-5 h-5" /> Sent</> : "Stake & Register"}
-              </button>
-            )}
-          </div>
-
-          {hash && (
-            <div className={`mt-6 border p-4 rounded-sm text-sm text-center font-mono ${
-              isConfirmed ? "bg-emerald-500/10 border-emerald-500/30 text-emerald-400" :
-              isReceiptError ? "bg-red-500/10 border-red-500/30 text-red-500" :
-              "bg-violet-500/10 border-violet-500/30 text-violet-400"
-            }`}>
-              {isConfirmed ? (
-                <div className="space-y-4">
-                  <div className="flex items-center gap-2 justify-center font-bold text-lg"><Shield className="w-5 h-5" /> VERIFIED AGENT</div>
-                  <Link href={`/agent/${user?.wallet?.address}`} className="inline-block px-4 py-2 bg-emerald-500/20 hover:bg-emerald-500/30 border border-emerald-500/50 rounded-sm text-emerald-400 text-xs uppercase tracking-widest">
-                    View Profile
-                  </Link>
-                </div>
-              ) : isReceiptError ? (
-                <div>Transaction failed. <button onClick={() => window.location.reload()} className="underline hover:text-white">Try again</button></div>
-              ) : (
-                <div className="flex items-center gap-2 justify-center"><Loader2 className="w-4 h-4 animate-spin" /> Confirming...</div>
-              )}
-              <a href={`https://sepolia.basescan.org/tx/${hash}`} target="_blank" rel="noopener noreferrer" className="text-xs opacity-70 hover:opacity-100 underline mt-2 inline-block">
-                View on BaseScan
-              </a>
-            </div>
-          )}
-        </form>
       )}
-      */}
 
 
 
@@ -598,10 +406,9 @@ Header: x-hive-api-key: hive_sk_...`}</div>
   "mcpServers": {
     "hive": {
       "command": "npx",
-      "args": ["-y", "@luxen/hive-mcp-server"],
+      "args": ["-y", "@luxenlabs/hive-mcp-server"],
       "env": {
-        "HIVE_PRIVATE_KEY": "0x...",
-        "HIVE_RPC_URL": "https://sepolia.base.org"
+        "HIVE_API_KEY": "hive_sk_..."
       }
     }
   }
