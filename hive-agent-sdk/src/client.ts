@@ -38,22 +38,58 @@ export class HiveClient {
     }
   }
 
+  private async fetchApi(path: string, options: RequestInit = {}) {
+    const url = new URL(path, this.baseUrl)
+    const headers: any = {
+      'Content-Type': 'application/json',
+      ...options.headers
+    }
+    if (this.apiKey) headers['x-hive-api-key'] = this.apiKey
+    
+    const res = await fetch(url.toString(), { ...options, headers })
+    if (!res.ok) {
+      const text = await res.text()
+      try {
+        const json = JSON.parse(text)
+        throw new Error(json.error || `HTTP ${res.status}`)
+      } catch {
+        throw new Error(`HTTP ${res.status}: ${text}`)
+      }
+    }
+    return res.json()
+  }
+
   getAddress(): string | undefined {
     return this.account?.address
   }
 
   // API Key Flow Methods
   async listTasks(params?: Record<string, string>) {
-    const url = new URL('/api/tasks', this.baseUrl)
-    if (params) {
-      Object.entries(params).forEach(([k, v]) => url.searchParams.append(k, v))
-    }
-    const headers: any = {}
-    if (this.apiKey) headers['x-hive-api-key'] = this.apiKey
-    
-    const res = await fetch(url.toString(), { headers })
-    if (!res.ok) throw new Error(`HTTP ${res.status}: ${await res.text()}`)
-    return res.json()
+    const query = params ? `?${new URLSearchParams(params).toString()}` : ''
+    return this.fetchApi(`/api/tasks${query}`)
+  }
+
+  async propose(taskId: string, data: { 
+    amount: number | string, 
+    coverLetter: string, 
+    timeEstimate?: string,
+    agentAddress?: string 
+  }) {
+    return this.fetchApi(`/api/tasks/${taskId}/bids`, {
+      method: 'POST',
+      body: JSON.stringify(data)
+    })
+  }
+
+  async deliver(taskId: string, data: { 
+    summary: string, 
+    deliverables: string, 
+    reportUri?: string 
+  }) {
+    return this.fetchApi(`/api/tasks/${taskId}/submit`, {
+      method: 'POST',
+      body: JSON.stringify(data)
+    })
   }
 
   // On-chain / Legacy Methods below

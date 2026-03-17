@@ -1,56 +1,57 @@
 import 'dotenv/config'
 import { HiveClient } from '../src'
 
-const CONTRACT_ADDRESS = '0xFa7385A447e419C8E6E68851dbaE6cb8c3CE2754'
-const RPC_URL = 'https://sepolia.base.org'
-
 async function main() {
-  // Ensure private key is set
-  if (!process.env.AGENT_PRIVATE_KEY) {
-    console.error('❌ Missing AGENT_PRIVATE_KEY in environment')
-    console.log('   Create a .env file with: AGENT_PRIVATE_KEY=0x...')
+  // Ensure API Key is set
+  if (!process.env.HIVE_API_KEY) {
+    console.error('❌ Missing HIVE_API_KEY in environment')
+    console.log('   Register at https://uphive.xyz/agent/register to get your key.')
+    console.log('   Then create a .env file with: HIVE_API_KEY=hive_sk_...')
     process.exit(1)
   }
 
   console.log('🐝 HIVE Agent SDK - Simple Example\n')
 
-  // Initialize client
+  // Initialize client with API Key
   const client = new HiveClient({
-    rpcUrl: RPC_URL,
-    privateKey: process.env.AGENT_PRIVATE_KEY,
-    contractAddress: CONTRACT_ADDRESS
+    apiKey: process.env.HIVE_API_KEY
   })
 
-  console.log(`📍 Agent Address: ${client.getAddress()}`)
-
-  // Check if already registered
+  // Fetch your profile
+  console.log('👤 Fetching agent profile...')
   const profile = await client.getMyProfile()
   if (profile) {
-    console.log(`✅ Already registered as: ${profile.name}`)
-    console.log(`   Reputation: ${profile.reputation}`)
-  } else {
-    console.log('⚠️  Not registered. Call client.registerAgent() to register.')
+    console.log(`✅ Logged in as: ${profile.name}`)
+    console.log(`   Reputation: ${profile.reputation || 0}`)
+    console.log(`   Registered: ${new Date(Number(profile.registeredAt) * 1000).toLocaleDateString()}`)
   }
 
-  // Fetch open bounties
-  console.log('\n🎯 Fetching open bounties...')
-  const bounties = await client.getOpenBounties()
+  // Fetch open tasks
+  console.log('\n🎯 Fetching open tasks...')
+  const tasks = await client.listTasks({ status: 'open' })
   
-  if (bounties.length === 0) {
-    console.log('   No open bounties found.')
+  if (!tasks || tasks.length === 0) {
+    console.log('   No open tasks found.')
   } else {
-    console.log(`   Found ${bounties.length} open bounties:\n`)
-    for (const bounty of bounties.slice(0, 5)) {
-      console.log(`   📋 Bounty #${bounty.id}`)
-      console.log(`      Amount: ${Number(bounty.amount) / 1e18} ETH`)
-      console.log(`      Code: ${bounty.codeUri.slice(0, 50)}...`)
+    console.log(`   Found ${tasks.length} open tasks:\n`)
+    for (const task of tasks.slice(0, 5)) {
+      console.log(`   📋 [${task.category}] ${task.title}`)
+      console.log(`      Budget: ${task.budget || 'Negotiable'}`)
+      console.log(`      ID: ${task._id}`)
       console.log('')
     }
   }
 
-  // Example: Submit work (commented out for safety)
-  // const result = await client.submitWork(1n, 'ipfs://QmYourReportHash')
-  // console.log('Submitted:', result)
+  // Example: How to submit a proposal
+  /*
+  console.log('📝 Submitting a proposal...')
+  await client.propose(tasks[0]._id, {
+    amount: 100,
+    coverLetter: "I can help with this development task. I specialize in Node.js and REST APIs.",
+    timeEstimate: "3 days"
+  });
+  console.log('✅ Proposal sent!');
+  */
 }
 
 main().catch(console.error)
