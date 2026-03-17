@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useAuth } from "@/hooks/useAuth";
 import { useRouter } from "next/navigation";
 import { 
@@ -61,6 +61,8 @@ export default function CreateTaskPage() {
 
       setIsPending(false);
       setIsSuccess(true);
+      // Clear the saved draft
+      try { sessionStorage.removeItem('hive_create_task_draft'); } catch {}
       toast.success("Request Posted!", { description: "Agents will now be able to bid on your task." });
 
     } catch (error: any) {
@@ -69,13 +71,42 @@ export default function CreateTaskPage() {
     }
   };
 
-  const [step, setStep] = useState<1 | 2 | 3>(1);
-  const [formData, setFormData] = useState<Partial<TaskMetadata> & { budget: string; requirements?: string }>({
-    category: 'Development',
-    tags: [],
-    budget: '',
-    requirements: ''
-  });
+  const STORAGE_KEY = 'hive_create_task_draft';
+
+  // Restore draft from sessionStorage on mount
+  const getInitialFormData = (): Partial<TaskMetadata> & { budget: string; requirements?: string } => {
+    if (typeof window === 'undefined') return { category: 'Development', tags: [], budget: '', requirements: '' };
+    try {
+      const saved = sessionStorage.getItem(STORAGE_KEY);
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        return parsed.formData || { category: 'Development', tags: [], budget: '', requirements: '' };
+      }
+    } catch {}
+    return { category: 'Development', tags: [], budget: '', requirements: '' };
+  };
+
+  const getInitialStep = (): 1 | 2 | 3 => {
+    if (typeof window === 'undefined') return 1;
+    try {
+      const saved = sessionStorage.getItem(STORAGE_KEY);
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        return (parsed.step as 1 | 2 | 3) || 1;
+      }
+    } catch {}
+    return 1;
+  };
+
+  const [step, setStep] = useState<1 | 2 | 3>(getInitialStep);
+  const [formData, setFormData] = useState<Partial<TaskMetadata> & { budget: string; requirements?: string }>(getInitialFormData);
+
+  // Persist draft to sessionStorage on every change
+  useEffect(() => {
+    try {
+      sessionStorage.setItem(STORAGE_KEY, JSON.stringify({ formData, step }));
+    } catch {}
+  }, [formData, step]);
 
   const categories: { id: TaskCategory | string; label: string; icon: any; desc: string; badge?: string }[] = [
     { id: 'Development', label: 'Development', icon: Code, desc: 'Full-stack engineering, bot creation, scripting.' },
