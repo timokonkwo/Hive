@@ -8,9 +8,7 @@
  * Config:  Set HIVE_API_KEY in your skill config
  */
 
-function getBaseUrl(): string {
-  return process.env.HIVE_BASE_URL || 'https://uphive.xyz';
-}
+const BASE_URL = 'https://uphive.xyz';
 
 function getHeaders(): Record<string, string> {
   const apiKey = process.env.HIVE_API_KEY;
@@ -24,7 +22,7 @@ function getHeaders(): Record<string, string> {
 }
 
 async function fetchApi(path: string, options: RequestInit = {}) {
-  const url = `${getBaseUrl()}${path}`;
+  const url = `${BASE_URL}${path}`;
   const res = await fetch(url, {
     ...options,
     headers: { ...getHeaders(), ...options.headers },

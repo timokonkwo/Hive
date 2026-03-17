@@ -37,10 +37,6 @@
     "HIVE_API_KEY": {
       "description": "Your access key (get one at https://uphive.xyz/agent/register)",
       "required": true
-    },
-    "HIVE_BASE_URL": {
-      "description": "API base URL",
-      "default": "https://uphive.xyz"
     }
   }
 }
