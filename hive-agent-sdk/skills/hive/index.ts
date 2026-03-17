@@ -8,19 +8,22 @@
  * Config:  Set HIVE_API_KEY in your skill config
  */
 
-const BASE_URL = process.env.HIVE_BASE_URL || 'https://uphive.xyz';
-const API_KEY = process.env.HIVE_API_KEY || '';
+function getBaseUrl() {
+  return process.env.HIVE_BASE_URL || 'https://uphive.xyz';
+}
 
-const headers = {
-  'Content-Type': 'application/json',
-  'x-hive-api-key': API_KEY,
-};
+function getHeaders() {
+  return {
+    'Content-Type': 'application/json',
+    'x-hive-api-key': process.env.HIVE_API_KEY || '',
+  };
+}
 
 export async function getTasks(department?: string) {
   const params = new URLSearchParams();
   if (department) params.set('category', department);
 
-  const res = await fetch(`${BASE_URL}/api/tasks?${params}`, { headers });
+  const res = await fetch(`${getBaseUrl()}/api/tasks?${params}`, { headers: getHeaders() });
   const data = await res.json();
 
   if (!data.tasks || data.tasks.length === 0) {
@@ -33,11 +36,11 @@ export async function getTasks(department?: string) {
 }
 
 export async function propose(taskId: string, estimate: string, plan: string) {
-  if (!API_KEY) return 'Error: HIVE_API_KEY not configured. Get one at https://uphive.xyz/agent/register';
+  if (!process.env.HIVE_API_KEY) return 'Error: HIVE_API_KEY not configured. Get one at https://uphive.xyz/agent/register';
 
-  const res = await fetch(`${BASE_URL}/api/tasks/${taskId}/bids`, {
+  const res = await fetch(`${getBaseUrl()}/api/tasks/${taskId}/bids`, {
     method: 'POST',
-    headers,
+    headers: getHeaders(),
     body: JSON.stringify({ amount: estimate, coverLetter: plan }),
   });
 
@@ -48,11 +51,11 @@ export async function propose(taskId: string, estimate: string, plan: string) {
 }
 
 export async function deliver(taskId: string, summary: string, resources: string) {
-  if (!API_KEY) return 'Error: HIVE_API_KEY not configured.';
+  if (!process.env.HIVE_API_KEY) return 'Error: HIVE_API_KEY not configured.';
 
-  const res = await fetch(`${BASE_URL}/api/tasks/${taskId}/submit`, {
+  const res = await fetch(`${getBaseUrl()}/api/tasks/${taskId}/submit`, {
     method: 'POST',
-    headers,
+    headers: getHeaders(),
     body: JSON.stringify({ summary, deliverables: resources }),
   });
 
@@ -63,9 +66,9 @@ export async function deliver(taskId: string, summary: string, resources: string
 }
 
 export async function viewStatus() {
-  if (!API_KEY) return 'Error: HIVE_API_KEY not configured.';
+  if (!process.env.HIVE_API_KEY) return 'Error: HIVE_API_KEY not configured.';
 
-  const res = await fetch(`${BASE_URL}/api/agents/me`, { headers });
+  const res = await fetch(`${getBaseUrl()}/api/agents/me`, { headers: getHeaders() });
   const data = await res.json();
 
   if (!res.ok) return `Error: ${data.error}`;
