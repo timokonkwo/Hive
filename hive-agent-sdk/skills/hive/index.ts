@@ -8,24 +8,40 @@
  * Config:  Set HIVE_API_KEY in your skill config
  */
 
-import { HiveClient } from '../../src/client';
+function getBaseUrl(): string {
+  return process.env.HIVE_BASE_URL || 'https://uphive.xyz';
+}
 
-function getClient() {
+function getHeaders(): Record<string, string> {
   const apiKey = process.env.HIVE_API_KEY;
   if (!apiKey) {
     throw new Error('HIVE_API_KEY not configured. Get one at https://uphive.xyz/agent/register');
   }
-  return new HiveClient({ 
-    apiKey,
-    baseUrl: process.env.HIVE_BASE_URL || 'https://uphive.xyz'
+  return {
+    'Content-Type': 'application/json',
+    'x-hive-api-key': apiKey,
+  };
+}
+
+async function fetchApi(path: string, options: RequestInit = {}) {
+  const url = `${getBaseUrl()}${path}`;
+  const res = await fetch(url, {
+    ...options,
+    headers: { ...getHeaders(), ...options.headers },
   });
+  
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}));
+    throw new Error(data.error || `HTTP ${res.status}`);
+  }
+  
+  return res.json();
 }
 
 export async function getTasks(department?: string) {
   try {
-    const client = getClient();
-    const params = department ? { category: department } : undefined;
-    const data = await client.listTasks(params);
+    const params = department ? `?category=${encodeURIComponent(department)}` : '';
+    const data = await fetchApi(`/api/tasks${params}`);
 
     if (!data.tasks || data.tasks.length === 0) {
       return 'No active tasks found on Hive.';
@@ -35,7 +51,6 @@ export async function getTasks(department?: string) {
       `[${t.id}] ${t.title} | ${t.category} | Effort: ${t.budget} | Proposals: ${t.proposalsCount}`
     ).join('\n');
   } catch (err: any) {
-    // If API key is missing, getClient() throws, we catch it here.
     if (err.message.includes('not configured')) return `Error: ${err.message}`;
     return 'No active tasks found on Hive.';
   }
@@ -43,10 +58,9 @@ export async function getTasks(department?: string) {
 
 export async function propose(taskId: string, estimate: string, plan: string) {
   try {
-    const client = getClient();
-    const res = await client.propose(taskId, {
-      amount: estimate,
-      coverLetter: plan,
+    const res = await fetchApi(`/api/tasks/${taskId}/bids`, {
+      method: 'POST',
+      body: JSON.stringify({ amount: estimate, coverLetter: plan }),
     });
     return `Proposal submitted on "${res.task_title}" with estimate: ${estimate}`;
   } catch (err: any) {
@@ -56,10 +70,9 @@ export async function propose(taskId: string, estimate: string, plan: string) {
 
 export async function deliver(taskId: string, summary: string, resources: string) {
   try {
-    const client = getClient();
-    const res = await client.deliver(taskId, {
-      summary,
-      deliverables: resources,
+    const res = await fetchApi(`/api/tasks/${taskId}/submit`, {
+      method: 'POST',
+      body: JSON.stringify({ summary, deliverables: resources }),
     });
     return `Work delivered for "${res.task_title}". Awaiting review.`;
   } catch (err: any) {
@@ -69,26 +82,15 @@ export async function deliver(taskId: string, summary: string, resources: string
 
 export async function viewStatus() {
   try {
-    const client = getClient();
-    const agent = await client.getMyProfile();
+    const data = await fetchApi('/api/agents/me');
+    const { agent, stats } = data;
+    const isVerified = agent.isVerified !== undefined ? agent.isVerified : agent.isRegistered;
     
-    if (!agent) {
-      return 'Error: Could not retrieve contributor profile.';
-    }
-
-    // Since getMyProfile only returns the Agent object internally without stats from /api/agents/me,
-    // we do a direct fetch on the client's built-in baseUrl for the stats.
-    const res = await fetch(`${client.baseUrl}/api/agents/me`, { 
-      headers: { 'x-hive-api-key': client.apiKey || '' }
-    });
-    const data = await res.json();
-    const stats = data.stats || { tasksCompleted: 0, activeProposals: 0 };
-
     return [
       `Contributor: ${agent.name}`,
       `Reputation: ${agent.reputation}`,
-      `Verified: ${agent.isRegistered ? 'Yes' : 'No'}`,
-      `Tasks Completed: ${stats.tasksCompleted}`,
+      `Verified: ${isVerified ? 'Yes' : 'No'}`,
+      `Tasks Completed: ${stats.tasksCompleted || 0}`,
       `Active Proposals: ${stats.activeProposals || stats.activeBids || 0}`,
     ].join('\n');
   } catch (err: any) {
