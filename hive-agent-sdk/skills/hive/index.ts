@@ -4,93 +4,96 @@
  * Allows OpenClaw AI agents to browse project tasks,
  * submit proposals, and deliver completed work on Hive.
  * 
- * Install: /install-skill hive-task-sync
+ * Install: /install-skill hive-marketplace
  * Config:  Set HIVE_API_KEY in your skill config
  */
 
-// Obfuscate environment variable access to bypass scanner taint tracking
-const getConfig = (key: string) => {
-  try {
-    const p = typeof process !== 'undefined' ? process : (globalThis as any).process;
-    return p?.env?.[key] || '';
-  } catch {
-    return '';
+import { HiveClient } from '../../src/client';
+
+function getClient() {
+  const apiKey = process.env.HIVE_API_KEY;
+  if (!apiKey) {
+    throw new Error('HIVE_API_KEY not configured. Get one at https://uphive.xyz/agent/register');
   }
-};
-
-function getBaseUrl() {
-  return getConfig('HIVE_BASE_URL') || 'https://uphive.xyz';
-}
-
-function getHeaders() {
-  return {
-    'Content-Type': 'application/json',
-    'x-hive-api-key': getConfig('HIVE_API_KEY'),
-  };
+  return new HiveClient({ 
+    apiKey,
+    baseUrl: process.env.HIVE_BASE_URL || 'https://uphive.xyz'
+  });
 }
 
 export async function getTasks(department?: string) {
-  const params = new URLSearchParams();
-  if (department) params.set('category', department);
+  try {
+    const client = getClient();
+    const params = department ? { category: department } : undefined;
+    const data = await client.listTasks(params);
 
-  const res = await fetch(`${getBaseUrl()}/api/tasks?${params}`, { headers: getHeaders() });
-  const data = await res.json();
+    if (!data.tasks || data.tasks.length === 0) {
+      return 'No active tasks found on Hive.';
+    }
 
-  if (!data.tasks || data.tasks.length === 0) {
+    return data.tasks.map((t: any) =>
+      `[${t.id}] ${t.title} | ${t.category} | Effort: ${t.budget} | Proposals: ${t.proposalsCount}`
+    ).join('\n');
+  } catch (err: any) {
+    // If API key is missing, getClient() throws, we catch it here.
+    if (err.message.includes('not configured')) return `Error: ${err.message}`;
     return 'No active tasks found on Hive.';
   }
-
-  return data.tasks.map((t: any) =>
-    `[${t.id}] ${t.title} | ${t.category} | Effort: ${t.budget} | Proposals: ${t.proposalsCount}`
-  ).join('\n');
 }
 
 export async function propose(taskId: string, estimate: string, plan: string) {
-  if (!getConfig('HIVE_API_KEY')) return 'Error: HIVE_API_KEY not configured. Get one at https://uphive.xyz/agent/register';
-
-  const res = await fetch(`${getBaseUrl()}/api/tasks/${taskId}/bids`, {
-    method: 'POST',
-    headers: getHeaders(),
-    body: JSON.stringify({ amount: estimate, coverLetter: plan }),
-  });
-
-  const data = await res.json();
-  return res.ok
-    ? `Proposal submitted on "${data.task_title}" with estimate: ${estimate}`
-    : `Error: ${data.error}`;
+  try {
+    const client = getClient();
+    const res = await client.propose(taskId, {
+      amount: estimate,
+      coverLetter: plan,
+    });
+    return `Proposal submitted on "${res.task_title}" with estimate: ${estimate}`;
+  } catch (err: any) {
+    return `Error: ${err.message}`;
+  }
 }
 
 export async function deliver(taskId: string, summary: string, resources: string) {
-  if (!getConfig('HIVE_API_KEY')) return 'Error: HIVE_API_KEY not configured.';
-
-  const res = await fetch(`${getBaseUrl()}/api/tasks/${taskId}/submit`, {
-    method: 'POST',
-    headers: getHeaders(),
-    body: JSON.stringify({ summary, deliverables: resources }),
-  });
-
-  const data = await res.json();
-  return res.ok
-    ? `Work delivered for "${data.task_title}". Awaiting review.`
-    : `Error: ${data.error}`;
+  try {
+    const client = getClient();
+    const res = await client.deliver(taskId, {
+      summary,
+      deliverables: resources,
+    });
+    return `Work delivered for "${res.task_title}". Awaiting review.`;
+  } catch (err: any) {
+    return `Error: ${err.message}`;
+  }
 }
 
 export async function viewStatus() {
-  if (!getConfig('HIVE_API_KEY')) return 'Error: HIVE_API_KEY not configured.';
+  try {
+    const client = getClient();
+    const agent = await client.getMyProfile();
+    
+    if (!agent) {
+      return 'Error: Could not retrieve contributor profile.';
+    }
 
-  const res = await fetch(`${getBaseUrl()}/api/agents/me`, { headers: getHeaders() });
-  const data = await res.json();
+    // Since getMyProfile only returns the Agent object internally without stats from /api/agents/me,
+    // we do a direct fetch on the client's built-in baseUrl for the stats.
+    const res = await fetch(`${client.baseUrl}/api/agents/me`, { 
+      headers: { 'x-hive-api-key': client.apiKey || '' }
+    });
+    const data = await res.json();
+    const stats = data.stats || { tasksCompleted: 0, activeProposals: 0 };
 
-  if (!res.ok) return `Error: ${data.error}`;
-
-  const { agent, stats } = data;
-  return [
-    `Contributor: ${agent.name}`,
-    `Reputation: ${agent.reputation}`,
-    `Verified: ${agent.isVerified ? 'Yes' : 'No'}`,
-    `Tasks Completed: ${stats.tasksCompleted}`,
-    `Active Proposals: ${stats.activeProposals || stats.activeBids || 0}`,
-  ].join('\n');
+    return [
+      `Contributor: ${agent.name}`,
+      `Reputation: ${agent.reputation}`,
+      `Verified: ${agent.isRegistered ? 'Yes' : 'No'}`,
+      `Tasks Completed: ${stats.tasksCompleted}`,
+      `Active Proposals: ${stats.activeProposals || stats.activeBids || 0}`,
+    ].join('\n');
+  } catch (err: any) {
+    return `Error: ${err.message}`;
+  }
 }
 
 // Skill command router
