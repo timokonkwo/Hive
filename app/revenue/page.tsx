@@ -71,6 +71,7 @@ export default function RevenuePage() {
   const p = data?.platform;
   const a = data?.activity;
   const lf = data?.lifetimeFees;
+  const isFirstLoad = loading && !data;
 
   return (
     <div className="min-h-screen font-sans text-white" style={{ background: "#050505" }}>
@@ -108,34 +109,22 @@ export default function RevenuePage() {
               Total Revenue
             </h2>
           </div>
-          <div className="text-3xl sm:text-4xl font-bold text-emerald-500">
-            {lf?.usd != null ? fmt(lf.usd) : "—"}
-          </div>
+          {isFirstLoad ? (
+            <Shimmer className="h-10 w-48 rounded" />
+          ) : (
+            <div className="text-3xl sm:text-4xl font-bold text-emerald-500">
+              {lf?.usd != null ? fmt(lf.usd) : "—"}
+            </div>
+          )}
           <p className="text-zinc-600 text-xs mt-2">Cumulative fees generated from HIVE on BagsApp</p>
         </div>
 
         {/* Key metrics */}
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
-          <MetricCard
-            icon={DollarSign}
-            label="Task Payouts"
-            value={p ? fmt(p.totalEarnings) : "—"}
-          />
-          <MetricCard
-            icon={Briefcase}
-            label="Total Tasks"
-            value={p ? num(p.totalTasks) : "—"}
-          />
-          <MetricCard
-            icon={Users}
-            label="Agents"
-            value={p ? num(p.totalAgents) : "—"}
-          />
-          <MetricCard
-            icon={FileText}
-            label="Proposals"
-            value={p ? num(p.totalBids) : "—"}
-          />
+          <MetricCard icon={DollarSign} label="Task Payouts" value={p ? fmt(p.totalEarnings) : null} loading={isFirstLoad} />
+          <MetricCard icon={Briefcase} label="Total Tasks" value={p ? num(p.totalTasks) : null} loading={isFirstLoad} />
+          <MetricCard icon={Users} label="Agents" value={p ? num(p.totalAgents) : null} loading={isFirstLoad} />
+          <MetricCard icon={FileText} label="Proposals" value={p ? num(p.totalBids) : null} loading={isFirstLoad} />
         </div>
 
         {/* Platform overview + Recent activity */}
@@ -145,31 +134,26 @@ export default function RevenuePage() {
               <Activity size={13} className="text-zinc-500" />
               Platform Overview
             </h3>
-            <div className="space-y-4">
-              <OverviewRow
-                label="Open"
-                count={p?.openTasks}
-                total={p?.totalTasks}
-                color="emerald"
-              />
-              <OverviewRow
-                label="In Progress"
-                count={p?.inProgressTasks}
-                total={p?.totalTasks}
-                color="blue"
-              />
-              <OverviewRow
-                label="Completed"
-                count={p?.completedTasks}
-                total={p?.totalTasks}
-                color="purple"
-              />
-            </div>
-            {p && (
-              <div className="mt-4 pt-4 border-t border-zinc-800/50 flex justify-between text-xs text-zinc-500">
-                <span>Completion rate</span>
-                <span className="font-bold text-white">{pct(p.completedTasks, p.totalTasks)}</span>
+            {isFirstLoad ? (
+              <div className="space-y-4">
+                <Shimmer className="h-6 w-full rounded" />
+                <Shimmer className="h-6 w-full rounded" />
+                <Shimmer className="h-6 w-full rounded" />
               </div>
+            ) : (
+              <>
+                <div className="space-y-4">
+                  <OverviewRow label="Open" count={p?.openTasks} total={p?.totalTasks} color="emerald" />
+                  <OverviewRow label="In Progress" count={p?.inProgressTasks} total={p?.totalTasks} color="blue" />
+                  <OverviewRow label="Completed" count={p?.completedTasks} total={p?.totalTasks} color="purple" />
+                </div>
+                {p && (
+                  <div className="mt-4 pt-4 border-t border-zinc-800/50 flex justify-between text-xs text-zinc-500">
+                    <span>Completion rate</span>
+                    <span className="font-bold text-white">{pct(p.completedTasks, p.totalTasks)}</span>
+                  </div>
+                )}
+              </>
             )}
           </div>
 
@@ -178,16 +162,26 @@ export default function RevenuePage() {
               <RefreshCw size={13} className="text-zinc-500" />
               Last 7 Days
             </h3>
-            <div className="space-y-5">
-              <StatRow icon={Briefcase} label="Tasks Created" value={a?.tasksLast7d} />
-              <StatRow icon={Users} label="Agents Joined" value={a?.agentsLast7d} />
-              <StatRow icon={FileText} label="Proposals Submitted" value={a?.bidsLast7d} />
-            </div>
-            {a && (
-              <div className="mt-4 pt-4 border-t border-zinc-800/50 flex justify-between text-xs text-zinc-500">
-                <span>Weekly activity</span>
-                <span className="font-bold text-white">{num((a.tasksLast7d || 0) + (a.agentsLast7d || 0) + (a.bidsLast7d || 0))} events</span>
+            {isFirstLoad ? (
+              <div className="space-y-5">
+                <Shimmer className="h-5 w-full rounded" />
+                <Shimmer className="h-5 w-full rounded" />
+                <Shimmer className="h-5 w-full rounded" />
               </div>
+            ) : (
+              <>
+                <div className="space-y-5">
+                  <StatRow icon={Briefcase} label="Tasks Created" value={a?.tasksLast7d} />
+                  <StatRow icon={Users} label="Agents Joined" value={a?.agentsLast7d} />
+                  <StatRow icon={FileText} label="Proposals Submitted" value={a?.bidsLast7d} />
+                </div>
+                {a && (
+                  <div className="mt-4 pt-4 border-t border-zinc-800/50 flex justify-between text-xs text-zinc-500">
+                    <span>Weekly activity</span>
+                    <span className="font-bold text-white">{num((a.tasksLast7d || 0) + (a.agentsLast7d || 0) + (a.bidsLast7d || 0))} events</span>
+                  </div>
+                )}
+              </>
             )}
           </div>
         </div>
@@ -203,14 +197,26 @@ export default function RevenuePage() {
   );
 }
 
-function MetricCard({ icon: Icon, label, value }: { icon: React.ElementType; label: string; value: string }) {
+/* ---------- Components ---------- */
+
+function Shimmer({ className }: { className?: string }) {
+  return (
+    <div className={`animate-pulse bg-zinc-800/60 ${className || ""}`} />
+  );
+}
+
+function MetricCard({ icon: Icon, label, value, loading }: { icon: React.ElementType; label: string; value: string | null; loading?: boolean }) {
   return (
     <div className="p-5 rounded-sm border bg-zinc-900/30 border-zinc-800/50">
       <div className="flex items-center gap-1.5 mb-2">
         <Icon className="text-zinc-600" size={14} />
         <span className="text-[10px] font-mono uppercase tracking-widest text-zinc-500">{label}</span>
       </div>
-      <div className="text-2xl font-bold text-white">{value}</div>
+      {loading ? (
+        <Shimmer className="h-7 w-20 rounded" />
+      ) : (
+        <div className="text-2xl font-bold text-white">{value ?? "—"}</div>
+      )}
     </div>
   );
 }

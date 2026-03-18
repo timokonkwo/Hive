@@ -3,10 +3,23 @@ import { getDb } from '@/lib/db';
 
 const HIVE_TOKEN_CA = '6JfonM6a24xngXh5yJ1imZzbMhpfvEsiafkb4syHBAGS';
 const LAMPORTS_PER_SOL = 1_000_000_000;
+const FEES_CACHE_TTL = 5 * 60 * 1000; // 5 minutes
+
+// In-memory cache for lifetime fees (persists across warm function invocations)
+let feesCache: { sol: number; usd: number | null; fetchedAt: number } | null = null;
+
+async function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
+  return Promise.race([
+    promise,
+    new Promise<never>((_, reject) =>
+      setTimeout(() => reject(new Error(`Timed out after ${ms}ms`)), ms)
+    ),
+  ]);
+}
 
 /**
  * GET /api/revenue
- * Public revenue dashboard — platform metrics and fee revenue via Bags SDK.
+ * Public revenue dashboard — platform metrics + fee revenue via Bags SDK.
  */
 export async function GET(req: NextRequest) {
   try {
@@ -53,14 +66,16 @@ export async function GET(req: NextRequest) {
       bidsCol.countDocuments({ createdAt: { $gte: sevenDaysAgo } }),
     ]);
 
-    // Bags SDK: on-chain lifetime fees
+    // Bags SDK: on-chain lifetime fees (with cache + timeout)
     let lifetimeFees: { sol: number; usd: number | null } | null = null;
     const bagsApiKey = (process.env.BAGS_API_KEY || '').trim();
     const rpcUrl = (process.env.SOLANA_RPC_URL || 'https://api.mainnet-beta.solana.com').trim();
 
-    if (bagsApiKey) {
+    // Return cached value if still fresh
+    if (feesCache && Date.now() - feesCache.fetchedAt < FEES_CACHE_TTL) {
+      lifetimeFees = { sol: feesCache.sol, usd: feesCache.usd };
+    } else if (bagsApiKey) {
       try {
-        // Dynamic import required — @bagsfm/bags-sdk is ESM-only
         const bagsMod = await import('@bagsfm/bags-sdk');
         const solanaMod = await import('@solana/web3.js');
         const BagsSDK = bagsMod.BagsSDK || bagsMod.default?.BagsSDK || bagsMod.default;
@@ -69,30 +84,38 @@ export async function GET(req: NextRequest) {
 
         const connection = new Connection(rpcUrl);
         const sdk = new BagsSDK(bagsApiKey, connection, 'processed');
-        const feesLamports = await sdk.state.getTokenLifetimeFees(new PublicKey(HIVE_TOKEN_CA));
+
+        // 8s timeout — Netlify functions have 10s default
+        const feesLamports = await withTimeout(
+          sdk.state.getTokenLifetimeFees(new PublicKey(HIVE_TOKEN_CA)),
+          8000
+        );
         const feesSol = feesLamports / LAMPORTS_PER_SOL;
 
-        // SOL → USD conversion
+        // SOL → USD (with own 3s timeout)
         let solPrice: number | null = null;
         try {
-          const priceRes = await fetch('https://api.coingecko.com/api/v3/simple/price?ids=solana&vs_currencies=usd');
+          const priceRes = await withTimeout(
+            fetch('https://api.coingecko.com/api/v3/simple/price?ids=solana&vs_currencies=usd'),
+            3000
+          );
           if (priceRes.ok) {
             const priceData = await priceRes.json();
             solPrice = priceData?.solana?.usd || null;
           }
         } catch {
-          // Non-fatal
+          // Non-fatal — USD will be null
         }
 
-        lifetimeFees = {
-          sol: feesSol,
-          usd: solPrice ? feesSol * solPrice : null,
-        };
+        lifetimeFees = { sol: feesSol, usd: solPrice ? feesSol * solPrice : null };
+        feesCache = { sol: feesSol, usd: lifetimeFees.usd, fetchedAt: Date.now() };
       } catch (e: any) {
-        console.error('[REVENUE] Bags SDK error:', e.message, e.stack);
+        console.error('[REVENUE] Bags SDK error:', e.message);
+        // Return stale cache if available
+        if (feesCache) {
+          lifetimeFees = { sol: feesCache.sol, usd: feesCache.usd };
+        }
       }
-    } else {
-      console.warn('[REVENUE] BAGS_API_KEY not set — skipping lifetime fees');
     }
 
     return NextResponse.json({
