@@ -4,7 +4,7 @@ import React, { useEffect, useState, useCallback } from "react";
 import Link from "next/link";
 import {
   DollarSign, Users, Briefcase,
-  ArrowLeft, RefreshCw, FileText
+  ArrowLeft, RefreshCw, FileText, Activity
 } from "lucide-react";
 import { Navbar } from "@/components/layout/Navbar";
 import { Footer } from "@/components/layout/Footer";
@@ -19,6 +19,11 @@ function fmt(n: number | null | undefined): string {
 function num(n: number | null | undefined): string {
   if (n == null || isNaN(n)) return "0";
   return n.toLocaleString();
+}
+
+function pct(count: number | undefined, total: number | undefined): string {
+  if (!count || !total || total === 0) return "0%";
+  return `${Math.round((count / total) * 100)}%`;
 }
 
 interface RevenueData {
@@ -79,10 +84,10 @@ export default function RevenuePage() {
               <ArrowLeft className="w-3.5 h-3.5 mr-2" /> Home
             </Link>
             <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">
-              Revenue & Metrics
+              Revenue
             </h1>
             <p className="text-zinc-500 text-sm mt-1">
-              Hive platform performance at a glance
+              Live earnings and platform activity
             </p>
           </div>
           <button
@@ -95,27 +100,26 @@ export default function RevenuePage() {
           </button>
         </div>
 
-        {/* Lifetime Revenue — from Bags */}
+        {/* Revenue — Hero */}
         <div className="mb-8 p-6 bg-emerald-500/5 border border-emerald-500/20 rounded-sm">
           <div className="flex items-center gap-2 mb-3">
             <DollarSign className="text-emerald-500" size={16} />
             <h2 className="text-xs font-bold font-mono uppercase tracking-widest text-emerald-500">
-              Lifetime Revenue
+              Total Revenue
             </h2>
           </div>
           <div className="text-3xl sm:text-4xl font-bold text-emerald-500">
             {lf?.usd != null ? fmt(lf.usd) : "—"}
           </div>
-          <p className="text-zinc-600 text-xs mt-2">Total fees earned from HIVE token on Bags</p>
+          <p className="text-zinc-600 text-xs mt-2">Cumulative fees generated from HIVE token trading</p>
         </div>
 
-        {/* Top-line metrics */}
+        {/* Key metrics */}
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
           <MetricCard
             icon={DollarSign}
-            label="Task Earnings"
+            label="Task Payouts"
             value={p ? fmt(p.totalEarnings) : "—"}
-            accent
           />
           <MetricCard
             icon={Briefcase}
@@ -124,46 +128,73 @@ export default function RevenuePage() {
           />
           <MetricCard
             icon={Users}
-            label="Registered Agents"
+            label="Agents"
             value={p ? num(p.totalAgents) : "—"}
           />
           <MetricCard
             icon={FileText}
-            label="Proposals Sent"
+            label="Proposals"
             value={p ? num(p.totalBids) : "—"}
           />
         </div>
 
-        {/* Task breakdown */}
+        {/* Platform overview + Recent activity */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-8">
           <div className="p-6 bg-zinc-900/30 border border-zinc-800/50 rounded-sm">
-            <h3 className="text-xs font-bold font-mono uppercase tracking-widest text-zinc-400 mb-5">
-              Task Pipeline
+            <h3 className="text-xs font-bold font-mono uppercase tracking-widest text-zinc-400 mb-5 flex items-center gap-2">
+              <Activity size={13} className="text-zinc-500" />
+              Platform Overview
             </h3>
             <div className="space-y-4">
-              <PipelineRow label="Open" count={p?.openTasks} color="emerald" total={p?.totalTasks} />
-              <PipelineRow label="In Progress" count={p?.inProgressTasks} color="blue" total={p?.totalTasks} />
-              <PipelineRow label="Completed" count={p?.completedTasks} color="purple" total={p?.totalTasks} />
+              <OverviewRow
+                label="Open"
+                count={p?.openTasks}
+                total={p?.totalTasks}
+                color="emerald"
+              />
+              <OverviewRow
+                label="In Progress"
+                count={p?.inProgressTasks}
+                total={p?.totalTasks}
+                color="blue"
+              />
+              <OverviewRow
+                label="Completed"
+                count={p?.completedTasks}
+                total={p?.totalTasks}
+                color="purple"
+              />
             </div>
+            {p && (
+              <div className="mt-4 pt-4 border-t border-zinc-800/50 flex justify-between text-xs text-zinc-500">
+                <span>Completion rate</span>
+                <span className="font-bold text-white">{pct(p.completedTasks, p.totalTasks)}</span>
+              </div>
+            )}
           </div>
 
           <div className="p-6 bg-zinc-900/30 border border-zinc-800/50 rounded-sm">
-            <h3 className="text-xs font-bold font-mono uppercase tracking-widest text-zinc-400 mb-5">
+            <h3 className="text-xs font-bold font-mono uppercase tracking-widest text-zinc-400 mb-5 flex items-center gap-2">
+              <RefreshCw size={13} className="text-zinc-500" />
               Last 7 Days
             </h3>
             <div className="space-y-5">
-              <ActivityRow icon={Briefcase} label="New Tasks" value={a?.tasksLast7d} />
-              <ActivityRow icon={Users} label="New Agents" value={a?.agentsLast7d} />
-              <ActivityRow icon={FileText} label="New Proposals" value={a?.bidsLast7d} />
+              <StatRow icon={Briefcase} label="Tasks Created" value={a?.tasksLast7d} />
+              <StatRow icon={Users} label="Agents Joined" value={a?.agentsLast7d} />
+              <StatRow icon={FileText} label="Proposals Submitted" value={a?.bidsLast7d} />
             </div>
+            {a && (
+              <div className="mt-4 pt-4 border-t border-zinc-800/50 flex justify-between text-xs text-zinc-500">
+                <span>Weekly activity</span>
+                <span className="font-bold text-white">{num((a.tasksLast7d || 0) + (a.agentsLast7d || 0) + (a.bidsLast7d || 0))} events</span>
+              </div>
+            )}
           </div>
         </div>
 
-
-
-        {/* Footer note */}
+        {/* Footer */}
         <div className="text-center text-[10px] font-mono text-zinc-600">
-          Auto-refreshes every 2 minutes &middot; Revenue data from Bags &middot; Platform data from Hive
+          Auto-refreshes every 2 minutes &middot; {data?.lastUpdated ? `Last updated ${new Date(data.lastUpdated).toLocaleTimeString()}` : "Loading…"}
         </div>
 
       </main>
@@ -172,39 +203,42 @@ export default function RevenuePage() {
   );
 }
 
-function MetricCard({ icon: Icon, label, value, accent }: { icon: React.ElementType; label: string; value: string; accent?: boolean }) {
+function MetricCard({ icon: Icon, label, value }: { icon: React.ElementType; label: string; value: string }) {
   return (
-    <div className={`p-5 rounded-sm border ${accent ? "bg-emerald-500/5 border-emerald-500/20" : "bg-zinc-900/30 border-zinc-800/50"}`}>
+    <div className="p-5 rounded-sm border bg-zinc-900/30 border-zinc-800/50">
       <div className="flex items-center gap-1.5 mb-2">
-        <Icon className={accent ? "text-emerald-500" : "text-zinc-600"} size={14} />
+        <Icon className="text-zinc-600" size={14} />
         <span className="text-[10px] font-mono uppercase tracking-widest text-zinc-500">{label}</span>
       </div>
-      <div className={`text-2xl font-bold ${accent ? "text-emerald-500" : "text-white"}`}>{value}</div>
+      <div className="text-2xl font-bold text-white">{value}</div>
     </div>
   );
 }
 
-function PipelineRow({ label, count, color, total }: { label: string; count?: number; color: string; total?: number }) {
-  const pct = total && count ? Math.round((count / total) * 100) : 0;
+function OverviewRow({ label, count, total, color }: { label: string; count?: number; total?: number; color: string }) {
+  const width = total && count ? Math.round((count / total) * 100) : 0;
   return (
     <div>
       <div className="flex items-center justify-between mb-1.5">
         <span className="text-sm text-zinc-400">{label}</span>
-        <span className="text-sm font-bold text-white">{count ?? 0}</span>
+        <div className="flex items-center gap-2">
+          <span className="text-xs text-zinc-600">{pct(count, total)}</span>
+          <span className="text-sm font-bold text-white">{count ?? 0}</span>
+        </div>
       </div>
       <div className="h-1.5 bg-zinc-800 rounded-full overflow-hidden">
         <div
           className={`h-full rounded-full transition-all duration-700 ${
             color === "emerald" ? "bg-emerald-500" : color === "blue" ? "bg-blue-500" : "bg-purple-500"
           }`}
-          style={{ width: `${pct}%` }}
+          style={{ width: `${width}%` }}
         />
       </div>
     </div>
   );
 }
 
-function ActivityRow({ icon: Icon, label, value }: { icon: React.ElementType; label: string; value?: number }) {
+function StatRow({ icon: Icon, label, value }: { icon: React.ElementType; label: string; value?: number }) {
   return (
     <div className="flex items-center justify-between">
       <div className="flex items-center gap-2.5">

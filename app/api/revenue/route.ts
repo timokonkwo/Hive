@@ -6,8 +6,7 @@ const LAMPORTS_PER_SOL = 1_000_000_000;
 
 /**
  * GET /api/revenue
- * Public revenue dashboard — returns platform metrics and fee revenue.
- * Uses Bags SDK for on-chain lifetime fees.
+ * Public revenue dashboard — platform metrics and fee revenue via Bags SDK.
  */
 export async function GET(req: NextRequest) {
   try {
@@ -33,11 +32,11 @@ export async function GET(req: NextRequest) {
       bidsCol.countDocuments(),
     ]);
 
-    // Calculate total platform earnings from completed tasks
+    // Total platform earnings from completed tasks
     const completedTaskDocs = await tasksCol
       .find({ status: { $in: ['Completed', 'completed'] } }, { projection: { budget: 1 } })
       .toArray();
-    
+
     let totalEarnings = 0;
     for (const task of completedTaskDocs) {
       if (task.budget) {
@@ -54,22 +53,26 @@ export async function GET(req: NextRequest) {
       bidsCol.countDocuments({ createdAt: { $gte: sevenDaysAgo } }),
     ]);
 
-    // Bags SDK: fetch lifetime fees from on-chain data
+    // Bags SDK: on-chain lifetime fees
     let lifetimeFees: { sol: number; usd: number | null } | null = null;
-    try {
-      const bagsApiKey = process.env.BAGS_API_KEY;
-      const rpcUrl = process.env.SOLANA_RPC_URL || 'https://api.mainnet-beta.solana.com';
-      
-      if (bagsApiKey) {
-        const { BagsSDK } = await import('@bagsfm/bags-sdk');
-        const { Connection, PublicKey } = await import('@solana/web3.js');
-        
+    const bagsApiKey = process.env.BAGS_API_KEY;
+    const rpcUrl = process.env.SOLANA_RPC_URL || 'https://api.mainnet-beta.solana.com';
+
+    if (bagsApiKey) {
+      try {
+        // Dynamic import required — @bagsfm/bags-sdk is ESM-only
+        const bagsMod = await import('@bagsfm/bags-sdk');
+        const solanaMod = await import('@solana/web3.js');
+        const BagsSDK = bagsMod.BagsSDK || bagsMod.default?.BagsSDK || bagsMod.default;
+        const Connection = solanaMod.Connection;
+        const PublicKey = solanaMod.PublicKey;
+
         const connection = new Connection(rpcUrl);
         const sdk = new BagsSDK(bagsApiKey, connection, 'processed');
         const feesLamports = await sdk.state.getTokenLifetimeFees(new PublicKey(HIVE_TOKEN_CA));
         const feesSol = feesLamports / LAMPORTS_PER_SOL;
-        
-        // Try to get SOL price for USD conversion
+
+        // SOL → USD conversion
         let solPrice: number | null = null;
         try {
           const priceRes = await fetch('https://api.coingecko.com/api/v3/simple/price?ids=solana&vs_currencies=usd');
@@ -85,9 +88,11 @@ export async function GET(req: NextRequest) {
           sol: feesSol,
           usd: solPrice ? feesSol * solPrice : null,
         };
+      } catch (e: any) {
+        console.error('[REVENUE] Bags SDK error:', e.message, e.stack);
       }
-    } catch (e: any) {
-      console.warn('[REVENUE] Bags SDK error (non-fatal):', e.message);
+    } else {
+      console.warn('[REVENUE] BAGS_API_KEY not set — skipping lifetime fees');
     }
 
     return NextResponse.json({
