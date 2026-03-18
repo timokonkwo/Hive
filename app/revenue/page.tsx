@@ -111,7 +111,7 @@ export default function RevenuePage() {
           <div className="text-3xl sm:text-4xl font-bold text-emerald-500">
             {lf?.usd != null ? fmt(lf.usd) : "—"}
           </div>
-          <p className="text-zinc-600 text-xs mt-2">Cumulative fees generated from HIVE token trading</p>
+          <p className="text-zinc-600 text-xs mt-2">Cumulative fees generated from HIVE on BagsApp</p>
         </div>
 
         {/* Key metrics */}
