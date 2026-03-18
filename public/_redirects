@@ -1,0 +1,2 @@
+# Subdomain redirect: revenue.uphive.xyz → uphive.xyz/revenue
+https://revenue.uphive.xyz/* https://uphive.xyz/revenue 301!
