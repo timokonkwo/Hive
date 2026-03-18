@@ -3,8 +3,8 @@
 import React, { useEffect, useState, useCallback } from "react";
 import Link from "next/link";
 import {
-  TrendingUp, DollarSign, Users, Briefcase, BarChart3,
-  ArrowLeft, RefreshCw, FileText, Zap, CheckCircle, Clock
+  DollarSign, Users, Briefcase,
+  ArrowLeft, RefreshCw, FileText
 } from "lucide-react";
 import { Navbar } from "@/components/layout/Navbar";
 import { Footer } from "@/components/layout/Footer";
@@ -36,7 +36,6 @@ interface RevenueData {
     agentsLast7d: number;
     bidsLast7d: number;
   };
-  tokenFees: { volume24h: number; fees24h: number; txns24h: number } | null;
   lifetimeFees: { sol: number; usd: number | null } | null;
   lastUpdated: string;
 }
@@ -66,7 +65,6 @@ export default function RevenuePage() {
 
   const p = data?.platform;
   const a = data?.activity;
-  const f = data?.tokenFees;
   const lf = data?.lifetimeFees;
 
   return (
@@ -97,21 +95,19 @@ export default function RevenuePage() {
           </button>
         </div>
 
-        {/* Lifetime Fees — Hero Card (from Bags) */}
-        {lf && (
-          <div className="mb-8 p-6 bg-emerald-500/5 border border-emerald-500/20 rounded-sm">
-            <div className="flex items-center gap-2 mb-3">
-              <DollarSign className="text-emerald-500" size={16} />
-              <h2 className="text-xs font-bold font-mono uppercase tracking-widest text-emerald-500">
-                Lifetime Revenue (via Bags)
-              </h2>
-            </div>
-            <div className="flex items-end gap-4 flex-wrap">
-              <div className="text-3xl sm:text-4xl font-bold text-emerald-500">{lf.usd != null ? fmt(lf.usd) : "—"}</div>
-            </div>
-            <p className="text-zinc-600 text-xs mt-2">Total fees earned from token trading on Bags</p>
+        {/* Lifetime Revenue — from Bags */}
+        <div className="mb-8 p-6 bg-emerald-500/5 border border-emerald-500/20 rounded-sm">
+          <div className="flex items-center gap-2 mb-3">
+            <DollarSign className="text-emerald-500" size={16} />
+            <h2 className="text-xs font-bold font-mono uppercase tracking-widest text-emerald-500">
+              Lifetime Revenue
+            </h2>
           </div>
-        )}
+          <div className="text-3xl sm:text-4xl font-bold text-emerald-500">
+            {lf?.usd != null ? fmt(lf.usd) : "—"}
+          </div>
+          <p className="text-zinc-600 text-xs mt-2">Total fees earned from HIVE token on Bags</p>
+        </div>
 
         {/* Top-line metrics */}
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
@@ -163,29 +159,7 @@ export default function RevenuePage() {
           </div>
         </div>
 
-        {/* 24h Token Fees */}
-        {f && (
-          <div className="p-6 bg-zinc-900/30 border border-zinc-800/50 rounded-sm mb-8">
-            <h3 className="text-xs font-bold font-mono uppercase tracking-widest text-zinc-400 mb-5 flex items-center gap-2">
-              <TrendingUp className="text-emerald-500" size={14} />
-              Token Fee Revenue (24h)
-            </h3>
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-              <div className="p-4 bg-zinc-800/30 border border-zinc-800/50 rounded-sm">
-                <div className="text-[10px] font-mono uppercase text-zinc-500 mb-1">Trading Volume</div>
-                <div className="text-xl font-bold text-white">{fmt(f.volume24h)}</div>
-              </div>
-              <div className="p-4 bg-emerald-500/5 border border-emerald-500/20 rounded-sm">
-                <div className="text-[10px] font-mono uppercase text-zinc-500 mb-1">Fees Earned (1%)</div>
-                <div className="text-xl font-bold text-emerald-500">{fmt(f.fees24h)}</div>
-              </div>
-              <div className="p-4 bg-zinc-800/30 border border-zinc-800/50 rounded-sm">
-                <div className="text-[10px] font-mono uppercase text-zinc-500 mb-1">Transactions</div>
-                <div className="text-xl font-bold text-white">{num(f.txns24h)}</div>
-              </div>
-            </div>
-          </div>
-        )}
+
 
         {/* Footer note */}
         <div className="text-center text-[10px] font-mono text-zinc-600">

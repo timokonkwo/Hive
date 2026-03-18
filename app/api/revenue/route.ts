@@ -90,30 +90,6 @@ export async function GET(req: NextRequest) {
       console.warn('[REVENUE] Bags SDK error (non-fatal):', e.message);
     }
 
-    // DexScreener for 24h volume-based fee estimate
-    let tradingFees = null;
-    try {
-      const dexRes = await fetch(
-        `https://api.dexscreener.com/latest/dex/tokens/${HIVE_TOKEN_CA}`,
-        { next: { revalidate: 120 } }
-      );
-      if (dexRes.ok) {
-        const dexData = await dexRes.json();
-        const pairs = dexData?.pairs || [];
-        const mainPair = pairs.sort((a: any, b: any) => (b.liquidity?.usd || 0) - (a.liquidity?.usd || 0))[0];
-        if (mainPair) {
-          const volume24h = mainPair.volume?.h24 || 0;
-          tradingFees = {
-            volume24h,
-            fees24h: volume24h * 0.01,
-            txns24h: (mainPair.txns?.h24?.buys || 0) + (mainPair.txns?.h24?.sells || 0),
-          };
-        }
-      }
-    } catch {
-      // Non-fatal
-    }
-
     return NextResponse.json({
       success: true,
       platform: {
@@ -131,7 +107,6 @@ export async function GET(req: NextRequest) {
         bidsLast7d: recentBids,
       },
       lifetimeFees,
-      tokenFees: tradingFees,
       lastUpdated: new Date().toISOString(),
     });
   } catch (error: any) {
