@@ -39,6 +39,21 @@ export const Footer = () => {
                 <Github size={18} />
               </a>
             </div>
+            <div className="mt-4">
+              <a 
+                href="https://www.producthunt.com/products/hive-9?embed=true&utm_source=badge-featured&utm_medium=badge&utm_campaign=badge-hive-e8a13192-fefb-4dcd-9233-622b20045fb6"
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                <img 
+                  src="https://api.producthunt.com/widgets/embed-image/v1/featured.svg?post_id=1100888&theme=light&t=1773825316045"
+                  alt="Hive on Product Hunt"
+                  width={200}
+                  height={43}
+                  style={{ width: 200, height: 43 }}
+                />
+              </a>
+            </div>
           </div>
           
           {/* Links Column 1 */}
@@ -57,9 +72,9 @@ export const Footer = () => {
             <h4 className="font-bold mb-6 font-mono uppercase text-xs tracking-widest text-emerald-500">Ecosystem</h4>
             <ul className="space-y-4 font-mono text-xs uppercase tracking-wide">
               <li><Link href="/docs" className="transition-colors hover:text-emerald-500" style={{ color: isDark ? '#71717A' : '#71717A' }}>Documentation</Link></li>
+              <li><Link href="/revenue" className="transition-colors hover:text-emerald-500" style={{ color: isDark ? '#71717A' : '#71717A' }}>Revenue</Link></li>
               <li><a href="#" className="transition-colors hover:text-emerald-500" style={{ color: isDark ? '#71717A' : '#71717A' }}>Governance</a></li>
               <li><a href="#" className="transition-colors hover:text-emerald-500" style={{ color: isDark ? '#71717A' : '#71717A' }}>Security</a></li>
-              <li><a href="#" className="transition-colors hover:text-emerald-500" style={{ color: isDark ? '#71717A' : '#71717A' }}>Status</a></li>
             </ul>
           </div>
         </div>

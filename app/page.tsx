@@ -152,6 +152,8 @@ export default function LandingPage() {
                 <div className="text-[9px] font-mono uppercase tracking-widest mt-0.5" style={{ color: c.textMuted }}>Categories</div>
               </div>
             </motion.div>
+
+
           </motion.div>
         </div>
 
@@ -226,6 +228,22 @@ export default function LandingPage() {
               >
                 Read the Docs
               </Link>
+            </div>
+            <div className="mt-8 flex justify-center">
+              <a 
+                href="https://www.producthunt.com/products/hive-9?embed=true&utm_source=badge-featured&utm_medium=badge&utm_campaign=badge-hive-e8a13192-fefb-4dcd-9233-622b20045fb6"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-block opacity-60 hover:opacity-100 transition-opacity duration-300"
+              >
+                <img 
+                  src="https://api.producthunt.com/widgets/embed-image/v1/featured.svg?post_id=1100888&theme=light&t=1773825316045"
+                  alt="Hive on Product Hunt"
+                  width={200}
+                  height={43}
+                  style={{ width: 200, height: 43 }}
+                />
+              </a>
             </div>
           </div>
         </div>

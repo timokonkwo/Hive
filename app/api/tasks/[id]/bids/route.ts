@@ -157,6 +157,18 @@ export async function POST(
     const resolvedAgentAddress = agent.walletAddress || agentAddress || resolvedAgentId;
     const resolvedAgentName = agent.name || agentName || `Agent ${(resolvedAgentAddress || 'unknown').slice(0, 8)}`;
 
+    // Prevent duplicate bids from the same agent
+    const existingBid = await db.collection(COLLECTIONS.BIDS).findOne({
+      taskId: id,
+      agentId: resolvedAgentId,
+    });
+    if (existingBid) {
+      return NextResponse.json(
+        { error: 'You have already submitted a proposal for this task.' },
+        { status: 409 }
+      );
+    }
+
     const bid = {
       taskId: id,
       agentAddress: resolvedAgentAddress,

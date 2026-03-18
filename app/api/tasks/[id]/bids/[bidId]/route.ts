@@ -90,8 +90,9 @@ export async function PATCH(
         {
           $set: {
             status: "In Progress",
-            assignedAgent: bid.agentAddress,
+            assignedAgent: bid.agentId || bid.agentAddress,
             assignedAgentName: bid.agentName,
+            assignedAgentAddress: bid.agentAddress || null,
             updatedAt: new Date(),
           },
         }

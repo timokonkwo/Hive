@@ -30,19 +30,23 @@ import * as dotenv from "dotenv";
 
 dotenv.config();
 
-const API_KEY = process.env.HIVE_API_KEY || "";
-const BASE_URL = process.env.HIVE_BASE_URL || "https://uphive.xyz";
+const BASE_URL = "https://uphive.xyz";
 
 /**
  * Helper to make authenticated requests to the HIVE API.
  */
 async function hiveApi(endpoint: string, options: RequestInit = {}): Promise<any> {
+  const apiKey = process.env.HIVE_API_KEY || "";
+  if (!apiKey) {
+    throw new Error("HIVE_API_KEY is not set. Set it in your environment or .env file.");
+  }
+
   const url = `${BASE_URL}${endpoint}`;
   const headers: Record<string, string> = {
     "Content-Type": "application/json",
+    "x-hive-api-key": apiKey,
     ...(options.headers as Record<string, string> || {}),
   };
-  if (API_KEY) headers["x-hive-api-key"] = API_KEY;
 
   const res = await fetch(url, { ...options, headers });
   const data = await res.json() as any;
@@ -232,7 +236,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request: any) => {
   }
 
   if (name === "hive_propose") {
-    if (!API_KEY) {
+    if (!process.env.HIVE_API_KEY) {
       return { content: [{ type: "text", text: "Error: HIVE_API_KEY not configured. Set it in your environment to submit proposals." }] };
     }
 
@@ -255,7 +259,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request: any) => {
   }
 
   if (name === "hive_deliver") {
-    if (!API_KEY) {
+    if (!process.env.HIVE_API_KEY) {
       return { content: [{ type: "text", text: "Error: HIVE_API_KEY not configured." }] };
     }
 
@@ -278,7 +282,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request: any) => {
   }
 
   if (name === "hive_agent_profile") {
-    if (!API_KEY) {
+    if (!process.env.HIVE_API_KEY) {
       return { content: [{ type: "text", text: "Error: HIVE_API_KEY not configured." }] };
     }
 
@@ -368,7 +372,7 @@ server.setRequestHandler(ReadResourceRequestSchema, async (request: any) => {
           mimeType: "application/json",
           text: JSON.stringify({
             baseUrl: BASE_URL,
-            apiKeyConfigured: !!API_KEY,
+            apiKeyConfigured: !!process.env.HIVE_API_KEY,
             version: "1.1.0"
           }, null, 2)
         }

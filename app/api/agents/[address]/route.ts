@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { getDb, COLLECTIONS } from "@/lib/db";
+import { ObjectId } from "mongodb";
 
 export async function GET(
   request: Request,
@@ -9,38 +10,57 @@ export async function GET(
     const { address } = await params;
 
     if (!address) {
-      return NextResponse.json({ error: "Address required" }, { status: 400 });
+      return NextResponse.json({ error: "Identifier required" }, { status: 400 });
     }
 
     const db = await getDb();
-    const escaped = address.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const decoded = decodeURIComponent(address);
+    const escaped = decoded.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
-    const agent = await db.collection(COLLECTIONS.AGENTS).findOne({ 
-      walletAddress: { $regex: new RegExp(`^${escaped}$`, "i") }
+    // Try lookup in order: name → MongoDB _id → wallet address
+    let agent = await db.collection(COLLECTIONS.AGENTS).findOne({
+      name: { $regex: new RegExp(`^${escaped}$`, "i") }
     });
+
+    if (!agent && ObjectId.isValid(decoded)) {
+      agent = await db.collection(COLLECTIONS.AGENTS).findOne({ _id: new ObjectId(decoded) });
+    }
+
+    if (!agent) {
+      agent = await db.collection(COLLECTIONS.AGENTS).findOne({
+        walletAddress: { $regex: new RegExp(`^${escaped}$`, "i") }
+      });
+    }
 
     if (!agent) {
       return NextResponse.json({ error: "Agent not found" }, { status: 404 });
     }
 
+    const agentId = agent._id.toString();
+
+    // Build a flexible match query for both agentId and legacy wallet-based assignedAgent
+    const assignedQuery: any = { $or: [{ assignedAgent: agentId }] };
+    if (agent.walletAddress) {
+      const walletEscaped = agent.walletAddress.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      assignedQuery.$or.push({ assignedAgent: { $regex: new RegExp(`^${walletEscaped}$`, "i") } });
+    }
+
     // Get real stats from DB
     const [tasksCompleted, activeProposals, totalProposals] = await Promise.all([
       db.collection(COLLECTIONS.TASKS).countDocuments({
-        assignedAgent: { $regex: new RegExp(`^${escaped}$`, "i") },
+        ...assignedQuery,
         status: "Completed",
       }),
       db.collection(COLLECTIONS.BIDS).countDocuments({
-        agentAddress: { $regex: new RegExp(`^${escaped}$`, "i") },
+        agentId,
         status: { $nin: ["rejected", "withdrawn"] },
       }),
-      db.collection(COLLECTIONS.BIDS).countDocuments({
-        agentAddress: { $regex: new RegExp(`^${escaped}$`, "i") },
-      }),
+      db.collection(COLLECTIONS.BIDS).countDocuments({ agentId }),
     ]);
 
     return NextResponse.json({
       agent: {
-        id: agent._id.toString(),
+        id: agentId,
         name: agent.name || "Unnamed Agent",
         bio: agent.bio || "",
         walletAddress: agent.walletAddress,

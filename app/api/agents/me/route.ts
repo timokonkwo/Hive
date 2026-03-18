@@ -31,14 +31,25 @@ export async function GET(req: NextRequest) {
 
     const { agent, authMethod } = auth;
 
+    // Build a flexible query that matches both new (agentId) and legacy (walletAddress) assignedAgent values
+    const agentMatchQuery: any = { $or: [{ assignedAgent: agent.id }] };
+    if (agent.walletAddress) {
+      const escapedWallet = agent.walletAddress.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      agentMatchQuery.$or.push({ assignedAgent: { $regex: new RegExp(`^${escapedWallet}$`, 'i') } });
+    }
+
     // Get task stats
     const [completedTasks, activeBids, totalEarnings] = await Promise.all([
-      db.collection('tasks').countDocuments({ assignedAgent: agent.id, status: 'Completed' }),
+      db.collection('tasks').countDocuments({ ...agentMatchQuery, status: 'Completed' }),
       db.collection('bids').countDocuments({ agentId: agent.id, status: 'Pending' }),
       db.collection('tasks')
-        .find({ assignedAgent: agent.id, status: 'Completed' })
+        .find({ ...agentMatchQuery, status: 'Completed' })
         .toArray()
-        .then(tasks => tasks.reduce((sum: number, t: any) => sum + (parseFloat(t.bountyAmount || '0')), 0)),
+        .then(tasks => tasks.reduce((sum: number, t: any) => {
+          const budgetStr = t.budget || t.bountyAmount || '0';
+          const num = parseFloat(budgetStr.replace(/[^0-9.]/g, ''));
+          return sum + (isNaN(num) ? 0 : num);
+        }, 0)),
     ]);
 
     return NextResponse.json({
@@ -57,7 +68,7 @@ export async function GET(req: NextRequest) {
       stats: {
         tasksCompleted: completedTasks,
         activeBids,
-        totalEarnings: `${totalEarnings} ETH`,
+        totalEarnings: `$${totalEarnings} USD`,
       },
       authMethod,
     });

@@ -19,25 +19,26 @@ async function main() {
 
   // Fetch your profile
   console.log('👤 Fetching agent profile...')
-  const profile = await client.getMyProfile()
-  if (profile) {
-    console.log(`✅ Logged in as: ${profile.name}`)
-    console.log(`   Reputation: ${profile.reputation || 0}`)
-    console.log(`   Registered: ${new Date(Number(profile.registeredAt) * 1000).toLocaleDateString()}`)
+  const profileData = await client.getMyProfile()
+  if (profileData?.agent) {
+    console.log(`✅ Logged in as: ${profileData.agent.name}`)
+    console.log(`   Reputation: ${profileData.agent.reputation || 0}`)
+    console.log(`   Completed Tasks: ${profileData.stats?.tasksCompleted || 0}`)
+    console.log(`   Total Earnings: ${profileData.stats?.totalEarnings || '$0 USD'}`)
   }
 
   // Fetch open tasks
   console.log('\n🎯 Fetching open tasks...')
-  const tasks = await client.listTasks({ status: 'open' })
+  const taskData = await client.listTasks({ status: 'Open' })
   
-  if (!tasks || tasks.length === 0) {
+  if (!taskData?.tasks || taskData.tasks.length === 0) {
     console.log('   No open tasks found.')
   } else {
-    console.log(`   Found ${tasks.length} open tasks:\n`)
-    for (const task of tasks.slice(0, 5)) {
+    console.log(`   Found ${taskData.tasks.length} open tasks:\n`)
+    for (const task of taskData.tasks.slice(0, 5)) {
       console.log(`   📋 [${task.category}] ${task.title}`)
       console.log(`      Budget: ${task.budget || 'Negotiable'}`)
-      console.log(`      ID: ${task._id}`)
+      console.log(`      ID: ${task.id}`)
       console.log('')
     }
   }
@@ -45,12 +46,12 @@ async function main() {
   // Example: How to submit a proposal
   /*
   console.log('📝 Submitting a proposal...')
-  await client.propose(tasks[0]._id, {
+  const result = await client.propose(taskData.tasks[0].id, {
     amount: 100,
     coverLetter: "I can help with this development task. I specialize in Node.js and REST APIs.",
     timeEstimate: "3 days"
   });
-  console.log('✅ Proposal sent!');
+  console.log('✅ Proposal sent!', result.message);
   */
 }
 

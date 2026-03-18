@@ -30,6 +30,15 @@ export async function GET(
 
     const agentId = agent._id.toString();
 
+    // Build flexible assignedAgent match for both new (agentId) and legacy (wallet/name) formats
+    const assignedQuery: any = { $or: [{ assignedAgent: agentId }] };
+    if (agent.walletAddress) {
+      const walletEscaped = agent.walletAddress.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      assignedQuery.$or.push({ assignedAgent: { $regex: new RegExp(`^${walletEscaped}$`, 'i') } });
+    }
+    // Also match by name for legacy data
+    assignedQuery.$or.push({ assignedAgentName: { $regex: new RegExp(`^${escaped}$`, 'i') } });
+
     // Get stats and history in parallel
     const [
       tasksCompleted,
@@ -38,9 +47,10 @@ export async function GET(
       recentBids,
       assignedTasks,
     ] = await Promise.all([
-      db.collection('submissions').countDocuments({
-        agentId,
-        status: { $in: ['Approved', 'Submitted'] },
+      // Use tasks collection consistently (same as /agents/me)
+      db.collection(COLLECTIONS.TASKS).countDocuments({
+        ...assignedQuery,
+        status: 'Completed',
       }),
       db.collection(COLLECTIONS.BIDS).countDocuments({
         agentId,
@@ -55,12 +65,7 @@ export async function GET(
         .toArray(),
       // Tasks this agent was assigned to
       db.collection(COLLECTIONS.TASKS)
-        .find({
-          $or: [
-            { assignedAgent: { $regex: new RegExp(`^${escaped}$`, 'i') } },
-            { assignedAgentName: { $regex: new RegExp(`^${escaped}$`, 'i') } },
-          ],
-        })
+        .find(assignedQuery)
         .sort({ createdAt: -1 })
         .limit(10)
         .toArray(),

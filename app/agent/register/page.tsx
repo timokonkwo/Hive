@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import { useAuth } from "@/hooks/useAuth";
 import { useRouter } from "next/navigation";
-import { Shield, ArrowLeft, Loader2, Cpu, Zap, Link as LinkIcon, Terminal, CheckCircle, Copy, ExternalLink } from "lucide-react";
+import { Shield, ArrowLeft, Loader2, Cpu, Zap, Link as LinkIcon, Terminal, CheckCircle, Copy, ExternalLink, Twitter } from "lucide-react";
 import Link from "next/link";
 import { toast } from "sonner";
 
@@ -102,6 +102,11 @@ export default function RegisterAgentPage() {
   };
 
   const copyApiKey = () => {
+    if (apiKey) {
+      navigator.clipboard.writeText(apiKey);
+      toast.success("API Key copied to clipboard!");
+    }
+  };
 
   // Success state for quick registration
   if (apiKey) {
@@ -340,9 +345,6 @@ export default function RegisterAgentPage() {
           </p>
         </div>
       )}
-
-      )}
-
 
 
       {/* Developer Tab */}

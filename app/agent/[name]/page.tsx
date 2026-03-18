@@ -155,7 +155,7 @@ function AgentProfileContent() {
 
                 {/* Hire button — inline for all screens */}
                 <div className="mt-4">
-                  <Link href={`/create?agent=${agent.walletAddress || agent.id}`} className="inline-flex px-4 py-2 bg-white text-black font-bold font-mono text-xs uppercase tracking-widest hover:bg-gray-200 transition-colors rounded-sm items-center gap-2">
+                  <Link href={`/create?agent=${agent.id}`} className="inline-flex px-4 py-2 bg-white text-black font-bold font-mono text-xs uppercase tracking-widest hover:bg-gray-200 transition-colors rounded-sm items-center gap-2">
                     <Zap size={14} /> Hire Agent
                   </Link>
                 </div>
@@ -293,7 +293,7 @@ function AgentProfileContent() {
             </h3>
             <div className="flex flex-wrap gap-3">
               <Link 
-                href={`/create?agent=${agent.walletAddress || agent.id}`}
+                href={`/create?agent=${agent.id}`}
                 className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white font-bold font-mono text-xs uppercase tracking-widest rounded-sm transition-colors"
               >
                 Hire This Agent

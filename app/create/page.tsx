@@ -2,10 +2,10 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { useAuth } from "@/hooks/useAuth";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { 
   Shield, ArrowLeft, Loader2, Code, FileText, Cpu, PenTool, CheckCircle, 
-  Search, Megaphone, Palette, Languages, Scale, Briefcase, Rocket
+  Search, Megaphone, Palette, Languages, Scale, Briefcase, Rocket, Bot, Zap
 } from "lucide-react";
 import Link from "next/link";
 import { toast } from "sonner";
@@ -15,8 +15,27 @@ import { TaskCategory, TaskMetadata } from "@/lib/types/task";
 
 export default function CreateTaskPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const { authenticated, login, user } = useAuth();
   
+  // Direct-hire: read ?agent= from URL
+  const directHireAgentId = searchParams.get('agent');
+  const [directHireAgent, setDirectHireAgent] = useState<any>(null);
+  const [loadingAgent, setLoadingAgent] = useState(!!directHireAgentId);
+
+  // Fetch agent info if direct-hire
+  useEffect(() => {
+    if (!directHireAgentId) return;
+    setLoadingAgent(true);
+    fetch(`/api/agents/${encodeURIComponent(directHireAgentId)}`)
+      .then(res => res.ok ? res.json() : null)
+      .then(data => {
+        if (data?.agent) setDirectHireAgent(data.agent);
+      })
+      .catch(err => console.error('Failed to fetch agent for direct hire:', err))
+      .finally(() => setLoadingAgent(false));
+  }, [directHireAgentId]);
+
   // Mock transaction states since we are moving to RFP model (no immediate eth)
   const [isPending, setIsPending] = useState(false);
   const [isSuccess, setIsSuccess] = useState(false);
@@ -59,11 +78,39 @@ export default function CreateTaskPage() {
         throw new Error(err.error || "Failed to create task");
       }
 
+      const taskData = await response.json();
+
+      // If direct-hire, auto-assign the agent
+      if (directHireAgent && taskData.id) {
+        try {
+          const assignRes = await fetch(`/api/tasks/${taskData.id}/assign`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              clientAddress: walletAddress,
+              agentId: directHireAgent.id,
+            }),
+          });
+          if (!assignRes.ok) {
+            const assignErr = await assignRes.json();
+            console.warn('Direct assign failed:', assignErr.error);
+          }
+        } catch (assignError) {
+          console.warn('Direct assign request failed:', assignError);
+        }
+      }
+
       setIsPending(false);
       setIsSuccess(true);
       // Clear the saved draft
       try { sessionStorage.removeItem('hive_create_task_draft'); } catch {}
-      toast.success("Request Posted!", { description: "Agents will now be able to bid on your task." });
+      toast.success(
+        directHireAgent ? "Agent Hired!" : "Request Posted!", 
+        { description: directHireAgent 
+          ? `"${directHireAgent.name}" has been assigned to your task.`
+          : "Agents will now be able to bid on your task." 
+        }
+      );
 
     } catch (error: any) {
       setIsPending(false);
@@ -132,10 +179,37 @@ export default function CreateTaskPage() {
     <div className="min-h-screen text-white font-sans selection:bg-emerald-500 selection:text-black">
       <Navbar />
       <main className="pt-32 pb-20 px-4 max-w-4xl mx-auto">
-        <Link href="/" className="inline-flex items-center text-zinc-400 hover:text-white mb-8 transition-colors font-mono uppercase tracking-widest text-xs">
+        <Link href={directHireAgent ? `/agent/${encodeURIComponent(directHireAgent.name)}` : "/"} className="inline-flex items-center text-zinc-400 hover:text-white mb-8 transition-colors font-mono uppercase tracking-widest text-xs">
           <ArrowLeft className="w-4 h-4 mr-2" />
-          Back to Marketplace
+          {directHireAgent ? `Back to ${directHireAgent.name}` : 'Back to Marketplace'}
         </Link>
+
+        {/* Direct Hire Banner */}
+        {loadingAgent && (
+          <div className="mb-6 p-4 bg-emerald-500/10 border border-emerald-500/20 rounded-sm flex items-center gap-3">
+            <Loader2 className="w-5 h-5 text-emerald-500 animate-spin" />
+            <span className="text-zinc-300 text-sm font-mono">Loading agent info...</span>
+          </div>
+        )}
+        {directHireAgent && !loadingAgent && (
+          <div className="mb-6 p-5 bg-emerald-500/10 border border-emerald-500/30 rounded-sm">
+            <div className="flex items-center gap-4">
+              <div className="w-12 h-12 bg-emerald-500/20 border border-emerald-500/30 rounded-sm flex items-center justify-center shrink-0">
+                <Bot className="text-emerald-500" size={24} />
+              </div>
+              <div className="flex-1">
+                <div className="flex items-center gap-2 mb-1">
+                  <Zap size={14} className="text-emerald-500" />
+                  <span className="text-xs font-mono uppercase text-emerald-500 tracking-widest font-bold">Direct Hire</span>
+                </div>
+                <h3 className="text-white font-bold font-mono">{directHireAgent.name}</h3>
+                <p className="text-zinc-400 text-xs mt-1">
+                  This task will be assigned directly to <strong>{directHireAgent.name}</strong> after posting. No proposal stage needed.
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Progress Bar */}
         <div className="flex items-center gap-2 mb-8 max-w-lg mx-auto">
@@ -344,9 +418,9 @@ export default function CreateTaskPage() {
                        <div className="w-16 h-16 bg-emerald-500 rounded-full flex items-center justify-center mx-auto mb-4 shadow-[0_0_30px_#10B981]">
                            <CheckCircle className="w-8 h-8 text-black" />
                        </div>
-                       <h2 className="text-xl font-bold text-white font-mono mb-2">REQUEST POSTED</h2>
-                       <p className="text-zinc-400 text-sm mb-6">Agents will be notified. Redirecting to dashboard...</p>
-                       <Loader2 className="w-6 h-6 text-emerald-500 animate-spin mx-auto" />
+                        <h2 className="text-xl font-bold text-white font-mono mb-2">{directHireAgent ? 'AGENT HIRED' : 'REQUEST POSTED'}</h2>
+                        <p className="text-zinc-400 text-sm mb-6">{directHireAgent ? `${directHireAgent.name} has been assigned. Redirecting...` : 'Agents will be notified. Redirecting to dashboard...'}</p>
+                        <Loader2 className="w-6 h-6 text-emerald-500 animate-spin mx-auto" />
                    </div>
                </div>
           )}
