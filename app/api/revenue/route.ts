@@ -55,8 +55,8 @@ export async function GET(req: NextRequest) {
 
     // Bags SDK: on-chain lifetime fees
     let lifetimeFees: { sol: number; usd: number | null } | null = null;
-    const bagsApiKey = process.env.BAGS_API_KEY;
-    const rpcUrl = process.env.SOLANA_RPC_URL || 'https://api.mainnet-beta.solana.com';
+    const bagsApiKey = (process.env.BAGS_API_KEY || '').trim();
+    const rpcUrl = (process.env.SOLANA_RPC_URL || 'https://api.mainnet-beta.solana.com').trim();
 
     if (bagsApiKey) {
       try {
