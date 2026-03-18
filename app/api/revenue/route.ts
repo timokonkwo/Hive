@@ -1,107 +1,137 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { getDb } from '@/lib/db';
 
 const HIVE_TOKEN_CA = '6JfonM6a24xngXh5yJ1imZzbMhpfvEsiafkb4syHBAGS';
+const LAMPORTS_PER_SOL = 1_000_000_000;
 
 /**
  * GET /api/revenue
- * Public endpoint for the HIVE token revenue dashboard.
- * Fetches data from DexScreener (public, no auth needed) and Bags API analytics.
+ * Public revenue dashboard — returns platform metrics and fee revenue.
+ * Uses Bags SDK for on-chain lifetime fees.
  */
 export async function GET(req: NextRequest) {
   try {
-    // Fetch from DexScreener (public, reliable, no API key needed)
-    const dexRes = await fetch(
-      `https://api.dexscreener.com/latest/dex/tokens/${HIVE_TOKEN_CA}`,
-      { next: { revalidate: 60 } } // Cache for 60s
-    );
+    const db = await getDb();
+    const tasksCol = db.collection('tasks');
+    const agentsCol = db.collection('agents');
+    const bidsCol = db.collection('bids');
 
-    let dexData: any = null;
-    if (dexRes.ok) {
-      dexData = await dexRes.json();
-    }
+    // Platform metrics from DB
+    const [
+      totalTasks,
+      openTasks,
+      completedTasks,
+      inProgressTasks,
+      totalAgents,
+      totalBids,
+    ] = await Promise.all([
+      tasksCol.countDocuments(),
+      tasksCol.countDocuments({ status: 'Open' }),
+      tasksCol.countDocuments({ status: { $in: ['Completed', 'completed'] } }),
+      tasksCol.countDocuments({ status: { $in: ['In Progress', 'in_progress'] } }),
+      agentsCol.countDocuments(),
+      bidsCol.countDocuments(),
+    ]);
 
-    // Extract the most liquid pair
-    const pairs = dexData?.pairs || [];
-    const mainPair = pairs.length > 0
-      ? pairs.sort((a: any, b: any) => (b.liquidity?.usd || 0) - (a.liquidity?.usd || 0))[0]
-      : null;
-
-    // Try Bags API for fee-specific analytics (requires BAGS_API_KEY)
-    let bagsAnalytics: any = null;
-    const bagsApiKey = process.env.BAGS_API_KEY;
-    if (bagsApiKey) {
-      try {
-        const bagsRes = await fetch(
-          `https://public-api-v2.bags.fm/api/v1/token/${HIVE_TOKEN_CA}/analytics`,
-          { headers: { 'x-api-key': bagsApiKey, 'Content-Type': 'application/json' } }
-        );
-        if (bagsRes.ok) {
-          const bagsJson = await bagsRes.json();
-          bagsAnalytics = bagsJson.response || bagsJson;
-        }
-      } catch (bagsErr) {
-        console.warn('[REVENUE] Bags API error (non-fatal):', bagsErr);
+    // Calculate total platform earnings from completed tasks
+    const completedTaskDocs = await tasksCol
+      .find({ status: { $in: ['Completed', 'completed'] } }, { projection: { budget: 1 } })
+      .toArray();
+    
+    let totalEarnings = 0;
+    for (const task of completedTaskDocs) {
+      if (task.budget) {
+        const parsed = parseFloat(String(task.budget).replace(/[^0-9.]/g, ''));
+        if (!isNaN(parsed)) totalEarnings += parsed;
       }
     }
 
-    // Calculate metrics
-    const priceUsd = mainPair?.priceUsd ? parseFloat(mainPair.priceUsd) : 0;
-    const marketCap = mainPair?.marketCap || mainPair?.fdv || 0;
-    const volume24h = mainPair?.volume?.h24 || 0;
-    const volume6h = mainPair?.volume?.h6 || 0;
-    const volume1h = mainPair?.volume?.h1 || 0;
-    const liquidity = mainPair?.liquidity?.usd || 0;
-    const priceChange24h = mainPair?.priceChange?.h24 || 0;
-    const priceChange6h = mainPair?.priceChange?.h6 || 0;
-    const priceChange1h = mainPair?.priceChange?.h1 || 0;
-    const txns24h = mainPair?.txns?.h24 || { buys: 0, sells: 0 };
+    // Recent activity — last 7 days
+    const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+    const [recentTasks, recentAgents, recentBids] = await Promise.all([
+      tasksCol.countDocuments({ createdAt: { $gte: sevenDaysAgo } }),
+      agentsCol.countDocuments({ createdAt: { $gte: sevenDaysAgo } }),
+      bidsCol.countDocuments({ createdAt: { $gte: sevenDaysAgo } }),
+    ]);
 
-    // Bags token fee = 1% of trading volume
-    const FEE_RATE = 0.01;
-    const totalFees = bagsAnalytics?.totalFees || null;
-    const estimatedFees24h = volume24h * FEE_RATE;
+    // Bags SDK: fetch lifetime fees from on-chain data
+    let lifetimeFees: { sol: number; usd: number | null } | null = null;
+    try {
+      const bagsApiKey = process.env.BAGS_API_KEY;
+      const rpcUrl = process.env.SOLANA_RPC_URL || 'https://api.mainnet-beta.solana.com';
+      
+      if (bagsApiKey) {
+        const { BagsSDK } = await import('@bagsfm/bags-sdk');
+        const { Connection, PublicKey } = await import('@solana/web3.js');
+        
+        const connection = new Connection(rpcUrl);
+        const sdk = new BagsSDK(bagsApiKey, connection, 'processed');
+        const feesLamports = await sdk.state.getTokenLifetimeFees(new PublicKey(HIVE_TOKEN_CA));
+        const feesSol = feesLamports / LAMPORTS_PER_SOL;
+        
+        // Try to get SOL price for USD conversion
+        let solPrice: number | null = null;
+        try {
+          const priceRes = await fetch('https://api.coingecko.com/api/v3/simple/price?ids=solana&vs_currencies=usd');
+          if (priceRes.ok) {
+            const priceData = await priceRes.json();
+            solPrice = priceData?.solana?.usd || null;
+          }
+        } catch {
+          // Non-fatal
+        }
+
+        lifetimeFees = {
+          sol: feesSol,
+          usd: solPrice ? feesSol * solPrice : null,
+        };
+      }
+    } catch (e: any) {
+      console.warn('[REVENUE] Bags SDK error (non-fatal):', e.message);
+    }
+
+    // DexScreener for 24h volume-based fee estimate
+    let tradingFees = null;
+    try {
+      const dexRes = await fetch(
+        `https://api.dexscreener.com/latest/dex/tokens/${HIVE_TOKEN_CA}`,
+        { next: { revalidate: 120 } }
+      );
+      if (dexRes.ok) {
+        const dexData = await dexRes.json();
+        const pairs = dexData?.pairs || [];
+        const mainPair = pairs.sort((a: any, b: any) => (b.liquidity?.usd || 0) - (a.liquidity?.usd || 0))[0];
+        if (mainPair) {
+          const volume24h = mainPair.volume?.h24 || 0;
+          tradingFees = {
+            volume24h,
+            fees24h: volume24h * 0.01,
+            txns24h: (mainPair.txns?.h24?.buys || 0) + (mainPair.txns?.h24?.sells || 0),
+          };
+        }
+      }
+    } catch {
+      // Non-fatal
+    }
 
     return NextResponse.json({
       success: true,
-      token: {
-        name: mainPair?.baseToken?.name || 'HIVE',
-        symbol: mainPair?.baseToken?.symbol || 'HIVE',
-        address: HIVE_TOKEN_CA,
-        dexScreenerUrl: mainPair?.url || `https://dexscreener.com/solana/${HIVE_TOKEN_CA}`,
-        bagsUrl: `https://bags.fm/token/${HIVE_TOKEN_CA}`,
+      platform: {
+        totalTasks,
+        openTasks,
+        completedTasks,
+        inProgressTasks,
+        totalAgents,
+        totalBids,
+        totalEarnings,
       },
-      price: {
-        usd: priceUsd,
-        change1h: priceChange1h,
-        change6h: priceChange6h,
-        change24h: priceChange24h,
+      activity: {
+        tasksLast7d: recentTasks,
+        agentsLast7d: recentAgents,
+        bidsLast7d: recentBids,
       },
-      market: {
-        marketCap,
-        liquidity,
-        volume1h,
-        volume6h,
-        volume24h,
-      },
-      txns24h,
-      fees: {
-        feeRate: `${FEE_RATE * 100}%`,
-        totalLifetime: totalFees,
-        estimated24h: estimatedFees24h,
-        estimated6h: volume6h * FEE_RATE,
-        estimated1h: volume1h * FEE_RATE,
-      },
-      feeDistribution: {
-        treasury: '40%',
-        agentPool: '30%',
-        creatorPool: '20%',
-        referrals: '10%',
-      },
-      source: {
-        dexScreener: !!mainPair,
-        bags: !!bagsAnalytics,
-      },
-      pairsCount: pairs.length,
+      lifetimeFees,
+      tokenFees: tradingFees,
       lastUpdated: new Date().toISOString(),
     });
   } catch (error: any) {

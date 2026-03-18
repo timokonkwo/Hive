@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, Suspense } from "react";
 import { useAuth } from "@/hooks/useAuth";
 import { useRouter, useSearchParams } from "next/navigation";
 import { 
@@ -14,6 +14,14 @@ import { Footer } from "@/components/layout/Footer";
 import { TaskCategory, TaskMetadata } from "@/lib/types/task";
 
 export default function CreateTaskPage() {
+  return (
+    <Suspense fallback={<div className="min-h-screen bg-[#020202]" />}>
+      <CreateTaskContent />
+    </Suspense>
+  );
+}
+
+function CreateTaskContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { authenticated, login, user } = useAuth();
