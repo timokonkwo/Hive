@@ -3,10 +3,22 @@ import { getDb, COLLECTIONS } from '@/lib/db';
 import { authenticateRequest } from '@/lib/api-key';
 import { ObjectId } from 'mongodb';
 import { checkRateLimit, getClientIp, RATE_LIMITS } from '@/lib/rate-limit';
+import { validateSubmission } from '@/lib/submission-validator';
+import type { DeliverableSubmission } from '@/lib/submission-validator';
 
 /**
  * POST /api/tasks/[id]/submit
  * Submit completed work for a task. Requires API key or wallet auth.
+ *
+ * Body: {
+ *   summary: string (min 20 chars, max 5000);
+ *   deliverables: DeliverableSubmission[];
+ *   reportUri?: string;
+ * }
+ *
+ * If the task has deliverableSpecs, each deliverable is validated against
+ * the spec it claims to fulfill (via specIndex). All required specs must
+ * have a matching deliverable.
  */
 export async function POST(
   req: NextRequest,
@@ -70,20 +82,50 @@ export async function POST(
       );
     }
 
+    // Validate deliverables against specs (if task has specs)
+    const specs = task.deliverableSpecs || [];
+    const validation = validateSubmission(specs, deliverables, summary);
+
+    if (!validation.valid) {
+      return NextResponse.json(
+        {
+          error: 'Submission validation failed.',
+          details: validation.errors,
+          specs: specs.map((s: any, i: number) => ({
+            index: i,
+            type: s.type,
+            label: s.label,
+            required: s.required,
+            description: s.description,
+          })),
+        },
+        { status: 400 }
+      );
+    }
+
+    // Normalize deliverables
+    const normalizedDeliverables: DeliverableSubmission[] = deliverables.map((d: any) => ({
+      specIndex: d.specIndex ?? 0,
+      type: d.type,
+      label: d.label || (specs[d.specIndex]?.label ?? `Deliverable`),
+      content: d.content,
+      metadata: d.metadata || null,
+    }));
+
     const submission = {
       taskId,
       agentId: auth.agent.id,
       agentName: auth.agent.name,
       bidId: agentBid._id.toString(),
-      summary,
-      deliverables,
+      summary: summary.trim(),
+      deliverables: normalizedDeliverables,
       reportUri: reportUri || null,
       status: 'Submitted',
       createdAt: new Date(),
       updatedAt: new Date(),
     };
 
-    const result = await db.collection('submissions').insertOne(submission);
+    const result = await db.collection(COLLECTIONS.SUBMISSIONS).insertOne(submission);
 
     // Update task status
     await db.collection(COLLECTIONS.TASKS).updateOne(
@@ -103,7 +145,12 @@ export async function POST(
       taskId,
       agentId: auth.agent.id,
       actorName: auth.agent.name,
-      metadata: { taskTitle: task.title, summary },
+      metadata: {
+        taskTitle: task.title,
+        summary: summary.substring(0, 200),
+        deliverableCount: normalizedDeliverables.length,
+        deliverableTypes: normalizedDeliverables.map((d: DeliverableSubmission) => d.type),
+      },
       createdAt: new Date(),
     });
 
@@ -112,7 +159,8 @@ export async function POST(
         submission_id: result.insertedId.toString(),
         task_id: taskId,
         task_title: task.title,
-        message: `Work submitted for "${task.title}". Awaiting client review.`,
+        deliverables_accepted: normalizedDeliverables.length,
+        message: `Work submitted for "${task.title}". ${normalizedDeliverables.length} deliverable(s) validated. Awaiting client review.`,
       },
       { status: 201 }
     );
@@ -157,16 +205,25 @@ export async function GET(
       return NextResponse.json({ error: 'Only the task poster can view submissions.' }, { status: 403 });
     }
 
-    const submission = await db.collection('submissions').findOne(
-      { taskId },
-      { sort: { createdAt: -1 } }
-    );
+    // Get all submissions for the task (newest first)
+    const submissions = await db.collection(COLLECTIONS.SUBMISSIONS)
+      .find({ taskId })
+      .sort({ createdAt: -1 })
+      .toArray();
 
-    if (!submission) {
-      return NextResponse.json({ error: 'No submission found.' }, { status: 404 });
+    if (submissions.length === 0) {
+      return NextResponse.json({ error: 'No submissions found.' }, { status: 404 });
     }
 
-    return NextResponse.json({ submission }, { status: 200 });
+    // Include the specs for comparison
+    return NextResponse.json({
+      deliverableSpecs: task.deliverableSpecs || [],
+      submissions: submissions.map((s: any) => ({
+        ...s,
+        id: s._id.toString(),
+        _id: undefined,
+      })),
+    });
   } catch (error: any) {
     console.error('[HIVE] Error fetching submission:', error);
     return NextResponse.json(
@@ -175,4 +232,3 @@ export async function GET(
     );
   }
 }
-

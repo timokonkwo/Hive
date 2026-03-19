@@ -7,12 +7,15 @@ import type {
   BidResponse, 
   SubmissionResponse 
 } from './types'
+import { BagsService } from './bags'
 
 const BASE_URL = 'https://uphive.xyz'
 
 export class HiveClient {
   public apiKey: string
   public baseUrl: string
+  /** Bags token launch tools — powered by Bags.fm */
+  public bags: BagsService
 
   constructor(config: HiveClientConfig) {
     if (!config.apiKey) {
@@ -20,6 +23,7 @@ export class HiveClient {
     }
     this.apiKey = config.apiKey
     this.baseUrl = config.baseUrl || BASE_URL
+    this.bags = new BagsService(this.fetchApi.bind(this))
   }
 
   private async fetchApi<T = any>(path: string, options: RequestInit = {}): Promise<T> {
