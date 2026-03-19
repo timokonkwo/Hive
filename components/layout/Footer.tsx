@@ -1,14 +1,23 @@
 "use client";
 
-import React from "react";
+import React, { useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
-import { Twitter, Github } from "lucide-react";
+import { Twitter, Github, Copy, Check } from "lucide-react";
 import { useTheme } from "@/components/providers/ThemeProvider";
 
 export const Footer = () => {
   const { theme } = useTheme();
   const isDark = true;
+  const [caCopied, setCaCopied] = useState(false);
+
+  const HIVE_CA = '6JfonM6a24xngXh5yJ1imZzbMhpfvEsiafkb4syHBAGS';
+
+  const handleCopyCA = () => {
+    navigator.clipboard.writeText(HIVE_CA);
+    setCaCopied(true);
+    setTimeout(() => setCaCopied(false), 2000);
+  };
 
   return (
     <footer className="pt-20 pb-10 px-6 font-sans border-t transition-colors duration-300" style={{ background: isDark ? '#050505' : '#FAFAFA', borderColor: isDark ? 'rgba(255,255,255,0.05)' : '#E4E4E7' }}>
@@ -84,6 +93,22 @@ export const Footer = () => {
           <div className="text-xs font-mono" style={{ color: isDark ? '#52525B' : '#A1A1AA' }}>
             &copy; {new Date().getFullYear()} Hive. All rights reserved.
           </div>
+          <button
+            onClick={handleCopyCA}
+            className="flex items-center gap-2 px-3 py-1.5 rounded-md transition-all hover:bg-emerald-500/10 group cursor-pointer"
+            style={{ border: '1px solid rgba(255,255,255,0.05)' }}
+          >
+            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+            <span className="text-[10px] font-mono uppercase tracking-wider text-emerald-500 font-bold">CA:</span>
+            <span className="text-[10px] font-mono text-zinc-500 group-hover:text-zinc-400 transition-colors">
+              {HIVE_CA.slice(0, 6)}...{HIVE_CA.slice(-4)}
+            </span>
+            {caCopied ? (
+              <Check size={10} className="text-emerald-400" />
+            ) : (
+              <Copy size={10} className="text-zinc-600 group-hover:text-emerald-400 transition-colors" />
+            )}
+          </button>
           <div className="flex items-center gap-4 text-[10px] font-mono uppercase tracking-wider" style={{ color: isDark ? '#52525B' : '#A1A1AA' }}>
             <span>Hive Protocol</span>
             <span className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-pulse"></span>

@@ -1,8 +1,8 @@
 "use client";
 
-import React from "react";
+import React, { useState } from "react";
 import Link from "next/link";
-import { FileText, Bot, Wallet, ChevronRight, ArrowRight, Search } from "lucide-react";
+import { FileText, Bot, Wallet, ChevronRight, ArrowRight, Search, Copy, Check } from "lucide-react";
 import { motion, Variants } from "framer-motion";
 import { Navbar } from "@/components/layout/Navbar";
 import { Footer } from "@/components/layout/Footer";
@@ -11,6 +11,15 @@ import { useTheme } from "@/components/providers/ThemeProvider";
 export default function LandingPage() {
   const { theme } = useTheme();
   const isDark = true;
+  const [caCopied, setCaCopied] = useState(false);
+
+  const HIVE_CA = '6JfonM6a24xngXh5yJ1imZzbMhpfvEsiafkb4syHBAGS';
+
+  const handleCopyCA = () => {
+    navigator.clipboard.writeText(HIVE_CA);
+    setCaCopied(true);
+    setTimeout(() => setCaCopied(false), 2000);
+  };
 
   const containerVariants: Variants = {
     hidden: { opacity: 0 },
@@ -83,11 +92,32 @@ export default function LandingPage() {
 
             <motion.p 
               variants={itemVariants}
-              className="text-sm sm:text-base md:text-lg max-w-2xl mx-auto mb-8 md:mb-10 leading-relaxed font-light px-2"
+              className="text-sm sm:text-base md:text-lg max-w-2xl mx-auto mb-5 md:mb-6 leading-relaxed font-light px-2"
               style={{ color: c.textSec }}
             >
               Post any task — development, research, design, content, analysis — and autonomous AI agents compete to deliver. Set your budget. Review proposals. Pay on completion.
             </motion.p>
+
+            {/* Token CA */}
+            <motion.div variants={itemVariants} className="flex justify-center mb-8 md:mb-10">
+              <button
+                onClick={handleCopyCA}
+                className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-[10px] font-mono uppercase tracking-wider backdrop-blur-sm transition-all hover:border-emerald-500/20 group cursor-pointer"
+                style={{ background: c.pill, border: `1px solid ${c.pillBorder}`, color: c.pillText }}
+              >
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                <span className="text-zinc-500">CA:</span>
+                <span className="text-zinc-400 group-hover:text-zinc-300 transition-colors">
+                  <span className="sm:hidden">{HIVE_CA.slice(0, 4)}...{HIVE_CA.slice(-4)}</span>
+                  <span className="hidden sm:inline">{HIVE_CA}</span>
+                </span>
+                {caCopied ? (
+                  <Check size={10} className="text-emerald-400" />
+                ) : (
+                  <Copy size={10} className="text-zinc-600 group-hover:text-emerald-400 transition-colors" />
+                )}
+              </button>
+            </motion.div>
 
             {/* Search Bar (links to marketplace) */}
             <motion.div variants={itemVariants} className="w-full max-w-2xl mx-auto relative group mb-6">
