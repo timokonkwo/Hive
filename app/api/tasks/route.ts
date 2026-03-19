@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getDb, COLLECTIONS } from "@/lib/db";
 import { ObjectId } from "mongodb";
 import { checkRateLimit, getClientIp, RATE_LIMITS } from "@/lib/rate-limit";
+import { validateTokenConfig, validateDeliverableSpecs } from "@/lib/submission-validator";
 
 // GET /api/tasks — List tasks with optional filters
 export async function GET(request: NextRequest) {
@@ -93,13 +94,68 @@ export async function POST(request: NextRequest) {
     const db = await getDb();
     const body = await request.json();
 
-    const { title, description, category, tags, requirements, budget, clientAddress, clientName } = body;
+    const {
+      title, description, category, tags, requirements, budget,
+      clientAddress, clientName,
+      tokenConfig,       // For "Token Launch" tasks
+      deliverableSpecs,  // Structured specs for what agent must deliver
+    } = body;
 
     if (!title || !description || !category) {
       return NextResponse.json(
         { error: "title, description, and category are required" },
         { status: 400 }
       );
+    }
+
+    // Validate tokenConfig for Token Launch tasks (optional — agent figures out details)
+    let validatedTokenConfig = null;
+    if (category === 'Token Launch' && tokenConfig) {
+      const tcResult = validateTokenConfig(tokenConfig);
+      if (!tcResult.valid) {
+        return NextResponse.json(
+          { error: 'Invalid tokenConfig.', details: tcResult.errors },
+          { status: 400 }
+        );
+      }
+      validatedTokenConfig = {
+        name: tokenConfig.name,
+        symbol: tokenConfig.symbol,
+        description: tokenConfig.description,
+        website: tokenConfig.website || null,
+        twitter: tokenConfig.twitter || null,
+        telegram: tokenConfig.telegram || null,
+        feeSharing: tokenConfig.feeSharing || null,
+        initialBuyAmountSol: tokenConfig.initialBuyAmountSol || 0,
+      };
+    }
+
+    // Validate deliverable specs (if provided)
+    let finalSpecs: any[] = [];
+    if (deliverableSpecs && Array.isArray(deliverableSpecs) && deliverableSpecs.length > 0) {
+      const specResult = validateDeliverableSpecs(deliverableSpecs);
+      if (!specResult.valid) {
+        return NextResponse.json(
+          { error: 'Invalid deliverableSpecs.', details: specResult.errors },
+          { status: 400 }
+        );
+      }
+      finalSpecs = deliverableSpecs;
+    }
+
+    // Auto-generate specs for Token Launch tasks if none provided
+    if (category === 'Token Launch' && finalSpecs.length === 0) {
+      const specDescription = validatedTokenConfig
+        ? `Launch token "${validatedTokenConfig.name}" (${validatedTokenConfig.symbol}) on Bags/Solana`
+        : 'Launch a token on Bags/Solana based on the task description';
+      finalSpecs = [
+        {
+          type: 'token_launch',
+          label: 'Token Launch',
+          description: specDescription,
+          required: true,
+        },
+      ];
     }
 
     const task = {
@@ -112,10 +168,12 @@ export async function POST(request: NextRequest) {
       status: "Open",
       clientAddress: clientAddress || "0x0000",
       clientName: clientName || "Anonymous",
-      bountyId: null,        // Will be set when funded on-chain
+      bountyId: null,
       bountyAmount: null,
       assignedAgent: null,
       proposalsCount: 0,
+      tokenConfig: validatedTokenConfig,
+      deliverableSpecs: finalSpecs,
       createdAt: new Date(),
       updatedAt: new Date(),
     };
@@ -128,7 +186,7 @@ export async function POST(request: NextRequest) {
       taskId: result.insertedId,
       actorAddress: clientAddress || "0x0000",
       actorName: clientName || "Anonymous",
-      metadata: { title, category, budget },
+      metadata: { title, category, budget, hasTokenConfig: !!validatedTokenConfig },
       createdAt: new Date(),
     });
 
@@ -144,3 +202,4 @@ export async function POST(request: NextRequest) {
     );
   }
 }
+

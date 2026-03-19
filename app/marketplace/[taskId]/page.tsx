@@ -4,7 +4,7 @@ import { use, useState, useEffect } from "react";
 import { Navbar } from "@/components/layout/Navbar";
 import { Footer } from "@/components/layout/Footer";
 import { useAuth } from "@/hooks/useAuth";
-import { ArrowLeft, Clock, Coins, CheckCircle, X, Loader2, ChevronDown, ChevronUp, UserCheck, XCircle, ExternalLink, BadgeCheck } from "lucide-react";
+import { ArrowLeft, Clock, Coins, CheckCircle, X, Loader2, ChevronDown, ChevronUp, UserCheck, XCircle, ExternalLink, BadgeCheck, Rocket, Copy } from "lucide-react";
 import Link from "next/link";
 import { toast } from "sonner";
 
@@ -264,6 +264,118 @@ export default function TaskDetailsPage({ params }: { params: Promise<{ taskId: 
                         {task.description}
                     </p>
                 </div>
+
+                {/* Token Launch Section — visible for Token Launch tasks */}
+                {task.category === 'Token Launch' && (
+                  <div className="space-y-6">
+                    {/* Bags banner */}
+                    <div className="flex items-start gap-3 p-4 bg-violet-500/10 border border-violet-500/20 rounded-xl">
+                      <Rocket className="w-5 h-5 text-violet-400 shrink-0 mt-0.5" />
+                      <div>
+                        <h4 className="text-white font-mono font-bold text-xs uppercase mb-1">Token Launch — Powered by Bags</h4>
+                        <p className="text-xs text-zinc-400 leading-relaxed">
+                          This task involves launching a token on Solana via the Bags API. The assigned agent will handle research, strategy, and deployment.
+                        </p>
+                      </div>
+                    </div>
+
+                    {/* Client's Token Preferences */}
+                    {task.tokenConfig && (
+                      <div>
+                        <h3 className="text-sm font-bold font-mono uppercase tracking-widest text-zinc-400 mb-4">Client Preferences</h3>
+                        <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+                          {task.tokenConfig.name && (
+                            <div className="p-3 bg-zinc-900/50 border border-zinc-800 rounded-lg">
+                              <div className="text-[10px] text-zinc-500 uppercase font-mono mb-1">Name</div>
+                              <div className="text-white font-mono text-sm font-bold">{task.tokenConfig.name}</div>
+                            </div>
+                          )}
+                          {task.tokenConfig.symbol && (
+                            <div className="p-3 bg-zinc-900/50 border border-zinc-800 rounded-lg">
+                              <div className="text-[10px] text-zinc-500 uppercase font-mono mb-1">Symbol</div>
+                              <div className="text-white font-mono text-sm font-bold">{task.tokenConfig.symbol}</div>
+                            </div>
+                          )}
+                          {task.tokenConfig.website && (
+                            <div className="p-3 bg-zinc-900/50 border border-zinc-800 rounded-lg">
+                              <div className="text-[10px] text-zinc-500 uppercase font-mono mb-1">Website</div>
+                              <a href={task.tokenConfig.website} target="_blank" rel="noopener noreferrer" className="text-emerald-400 hover:text-emerald-300 text-sm flex items-center gap-1">
+                                <ExternalLink size={10} />{new URL(task.tokenConfig.website).hostname}
+                              </a>
+                            </div>
+                          )}
+                          {task.tokenConfig.twitter && (
+                            <div className="p-3 bg-zinc-900/50 border border-zinc-800 rounded-lg">
+                              <div className="text-[10px] text-zinc-500 uppercase font-mono mb-1">Twitter</div>
+                              <a href={task.tokenConfig.twitter} target="_blank" rel="noopener noreferrer" className="text-emerald-400 hover:text-emerald-300 text-sm flex items-center gap-1">
+                                <ExternalLink size={10} />@{task.tokenConfig.twitter.split('/').pop()}
+                              </a>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Token Launch Result — shown when agent has launched */}
+                    {task.tokenLaunch && (
+                      <div className="p-6 bg-emerald-500/5 border border-emerald-500/30 rounded-xl">
+                        <h3 className="text-sm font-bold font-mono uppercase tracking-widest text-emerald-400 mb-4 flex items-center gap-2">
+                          <CheckCircle className="w-4 h-4" />
+                          Token Launched
+                        </h3>
+                        <div className="space-y-3">
+                          {task.tokenLaunch.tokenName && (
+                            <div className="flex items-center justify-between text-sm">
+                              <span className="text-zinc-500 font-mono">Token</span>
+                              <span className="text-white font-bold font-mono">
+                                {task.tokenLaunch.tokenName} ({task.tokenLaunch.tokenSymbol})
+                              </span>
+                            </div>
+                          )}
+                          {task.tokenLaunch.mintAddress && (
+                            <div className="flex items-center justify-between text-sm">
+                              <span className="text-zinc-500 font-mono">Mint Address</span>
+                              <a
+                                href={`https://solscan.io/token/${task.tokenLaunch.mintAddress}`}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="text-emerald-400 hover:text-emerald-300 font-mono flex items-center gap-1"
+                              >
+                                {task.tokenLaunch.mintAddress.slice(0, 8)}...{task.tokenLaunch.mintAddress.slice(-6)}
+                                <ExternalLink size={10} />
+                              </a>
+                            </div>
+                          )}
+                          {task.tokenLaunch.bagsUrl && (
+                            <div className="flex items-center justify-between text-sm">
+                              <span className="text-zinc-500 font-mono">Bags</span>
+                              <a
+                                href={task.tokenLaunch.bagsUrl}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="text-violet-400 hover:text-violet-300 font-mono flex items-center gap-1"
+                              >
+                                View on Bags <ExternalLink size={10} />
+                              </a>
+                            </div>
+                          )}
+                          <div className="flex items-center justify-between text-sm">
+                            <span className="text-zinc-500 font-mono">Status</span>
+                            <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase ${
+                              task.tokenLaunch.status === 'success'
+                                ? 'bg-green-500/10 border border-green-500/20 text-green-400'
+                                : task.tokenLaunch.status === 'failed'
+                                  ? 'bg-red-500/10 border border-red-500/20 text-red-400'
+                                  : 'bg-yellow-500/10 border border-yellow-500/20 text-yellow-400'
+                            }`}>
+                              {task.tokenLaunch.status}
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
 
                 {/* Requirements */}
                 <div>

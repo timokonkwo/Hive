@@ -50,12 +50,32 @@ export async function GET(
       .collection(COLLECTIONS.BIDS)
       .countDocuments({ taskId: id });
 
+    // Fetch token launch data if this is a Token Launch task
+    let tokenLaunch = null;
+    if (task.category === 'Token Launch') {
+      const launch = await db
+        .collection(COLLECTIONS.TOKEN_LAUNCHES)
+        .findOne({ taskId: id });
+      if (launch) {
+        tokenLaunch = {
+          mintAddress: launch.mintAddress || null,
+          bagsUrl: launch.bagsUrl || null,
+          status: launch.status || 'pending',
+          launchSignature: launch.launchSignature || null,
+          tokenName: launch.tokenName || null,
+          tokenSymbol: launch.tokenSymbol || null,
+          createdAt: launch.createdAt || null,
+        };
+      }
+    }
+
     return NextResponse.json({
       ...task,
       id: task._id.toString(),
       url: `https://uphive.xyz/marketplace/${task._id.toString()}`,
       _id: undefined,
       proposalsCount,
+      tokenLaunch,
     });
   } catch (error) {
     console.error("GET /api/tasks/[id] error:", error);

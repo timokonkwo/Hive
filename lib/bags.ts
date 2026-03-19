@@ -2,9 +2,14 @@
  * Bags API Client
  * Integration with the Bags.fm platform for token launches, fee sharing, and analytics.
  * Docs: https://docs.bags.fm
+ *
+ * Partner Config Key: Fu2RmDkuTC7JiW5irLcrip4GVaw84U1uL4UNeKH5ncXy
+ * Ref Code: hive
  */
 
 const BAGS_API_BASE = 'https://public-api-v2.bags.fm/api/v1';
+const BAGS_PARTNER_KEY = 'Fu2RmDkuTC7JiW5irLcrip4GVaw84U1uL4UNeKH5ncXy';
+const BAGS_REF_CODE = 'hive';
 
 interface BagsApiConfig {
   apiKey: string;
@@ -14,7 +19,7 @@ interface TokenMetadata {
   name: string;
   symbol: string;
   description: string;
-  image?: File | string; // File for upload or URL
+  image?: File | string;
   twitter?: string;
   telegram?: string;
   website?: string;
@@ -65,7 +70,7 @@ export class BagsClient {
   private headers: Record<string, string>;
 
   constructor(config: BagsApiConfig) {
-    this.apiKey = config.apiKey;
+    this.apiKey = config.apiKey.trim();
     this.headers = {
       'x-api-key': this.apiKey,
       'Content-Type': 'application/json',
@@ -86,6 +91,10 @@ export class BagsClient {
     if (metadata.telegram) formData.append('telegram', metadata.telegram);
     if (metadata.website) formData.append('website', metadata.website);
     
+    // Partner tracking
+    formData.append('partnerKey', BAGS_PARTNER_KEY);
+    formData.append('refCode', BAGS_REF_CODE);
+
     if (metadata.image && metadata.image instanceof File) {
       formData.append('image', metadata.image);
     }
@@ -97,7 +106,7 @@ export class BagsClient {
     });
 
     if (!response.ok) {
-      const err = await response.json();
+      const err = await response.json().catch(() => ({ error: `HTTP ${response.status}` }));
       throw new Error(err.error || 'Failed to create token info on Bags');
     }
 
@@ -131,7 +140,7 @@ export class BagsClient {
     });
 
     if (!response.ok) {
-      const err = await response.json();
+      const err = await response.json().catch(() => ({ error: `HTTP ${response.status}` }));
       throw new Error(err.error || 'Failed to configure fee sharing');
     }
 
@@ -158,11 +167,13 @@ export class BagsClient {
       body: JSON.stringify({
         mintAddress: tokenInfo.mintAddress,
         initialBuyAmountSol: params.initialBuyAmountSol || 0,
+        partnerKey: BAGS_PARTNER_KEY,
+        refCode: BAGS_REF_CODE,
       }),
     });
 
     if (!response.ok) {
-      const err = await response.json();
+      const err = await response.json().catch(() => ({ error: `HTTP ${response.status}` }));
       return { success: false, error: err.error || 'Token launch failed' };
     }
 
@@ -271,6 +282,11 @@ export const HIVE_DEFAULT_FEE_SHARING: FeeShareConfig[] = [
     label: 'Community Referrals',
   },
 ];
+
+/**
+ * Partner tracking constants (exposed for API routes).
+ */
+export { BAGS_PARTNER_KEY, BAGS_REF_CODE };
 
 /**
  * Create a singleton Bags client from environment variables.

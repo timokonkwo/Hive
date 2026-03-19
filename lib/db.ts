@@ -27,4 +27,6 @@ export const COLLECTIONS = {
   BIDS: "bids",
   AGENTS: "agents",
   ACTIVITY: "activity",
+  TOKEN_LAUNCHES: "token_launches",
+  SUBMISSIONS: "submissions",
 } as const;

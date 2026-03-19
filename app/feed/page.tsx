@@ -5,7 +5,7 @@ import { Navbar } from "@/components/layout/Navbar";
 import { Footer } from "@/components/layout/Footer";
 import { 
   Activity, Clock, CheckCircle, AlertCircle, Plus, 
-  ArrowRight, ExternalLink, Zap, Eye, Loader2
+  ArrowRight, ExternalLink, Zap, Eye, Loader2, Rocket
 } from "lucide-react";
 import Link from "next/link";
 
@@ -26,6 +26,7 @@ const EVENT_CONFIG: Record<string, { icon: any; color: string; bg: string }> = {
   BidAccepted: { icon: CheckCircle, color: "text-emerald-500", bg: "bg-emerald-500/10" },
   TaskFunded: { icon: Zap, color: "text-purple-500", bg: "bg-purple-500/10" },
   TaskCompleted: { icon: CheckCircle, color: "text-emerald-500", bg: "bg-emerald-500/10" },
+  TokenLaunched: { icon: Rocket, color: "text-violet-400", bg: "bg-violet-500/10" },
 };
 
 function EventCard({ event }: { event: any }) {
@@ -61,6 +62,26 @@ function EventCard({ event }: { event: any }) {
           <>
             <p className="text-white font-mono text-sm">
               Proposal accepted for <span className="text-emerald-500 font-bold">{event.metadata?.taskTitle}</span>
+            </p>
+          </>
+        );
+      case "TokenLaunched":
+        return (
+          <>
+            <p className="text-white font-mono text-sm">
+              🚀 Token <span className="text-violet-400 font-bold">{event.metadata?.tokenName || 'token'}</span>
+              {event.metadata?.tokenSymbol && <span className="text-zinc-500"> ({event.metadata.tokenSymbol})</span>}
+              {' '}launched on Bags
+            </p>
+            <p className="text-gray-400 text-xs mt-1">
+              {event.metadata?.taskTitle && <>Task: {event.metadata.taskTitle} • </>}
+              {event.metadata?.bagsUrl ? (
+                <a href={event.metadata.bagsUrl} target="_blank" rel="noopener noreferrer" className="text-violet-400 hover:text-violet-300 inline-flex items-center gap-1">
+                  View on Bags <ExternalLink size={10} />
+                </a>
+              ) : (
+                'Powered by Bags'
+              )}
             </p>
           </>
         );
@@ -141,6 +162,12 @@ export default function FeedPage() {
               <span>{events.length} events</span>
               <span>•</span>
               <span>{events.filter(e => e.type === "TaskCreated").length} new tasks</span>
+              {events.filter(e => e.type === "TokenLaunched").length > 0 && (
+                <>
+                  <span>•</span>
+                  <span className="text-violet-400">{events.filter(e => e.type === "TokenLaunched").length} token launches</span>
+                </>
+              )}
             </div>
           </div>
 
