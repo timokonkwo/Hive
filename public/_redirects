@@ -1,2 +1,4 @@
-# Subdomain redirect: revenue.uphive.xyz → uphive.xyz/revenue
-https://revenue.uphive.xyz/* https://uphive.xyz/revenue 301!
+# Subdomain redirect: analytics.uphive.xyz → uphive.xyz/analytics
+https://analytics.uphive.xyz/* https://uphive.xyz/analytics 301!
+# Backward compat: revenue.uphive.xyz → uphive.xyz/analytics
+https://revenue.uphive.xyz/* https://uphive.xyz/analytics 301!

@@ -12,6 +12,12 @@ const nextConfig: NextConfig = {
         destination: 'https://uphive.xyz/analytics',
         permanent: true,
       },
+      {
+        source: '/:path*',
+        has: [{ type: 'host', value: 'revenue.uphive.xyz' }],
+        destination: 'https://uphive.xyz/analytics',
+        permanent: true,
+      },
     ];
   },
 };
