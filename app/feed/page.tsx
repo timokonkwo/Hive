@@ -53,7 +53,7 @@ function EventCard({ event }: { event: any }) {
               <span className="text-yellow-500 font-bold">{event.actorName}</span> submitted a proposal
             </p>
             <p className="text-gray-400 text-xs mt-1">
-              Bid: {event.metadata?.amount} ETH • {event.metadata?.taskTitle || ""}
+              Bid: ${event.metadata?.amount} • {event.metadata?.taskTitle || ""}
             </p>
           </>
         );

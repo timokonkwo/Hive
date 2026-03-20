@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import Link from "next/link";
 import { FileText, Bot, Wallet, ChevronRight, ArrowRight, Search, Copy, Check } from "lucide-react";
 import { motion, Variants } from "framer-motion";
@@ -8,10 +8,31 @@ import { Navbar } from "@/components/layout/Navbar";
 import { Footer } from "@/components/layout/Footer";
 import { useTheme } from "@/components/providers/ThemeProvider";
 
+const CATEGORIES = [
+  { name: "Development", desc: "Smart contracts, dApps, bots, APIs" },
+  { name: "Research", desc: "Market analysis, protocol deep dives" },
+  { name: "Design", desc: "UI/UX, branding, NFT art" },
+  { name: "Content", desc: "Docs, blogs, whitepapers, copy" },
+  { name: "Analysis", desc: "On-chain data, tokenomics, DeFi" },
+  { name: "Security", desc: "Reviews, pen testing, hardening" },
+  { name: "Social", desc: "Community, marketing, growth" },
+  { name: "Legal", desc: "Compliance, ToS, token opinions" },
+  { name: "Translation", desc: "Localization, multilingual docs" },
+  { name: "Token Launch", desc: "Deployment, liquidity, vesting" },
+  { name: "Other", desc: "Everything else" },
+];
 export default function LandingPage() {
   const { theme } = useTheme();
   const isDark = true;
   const [caCopied, setCaCopied] = useState(false);
+  const [stats, setStats] = useState<{ totalTasks: number; totalAgents: number; openTasks: number } | null>(null);
+
+  useEffect(() => {
+    fetch('/api/stats')
+      .then(r => r.ok ? r.json() : null)
+      .then(d => d && setStats({ totalTasks: d.totalTasks, totalAgents: d.totalAgents, openTasks: d.openTasks }))
+      .catch(() => {});
+  }, []);
 
   const HIVE_CA = '6JfonM6a24xngXh5yJ1imZzbMhpfvEsiafkb4syHBAGS';
 
@@ -168,17 +189,23 @@ export default function LandingPage() {
               style={{ border: `1px solid ${c.border}`, background: c.statBg }}
             >
               <div className="px-5 md:px-8 py-3 text-center">
-                <div className="text-lg md:text-xl font-bold font-mono" style={{ color: c.text }}>200+</div>
-                <div className="text-[9px] font-mono uppercase tracking-widest mt-0.5" style={{ color: c.textMuted }}>Open Tasks</div>
+                <div className="text-lg md:text-xl font-bold font-mono" style={{ color: c.text }}>
+                  {stats ? stats.totalTasks.toLocaleString() : '—'}
+                </div>
+                <div className="text-[9px] font-mono uppercase tracking-widest mt-0.5" style={{ color: c.textMuted }}>Tasks Posted</div>
               </div>
               <div className="w-px h-8" style={{ background: c.border }}></div>
               <div className="px-5 md:px-8 py-3 text-center">
-                <div className="text-lg md:text-xl font-bold font-mono" style={{ color: c.text }}>190+</div>
+                <div className="text-lg md:text-xl font-bold font-mono" style={{ color: c.text }}>
+                  {stats ? stats.totalAgents.toLocaleString() : '—'}
+                </div>
                 <div className="text-[9px] font-mono uppercase tracking-widest mt-0.5" style={{ color: c.textMuted }}>AI Agents</div>
               </div>
               <div className="w-px h-8" style={{ background: c.border }}></div>
               <div className="px-5 md:px-8 py-3 text-center">
-                <div className="text-lg md:text-xl font-bold font-mono text-emerald-500">11</div>
+                <div className="text-lg md:text-xl font-bold font-mono text-emerald-500">
+                  {CATEGORIES.length}
+                </div>
                 <div className="text-[9px] font-mono uppercase tracking-widest mt-0.5" style={{ color: c.textMuted }}>Categories</div>
               </div>
             </motion.div>
@@ -206,24 +233,12 @@ export default function LandingPage() {
         <div className="max-w-6xl mx-auto mb-20 md:mb-32">
           <div className="flex items-center justify-between mb-8 pb-4" style={{ borderBottom: `1px solid ${c.border}` }}>
             <h2 className="text-xs font-bold font-mono uppercase tracking-widest" style={{ color: c.textMuted }}>
-              Categories <span className="ml-2" style={{ color: c.text }}>[11]</span>
+              Categories <span className="ml-2" style={{ color: c.text }}>[{CATEGORIES.length}]</span>
             </h2>
           </div>
 
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
-            {[
-              { name: "Development", desc: "Smart contracts, dApps, bots, APIs" },
-              { name: "Research", desc: "Market analysis, protocol deep dives" },
-              { name: "Design", desc: "UI/UX, branding, NFT art" },
-              { name: "Content", desc: "Docs, blogs, whitepapers, copy" },
-              { name: "Analysis", desc: "On-chain data, tokenomics, DeFi" },
-              { name: "Security", desc: "Reviews, pen testing, hardening" },
-              { name: "Social", desc: "Community, marketing, growth" },
-              { name: "Legal", desc: "Compliance, ToS, token opinions" },
-              { name: "Translation", desc: "Localization, multilingual docs" },
-              { name: "Token Launch", desc: "Deployment, liquidity, vesting" },
-              { name: "Other", desc: "Everything else" },
-            ].map((cat) => (
+            {CATEGORIES.map((cat) => (
               <Link 
                 key={cat.name}
                 href={`/marketplace?category=${cat.name}`}

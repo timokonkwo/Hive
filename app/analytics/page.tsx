@@ -4,7 +4,7 @@ import React, { useEffect, useState, useCallback } from "react";
 import Link from "next/link";
 import {
   DollarSign, Users, Briefcase,
-  ArrowLeft, RefreshCw, FileText, Activity
+  ArrowLeft, RefreshCw, FileText, Activity, TrendingUp, BarChart3
 } from "lucide-react";
 import { Navbar } from "@/components/layout/Navbar";
 import { Footer } from "@/components/layout/Footer";
@@ -26,7 +26,7 @@ function pct(count: number | undefined, total: number | undefined): string {
   return `${Math.round((count / total) * 100)}%`;
 }
 
-interface RevenueData {
+interface AnalyticsData {
   platform: {
     totalTasks: number;
     openTasks: number;
@@ -36,23 +36,18 @@ interface RevenueData {
     totalBids: number;
     totalEarnings: number;
   };
-  activity: {
-    tasksLast7d: number;
-    agentsLast7d: number;
-    bidsLast7d: number;
-  };
   lifetimeFees: { sol: number; usd: number | null } | null;
   lastUpdated: string;
 }
 
-export default function RevenuePage() {
-  const [data, setData] = useState<RevenueData | null>(null);
+export default function AnalyticsPage() {
+  const [data, setData] = useState<AnalyticsData | null>(null);
   const [loading, setLoading] = useState(true);
 
   const fetchData = useCallback(async () => {
     try {
       setLoading(true);
-      const res = await fetch("/api/revenue");
+      const res = await fetch("/api/analytics");
       if (!res.ok) throw new Error("Failed to fetch");
       setData(await res.json());
     } catch {
@@ -69,9 +64,12 @@ export default function RevenuePage() {
   }, [fetchData]);
 
   const p = data?.platform;
-  const a = data?.activity;
   const lf = data?.lifetimeFees;
   const isFirstLoad = loading && !data;
+
+  // Derived engagement metrics
+  const proposalsPerTask = p && p.totalTasks > 0 ? (p.totalBids / p.totalTasks).toFixed(1) : '0';
+  const acceptanceRate = p && p.totalBids > 0 ? Math.round(((p.completedTasks + p.inProgressTasks) / p.totalBids) * 100) : 0;
 
   return (
     <div className="min-h-screen font-sans text-white" style={{ background: "#050505" }}>
@@ -85,10 +83,10 @@ export default function RevenuePage() {
               <ArrowLeft className="w-3.5 h-3.5 mr-2" /> Home
             </Link>
             <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">
-              Revenue
+              Analytics
             </h1>
             <p className="text-zinc-500 text-sm mt-1">
-              Live earnings and platform activity
+              Live platform metrics and on-chain revenue
             </p>
           </div>
           <button
@@ -159,8 +157,8 @@ export default function RevenuePage() {
 
           <div className="p-6 bg-zinc-900/30 border border-zinc-800/50 rounded-sm">
             <h3 className="text-xs font-bold font-mono uppercase tracking-widest text-zinc-400 mb-5 flex items-center gap-2">
-              <RefreshCw size={13} className="text-zinc-500" />
-              Last 7 Days
+              <BarChart3 size={13} className="text-zinc-500" />
+              Agent Engagement
             </h3>
             {isFirstLoad ? (
               <div className="space-y-5">
@@ -171,14 +169,14 @@ export default function RevenuePage() {
             ) : (
               <>
                 <div className="space-y-5">
-                  <StatRow icon={Briefcase} label="Tasks Created" value={a?.tasksLast7d} />
-                  <StatRow icon={Users} label="Agents Joined" value={a?.agentsLast7d} />
-                  <StatRow icon={FileText} label="Proposals Submitted" value={a?.bidsLast7d} />
+                  <StatRow icon={TrendingUp} label="Proposals per Task" value={proposalsPerTask} />
+                  <StatRow icon={Users} label="Avg. Competing Agents" value={p && p.totalTasks > 0 ? Math.ceil(p.totalAgents / Math.max(p.totalTasks, 1)).toString() : '0'} />
+                  <StatRow icon={FileText} label="Task Acceptance Rate" value={`${acceptanceRate}%`} />
                 </div>
-                {a && (
+                {p && (
                   <div className="mt-4 pt-4 border-t border-zinc-800/50 flex justify-between text-xs text-zinc-500">
-                    <span>Weekly activity</span>
-                    <span className="font-bold text-white">{num((a.tasksLast7d || 0) + (a.agentsLast7d || 0) + (a.bidsLast7d || 0))} events</span>
+                    <span>Agent-to-task ratio</span>
+                    <span className="font-bold text-white">{p.totalTasks > 0 ? (p.totalAgents / p.totalTasks).toFixed(1) : '—'}x</span>
                   </div>
                 )}
               </>
@@ -244,14 +242,14 @@ function OverviewRow({ label, count, total, color }: { label: string; count?: nu
   );
 }
 
-function StatRow({ icon: Icon, label, value }: { icon: React.ElementType; label: string; value?: number }) {
+function StatRow({ icon: Icon, label, value }: { icon: React.ElementType; label: string; value?: string | number }) {
   return (
     <div className="flex items-center justify-between">
       <div className="flex items-center gap-2.5">
         <Icon className="text-zinc-600" size={14} />
         <span className="text-sm text-zinc-400">{label}</span>
       </div>
-      <span className="text-sm font-bold text-white">{num(value)}</span>
+      <span className="text-sm font-bold text-white">{typeof value === 'number' ? num(value) : value ?? '—'}</span>
     </div>
   );
 }

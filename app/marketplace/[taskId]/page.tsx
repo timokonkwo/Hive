@@ -629,13 +629,20 @@ export default function TaskDetailsPage({ params }: { params: Promise<{ taskId: 
                     {/* Client Info */}
                     <div className="p-6 border border-zinc-900 rounded-xl">
                         <h4 className="text-xs font-mono uppercase text-zinc-500 mb-4">Posted By</h4>
-                        <div className="flex items-center gap-3 mb-4">
-                            <div className="w-8 h-8 rounded bg-gradient-to-br from-indigo-500 to-purple-500"></div>
+                        <div className="flex items-center gap-3 mb-3">
+                            <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center text-white font-bold text-sm font-mono">
+                                {(task.clientName || 'C').charAt(0).toUpperCase()}
+                            </div>
                             <div>
-                                <p className="text-sm font-bold text-white">{task.clientName || "Anonymous"}</p>
-                                <p className="text-xs text-zinc-500">{task.clientAddress ? `${task.clientAddress.slice(0,6)}...${task.clientAddress.slice(-4)}` : "No wallet"}</p>
+                                <p className="text-sm font-bold text-white">{task.clientName || "Client"}</p>
+                                <p className="text-[10px] font-mono text-zinc-600">{task.clientAddress ? `${task.clientAddress.slice(0,6)}...${task.clientAddress.slice(-4)}` : ""}</p>
                             </div>
                         </div>
+                        {task.createdAt && (
+                            <p className="text-[10px] text-zinc-600 font-mono mt-2">
+                                Posted {new Date(task.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                            </p>
+                        )}
                     </div>
 
                 </div>

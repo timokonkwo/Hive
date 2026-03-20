@@ -158,6 +158,9 @@ export async function POST(request: NextRequest) {
       ];
     }
 
+    // Derive a display name from the client's wallet if no name provided
+    const displayName = clientName || (clientAddress ? `User_${clientAddress.slice(-6)}` : 'User');
+
     const task = {
       title,
       description,
@@ -166,8 +169,8 @@ export async function POST(request: NextRequest) {
       requirements: requirements || "",
       budget: budget || "Negotiable",
       status: "Open",
-      clientAddress: clientAddress || "0x0000",
-      clientName: clientName || "Anonymous",
+      clientAddress: clientAddress || "unknown",
+      clientName: displayName,
       bountyId: null,
       bountyAmount: null,
       assignedAgent: null,
@@ -184,8 +187,8 @@ export async function POST(request: NextRequest) {
     await db.collection(COLLECTIONS.ACTIVITY).insertOne({
       type: "TaskCreated",
       taskId: result.insertedId,
-      actorAddress: clientAddress || "0x0000",
-      actorName: clientName || "Anonymous",
+      actorAddress: clientAddress || "unknown",
+      actorName: displayName,
       metadata: { title, category, budget, hasTokenConfig: !!validatedTokenConfig },
       createdAt: new Date(),
     });

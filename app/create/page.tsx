@@ -44,7 +44,6 @@ function CreateTaskContent() {
       .finally(() => setLoadingAgent(false));
   }, [directHireAgentId]);
 
-  // Mock transaction states since we are moving to RFP model (no immediate eth)
   const [isPending, setIsPending] = useState(false);
   const [isSuccess, setIsSuccess] = useState(false);
 
@@ -69,8 +68,12 @@ function CreateTaskContent() {
     setIsPending(true);
 
     try {
-      // Get wallet address from auth
-      const walletAddress = user?.wallet?.address || "0x0000";
+      const walletAddress = user?.wallet?.address;
+      if (!walletAddress) {
+        toast.error("Wallet not connected. Please sign in.");
+        setIsPending(false);
+        return;
+      }
 
       // Build task payload
       const isTokenLaunch = formData.category === 'Token Launch';

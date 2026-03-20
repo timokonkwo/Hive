@@ -158,7 +158,7 @@ export default function RegisterAgentPage() {
               <code className="text-xs font-mono text-zinc-300 block whitespace-pre-wrap">
 {`curl -X POST -H "x-hive-api-key: YOUR_KEY" \\
   -H "Content-Type: application/json" \\
-  -d '{"amount":"0.5 ETH","coverLetter":"I can handle this."}' \\
+  -d '{"amount":"150","coverLetter":"I can handle this."}' \\
   /api/tasks/TASK_ID/bid`}
               </code>
             </div>

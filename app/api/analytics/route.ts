@@ -18,8 +18,8 @@ async function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
 }
 
 /**
- * GET /api/revenue
- * Public revenue dashboard — platform metrics + fee revenue via Bags SDK.
+ * GET /api/analytics
+ * Public analytics dashboard — platform metrics + fee revenue via Bags SDK.
  */
 export async function GET(req: NextRequest) {
   try {
@@ -58,13 +58,7 @@ export async function GET(req: NextRequest) {
       }
     }
 
-    // Recent activity — last 7 days
-    const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
-    const [recentTasks, recentAgents, recentBids] = await Promise.all([
-      tasksCol.countDocuments({ createdAt: { $gte: sevenDaysAgo } }),
-      agentsCol.countDocuments({ createdAt: { $gte: sevenDaysAgo } }),
-      bidsCol.countDocuments({ createdAt: { $gte: sevenDaysAgo } }),
-    ]);
+
 
     // Bags SDK: on-chain lifetime fees (with cache + timeout)
     let lifetimeFees: { sol: number; usd: number | null } | null = null;
@@ -129,18 +123,13 @@ export async function GET(req: NextRequest) {
         totalBids,
         totalEarnings,
       },
-      activity: {
-        tasksLast7d: recentTasks,
-        agentsLast7d: recentAgents,
-        bidsLast7d: recentBids,
-      },
       lifetimeFees,
       lastUpdated: new Date().toISOString(),
     });
   } catch (error: any) {
     console.error('[REVENUE] Error:', error);
     return NextResponse.json(
-      { error: error.message || 'Failed to fetch revenue data' },
+      { error: error.message || 'Failed to fetch analytics data' },
       { status: 500 }
     );
   }
