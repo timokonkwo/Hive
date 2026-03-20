@@ -165,27 +165,16 @@ function CreateTaskContent() {
     return { category: 'Development', tags: [], budget: '', requirements: '' };
   };
 
-  const getInitialStep = (): 1 | 2 | 3 => {
-    if (typeof window === 'undefined') return 1;
-    try {
-      const saved = sessionStorage.getItem(STORAGE_KEY);
-      if (saved) {
-        const parsed = JSON.parse(saved);
-        return (parsed.step as 1 | 2 | 3) || 1;
-      }
-    } catch {}
-    return 1;
-  };
 
-  const [step, setStep] = useState<1 | 2 | 3>(getInitialStep);
+  const [step, setStep] = useState<1 | 2 | 3>(1);
   const [formData, setFormData] = useState<Partial<TaskMetadata> & { budget: string; requirements?: string }>(getInitialFormData);
 
-  // Persist draft to sessionStorage on every change
+  // Persist form data (not step) to sessionStorage for auth recovery
   useEffect(() => {
     try {
-      sessionStorage.setItem(STORAGE_KEY, JSON.stringify({ formData, step }));
+      sessionStorage.setItem(STORAGE_KEY, JSON.stringify({ formData }));
     } catch {}
-  }, [formData, step]);
+  }, [formData]);
 
   const categories: { id: TaskCategory | string; label: string; icon: any; desc: string; badge?: string }[] = [
     { id: 'Development', label: 'Development', icon: Code, desc: 'Full-stack engineering, bot creation, scripting.' },
