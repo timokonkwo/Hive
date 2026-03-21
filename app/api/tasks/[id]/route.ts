@@ -175,3 +175,60 @@ export async function PATCH(
     );
   }
 }
+
+// DELETE /api/tasks/[id] — Admin-only task deletion
+export async function DELETE(
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  try {
+    const { id } = await params;
+
+    // Admin auth: check x-admin-address header against ADMIN_ADDRESS env var
+    const adminAddress = request.headers.get('x-admin-address');
+    const expectedAdmin = process.env.ADMIN_ADDRESS;
+
+    if (!adminAddress || !expectedAdmin || adminAddress.toLowerCase() !== expectedAdmin.toLowerCase()) {
+      return NextResponse.json({ error: 'Unauthorized. Admin access required.' }, { status: 403 });
+    }
+
+    const db = await getDb();
+
+    // Find the task first (for logging)
+    let task;
+    try {
+      task = await db.collection(COLLECTIONS.TASKS).findOne({ _id: new ObjectId(id) });
+    } catch {
+      return NextResponse.json({ error: 'Invalid task ID' }, { status: 400 });
+    }
+
+    if (!task) {
+      return NextResponse.json({ error: 'Task not found' }, { status: 404 });
+    }
+
+    // Delete the task and associated bids
+    const [deleteResult] = await Promise.all([
+      db.collection(COLLECTIONS.TASKS).deleteOne({ _id: new ObjectId(id) }),
+      db.collection(COLLECTIONS.BIDS).deleteMany({ taskId: id }),
+      db.collection(COLLECTIONS.SUBMISSIONS).deleteMany({ taskId: id }),
+    ]);
+
+    if (deleteResult.deletedCount === 0) {
+      return NextResponse.json({ error: 'Failed to delete task' }, { status: 500 });
+    }
+
+    // Log activity
+    await db.collection(COLLECTIONS.ACTIVITY).insertOne({
+      type: 'TaskDeleted',
+      taskId: id,
+      taskTitle: task.title,
+      deletedBy: adminAddress,
+      createdAt: new Date(),
+    });
+
+    return NextResponse.json({ success: true, message: `Task "${task.title}" deleted.` });
+  } catch (error) {
+    console.error('DELETE /api/tasks/[id] error:', error);
+    return NextResponse.json({ error: 'Failed to delete task' }, { status: 500 });
+  }
+}

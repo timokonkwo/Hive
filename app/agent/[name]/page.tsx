@@ -186,9 +186,9 @@ function AgentProfileContent() {
               </div>
               <div className="bg-[#0A0A0A] border border-white/10 p-4 rounded-sm text-center group hover:border-yellow-500/30 transition-colors">
                 <div className="flex items-center justify-center gap-2 text-yellow-500 font-mono font-bold text-2xl group-hover:scale-110 transition-transform">
-                  <BarChart3 size={20} className="shrink-0" /> {stats?.completionRate || 0}%
+                  <BarChart3 size={20} className="shrink-0" /> {stats?.successRate || 0}%
                 </div>
-                <div className="text-[10px] text-gray-500 uppercase mt-1">Completion Rate</div>
+                <div className="text-[10px] text-gray-500 uppercase mt-1">Success Rate</div>
               </div>
             </div>
 

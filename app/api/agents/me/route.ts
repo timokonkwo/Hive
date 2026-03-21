@@ -108,14 +108,32 @@ export async function PATCH(req: NextRequest) {
     }
 
     const body = await req.json();
-    const { walletAddress, bio, capabilities } = body;
+    const { walletAddress, bio, capabilities, name, website, owner_twitter } = body;
 
     const updates: Record<string, any> = { updatedAt: new Date() };
     const messages: string[] = [];
 
+    // Name update — with duplicate check
+    if (name !== undefined) {
+      if (typeof name !== 'string' || name.trim().length === 0 || name.length > 100) {
+        return NextResponse.json({ error: 'Name must be a non-empty string of 100 chars or less.' }, { status: 400 });
+      }
+      // Check for duplicate
+      const escaped = name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      const existing = await db.collection('agents').findOne({
+        name: { $regex: new RegExp(`^${escaped}$`, 'i') },
+        _id: { $ne: new (require('mongodb').ObjectId)(auth.agent.id) },
+      });
+      if (existing) {
+        return NextResponse.json({ error: `An agent named "${name}" already exists.` }, { status: 409 });
+      }
+      updates.name = name.trim();
+      messages.push('Name updated');
+    }
+
     // Wallet linking — only if currently null
     if (walletAddress) {
-      if (typeof walletAddress !== 'string' || !/^0x[a-fA-F0-9]{40}$/.test(walletAddress)) {
+      if (typeof walletAddress !== 'string' || walletAddress.length < 20) {
         return NextResponse.json({ error: 'Invalid wallet address format.' }, { status: 400 });
       }
       if (auth.agent.walletAddress) {
@@ -146,8 +164,26 @@ export async function PATCH(req: NextRequest) {
       messages.push('Capabilities updated');
     }
 
+    // Website update
+    if (website !== undefined) {
+      if (website !== null && (typeof website !== 'string' || website.length > 200)) {
+        return NextResponse.json({ error: 'Website must be a string of 200 chars or less, or null to clear.' }, { status: 400 });
+      }
+      updates.website = website;
+      messages.push('Website updated');
+    }
+
+    // Twitter handle update
+    if (owner_twitter !== undefined) {
+      if (owner_twitter !== null && (typeof owner_twitter !== 'string' || owner_twitter.length > 50)) {
+        return NextResponse.json({ error: 'Twitter handle must be 50 chars or less, or null to clear.' }, { status: 400 });
+      }
+      updates.ownerTwitter = owner_twitter;
+      messages.push('Twitter updated');
+    }
+
     if (Object.keys(updates).length <= 1) {
-      return NextResponse.json({ error: 'No valid fields to update. Provide walletAddress, bio, or capabilities.' }, { status: 400 });
+      return NextResponse.json({ error: 'No valid fields to update. Provide name, bio, capabilities, website, owner_twitter, or walletAddress.' }, { status: 400 });
     }
 
     const { ObjectId } = require('mongodb');

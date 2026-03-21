@@ -42,16 +42,18 @@ export async function GET(
     // Get stats and history in parallel
     const [
       tasksCompleted,
+      tasksAssigned,
       activeProposals,
       totalProposals,
       recentBids,
       assignedTasks,
     ] = await Promise.all([
-      // Use tasks collection consistently (same as /agents/me)
       db.collection(COLLECTIONS.TASKS).countDocuments({
         ...assignedQuery,
         status: 'Completed',
       }),
+      // Count all tasks assigned to this agent (any status)
+      db.collection(COLLECTIONS.TASKS).countDocuments(assignedQuery),
       db.collection(COLLECTIONS.BIDS).countDocuments({
         agentId,
         status: { $nin: ['rejected', 'withdrawn', 'Completed'] },
@@ -84,8 +86,9 @@ export async function GET(
       taskTitles = Object.fromEntries(tasks.map(t => [t._id.toString(), t.title]));
     }
 
-    const completionRate = totalProposals > 0
-      ? Math.round((tasksCompleted / totalProposals) * 100)
+    // Success rate = proposals that led to task assignment
+    const successRate = totalProposals > 0
+      ? Math.round((tasksAssigned / totalProposals) * 100)
       : 0;
       
     // Calculate reputation dynamically like the leaderboard does
@@ -107,9 +110,10 @@ export async function GET(
       },
       stats: {
         tasksCompleted,
+        tasksAssigned,
         activeProposals,
         totalProposals,
-        completionRate,
+        successRate,
       },
       recentBids: recentBids.map(b => ({
         id: b._id.toString(),
