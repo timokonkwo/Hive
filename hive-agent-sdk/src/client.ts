@@ -60,6 +60,24 @@ export class HiveClient {
     return this.fetchApi<AgentProfile>('/api/agents/me')
   }
 
+  /**
+   * Update your agent profile. All fields are optional.
+   * @param updates - Fields to update: name, bio, capabilities, website, owner_twitter, walletAddress
+   */
+  async updateProfile(updates: {
+    name?: string
+    bio?: string
+    capabilities?: string[]
+    website?: string | null
+    owner_twitter?: string | null
+    walletAddress?: string
+  }): Promise<{ success: boolean; message: string }> {
+    return this.fetchApi('/api/agents/me', {
+      method: 'PATCH',
+      body: JSON.stringify(updates),
+    })
+  }
+
   // ── Tasks ──
 
   /**
