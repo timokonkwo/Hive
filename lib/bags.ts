@@ -1,264 +1,317 @@
 /**
- * Bags API Client
- * Integration with the Bags.fm platform for token launches, fee sharing, and analytics.
- * Docs: https://docs.bags.fm
+ * Bags Integration — powered by @bagsfm/bags-sdk
  *
- * Partner Config Key: Fu2RmDkuTC7JiW5irLcrip4GVaw84U1uL4UNeKH5ncXy
- * Ref Code: hive
+ * Handles server-side token launches on Solana via the Bags platform.
+ * The server signs and broadcasts transactions using a dedicated launch keypair.
+ *
+ * Env vars required:
+ *   BAGS_API_KEY          — Bags developer API key (from dev.bags.fm)
+ *   HIVE_LAUNCH_KEYPAIR   — Solana keypair (base58 secret or JSON byte array)
+ *   SOLANA_RPC_URL         — (optional) Solana RPC endpoint, defaults to mainnet
  */
 
+import { BagsSDK } from '@bagsfm/bags-sdk';
+import { Connection, Keypair, PublicKey, VersionedTransaction } from '@solana/web3.js';
+import bs58 from 'bs58';
+
+// ── Constants ──
+
 const BAGS_API_BASE = 'https://public-api-v2.bags.fm/api/v1';
-const BAGS_PARTNER_KEY = 'Fu2RmDkuTC7JiW5irLcrip4GVaw84U1uL4UNeKH5ncXy';
-const BAGS_REF_CODE = 'hive';
+const BAGS_PARTNER_CONFIG_PDA = 'G5brHxe8WLXw8svg9Aon3CigpDfchVT8ukNJWqmH76uN';
+const BAGS_CONFIG_TYPE = 'fa29606e-5e48-4c37-827f-4b03d58ee23d'; // 1% pre-migration, 0.25% post
+const DEFAULT_RPC = 'https://flashy-proportionate-arm.solana-mainnet.quiknode.pro/7f10e26aece44e206a781dfd9c74360edac7181b/';
 
-interface BagsApiConfig {
-  apiKey: string;
-}
+// ── Types (re-exported for route handlers) ──
 
-interface TokenMetadata {
+export interface TokenMetadata {
   name: string;
   symbol: string;
   description: string;
-  image?: File | string;
+  image?: string; // URL string
   twitter?: string;
   telegram?: string;
   website?: string;
 }
 
-interface FeeShareConfig {
+export interface FeeShareConfig {
   walletAddress: string;
-  bps: number; // Basis points (out of 10000)
+  bps: number;
   label?: string;
-  socialPlatform?: 'twitter' | 'github' | 'kick';
-  socialHandle?: string;
 }
 
-interface TokenLaunchParams {
+export interface TokenLaunchParams {
   metadata: TokenMetadata;
   feeSharing?: FeeShareConfig[];
   initialBuyAmountSol?: number;
 }
 
-interface TokenLaunchResult {
+export interface TokenLaunchResult {
   success: boolean;
   mintAddress?: string;
   transactionId?: string;
   error?: string;
 }
 
-interface TokenAnalytics {
-  mintAddress: string;
-  totalFees: number;
-  volume24h: number;
-  holders: number;
-  marketCap: number;
-}
-
-interface ClaimableFee {
-  source: string;
-  amount: number;
-  mintAddress: string;
-}
+// ── Keypair Parsing ──
 
 /**
- * Bags API client for Hive Protocol integration.
- * Enables AI agents to launch tokens, configure fee sharing, and claim fees
- * via the Bags platform on Solana.
+ * Parse a Solana keypair from an env var.
+ * Supports two formats:
+ *   1. Base58-encoded secret key string
+ *   2. JSON byte array string: "[174,47,218,...]"
+ */
+function parseKeypair(raw: string): Keypair {
+  const trimmed = raw.trim();
+
+  // JSON byte array format
+  if (trimmed.startsWith('[')) {
+    const bytes = JSON.parse(trimmed) as number[];
+    return Keypair.fromSecretKey(Uint8Array.from(bytes));
+  }
+
+  // Base58 format
+  const decoded = bs58.decode(trimmed);
+  return Keypair.fromSecretKey(decoded);
+}
+
+// ── Singleton SDK + Connection ──
+
+let _sdk: BagsSDK | null = null;
+let _connection: Connection | null = null;
+let _launchKeypair: Keypair | null = null;
+
+function getConnection(): Connection {
+  if (!_connection) {
+    const rpcUrl = process.env.SOLANA_RPC_URL || DEFAULT_RPC;
+    _connection = new Connection(rpcUrl, 'confirmed');
+  }
+  return _connection;
+}
+
+function getLaunchKeypair(): Keypair | null {
+  if (!_launchKeypair) {
+    const raw = process.env.HIVE_LAUNCH_KEYPAIR;
+    if (!raw) {
+      console.warn('[BAGS] HIVE_LAUNCH_KEYPAIR not configured — token launch signing disabled');
+      return null;
+    }
+    try {
+      _launchKeypair = parseKeypair(raw);
+      console.log(`[BAGS] Launch wallet: ${_launchKeypair.publicKey.toBase58()}`);
+    } catch (err) {
+      console.error('[BAGS] Failed to parse HIVE_LAUNCH_KEYPAIR:', err);
+      return null;
+    }
+  }
+  return _launchKeypair;
+}
+
+function getSDK(): BagsSDK | null {
+  if (!_sdk) {
+    const apiKey = process.env.BAGS_API_KEY;
+    if (!apiKey) {
+      console.warn('[BAGS] BAGS_API_KEY not configured — Bags integration disabled');
+      return null;
+    }
+    _sdk = new BagsSDK(apiKey, getConnection(), 'confirmed');
+  }
+  return _sdk;
+}
+
+// ── Public API ──
+
+/**
+ * BagsClient wraps the official @bagsfm/bags-sdk with server-side signing.
  */
 export class BagsClient {
-  private apiKey: string;
-  private headers: Record<string, string>;
+  private sdk: BagsSDK;
+  private keypair: Keypair;
+  private connection: Connection;
 
-  constructor(config: BagsApiConfig) {
-    this.apiKey = config.apiKey.trim();
-    this.headers = {
-      'x-api-key': this.apiKey,
-      'Content-Type': 'application/json',
-    };
+  constructor() {
+    const sdk = getSDK();
+    if (!sdk) throw new Error('Bags SDK not configured (missing BAGS_API_KEY)');
+
+    const keypair = getLaunchKeypair();
+    if (!keypair) throw new Error('Launch keypair not configured (missing HIVE_LAUNCH_KEYPAIR)');
+
+    this.sdk = sdk;
+    this.keypair = keypair;
+    this.connection = getConnection();
   }
 
   /**
-   * Step 1: Create token info and metadata.
-   * Uploads token image and metadata to Bags, returns a mint address for launch.
-   */
-  async createTokenInfo(metadata: TokenMetadata): Promise<{ mintAddress: string; metadataUri: string }> {
-    const formData = new FormData();
-    formData.append('name', metadata.name);
-    formData.append('symbol', metadata.symbol);
-    formData.append('description', metadata.description);
-    
-    if (metadata.twitter) formData.append('twitter', metadata.twitter);
-    if (metadata.telegram) formData.append('telegram', metadata.telegram);
-    if (metadata.website) formData.append('website', metadata.website);
-    
-    // Partner tracking
-    formData.append('partnerKey', BAGS_PARTNER_KEY);
-    formData.append('refCode', BAGS_REF_CODE);
-
-    if (metadata.image && metadata.image instanceof File) {
-      formData.append('image', metadata.image);
-    }
-
-    const response = await fetch(`${BAGS_API_BASE}/token/create-token-info`, {
-      method: 'POST',
-      headers: { 'x-api-key': this.apiKey },
-      body: formData,
-    });
-
-    if (!response.ok) {
-      const err = await response.json().catch(() => ({ error: `HTTP ${response.status}` }));
-      throw new Error(err.error || 'Failed to create token info on Bags');
-    }
-
-    const data = await response.json();
-    return data.response;
-  }
-
-  /**
-   * Step 2: Configure fee sharing for a token.
-   * Sets up revenue sharing between wallets (agents, creators, treasury).
-   * Total BPS across all claimers must equal 10000 (100%).
-   */
-  async configureFeeSharing(mintAddress: string, feeClaimers: FeeShareConfig[]): Promise<{ success: boolean }> {
-    const totalBps = feeClaimers.reduce((sum, c) => sum + c.bps, 0);
-    if (totalBps !== 10000) {
-      throw new Error(`Fee sharing BPS must total 10000, got ${totalBps}`);
-    }
-
-    const response = await fetch(`${BAGS_API_BASE}/token/fee-sharing`, {
-      method: 'POST',
-      headers: this.headers,
-      body: JSON.stringify({
-        mintAddress,
-        claimers: feeClaimers.map(c => ({
-          wallet: c.walletAddress,
-          bps: c.bps,
-          label: c.label,
-          ...(c.socialPlatform && { socialPlatform: c.socialPlatform, socialHandle: c.socialHandle }),
-        })),
-      }),
-    });
-
-    if (!response.ok) {
-      const err = await response.json().catch(() => ({ error: `HTTP ${response.status}` }));
-      throw new Error(err.error || 'Failed to configure fee sharing');
-    }
-
-    return { success: true };
-  }
-
-  /**
-   * Step 3: Launch the token on Bags/Solana.
-   * Creates the token with an optional initial buy.
+   * Launch a token on Bags/Solana.
+   *
+   * Flow:
+   *  1. Upload metadata to Bags (create-token-info)
+   *  2. Create fee share config → get meteoraConfigKey + sign config txs
+   *  3. Create launch transaction with meteoraConfigKey
+   *  4. Sign + broadcast + confirm
    */
   async launchToken(params: TokenLaunchParams): Promise<TokenLaunchResult> {
-    // Step 1: Create token metadata
-    const tokenInfo = await this.createTokenInfo(params.metadata);
+    try {
+      const apiKey = process.env.BAGS_API_KEY!;
+      const wallet = this.keypair.publicKey.toBase58();
 
-    // Step 2: Configure fee sharing if provided
-    if (params.feeSharing && params.feeSharing.length > 0) {
-      await this.configureFeeSharing(tokenInfo.mintAddress, params.feeSharing);
+      // Step 1: Create token metadata on Bags
+      console.log(`[BAGS] Creating token info: ${params.metadata.name} (${params.metadata.symbol})`);
+
+      const imageUrl = params.metadata.image
+        || `https://api.dicebear.com/7.x/shapes/svg?seed=${encodeURIComponent(params.metadata.name)}&size=256`;
+
+      const tokenInfo = await this.sdk.tokenLaunch.createTokenInfoAndMetadata({
+        name: params.metadata.name,
+        symbol: params.metadata.symbol,
+        description: params.metadata.description,
+        imageUrl,
+        twitter: params.metadata.twitter,
+        telegram: params.metadata.telegram,
+        website: params.metadata.website,
+      });
+
+      console.log(`[BAGS] Token info created: mint=${tokenInfo.tokenMint}, metadata=${tokenInfo.tokenMetadata}`);
+
+      const initialBuyLamports = Math.floor((params.initialBuyAmountSol || 0) * 1e9);
+
+      // Step 2: Create fee share config with our partner config
+      console.log('[BAGS] Creating fee share config...');
+      const configRes = await fetch(`${BAGS_API_BASE}/fee-share/config`, {
+        method: 'POST',
+        headers: { 'x-api-key': apiKey, 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          payer: wallet,
+          baseMint: tokenInfo.tokenMint,
+          claimersArray: [wallet],
+          basisPointsArray: [10000],
+          bagsConfigType: BAGS_CONFIG_TYPE,
+          partner: wallet,
+          partnerConfig: BAGS_PARTNER_CONFIG_PDA,
+        }),
+      });
+
+      if (!configRes.ok) {
+        const err = await configRes.json().catch(() => ({}));
+        console.error('[BAGS] Fee share config failed:', configRes.status, err);
+        return { success: false, error: err.response || 'Fee share config failed' };
+      }
+
+      const configData = await configRes.json();
+      const meteoraConfigKey = configData.response?.meteoraConfigKey;
+      if (!meteoraConfigKey) {
+        return { success: false, error: 'No meteoraConfigKey in fee share config response' };
+      }
+      console.log(`[BAGS] meteoraConfigKey: ${meteoraConfigKey}`);
+
+      // Sign and broadcast config txs if needed
+      if (configData.response.needsCreation && configData.response.transactions?.length > 0) {
+        for (const txData of configData.response.transactions) {
+          const txStr = typeof txData === 'string' ? txData : txData.transaction;
+          const txBytes = bs58.decode(txStr);
+          const tx = VersionedTransaction.deserialize(txBytes);
+          tx.sign([this.keypair]);
+          const sig = await this.connection.sendRawTransaction(tx.serialize(), { skipPreflight: true, maxRetries: 5 });
+          console.log(`[BAGS] Config tx: ${sig}`);
+        }
+        // Wait for config txs to confirm
+        await new Promise(r => setTimeout(r, 5000));
+      }
+
+      // Step 3: Create launch transaction
+      console.log(`[BAGS] Getting launch tx... configKey=${meteoraConfigKey}`);
+      const launchRes = await fetch(`${BAGS_API_BASE}/token-launch/create-launch-transaction`, {
+        method: 'POST',
+        headers: { 'x-api-key': apiKey, 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          ipfs: tokenInfo.tokenMetadata,
+          tokenMint: tokenInfo.tokenMint,
+          wallet,
+          initialBuyLamports,
+          configKey: meteoraConfigKey,
+        }),
+      });
+
+      if (!launchRes.ok) {
+        const errData = await launchRes.json().catch(() => ({}));
+        console.error('[BAGS] Launch tx failed:', launchRes.status, errData);
+        return { success: false, error: errData.response || `Launch API returned ${launchRes.status}` };
+      }
+
+      const launchData = await launchRes.json();
+      const launchTxBytes = bs58.decode(launchData.response);
+      const launchTx = VersionedTransaction.deserialize(launchTxBytes);
+
+      // Step 4: Sign + broadcast + confirm
+      console.log('[BAGS] Signing and broadcasting...');
+      launchTx.sign([this.keypair]);
+      const txSignature = await this.connection.sendRawTransaction(launchTx.serialize(), {
+        skipPreflight: false,
+        maxRetries: 5,
+      });
+
+      console.log(`[BAGS] Confirming tx: ${txSignature}`);
+      const latestBlockhash = await this.connection.getLatestBlockhash('confirmed');
+      await this.connection.confirmTransaction({
+        signature: txSignature,
+        blockhash: latestBlockhash.blockhash,
+        lastValidBlockHeight: latestBlockhash.lastValidBlockHeight,
+      }, 'confirmed');
+
+      console.log(`[BAGS] ✅ Token launched! Mint: ${tokenInfo.tokenMint}, Tx: ${txSignature}`);
+
+      return {
+        success: true,
+        mintAddress: tokenInfo.tokenMint,
+        transactionId: txSignature,
+      };
+    } catch (error: any) {
+      console.error('[BAGS] Token launch failed:', error);
+      return {
+        success: false,
+        error: error.message || 'Token launch failed',
+      };
     }
-
-    // Step 3: Launch/finalize
-    const response = await fetch(`${BAGS_API_BASE}/token/launch`, {
-      method: 'POST',
-      headers: this.headers,
-      body: JSON.stringify({
-        mintAddress: tokenInfo.mintAddress,
-        initialBuyAmountSol: params.initialBuyAmountSol || 0,
-        partnerKey: BAGS_PARTNER_KEY,
-        refCode: BAGS_REF_CODE,
-      }),
-    });
-
-    if (!response.ok) {
-      const err = await response.json().catch(() => ({ error: `HTTP ${response.status}` }));
-      return { success: false, error: err.error || 'Token launch failed' };
-    }
-
-    const data = await response.json();
-    return {
-      success: true,
-      mintAddress: tokenInfo.mintAddress,
-      transactionId: data.response?.transactionId,
-    };
   }
 
   /**
-   * Get token analytics (fees, volume, holders).
+   * Get token analytics (lifetime fees, creators).
    */
-  async getTokenAnalytics(mintAddress: string): Promise<TokenAnalytics> {
-    const response = await fetch(`${BAGS_API_BASE}/token/${mintAddress}/analytics`, {
-      headers: this.headers,
-    });
-
-    if (!response.ok) {
-      throw new Error('Failed to fetch token analytics');
-    }
-
-    const data = await response.json();
-    return data.response;
+  async getTokenAnalytics(mintAddress: string) {
+    const mint = new PublicKey(mintAddress);
+    const [totalFees, creators] = await Promise.all([
+      this.sdk.state.getTokenLifetimeFees(mint),
+      this.sdk.state.getTokenCreators(mint).catch(() => []),
+    ]);
+    return { mintAddress, totalFees, creators };
   }
 
   /**
-   * Get claimable fees for a wallet.
+   * Get claimable fee positions for a wallet.
    */
-  async getClaimableFees(walletAddress: string): Promise<ClaimableFee[]> {
-    const response = await fetch(`${BAGS_API_BASE}/fees/claimable/${walletAddress}`, {
-      headers: this.headers,
-    });
-
-    if (!response.ok) {
-      throw new Error('Failed to fetch claimable fees');
-    }
-
-    const data = await response.json();
-    return data.response;
+  async getClaimableFees(walletAddress: string) {
+    const wallet = new PublicKey(walletAddress);
+    return this.sdk.fee.getAllClaimablePositions(wallet);
   }
 
   /**
-   * Generate a claim transaction for earned fees.
+   * Generate claim transactions for a fee position.
    */
-  async generateClaimTransaction(walletAddress: string, mintAddress: string): Promise<{ transaction: string }> {
-    const response = await fetch(`${BAGS_API_BASE}/fees/claim`, {
-      method: 'POST',
-      headers: this.headers,
-      body: JSON.stringify({ walletAddress, mintAddress }),
-    });
-
-    if (!response.ok) {
-      throw new Error('Failed to generate claim transaction');
+  async generateClaimTransaction(walletAddress: string, mintAddress: string) {
+    const wallet = new PublicKey(walletAddress);
+    const positions = await this.sdk.fee.getAllClaimablePositions(wallet);
+    // Find position matching the requested mint
+    const position = positions.find((p: any) => p.baseMint?.toBase58() === mintAddress);
+    if (!position) {
+      throw new Error('No claimable position found for this mint');
     }
-
-    const data = await response.json();
-    return data.response;
-  }
-
-  /**
-   * Get creator info for a token.
-   */
-  async getCreatorInfo(mintAddress: string): Promise<{ creator: string; totalFees: number }> {
-    const response = await fetch(`${BAGS_API_BASE}/token/${mintAddress}/creator`, {
-      headers: this.headers,
-    });
-
-    if (!response.ok) {
-      throw new Error('Failed to fetch creator info');
-    }
-
-    const data = await response.json();
-    return data.response;
+    const txs = await this.sdk.fee.getClaimTransaction(wallet, position);
+    return { transactions: txs.map(tx => Buffer.from(tx.serialize()).toString('base64')) };
   }
 }
 
 /**
- * Default HIVE fee sharing configuration for tokens launched through the marketplace.
- * 1% of all trading volume is distributed:
- * - 40% → Hive Protocol treasury
- * - 30% → Top-performing agents (reputation-weighted)
- * - 20% → Task creators
- * - 10% → Community referrers
+ * Default Hive fee sharing configuration.
+ * 1% of all trading volume is distributed among configured wallets.
  */
 export const HIVE_DEFAULT_FEE_SHARING: FeeShareConfig[] = [
   {
@@ -283,21 +336,19 @@ export const HIVE_DEFAULT_FEE_SHARING: FeeShareConfig[] = [
   },
 ];
 
-/**
- * Partner tracking constants (exposed for API routes).
- */
+// Legacy aliases for route handlers
+const BAGS_PARTNER_KEY = BAGS_PARTNER_CONFIG_PDA;
+const BAGS_REF_CODE = 'hive';
 export { BAGS_PARTNER_KEY, BAGS_REF_CODE };
 
 /**
- * Create a singleton Bags client from environment variables.
+ * Create a BagsClient instance. Returns null if not configured.
  */
 export function createBagsClient(): BagsClient | null {
-  const apiKey = process.env.BAGS_API_KEY;
-  if (!apiKey) {
-    console.warn('[HIVE] Bags API key not configured - Bags integration disabled');
+  try {
+    return new BagsClient();
+  } catch (err: any) {
+    console.warn(`[BAGS] Client not available: ${err.message}`);
     return null;
   }
-  return new BagsClient({ apiKey });
 }
-
-export type { TokenMetadata, FeeShareConfig, TokenLaunchParams, TokenLaunchResult, TokenAnalytics, ClaimableFee };

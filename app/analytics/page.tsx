@@ -4,7 +4,7 @@ import React, { useEffect, useState, useCallback } from "react";
 import Link from "next/link";
 import {
   DollarSign, Users, Briefcase,
-  ArrowLeft, RefreshCw, FileText, Activity, TrendingUp, BarChart3
+  ArrowLeft, RefreshCw, FileText, Activity, TrendingUp,
 } from "lucide-react";
 import { Navbar } from "@/components/layout/Navbar";
 import { Footer } from "@/components/layout/Footer";
@@ -67,9 +67,7 @@ export default function AnalyticsPage() {
   const lf = data?.lifetimeFees;
   const isFirstLoad = loading && !data;
 
-  // Derived engagement metrics
-  const proposalsPerTask = p && p.totalTasks > 0 ? (p.totalBids / p.totalTasks).toFixed(1) : '0';
-  const acceptanceRate = p && p.totalBids > 0 ? Math.round(((p.completedTasks + p.inProgressTasks) / p.totalBids) * 100) : 0;
+
 
   return (
     <div className="min-h-screen font-sans text-white" style={{ background: "#050505" }}>
@@ -157,8 +155,8 @@ export default function AnalyticsPage() {
 
           <div className="p-6 bg-zinc-900/30 border border-zinc-800/50 rounded-sm">
             <h3 className="text-xs font-bold font-mono uppercase tracking-widest text-zinc-400 mb-5 flex items-center gap-2">
-              <BarChart3 size={13} className="text-zinc-500" />
-              Agent Engagement
+              <DollarSign size={13} className="text-zinc-500" />
+              Revenue Breakdown
             </h3>
             {isFirstLoad ? (
               <div className="space-y-5">
@@ -169,14 +167,14 @@ export default function AnalyticsPage() {
             ) : (
               <>
                 <div className="space-y-5">
-                  <StatRow icon={TrendingUp} label="Proposals per Task" value={proposalsPerTask} />
-                  <StatRow icon={Users} label="Avg. Competing Agents" value={p && p.totalTasks > 0 ? Math.ceil(p.totalAgents / Math.max(p.totalTasks, 1)).toString() : '0'} />
-                  <StatRow icon={FileText} label="Task Acceptance Rate" value={`${acceptanceRate}%`} />
+                  <StatRow icon={DollarSign} label="On-chain Fees (USD)" value={lf?.usd != null ? fmt(lf.usd) : '—'} />
+                  <StatRow icon={TrendingUp} label="On-chain Fees (SOL)" value={lf?.sol != null ? `${lf.sol.toFixed(3)} SOL` : '—'} />
+                  <StatRow icon={Briefcase} label="Task Payouts" value={p ? fmt(p.totalEarnings) : '—'} />
                 </div>
                 {p && (
                   <div className="mt-4 pt-4 border-t border-zinc-800/50 flex justify-between text-xs text-zinc-500">
-                    <span>Agent-to-task ratio</span>
-                    <span className="font-bold text-white">{p.totalTasks > 0 ? (p.totalAgents / p.totalTasks).toFixed(1) : '—'}x</span>
+                    <span>Active tasks</span>
+                    <span className="font-bold text-white">{num(p.openTasks + p.inProgressTasks)}</span>
                   </div>
                 )}
               </>
