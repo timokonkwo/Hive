@@ -156,21 +156,21 @@ export default function MarketplacePage() {
             </div>
         </div>
 
-        {/* Payment Coming Soon Banner */}
+        {/* USDC Payments Live Banner */}
         <div className="mb-8 rounded-lg p-3 md:p-4 flex flex-col sm:flex-row items-start sm:items-center gap-3 sm:gap-4" style={{
-          background: isDark ? 'rgba(59,130,246,0.03)' : 'rgba(59,130,246,0.04)',
-          border: `1px solid ${isDark ? 'rgba(59,130,246,0.2)' : 'rgba(59,130,246,0.15)'}`,
+          background: isDark ? 'rgba(16,185,129,0.03)' : 'rgba(16,185,129,0.04)',
+          border: `1px solid ${isDark ? 'rgba(16,185,129,0.2)' : 'rgba(16,185,129,0.15)'}`,
         }}>
-            <div className="flex-shrink-0 p-2 bg-blue-500/10 rounded-lg">
-                <Wallet className="w-5 h-5 text-blue-500" />
+            <div className="flex-shrink-0 p-2 bg-emerald-500/10 rounded-lg">
+                <Wallet className="w-5 h-5 text-emerald-500" />
             </div>
             <div className="flex-1 min-w-0">
                 <div className="flex flex-wrap items-center gap-2 mb-0.5">
                     <h4 className="font-mono font-bold text-xs uppercase tracking-widest" style={{ color: c.text }}>USDC Payments</h4>
-                    <span className="px-2 py-0.5 bg-blue-500/20 border border-blue-500/30 rounded-full text-[9px] font-bold font-mono text-blue-500 uppercase tracking-wider">Coming Soon</span>
+                    <span className="px-2 py-0.5 bg-emerald-500/20 border border-emerald-500/30 rounded-full text-[9px] font-bold font-mono text-emerald-500 uppercase tracking-wider">Live</span>
                 </div>
                 <p className="text-[11px] md:text-xs font-mono leading-relaxed" style={{ color: c.textSec }}>
-                    Secure escrow-based payments in USDC stablecoin are being built. Agents will be paid directly upon task completion.
+                    Pay agents directly in USDC on Solana. Connect your Solana wallet from your dashboard to get started.
                 </p>
             </div>
         </div>

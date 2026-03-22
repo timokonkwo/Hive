@@ -4,31 +4,37 @@ import React, { Suspense, useState } from "react";
 import { Navbar } from "@/components/layout/Navbar";
 import { Footer } from "@/components/layout/Footer";
 import { 
-  Wallet, Shield, CheckCircle, Loader2, Key, Link2, AlertTriangle
+  Wallet, Shield, CheckCircle, Loader2, Key, AlertTriangle, Bot
 } from "lucide-react";
-import { useAuth } from "@/hooks/useAuth";
 import { useParams } from "next/navigation";
 import { toast } from "sonner";
 
 function ManageContent() {
   const params = useParams();
   const agentId = params.id as string;
-  const { authenticated, login, user, ready } = useAuth();
 
   const [apiKey, setApiKey] = useState("");
   const [linking, setLinking] = useState(false);
   const [linked, setLinked] = useState(false);
+  const [connectedAddress, setConnectedAddress] = useState("");
   const [error, setError] = useState("");
 
-  const walletAddress = user?.wallet?.address;
-
-  const handleLinkWallet = async () => {
-    if (!walletAddress) {
-      toast.error("Please sign in with a wallet first.");
-      return;
-    }
+  const handleConnectSolanaWallet = async () => {
     if (!apiKey.startsWith("hive_sk_")) {
       setError("Invalid API key format. It should start with hive_sk_");
+      return;
+    }
+
+    // Detect any Solana wallet
+    const solWallet = (window as any).solana
+      || (window as any).phantom?.solana
+      || (window as any).solflare
+      || (window as any).backpack?.solana;
+
+    if (!solWallet) {
+      toast.error("No Solana wallet found", {
+        description: "Install Phantom, Solflare, or Backpack to connect.",
+      });
       return;
     }
 
@@ -36,26 +42,34 @@ function ManageContent() {
     setError("");
 
     try {
+      const response = await solWallet.connect();
+      const walletAddress = response.publicKey.toString();
+
       const res = await fetch("/api/agents/me", {
         method: "PATCH",
         headers: {
           "Content-Type": "application/json",
           "x-hive-api-key": apiKey,
         },
-        body: JSON.stringify({ walletAddress }),
+        body: JSON.stringify({ solanaAddress: walletAddress }),
       });
 
       const data = await res.json();
 
       if (res.ok) {
         setLinked(true);
-        toast.success("Wallet linked successfully!");
+        setConnectedAddress(walletAddress);
+        toast.success("Solana wallet connected to agent!");
       } else {
-        setError(data.error || "Failed to link wallet.");
-        toast.error(data.error || "Failed to link wallet.");
+        setError(data.error || "Failed to connect wallet.");
+        toast.error(data.error || "Failed to connect wallet.");
       }
-    } catch (err) {
-      setError("Network error. Please try again.");
+    } catch (err: any) {
+      if (err.message?.includes("User rejected")) {
+        setError("Wallet connection cancelled.");
+      } else {
+        setError("Failed to connect wallet. Please try again.");
+      }
     } finally {
       setLinking(false);
     }
@@ -69,60 +83,40 @@ function ManageContent() {
         <div className="max-w-lg mx-auto px-6">
 
           <div className="text-center mb-10">
-            <div className="w-16 h-16 mx-auto mb-6 rounded-sm bg-blue-500/10 border border-blue-500/20 flex items-center justify-center">
-              <Wallet className="text-blue-500" size={32} />
+            <div className="w-16 h-16 mx-auto mb-6 rounded-sm bg-purple-500/10 border border-purple-500/20 flex items-center justify-center">
+              <Wallet className="text-purple-500" size={32} />
             </div>
             <h1 className="text-2xl font-black font-mono uppercase tracking-tight mb-2">
-              Link Wallet
+              Connect Payment Wallet
             </h1>
             <p className="text-zinc-400 font-mono text-sm leading-relaxed">
-              Connect your wallet to your AI agent for on-chain payments and reputation tracking.
+              Set up your agent&apos;s Solana wallet to receive USDC payments from clients.
             </p>
           </div>
 
           {linked ? (
             <div className="bg-[#0A0A0A] border border-emerald-500/20 rounded-sm p-8 text-center">
               <CheckCircle className="mx-auto text-emerald-500 mb-4" size={48} />
-              <h2 className="text-lg font-bold font-mono uppercase mb-2">Wallet Linked!</h2>
+              <h2 className="text-lg font-bold font-mono uppercase mb-2">Wallet Connected!</h2>
               <p className="text-zinc-400 text-sm font-mono mb-2">
-                {walletAddress?.slice(0, 6)}...{walletAddress?.slice(-4)} is now linked to your agent.
+                {connectedAddress.slice(0, 8)}...{connectedAddress.slice(-6)} is now set as the payment wallet.
               </p>
-              <p className="text-zinc-600 text-xs font-mono">
-                Your agent can now receive on-chain payments.
+              <p className="text-zinc-600 text-xs font-mono mb-4">
+                Clients will send USDC directly to this wallet when approving your agent&apos;s work.
               </p>
+              <a
+                href="/agent/dashboard"
+                className="inline-flex items-center gap-2 px-4 py-2 bg-zinc-800 hover:bg-zinc-700 text-white font-mono text-xs uppercase tracking-widest rounded-sm transition-colors"
+              >
+                <Bot size={14} /> Go to Agent Dashboard
+              </a>
             </div>
           ) : (
             <div className="space-y-6">
-              {/* Step 1: Sign In */}
+              {/* Step 1: Enter API Key */}
               <div className="bg-[#0A0A0A] border border-white/10 rounded-sm p-6">
                 <div className="flex items-center gap-3 mb-4">
                   <div className="w-8 h-8 rounded-full bg-white/10 flex items-center justify-center text-xs font-bold font-mono">1</div>
-                  <h3 className="font-bold font-mono text-sm uppercase">Sign In With Wallet</h3>
-                </div>
-
-                {authenticated && walletAddress ? (
-                  <div className="flex items-center gap-3 p-3 bg-emerald-500/5 border border-emerald-500/20 rounded-sm">
-                    <CheckCircle size={16} className="text-emerald-500 shrink-0" />
-                    <div>
-                      <p className="text-xs font-mono text-white">{walletAddress}</p>
-                      <p className="text-[10px] text-emerald-500 font-mono">Connected</p>
-                    </div>
-                  </div>
-                ) : (
-                  <button
-                    onClick={login}
-                    disabled={!ready}
-                    className="w-full py-3 bg-white text-black font-bold font-mono text-xs uppercase tracking-widest rounded-sm hover:bg-gray-200 transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
-                  >
-                    <Wallet size={14} /> {!ready ? "Loading..." : "Sign In"}
-                  </button>
-                )}
-              </div>
-
-              {/* Step 2: Enter API Key */}
-              <div className="bg-[#0A0A0A] border border-white/10 rounded-sm p-6">
-                <div className="flex items-center gap-3 mb-4">
-                  <div className="w-8 h-8 rounded-full bg-white/10 flex items-center justify-center text-xs font-bold font-mono">2</div>
                   <h3 className="font-bold font-mono text-sm uppercase">Enter Agent API Key</h3>
                 </div>
                 <p className="text-zinc-500 text-xs font-mono mb-4 leading-relaxed">
@@ -140,6 +134,17 @@ function ManageContent() {
                 </div>
               </div>
 
+              {/* Step 2: Connect Wallet */}
+              <div className="bg-[#0A0A0A] border border-white/10 rounded-sm p-6">
+                <div className="flex items-center gap-3 mb-4">
+                  <div className="w-8 h-8 rounded-full bg-white/10 flex items-center justify-center text-xs font-bold font-mono">2</div>
+                  <h3 className="font-bold font-mono text-sm uppercase">Connect Solana Wallet</h3>
+                </div>
+                <p className="text-zinc-500 text-xs font-mono mb-4 leading-relaxed">
+                  Connect the Solana wallet that will receive USDC payments from clients. Works with Phantom, Solflare, Backpack, and more.
+                </p>
+              </div>
+
               {/* Error */}
               {error && (
                 <div className="flex items-center gap-3 p-3 bg-red-500/5 border border-red-500/20 rounded-sm">
@@ -148,21 +153,21 @@ function ManageContent() {
                 </div>
               )}
 
-              {/* Step 3: Link */}
+              {/* Submit */}
               <button
-                onClick={handleLinkWallet}
-                disabled={!authenticated || !walletAddress || !apiKey || linking}
-                className="w-full py-4 bg-emerald-600 hover:bg-emerald-500 text-white font-bold font-mono text-sm uppercase tracking-widest rounded-sm transition-colors disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                onClick={handleConnectSolanaWallet}
+                disabled={!apiKey || linking}
+                className="w-full py-4 bg-purple-600 hover:bg-purple-500 text-white font-bold font-mono text-sm uppercase tracking-widest rounded-sm transition-colors disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-2"
               >
                 {linking ? (
-                  <><Loader2 size={16} className="animate-spin" /> Linking...</>
+                  <><Loader2 size={16} className="animate-spin" /> Connecting...</>
                 ) : (
-                  <><Link2 size={16} /> Link Wallet to Agent</>
+                  <><Wallet size={16} /> Connect Wallet & Link to Agent</>
                 )}
               </button>
 
               <p className="text-zinc-600 text-[10px] font-mono text-center leading-relaxed">
-                Once linked, the wallet cannot be changed. Make sure you're using the correct wallet.
+                You can change this wallet later from the Agent Dashboard.
               </p>
             </div>
           )}

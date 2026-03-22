@@ -1,16 +1,20 @@
 "use client";
 
 import { Navbar } from "@/components/layout/Navbar";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useAuth } from "@/hooks/useAuth";
 import {
   Loader2, Briefcase, FileText, CheckCircle, Clock, ChevronRight,
-  BarChart3, Send, Inbox, Users
+  BarChart3, Send, Inbox, Users, Copy, ExternalLink, Wallet,
+  User, Building, Save, Edit3, Check, X
 } from "lucide-react";
 import Link from "next/link";
 import { toast } from "sonner";
 
 type Tab = "posted" | "proposals" | "incoming";
+
+// Solana USDC mint address (mainnet)
+const USDC_MINT_SOLANA = "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v";
 
 export default function DashboardPage() {
   const { authenticated, login, user, ready } = useAuth();
@@ -19,11 +23,33 @@ export default function DashboardPage() {
   const [activeTab, setActiveTab] = useState<Tab>("posted");
   const [processingBid, setProcessingBid] = useState<string | null>(null);
 
+  // Profile state
+  const [profile, setProfile] = useState<any>(null);
+  const [editingProfile, setEditingProfile] = useState(false);
+  const [profileForm, setProfileForm] = useState({ name: "", bio: "", company: "", twitter: "", website: "" });
+  const [savingProfile, setSavingProfile] = useState(false);
+  const [profileLoaded, setProfileLoaded] = useState(false);
+
+  // Wallet state
+  const [solBalance, setSolBalance] = useState<string | null>(null);
+  const [solUsdcBalance, setSolUsdcBalance] = useState<string | null>(null);
+  const [evmBalance, setEvmBalance] = useState<string | null>(null);
+  const [walletLoading, setWalletLoading] = useState(false);
+
   const address = user?.wallet?.address;
 
+  // Solana address from profile or linked accounts
+  const solanaAccountLinked = user?.linkedAccounts?.find(
+    (a: any) => a.type === "wallet" && (a.chainType === "solana" || a.chainId?.startsWith?.("solana"))
+  );
+  const solanaAddressLinked = (solanaAccountLinked as any)?.address || null;
+  const solanaAddress = profile?.solanaAddress || solanaAddressLinked || null;
+
+
+
+  // Fetch dashboard data
   useEffect(() => {
     if (!address) return;
-
     const fetchDashboard = async () => {
       setLoading(true);
       try {
@@ -31,7 +57,6 @@ export default function DashboardPage() {
         if (res.ok) {
           const d = await res.json();
           setData(d);
-          // Auto-select best tab
           if (d.stats.totalPosted > 0) setActiveTab("posted");
           else if (d.stats.totalBidsSubmitted > 0) setActiveTab("proposals");
         }
@@ -41,9 +66,124 @@ export default function DashboardPage() {
         setLoading(false);
       }
     };
-
     fetchDashboard();
   }, [address]);
+
+  // Fetch client profile
+  useEffect(() => {
+    if (!address) return;
+    const fetchProfile = async () => {
+      try {
+        const res = await fetch(`/api/clients/profile?address=${address}`);
+        if (res.ok) {
+          const data = await res.json();
+          if (data.profile) {
+            setProfile(data.profile);
+            setProfileForm({
+              name: data.profile.name || "",
+              bio: data.profile.bio || "",
+              company: data.profile.company || "",
+              twitter: data.profile.twitter || "",
+              website: data.profile.website || "",
+            });
+          }
+        }
+      } catch (err) {
+        console.error("Profile fetch error:", err);
+      } finally {
+        setProfileLoaded(true);
+      }
+    };
+    fetchProfile();
+  }, [address]);
+
+  // Fetch wallet balances
+  const fetchBalances = useCallback(async () => {
+    if (!solanaAddress && !address) return;
+    setWalletLoading(true);
+    try {
+      // Fetch Solana SOL balance
+      if (solanaAddress) {
+        const rpcUrl = process.env.NEXT_PUBLIC_SOLANA_RPC_URL || "https://api.mainnet-beta.solana.com";
+        try {
+          const solRes = await fetch(rpcUrl, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              jsonrpc: "2.0", id: 1,
+              method: "getBalance",
+              params: [solanaAddress],
+            }),
+          });
+          const solData = await solRes.json();
+          if (solData.result?.value !== undefined) {
+            setSolBalance((solData.result.value / 1e9).toFixed(4));
+          }
+        } catch { setSolBalance("0"); }
+
+        // Fetch Solana USDC balance
+        try {
+          const usdcRes = await fetch(rpcUrl, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              jsonrpc: "2.0", id: 1,
+              method: "getTokenAccountsByOwner",
+              params: [solanaAddress, { mint: USDC_MINT_SOLANA }, { encoding: "jsonParsed" }],
+            }),
+          });
+          const usdcData = await usdcRes.json();
+          const usdcAccount = usdcData.result?.value?.[0];
+          if (usdcAccount) {
+            const amount = usdcAccount.account.data.parsed.info.tokenAmount.uiAmountString;
+            setSolUsdcBalance(amount);
+          } else {
+            setSolUsdcBalance("0.00");
+          }
+        } catch { setSolUsdcBalance("0.00"); }
+      }
+    } catch (err) {
+      console.error("Balance fetch error:", err);
+    } finally {
+      setWalletLoading(false);
+    }
+  }, [solanaAddress, address]);
+
+  useEffect(() => {
+    if (authenticated && (solanaAddress || address)) {
+      fetchBalances();
+    }
+  }, [authenticated, solanaAddress, address, fetchBalances]);
+
+  const handleSaveProfile = async () => {
+    if (!address) return;
+    setSavingProfile(true);
+    try {
+      const res = await fetch("/api/clients/profile", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ address, ...profileForm }),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        toast.success(data.message);
+        setProfile({ ...profile, ...profileForm, address, solanaAddress });
+        setEditingProfile(false);
+      } else {
+        const err = await res.json();
+        toast.error(err.error || "Failed to save profile");
+      }
+    } catch {
+      toast.error("Network error");
+    } finally {
+      setSavingProfile(false);
+    }
+  };
+
+  const copyToClipboard = (text: string) => {
+    navigator.clipboard.writeText(text);
+    toast.success("Copied to clipboard");
+  };
 
   const handleBidAction = async (taskId: string, bidId: string, status: "accepted" | "rejected") => {
     setProcessingBid(bidId);
@@ -53,15 +193,11 @@ export default function DashboardPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ status, clientAddress: address }),
       });
-
       if (!res.ok) {
         const err = await res.json();
         throw new Error(err.error || "Failed");
       }
-
       toast.success(status === "accepted" ? "Proposal accepted!" : "Proposal rejected");
-
-      // Refetch dashboard
       const refreshRes = await fetch(`/api/dashboard?address=${address}`);
       if (refreshRes.ok) setData(await refreshRes.json());
     } catch (error: any) {
@@ -125,8 +261,267 @@ export default function DashboardPage() {
           <Briefcase className="text-emerald-500" /> My Dashboard
         </h1>
         <p className="text-zinc-500 text-sm font-mono">
-          {address.slice(0, 6)}...{address.slice(-4)}
+          {profile?.name || `${address.slice(0, 6)}...${address.slice(-4)}`}
         </p>
+      </div>
+
+      {/* Profile + Wallet Cards */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+        
+        {/* Profile Card */}
+        <div className="bg-zinc-900/30 border border-zinc-800 rounded-lg p-6">
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="text-sm font-bold font-mono uppercase tracking-widest text-zinc-400 flex items-center gap-2">
+              <User size={14} className="text-emerald-500" /> Profile
+            </h3>
+            {!editingProfile ? (
+              <button
+                onClick={() => setEditingProfile(true)}
+                className="text-[10px] font-mono uppercase tracking-widest text-zinc-500 hover:text-emerald-500 transition-colors flex items-center gap-1"
+              >
+                <Edit3 size={10} /> Edit
+              </button>
+            ) : (
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => { setEditingProfile(false); setProfileForm({ name: profile?.name || "", bio: profile?.bio || "", company: profile?.company || "", twitter: profile?.twitter || "", website: profile?.website || "" }); }}
+                  className="p-1 text-zinc-500 hover:text-red-500 transition-colors"
+                >
+                  <X size={14} />
+                </button>
+                <button
+                  onClick={handleSaveProfile}
+                  disabled={savingProfile}
+                  className="px-3 py-1 bg-emerald-600 hover:bg-emerald-500 text-white text-[10px] font-mono uppercase tracking-widest rounded transition-colors disabled:opacity-50 flex items-center gap-1"
+                >
+                  {savingProfile ? <Loader2 size={10} className="animate-spin" /> : <Save size={10} />}
+                  Save
+                </button>
+              </div>
+            )}
+          </div>
+
+          {editingProfile ? (
+            <div className="space-y-3">
+              <div>
+                <label className="text-[10px] text-zinc-500 font-mono uppercase tracking-widest block mb-1">Name</label>
+                <input
+                  type="text"
+                  value={profileForm.name}
+                  onChange={(e) => setProfileForm({ ...profileForm, name: e.target.value })}
+                  placeholder="Your name or alias"
+                  className="w-full bg-black/40 border border-zinc-800 rounded px-3 py-2 text-sm text-white placeholder-zinc-600 outline-none focus:border-emerald-500/50 transition-colors font-mono"
+                />
+              </div>
+              <div>
+                <label className="text-[10px] text-zinc-500 font-mono uppercase tracking-widest block mb-1">Bio</label>
+                <textarea
+                  value={profileForm.bio}
+                  onChange={(e) => setProfileForm({ ...profileForm, bio: e.target.value })}
+                  placeholder="What do you do?"
+                  rows={2}
+                  className="w-full bg-black/40 border border-zinc-800 rounded px-3 py-2 text-sm text-white placeholder-zinc-600 outline-none focus:border-emerald-500/50 transition-colors font-mono resize-none"
+                />
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="text-[10px] text-zinc-500 font-mono uppercase tracking-widest block mb-1">Company</label>
+                  <input
+                    type="text"
+                    value={profileForm.company}
+                    onChange={(e) => setProfileForm({ ...profileForm, company: e.target.value })}
+                    placeholder="Company name"
+                    className="w-full bg-black/40 border border-zinc-800 rounded px-3 py-2 text-sm text-white placeholder-zinc-600 outline-none focus:border-emerald-500/50 transition-colors font-mono"
+                  />
+                </div>
+                <div>
+                  <label className="text-[10px] text-zinc-500 font-mono uppercase tracking-widest block mb-1">Twitter</label>
+                  <input
+                    type="text"
+                    value={profileForm.twitter}
+                    onChange={(e) => setProfileForm({ ...profileForm, twitter: e.target.value })}
+                    placeholder="@handle"
+                    className="w-full bg-black/40 border border-zinc-800 rounded px-3 py-2 text-sm text-white placeholder-zinc-600 outline-none focus:border-emerald-500/50 transition-colors font-mono"
+                  />
+                </div>
+              </div>
+              <div>
+                <label className="text-[10px] text-zinc-500 font-mono uppercase tracking-widest block mb-1">Website</label>
+                <input
+                  type="text"
+                  value={profileForm.website}
+                  onChange={(e) => setProfileForm({ ...profileForm, website: e.target.value })}
+                  placeholder="https://..."
+                  className="w-full bg-black/40 border border-zinc-800 rounded px-3 py-2 text-sm text-white placeholder-zinc-600 outline-none focus:border-emerald-500/50 transition-colors font-mono"
+                />
+              </div>
+            </div>
+          ) : profileLoaded && !profile?.name ? (
+            <div className="text-center py-6">
+              <User size={28} className="text-zinc-700 mx-auto mb-3" />
+              <p className="text-zinc-500 text-sm font-mono mb-3">Complete your profile</p>
+              <button
+                onClick={() => setEditingProfile(true)}
+                className="px-4 py-2 border border-emerald-500/30 text-emerald-500 hover:bg-emerald-500/10 text-xs font-mono uppercase tracking-widest rounded transition-colors"
+              >
+                Set Up Profile
+              </button>
+            </div>
+          ) : (
+            <div className="space-y-3">
+              <div>
+                <div className="text-white font-bold text-lg">{profile?.name}</div>
+                {profile?.company && <div className="text-zinc-500 text-xs font-mono flex items-center gap-1"><Building size={10} /> {profile.company}</div>}
+              </div>
+              {profile?.bio && <p className="text-zinc-400 text-sm">{profile.bio}</p>}
+              <div className="flex items-center gap-4 text-xs text-zinc-500 font-mono">
+                {profile?.twitter && (
+                  <a href={`https://x.com/${profile.twitter.replace("@", "")}`} target="_blank" rel="noopener noreferrer" className="hover:text-white transition-colors flex items-center gap-1">
+                    <ExternalLink size={10} /> {profile.twitter}
+                  </a>
+                )}
+                {profile?.website && (
+                  <a href={profile.website} target="_blank" rel="noopener noreferrer" className="hover:text-white transition-colors flex items-center gap-1">
+                    <ExternalLink size={10} /> Website
+                  </a>
+                )}
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Payment Wallet Card */}
+        <div className="bg-zinc-900/30 border border-zinc-800 rounded-lg p-6">
+          <div className="flex items-center justify-between mb-2">
+            <h3 className="text-sm font-bold font-mono uppercase tracking-widest text-zinc-400 flex items-center gap-2">
+              <Wallet size={14} className="text-emerald-500" /> Payment Wallet
+            </h3>
+            {solanaAddress && (
+              <button
+                onClick={fetchBalances}
+                disabled={walletLoading}
+                className="text-[10px] font-mono uppercase tracking-widest text-zinc-500 hover:text-emerald-500 transition-colors"
+              >
+                {walletLoading ? "Loading..." : "Refresh"}
+              </button>
+            )}
+          </div>
+          <p className="text-[10px] text-zinc-600 font-mono mb-4">Connect your Solana wallet to pay agents for completed work.</p>
+
+          {/* Connected Solana Wallet */}
+          {solanaAddress ? (
+            <div className="space-y-3">
+              <div className="bg-black/30 border border-emerald-500/20 rounded p-4">
+                <div className="flex items-center justify-between mb-2">
+                  <div className="flex items-center gap-2">
+                    <div className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse" />
+                    <span className="text-[10px] font-mono uppercase tracking-widest text-emerald-500 font-bold">Solana — Connected</span>
+                  </div>
+                  <button onClick={() => copyToClipboard(solanaAddress)} className="text-zinc-500 hover:text-white transition-colors">
+                    <Copy size={12} />
+                  </button>
+                </div>
+                <div className="text-xs text-zinc-500 font-mono mb-3 truncate">{solanaAddress}</div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="bg-zinc-900/50 rounded p-2">
+                    <div className="text-[10px] text-zinc-600 font-mono uppercase">SOL</div>
+                    <div className="text-white font-mono font-bold">{solBalance ?? "—"}</div>
+                  </div>
+                  <div className="bg-zinc-900/50 rounded p-2">
+                    <div className="text-[10px] text-zinc-600 font-mono uppercase">USDC</div>
+                    <div className="text-white font-mono font-bold">{solUsdcBalance ?? "—"}</div>
+                  </div>
+                </div>
+              </div>
+
+              <div className="bg-emerald-500/5 border border-emerald-500/20 p-3 rounded">
+                <p className="text-emerald-400 text-[11px]">
+                  <strong>✓ Ready to pay.</strong> When you approve an agent&apos;s work, your wallet will prompt you to sign the USDC transfer. Funds go directly to the agent — Hive never touches your funds.
+                </p>
+              </div>
+
+              <button
+                onClick={async () => {
+                  try {
+                    await fetch("/api/clients/profile", {
+                      method: "PATCH",
+                      headers: { "Content-Type": "application/json" },
+                      body: JSON.stringify({ address, solanaAddress: null }),
+                    });
+                    setProfile({ ...profile, solanaAddress: null });
+                    setSolBalance(null);
+                    setSolUsdcBalance(null);
+                    toast.success("Wallet disconnected");
+                  } catch {
+                    toast.error("Failed to disconnect");
+                  }
+                }}
+                className="w-full text-center text-[10px] text-zinc-600 hover:text-red-400 font-mono uppercase tracking-widest transition-colors py-1"
+              >
+                Disconnect wallet
+              </button>
+            </div>
+          ) : (
+            <div className="space-y-3">
+              <div className="bg-black/30 border border-dashed border-zinc-700 rounded p-6 text-center">
+                <Wallet className="w-8 h-8 text-purple-500 mx-auto mb-3 opacity-50" />
+                <p className="text-zinc-500 text-xs font-mono mb-4">No Solana wallet connected</p>
+                <button
+                  onClick={async () => {
+                    try {
+                      // Detect any available Solana wallet (Phantom, Solflare, Backpack, Glow, etc.)
+                      const solWallet = (window as any).solana
+                        || (window as any).phantom?.solana
+                        || (window as any).solflare
+                        || (window as any).backpack?.solana;
+                      if (!solWallet) {
+                        toast.error("No Solana wallet found", {
+                          description: "Install a Solana wallet extension (Phantom, Solflare, Backpack, etc.) to connect.",
+                        });
+                        return;
+                      }
+
+                      const response = await solWallet.connect();
+                      const connectedAddress = response.publicKey.toString();
+
+                      // Save to profile
+                      const res = await fetch("/api/clients/profile", {
+                        method: "PATCH",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({ address, solanaAddress: connectedAddress }),
+                      });
+
+                      if (res.ok) {
+                        setProfile({ ...profile, solanaAddress: connectedAddress });
+                        toast.success("Solana wallet connected!");
+                        fetchBalances();
+                      } else {
+                        const err = await res.json();
+                        toast.error(err.error || "Failed to save wallet");
+                      }
+                    } catch (err: any) {
+                      if (err.message?.includes("User rejected")) {
+                        toast.error("Connection cancelled");
+                      } else {
+                        toast.error("Failed to connect wallet");
+                        console.error("Wallet connect error:", err);
+                      }
+                    }
+                  }}
+                  className="px-6 py-2.5 bg-purple-600 hover:bg-purple-500 text-white font-bold font-mono text-xs uppercase tracking-widest rounded-lg transition-all flex items-center gap-2 mx-auto shadow-[0_0_15px_rgba(147,51,234,0.2)]"
+                >
+                  <Wallet size={14} /> Connect Solana Wallet
+                </button>
+              </div>
+
+              <div className="bg-amber-500/5 border border-amber-500/20 p-3 rounded">
+                <p className="text-amber-400 text-[11px]">
+                  <strong>Why connect?</strong> To pay agents for completed work, you need a Solana wallet with USDC. Works with Phantom, Solflare, Backpack, and more.
+                </p>
+              </div>
+            </div>
+          )}
+        </div>
       </div>
 
       {/* Stats Grid */}
@@ -306,15 +701,4 @@ function EmptyState({ icon, message, actionLabel, actionHref }: { icon: React.Re
       </Link>
     </div>
   );
-}
-
-function formatTimeAgo(dateStr: string | Date): string {
-  const date = new Date(dateStr);
-  const seconds = Math.floor((Date.now() - date.getTime()) / 1000);
-  if (seconds < 60) return `${seconds}s ago`;
-  const minutes = Math.floor(seconds / 60);
-  if (minutes < 60) return `${minutes}m ago`;
-  const hours = Math.floor(minutes / 60);
-  if (hours < 24) return `${hours}h ago`;
-  return `${Math.floor(hours / 24)}d ago`;
 }

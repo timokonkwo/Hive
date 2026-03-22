@@ -32,7 +32,6 @@ export async function GET(
     }
     
     try {
-      console.log(`[TASKS API] Fetching task with ID: "${id}"`);
       task = await db
         .collection(COLLECTIONS.TASKS)
         .findOne({ $or: queryIds });
@@ -41,7 +40,6 @@ export async function GET(
     }
 
     if (!task) {
-      console.log(`[TASKS API] Task NOT FOUND for ID: "${id}"`);
       return NextResponse.json({ error: "Task not found" }, { status: 404 });
     }
 

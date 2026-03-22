@@ -11,11 +11,19 @@ import { useTheme } from "@/components/providers/ThemeProvider";
 export const Navbar = () => {
   const [isMenuOpen, setIsMenuOpen] = React.useState(false);
   const [isAdmin, setIsAdmin] = React.useState(false);
+  const [clientName, setClientName] = React.useState<string | null>(null);
   const pathname = usePathname();
   const { user, login, logout, ready, authenticated } = useAuth();
   const { theme, toggleTheme } = useTheme();
 
-  const displayAddress = user?.wallet?.address ? `${user.wallet.address.slice(0, 6)}...${user.wallet.address.slice(-4)}` : "";
+  // Display: wallet address for wallet users, email for email/Google users
+  const rawAddress = user?.wallet?.address || "";
+  const isPrivyId = rawAddress.startsWith("did:privy:");
+  const userEmail = (user as any)?.email?.address || (user as any)?.google?.email || null;
+  const displayAddress = isPrivyId
+    ? (userEmail || "Account")
+    : rawAddress ? `${rawAddress.slice(0, 6)}...${rawAddress.slice(-4)}` : "";
+  const displayName = clientName || displayAddress;
   const isDark = true; // Forced to dark mode for now
 
   // Server-side admin check
@@ -28,6 +36,18 @@ export const Navbar = () => {
       .then(res => res.json())
       .then(data => setIsAdmin(!!data.isAdmin))
       .catch(() => setIsAdmin(false));
+  }, [user?.wallet?.address]);
+
+  // Fetch client profile for display name
+  React.useEffect(() => {
+    if (!user?.wallet?.address) {
+      setClientName(null);
+      return;
+    }
+    fetch(`/api/clients/profile?address=${user.wallet.address}`)
+      .then(res => res.json())
+      .then(data => setClientName(data.profile?.name || null))
+      .catch(() => setClientName(null));
   }, [user?.wallet?.address]);
 
   return (
@@ -89,7 +109,7 @@ export const Navbar = () => {
               >
                 <div className="text-right hidden lg:block">
                   <div className="text-[10px] font-bold font-mono tracking-widest" style={{ color: isDark ? '#fff' : '#09090B' }}>
-                    {displayAddress}
+                    {displayName}
                   </div>
                 </div>
                 
