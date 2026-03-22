@@ -22,6 +22,12 @@ export default function TaskDetailsPage({ params }: { params: Promise<{ taskId: 
   const [completingTask, setCompletingTask] = useState(false);
   const [isRegisteredAgent, setIsRegisteredAgent] = useState<boolean | null>(null);
 
+  // Payment flow state
+  const [showPaymentModal, setShowPaymentModal] = useState(false);
+  const [paymentDetails, setPaymentDetails] = useState<any>(null);
+  const [paymentStep, setPaymentStep] = useState<'confirm' | 'signing' | 'verifying' | 'done' | 'error'>('confirm');
+  const [paymentError, setPaymentError] = useState<string | null>(null);
+
   const userAddress = user?.wallet?.address?.toLowerCase();
   const isTaskPoster = task?.clientAddress?.toLowerCase() === userAddress;
 
@@ -122,6 +128,53 @@ export default function TaskDetailsPage({ params }: { params: Promise<{ taskId: 
   };
 
   const handleCompleteTask = async () => {
+    const budgetAmount = task?.budgetAmount || 0;
+
+    // If there's a budget, show payment modal first
+    if (budgetAmount > 0) {
+      setPaymentStep('confirm');
+      setPaymentError(null);
+      setCompletingTask(true);
+
+      try {
+        // Preflight: check client has a Solana address set
+        const profileRes = await fetch(`/api/clients/profile?address=${user?.wallet?.address}`);
+        const profileData = await profileRes.json();
+        const clientSolanaAddress = profileData.profile?.solanaAddress;
+
+        if (!clientSolanaAddress) {
+          setPaymentError('You need to set your Solana wallet address in your dashboard before making payments.');
+          setPaymentStep('error');
+          setShowPaymentModal(true);
+          setCompletingTask(false);
+          return;
+        }
+
+        // SECURITY: Show preview from existing task data only (no /payment/build call).
+        // The actual transaction is built only once, inside handleConfirmPayment,
+        // right before signing. This eliminates the TOCTOU window where agent
+        // address or amount could change between preview and actual signing.
+        const acceptedBid = bids.find((b: any) => b.status === 'accepted' || b.status === 'WorkSubmitted');
+        setPaymentDetails({
+          amount: budgetAmount,
+          token: 'USDC',
+          chain: 'solana',
+          fromAddress: clientSolanaAddress,
+          toName: acceptedBid?.agentName || task?.assignedAgentName || 'Agent',
+          // toAddress is fetched server-side during handleConfirmPayment
+        });
+        setShowPaymentModal(true);
+        setCompletingTask(false);
+      } catch (error: any) {
+        setPaymentError(error.message || 'An error occurred.');
+        setPaymentStep('error');
+        setShowPaymentModal(true);
+        setCompletingTask(false);
+      }
+      return;
+    }
+
+    // No budget — just complete without payment
     setCompletingTask(true);
     try {
       const res = await fetch(`/api/tasks/${taskId}/complete`, {
@@ -141,6 +194,102 @@ export default function TaskDetailsPage({ params }: { params: Promise<{ taskId: 
       toast.error("Error", { description: error.message });
     } finally {
       setCompletingTask(false);
+    }
+  };
+
+  /**
+   * Called when client confirms payment in the modal.
+   * Opens the Solana wallet for signing.
+   */
+  const handleConfirmPayment = async () => {
+    setPaymentStep('signing');
+    setPaymentError(null);
+
+    try {
+      // Get client's Solana address
+      const profileRes = await fetch(`/api/clients/profile?address=${user?.wallet?.address}`);
+      const profileData = await profileRes.json();
+      const clientSolanaAddress = profileData.profile?.solanaAddress;
+
+      // Build the transaction
+      const buildRes = await fetch(`/api/tasks/${taskId}/payment/build`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          clientAddress: user?.wallet?.address,
+          clientSolanaAddress,
+        }),
+      });
+
+      if (!buildRes.ok) {
+        const err = await buildRes.json();
+        throw new Error(err.error);
+      }
+
+      const buildData = await buildRes.json();
+
+      // Prompt user to sign the transaction via their Solana wallet
+      // Detect any available Solana wallet (Phantom, Solflare, Backpack, Glow, etc.)
+      const solanaWallet = (window as any).solana
+        || (window as any).phantom?.solana
+        || (window as any).solflare
+        || (window as any).backpack?.solana;
+
+      if (!solanaWallet) {
+        throw new Error('No Solana wallet found. Please install a Solana wallet extension (Phantom, Solflare, Backpack, etc.).');
+      }
+
+      // Ensure wallet is connected
+      if (!solanaWallet.isConnected) {
+        await solanaWallet.connect();
+      }
+
+      // Deserialize and sign the transaction
+      const { Transaction } = await import('@solana/web3.js');
+      const txBuffer = Buffer.from(buildData.transaction, 'base64');
+      const transaction = Transaction.from(txBuffer);
+
+      const signedTx = await solanaWallet.signTransaction(transaction);
+
+      // Send the signed transaction
+      const { Connection } = await import('@solana/web3.js');
+      const connection = new Connection(
+        process.env.NEXT_PUBLIC_SOLANA_RPC_URL || 'https://api.mainnet-beta.solana.com',
+        'confirmed'
+      );
+
+      setPaymentStep('verifying');
+
+      const txSignature = await connection.sendRawTransaction(signedTx.serialize());
+      await connection.confirmTransaction(txSignature, 'confirmed');
+
+      // Submit the signature for backend verification + task completion
+      const completeRes = await fetch(`/api/tasks/${taskId}/complete`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          clientAddress: user?.wallet?.address,
+          txSignature,
+        }),
+      });
+
+      if (!completeRes.ok) {
+        const err = await completeRes.json();
+        throw new Error(err.error);
+      }
+
+      setPaymentStep('done');
+      setTask((prev: any) => prev ? { ...prev, status: 'Completed' } : prev);
+      toast.success('Payment Sent!', {
+        description: `$${paymentDetails?.amount} USDC paid to ${paymentDetails?.toName}. Task completed.`,
+      });
+
+      // Close modal after a moment
+      setTimeout(() => setShowPaymentModal(false), 2000);
+    } catch (error: any) {
+      console.error('[Payment] Error:', error);
+      setPaymentError(error.message || 'Payment failed.');
+      setPaymentStep('error');
     }
   };
 
@@ -468,9 +617,20 @@ export default function TaskDetailsPage({ params }: { params: Promise<{ taskId: 
                                         disabled={completingTask}
                                         className="px-6 py-2.5 bg-green-600 hover:bg-green-500 text-white font-bold font-mono text-xs uppercase tracking-widest rounded-lg flex items-center gap-2 shadow-[0_0_15px_rgba(34,197,94,0.3)] transition-all disabled:opacity-50"
                                     >
-                                        {completingTask ? <Loader2 size={14} className="animate-spin" /> : <BadgeCheck size={14} />}
-                                        Approve & Complete Task
+                                        {completingTask ? <Loader2 size={14} className="animate-spin" /> : <Coins size={14} />}
+                                        {task.budgetAmount > 0 ? `Approve & Pay $${task.budgetAmount} USDC` : 'Approve & Complete Task'}
                                     </button>
+                                )}
+
+                                {task.status === 'Completed' && task.paymentTxSignature && (
+                                    <a
+                                        href={`https://solscan.io/tx/${task.paymentTxSignature}`}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className="text-xs text-emerald-500 font-mono flex items-center gap-1 hover:text-emerald-400 transition-colors"
+                                    >
+                                        <ExternalLink size={10} /> View Payment on Solscan
+                                    </a>
                                 )}
                             </div>
                         </div>
@@ -649,6 +809,105 @@ export default function TaskDetailsPage({ params }: { params: Promise<{ taskId: 
             </aside>
         </div>
       </main>
+
+      {/* Payment Modal */}
+      {showPaymentModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm">
+          <div className="bg-zinc-900 border border-zinc-700 rounded-xl p-8 max-w-md w-full mx-4 shadow-2xl">
+            
+            {paymentStep === 'confirm' && (
+              <>
+                <h3 className="text-lg font-bold font-mono uppercase tracking-widest text-white mb-6 flex items-center gap-2">
+                  <Coins className="text-emerald-500" size={20} /> Confirm Payment
+                </h3>
+                <div className="space-y-4 mb-8">
+                  <div className="flex justify-between items-center py-3 border-b border-zinc-800">
+                    <span className="text-zinc-400 text-sm font-mono">Amount</span>
+                    <span className="text-white font-bold text-xl font-mono">${paymentDetails?.amount} USDC</span>
+                  </div>
+                  <div className="flex justify-between items-center py-3 border-b border-zinc-800">
+                    <span className="text-zinc-400 text-sm font-mono">To</span>
+                    <span className="text-emerald-400 font-bold font-mono">{paymentDetails?.toName}</span>
+                  </div>
+                  <div className="flex justify-between items-center py-3 border-b border-zinc-800">
+                    <span className="text-zinc-400 text-sm font-mono">Chain</span>
+                    <span className="text-purple-400 font-mono text-sm">Solana (USDC-SPL)</span>
+                  </div>
+                  <div className="py-3">
+                    <span className="text-zinc-400 text-sm font-mono block mb-1">Recipient Wallet</span>
+                    <span className="text-zinc-500 font-mono text-xs break-all">{paymentDetails?.toAddress}</span>
+                  </div>
+                </div>
+                <div className="bg-amber-500/10 border border-amber-500/20 rounded p-3 mb-6">
+                  <p className="text-amber-400 text-xs">
+                    <strong>Note:</strong> This will prompt your Solana wallet to sign a USDC transfer. The funds go directly to the agent's wallet — Hive never touches your funds.
+                  </p>
+                </div>
+                <div className="flex gap-3">
+                  <button
+                    onClick={() => setShowPaymentModal(false)}
+                    className="flex-1 px-4 py-3 border border-zinc-700 text-zinc-400 hover:text-white rounded-lg font-mono text-xs uppercase tracking-widest transition-colors"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={handleConfirmPayment}
+                    className="flex-1 px-4 py-3 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg font-bold font-mono text-xs uppercase tracking-widest transition-colors flex items-center justify-center gap-2"
+                  >
+                    <Coins size={14} /> Pay ${paymentDetails?.amount}
+                  </button>
+                </div>
+              </>
+            )}
+
+            {paymentStep === 'signing' && (
+              <div className="text-center py-8">
+                <Loader2 className="w-12 h-12 text-emerald-500 animate-spin mx-auto mb-4" />
+                <h3 className="text-lg font-bold text-white font-mono mb-2">Waiting for Wallet</h3>
+                <p className="text-zinc-400 text-sm">Please approve the transaction in your Solana wallet...</p>
+              </div>
+            )}
+
+            {paymentStep === 'verifying' && (
+              <div className="text-center py-8">
+                <Loader2 className="w-12 h-12 text-blue-500 animate-spin mx-auto mb-4" />
+                <h3 className="text-lg font-bold text-white font-mono mb-2">Verifying Payment</h3>
+                <p className="text-zinc-400 text-sm">Confirming transaction on Solana...</p>
+              </div>
+            )}
+
+            {paymentStep === 'done' && (
+              <div className="text-center py-8">
+                <CheckCircle className="w-12 h-12 text-emerald-500 mx-auto mb-4" />
+                <h3 className="text-lg font-bold text-white font-mono mb-2">Payment Complete!</h3>
+                <p className="text-zinc-400 text-sm">${paymentDetails?.amount} USDC sent to {paymentDetails?.toName}</p>
+              </div>
+            )}
+
+            {paymentStep === 'error' && (
+              <div className="py-6">
+                <XCircle className="w-12 h-12 text-red-500 mx-auto mb-4" />
+                <h3 className="text-lg font-bold text-white font-mono mb-2 text-center">Payment Failed</h3>
+                <p className="text-red-400 text-sm text-center mb-6">{paymentError}</p>
+                <div className="flex gap-3">
+                  <button
+                    onClick={() => setShowPaymentModal(false)}
+                    className="flex-1 px-4 py-3 border border-zinc-700 text-zinc-400 hover:text-white rounded-lg font-mono text-xs uppercase tracking-widest transition-colors"
+                  >
+                    Close
+                  </button>
+                  <button
+                    onClick={() => { setPaymentStep('confirm'); setPaymentError(null); }}
+                    className="flex-1 px-4 py-3 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg font-bold font-mono text-xs uppercase tracking-widest transition-colors"
+                  >
+                    Try Again
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 }

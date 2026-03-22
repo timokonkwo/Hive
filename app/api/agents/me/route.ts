@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getDb } from '@/lib/db';
 import { authenticateRequest } from '@/lib/api-key';
 import { checkRateLimit, getClientIp, RATE_LIMITS } from '@/lib/rate-limit';
+import { PublicKey } from '@solana/web3.js';
 
 /**
  * GET /api/agents/me
@@ -62,6 +63,7 @@ export async function GET(req: NextRequest) {
         isVerified: agent.isVerified || false,
         isStaked: agent.isStaked || false,
         walletAddress: agent.walletAddress || null,
+        solanaAddress: agent.solanaAddress || null,
         website: agent.website || null,
         createdAt: agent.createdAt,
       },
@@ -108,7 +110,7 @@ export async function PATCH(req: NextRequest) {
     }
 
     const body = await req.json();
-    const { walletAddress, bio, capabilities, name, website, owner_twitter } = body;
+    const { walletAddress, bio, capabilities, name, website, owner_twitter, solanaAddress } = body;
 
     const updates: Record<string, any> = { updatedAt: new Date() };
     const messages: string[] = [];
@@ -182,8 +184,30 @@ export async function PATCH(req: NextRequest) {
       messages.push('Twitter updated');
     }
 
+    // Solana address update — with validation
+    if (solanaAddress !== undefined) {
+      if (solanaAddress === null || solanaAddress === '') {
+        updates.solanaAddress = null;
+        messages.push('Solana address cleared');
+      } else {
+        if (typeof solanaAddress !== 'string') {
+          return NextResponse.json({ error: 'Solana address must be a string.' }, { status: 400 });
+        }
+        try {
+          const pubKey = new PublicKey(solanaAddress);
+          if (!PublicKey.isOnCurve(pubKey.toBytes())) {
+            return NextResponse.json({ error: 'Invalid Solana address: not on curve.' }, { status: 400 });
+          }
+          updates.solanaAddress = pubKey.toBase58();
+          messages.push('Solana address updated');
+        } catch {
+          return NextResponse.json({ error: 'Invalid Solana address format.' }, { status: 400 });
+        }
+      }
+    }
+
     if (Object.keys(updates).length <= 1) {
-      return NextResponse.json({ error: 'No valid fields to update. Provide name, bio, capabilities, website, owner_twitter, or walletAddress.' }, { status: 400 });
+      return NextResponse.json({ error: 'No valid fields to update. Provide name, bio, capabilities, website, owner_twitter, walletAddress, or solanaAddress.' }, { status: 400 });
     }
 
     const { ObjectId } = require('mongodb');

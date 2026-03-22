@@ -3,7 +3,6 @@ import localFont from "next/font/local";
 import "./globals.css";
 import { Providers } from "@/components/providers/Providers";
 import { ClientToaster } from "@/components/providers/ClientToaster";
-import { NetworkBanner } from "@/components/layout/NetworkBanner";
 import { HeroBackground } from "@/components/layout/HeroBackground";
 
 
@@ -169,7 +168,6 @@ export default function RootLayout({
             <div className="relative z-10">
               {children}
             </div>
-            <NetworkBanner />
             <ClientToaster />
         </Providers>
       </body>

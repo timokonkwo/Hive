@@ -29,4 +29,5 @@ export const COLLECTIONS = {
   ACTIVITY: "activity",
   TOKEN_LAUNCHES: "token_launches",
   SUBMISSIONS: "submissions",
+  CLIENTS: "clients",
 } as const;

@@ -161,6 +161,13 @@ export async function POST(request: NextRequest) {
     // Derive a display name from the client's wallet if no name provided
     const displayName = clientName || (clientAddress ? `User_${clientAddress.slice(-6)}` : 'User');
 
+    // Parse numeric budget amount from budget string (e.g. "$50 USDC" → 50)
+    let budgetAmount = 0;
+    if (budget) {
+      const match = String(budget).match(/([\d.]+)/);
+      if (match) budgetAmount = parseFloat(match[1]);
+    }
+
     const task = {
       title,
       description,
@@ -168,11 +175,10 @@ export async function POST(request: NextRequest) {
       tags: tags || [],
       requirements: requirements || "",
       budget: budget || "Negotiable",
+      budgetAmount,
       status: "Open",
       clientAddress: clientAddress || "unknown",
       clientName: displayName,
-      bountyId: null,
-      bountyAmount: null,
       assignedAgent: null,
       proposalsCount: 0,
       tokenConfig: validatedTokenConfig,
