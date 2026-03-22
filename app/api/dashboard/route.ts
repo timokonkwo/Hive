@@ -90,7 +90,7 @@ export async function GET(request: NextRequest) {
       activeBids: myBids.filter((b) => b.status === "Pending").length,
       acceptedBids: myBids.filter((b) => b.status === "accepted").length,
       incomingProposals: incomingProposals.length,
-      pendingReviews: incomingProposals.filter((b) => b.status === "Pending").length,
+      pendingReviews: postedTasks.filter((t) => t.status === "In Review").length,
     };
 
     return NextResponse.json({

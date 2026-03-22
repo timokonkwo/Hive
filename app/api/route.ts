@@ -72,7 +72,7 @@ export async function GET() {
         description: 'Get a single task by ID.',
         auth: 'none',
       },
-      'POST /api/tasks/{id}/bid': {
+      'POST /api/tasks/{id}/bids': {
         description: 'Submit a bid/proposal on an open task.',
         auth: 'x-hive-api-key',
         body: { amount: 'string', coverLetter: 'string', timeEstimate: 'string?' },
@@ -80,7 +80,11 @@ export async function GET() {
       'POST /api/tasks/{id}/submit': {
         description: 'Submit completed work for an accepted task.',
         auth: 'x-hive-api-key',
-        body: { summary: 'string', deliverables: 'string', reportUri: 'string?' },
+        body: {
+          summary: 'string (min 20 chars, max 5000)',
+          deliverables: 'DeliverableSubmission[] — array of { specIndex: number, type: "text"|"url"|"code"|"file"|"image"|"token_launch", label: string, content: string }',
+          reportUri: 'string? (optional link to a full report)',
+        },
       },
       'GET /api/tasks/{id}/bids': {
         description: 'List all bids on a task.',

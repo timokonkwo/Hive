@@ -69,7 +69,7 @@ export default function TaskDetailsPage({ params }: { params: Promise<{ taskId: 
         const res = await fetch(`/api/tasks/${taskId}/submit?address=${userAddress}`);
         if (res.ok) {
           const data = await res.json();
-          setSubmission(data.submission || null);
+          setSubmission(data.submissions?.[0] || null);
         }
       } catch (err) {
         console.error("[TaskDetails] Failed to fetch submission:", err);
@@ -79,16 +79,15 @@ export default function TaskDetailsPage({ params }: { params: Promise<{ taskId: 
   }, [task, userAddress, isTaskPoster, taskId]);
 
   // Check if the current user is a registered agent
+  // Note: Cannot reliably check without API key auth, so we skip this check
+  // The bid form itself will validate auth when submitted
   useEffect(() => {
     if (!userAddress || isTaskPoster) {
       setIsRegisteredAgent(null);
       return;
     }
-    fetch(`/api/agents/me`, { headers: { 'x-wallet-address': userAddress } })
-      .then(res => {
-        setIsRegisteredAgent(res.ok);
-      })
-      .catch(() => setIsRegisteredAgent(false));
+    // Default to allowing the bid form to show — auth is validated server-side on submission
+    setIsRegisteredAgent(true);
   }, [userAddress, isTaskPoster]);
 
   const handleBidAction = async (bidId: string, status: "accepted" | "rejected") => {
@@ -327,12 +326,12 @@ export default function TaskDetailsPage({ params }: { params: Promise<{ taskId: 
   };
 
   const getStatusBadge = (bidStatus: string) => {
-    // For accepted bids, show contextual label based on task stage
-    if (bidStatus === "accepted" && task) {
+    // For accepted or work-submitted bids, show contextual label based on task stage
+    if ((bidStatus === "accepted" || bidStatus === "WorkSubmitted") && task) {
       if (task.status === 'Completed') {
         return <span className="px-2 py-0.5 rounded-full bg-green-500/10 border border-green-500/20 text-green-400 text-[10px] font-bold uppercase flex items-center gap-1"><BadgeCheck size={10} /> Completed</span>;
       }
-      if (task.status === 'In Review') {
+      if (task.status === 'In Review' || bidStatus === 'WorkSubmitted') {
         return <span className="px-2 py-0.5 rounded-full bg-amber-500/10 border border-amber-500/20 text-amber-500 text-[10px] font-bold uppercase">Work Submitted</span>;
       }
       return <span className="px-2 py-0.5 rounded-full bg-blue-500/10 border border-blue-500/20 text-blue-400 text-[10px] font-bold uppercase">Assigned</span>;
@@ -577,16 +576,34 @@ export default function TaskDetailsPage({ params }: { params: Promise<{ taskId: 
 
                             <div>
                                 <h4 className="text-xs font-mono uppercase tracking-widest text-emerald-500/70 mb-2">Deliverables</h4>
-                                <div className="p-4 bg-black/40 border border-emerald-500/20 rounded-lg">
-                                    <a 
-                                        href={submission.deliverables.startsWith('http') ? submission.deliverables : `https://${submission.deliverables}`} 
-                                        target="_blank" 
-                                        rel="noopener noreferrer" 
-                                        className="text-emerald-400 hover:text-emerald-300 flex items-center gap-2 break-all"
-                                    >
-                                        <ExternalLink className="w-4 h-4 shrink-0" />
-                                        {submission.deliverables}
-                                    </a>
+                                <div className="space-y-3">
+                                    {Array.isArray(submission.deliverables) ? submission.deliverables.map((d: any, i: number) => (
+                                        <div key={i} className="p-4 bg-black/40 border border-emerald-500/20 rounded-lg">
+                                            <div className="flex items-center gap-2 mb-2">
+                                                <span className="text-[10px] font-mono uppercase tracking-widest text-emerald-500/70 bg-emerald-500/10 px-2 py-0.5 rounded">{d.type}</span>
+                                                <span className="text-xs font-mono text-zinc-400">{d.label}</span>
+                                            </div>
+                                            {d.type === 'url' ? (
+                                                <a
+                                                    href={d.content}
+                                                    target="_blank"
+                                                    rel="noopener noreferrer"
+                                                    className="text-emerald-400 hover:text-emerald-300 flex items-center gap-2 break-all text-sm"
+                                                >
+                                                    <ExternalLink className="w-4 h-4 shrink-0" />
+                                                    {d.content}
+                                                </a>
+                                            ) : (
+                                                <div className="text-zinc-300 text-sm font-light whitespace-pre-wrap max-h-96 overflow-y-auto leading-relaxed">
+                                                    {d.content}
+                                                </div>
+                                            )}
+                                        </div>
+                                    )) : (
+                                        <div className="p-4 bg-black/40 border border-emerald-500/20 rounded-lg">
+                                            <p className="text-zinc-300 text-sm">{String(submission.deliverables)}</p>
+                                        </div>
+                                    )}
                                 </div>
                             </div>
 
