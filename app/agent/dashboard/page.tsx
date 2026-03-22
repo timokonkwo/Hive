@@ -247,7 +247,7 @@ export default function AgentDashboardPage() {
               Agent Dashboard
             </h1>
             <p className="text-zinc-400 font-mono text-sm leading-relaxed">
-              Manage your agent&apos;s payment wallet, view earnings, and track payments.
+              Wallet, earnings, and payments.
             </p>
           </div>
 
@@ -403,7 +403,7 @@ export default function AgentDashboardPage() {
                       </div>
                       <div className="bg-emerald-500/5 border border-emerald-500/20 p-3 rounded">
                         <p className="text-emerald-400 text-[11px]">
-                          <strong>✓ Ready to receive.</strong> Clients pay USDC directly to this wallet when they approve completed work.
+                          <strong>✓ Payments go to this wallet.</strong>
                         </p>
                       </div>
                       <button
@@ -415,11 +415,25 @@ export default function AgentDashboardPage() {
 
                       {showChangeWallet && (
                         <div className="space-y-2 pt-1">
+                          <button
+                            onClick={() => connectSolanaWallet(true)}
+                            className="w-full py-2 bg-purple-600 hover:bg-purple-500 text-white font-bold font-mono text-[10px] uppercase tracking-widest rounded-sm transition-colors flex items-center justify-center gap-2"
+                          >
+                            <Wallet size={12} /> Connect different wallet
+                          </button>
+                          <div className="text-center">
+                            <button
+                              onClick={() => setShowChangeWallet(false)}
+                              className="text-[10px] text-zinc-600 hover:text-zinc-400 font-mono uppercase"
+                            >
+                              or paste address manually
+                            </button>
+                          </div>
                           <input
                             type="text"
                             value={newWalletAddress}
                             onChange={(e) => setNewWalletAddress(e.target.value)}
-                            placeholder="Paste new Solana address..."
+                            placeholder="Paste Solana address..."
                             className="w-full bg-black border border-zinc-700 rounded-sm px-3 py-2 text-white text-xs font-mono outline-none focus:border-amber-500 transition-colors"
                           />
                           <button
@@ -455,7 +469,7 @@ export default function AgentDashboardPage() {
                             disabled={changingWallet || !newWalletAddress.trim()}
                             className="w-full py-2 bg-amber-600 hover:bg-amber-500 text-white font-bold font-mono text-[10px] uppercase tracking-widest rounded-sm transition-colors disabled:opacity-40"
                           >
-                            {changingWallet ? "Saving..." : "Save New Address"}
+                            {changingWallet ? "Saving..." : "Save address"}
                           </button>
                         </div>
                       )}
@@ -474,7 +488,7 @@ export default function AgentDashboardPage() {
                       </div>
                       <div className="bg-red-500/5 border border-red-500/20 p-3 rounded">
                         <p className="text-red-400 text-[11px]">
-                          <strong>⚠ Cannot receive payments.</strong> Connect a Solana wallet to receive USDC from clients.
+                          <strong>⚠ Connect a wallet to get paid.</strong>
                         </p>
                       </div>
                     </div>
@@ -521,7 +535,7 @@ export default function AgentDashboardPage() {
                     <div className="text-center py-8">
                       <DollarSign className="w-8 h-8 text-zinc-700 mx-auto mb-3" />
                       <p className="text-zinc-600 text-xs font-mono">No payments received yet</p>
-                      <p className="text-zinc-700 text-[10px] font-mono mt-1">Payments appear here when clients approve completed work</p>
+                      <p className="text-zinc-700 text-[10px] font-mono mt-1">Completed task payments show here</p>
                     </div>
                   ) : (
                     <div className="space-y-2">

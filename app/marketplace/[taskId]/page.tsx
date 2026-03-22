@@ -136,31 +136,66 @@ export default function TaskDetailsPage({ params }: { params: Promise<{ taskId: 
       setCompletingTask(true);
 
       try {
-        // Preflight: check client has a Solana address set
+        // Check client has a Solana address — if not, prompt wallet connection
         const profileRes = await fetch(`/api/clients/profile?address=${user?.wallet?.address}`);
         const profileData = await profileRes.json();
-        const clientSolanaAddress = profileData.profile?.solanaAddress;
+        let clientSolanaAddress = profileData.profile?.solanaAddress;
 
         if (!clientSolanaAddress) {
-          setPaymentError('You need to set your Solana wallet address in your dashboard before making payments.');
-          setPaymentStep('error');
-          setShowPaymentModal(true);
-          setCompletingTask(false);
-          return;
+          // Auto-connect: prompt Solana wallet popup
+          const solWallet = (window as any).solana
+            || (window as any).phantom?.solana
+            || (window as any).solflare
+            || (window as any).backpack?.solana;
+
+          if (!solWallet) {
+            setPaymentError('Install a Solana wallet (Phantom, Solflare, etc.) to pay.');
+            setPaymentStep('error');
+            setShowPaymentModal(true);
+            setCompletingTask(false);
+            return;
+          }
+
+          try {
+            const response = await solWallet.connect();
+            const connectedAddress = response.publicKey.toString();
+            // Save to profile
+            await fetch('/api/clients/profile', {
+              method: 'PATCH',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ address: user?.wallet?.address, solanaAddress: connectedAddress }),
+            });
+            clientSolanaAddress = connectedAddress;
+          } catch (walletErr: any) {
+            setPaymentError(walletErr.message?.includes('User rejected') ? 'Wallet connection cancelled.' : 'Could not connect wallet.');
+            setPaymentStep('error');
+            setShowPaymentModal(true);
+            setCompletingTask(false);
+            return;
+          }
         }
 
-        // SECURITY: Show preview from existing task data only (no /payment/build call).
-        // The actual transaction is built only once, inside handleConfirmPayment,
-        // right before signing. This eliminates the TOCTOU window where agent
-        // address or amount could change between preview and actual signing.
         const acceptedBid = bids.find((b: any) => b.status === 'accepted' || b.status === 'WorkSubmitted');
+
+        // Fetch agent's Solana address for preview
+        let agentSolanaAddress = '';
+        if (acceptedBid?.agentName) {
+          try {
+            const agentRes = await fetch(`/api/agents/${encodeURIComponent(acceptedBid.agentName)}`);
+            if (agentRes.ok) {
+              const agentData = await agentRes.json();
+              agentSolanaAddress = agentData.agent?.solanaAddress || '';
+            }
+          } catch { /* use empty fallback */ }
+        }
+
         setPaymentDetails({
           amount: budgetAmount,
           token: 'USDC',
           chain: 'solana',
           fromAddress: clientSolanaAddress,
+          toAddress: agentSolanaAddress,
           toName: acceptedBid?.agentName || task?.assignedAgentName || 'Agent',
-          // toAddress is fetched server-side during handleConfirmPayment
         });
         setShowPaymentModal(true);
         setCompletingTask(false);
@@ -205,10 +240,17 @@ export default function TaskDetailsPage({ params }: { params: Promise<{ taskId: 
     setPaymentError(null);
 
     try {
-      // Get client's Solana address
-      const profileRes = await fetch(`/api/clients/profile?address=${user?.wallet?.address}`);
-      const profileData = await profileRes.json();
-      const clientSolanaAddress = profileData.profile?.solanaAddress;
+      // Use already-connected address from state, fallback to profile fetch
+      let clientSolanaAddress = paymentDetails?.fromAddress;
+      if (!clientSolanaAddress) {
+        const profileRes = await fetch(`/api/clients/profile?address=${user?.wallet?.address}`);
+        const profileData = await profileRes.json();
+        clientSolanaAddress = profileData.profile?.solanaAddress;
+      }
+
+      if (!clientSolanaAddress) {
+        throw new Error('No Solana wallet connected. Please try again.');
+      }
 
       // Build the transaction
       const buildRes = await fetch(`/api/tasks/${taskId}/payment/build`, {
@@ -422,7 +464,7 @@ export default function TaskDetailsPage({ params }: { params: Promise<{ taskId: 
                       <div>
                         <h4 className="text-white font-mono font-bold text-xs uppercase mb-1">Token Launch — Powered by Bags</h4>
                         <p className="text-xs text-zinc-400 leading-relaxed">
-                          This task involves launching a token on Solana via the Bags API. The assigned agent will handle research, strategy, and deployment.
+                          Agent will launch and deploy this token on Solana.
                         </p>
                       </div>
                     </div>
@@ -537,13 +579,9 @@ export default function TaskDetailsPage({ params }: { params: Promise<{ taskId: 
                         ) : (
                              <li className="flex items-start gap-3">
                                 <CheckCircle className="w-5 h-5 text-emerald-500 shrink-0 mt-0.5" />
-                                <span>Standard Hive verification required.</span>
+                                <span>No specific requirements listed.</span>
                             </li>
                         )}
-                         <li className="flex items-start gap-3">
-                            <CheckCircle className="w-5 h-5 text-emerald-500 shrink-0 mt-0.5" />
-                            <span>Deliverables must include structured documentation.</span>
-                        </li>
                     </ul>
                 </div>
 
@@ -659,7 +697,7 @@ export default function TaskDetailsPage({ params }: { params: Promise<{ taskId: 
                     <div className="flex items-center justify-between mb-8">
                         <h2 className="text-xl font-bold font-mono uppercase tracking-widest">Proposals <span className="text-zinc-600">[{bids.length}]</span></h2>
                         {isTaskPoster && bids.length > 0 && (
-                            <span className="text-xs text-emerald-500 font-mono">You are the task poster — review proposals below</span>
+                            <span className="text-xs text-emerald-500 font-mono">Review proposals</span>
                         )}
                     </div>
 
@@ -771,7 +809,7 @@ export default function TaskDetailsPage({ params }: { params: Promise<{ taskId: 
                         
                         {task.status === "Open" && !isTaskPoster && (
                             <div className="text-center py-3 bg-zinc-800/50 border border-zinc-700 rounded text-xs font-mono text-zinc-400 uppercase tracking-widest">
-                                Awaiting Agent Proposals
+                                Accepting proposals
                             </div>
                         )}
                         {isTaskPoster && task.status === 'Open' && (
@@ -782,13 +820,13 @@ export default function TaskDetailsPage({ params }: { params: Promise<{ taskId: 
 
                         {task.status === 'In Progress' && (
                             <div className="text-center py-3 bg-blue-500/10 border border-blue-500/20 rounded text-xs font-mono text-blue-400 uppercase tracking-widest">
-                                Agent assigned — awaiting deliverables
+                                In progress
                             </div>
                         )}
 
                         {isTaskPoster && task.status === 'In Review' && (
                             <div className="text-center py-3 bg-amber-500/10 border border-amber-500/20 rounded text-xs font-mono text-amber-400 uppercase tracking-widest">
-                                Work submitted — review below
+                                Review submitted work
                             </div>
                         )}
 
@@ -848,7 +886,7 @@ export default function TaskDetailsPage({ params }: { params: Promise<{ taskId: 
                   </div>
                   <div className="flex justify-between items-center py-3 border-b border-zinc-800">
                     <span className="text-zinc-400 text-sm font-mono">Chain</span>
-                    <span className="text-purple-400 font-mono text-sm">Solana (USDC-SPL)</span>
+                    <span className="text-purple-400 font-mono text-sm">Solana (USDC)</span>
                   </div>
                   <div className="py-3">
                     <span className="text-zinc-400 text-sm font-mono block mb-1">Recipient Wallet</span>
@@ -857,7 +895,7 @@ export default function TaskDetailsPage({ params }: { params: Promise<{ taskId: 
                 </div>
                 <div className="bg-amber-500/10 border border-amber-500/20 rounded p-3 mb-6">
                   <p className="text-amber-400 text-xs">
-                    <strong>Note:</strong> This will prompt your Solana wallet to sign a USDC transfer. The funds go directly to the agent's wallet — Hive never touches your funds.
+                    You'll sign a USDC transfer from your wallet.
                   </p>
                 </div>
                 <div className="flex gap-3">

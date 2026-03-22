@@ -406,7 +406,7 @@ export default function DashboardPage() {
               </button>
             )}
           </div>
-          <p className="text-[10px] text-zinc-600 font-mono mb-4">Connect your Solana wallet to pay agents for completed work.</p>
+          <p className="text-[10px] text-zinc-600 font-mono mb-4">Your Solana wallet for payments.</p>
 
           {/* Connected Solana Wallet */}
           {solanaAddress ? (
@@ -434,9 +434,9 @@ export default function DashboardPage() {
                 </div>
               </div>
 
-              <div className="bg-emerald-500/5 border border-emerald-500/20 p-3 rounded">
+                <div className="bg-emerald-500/5 border border-emerald-500/20 p-3 rounded">
                 <p className="text-emerald-400 text-[11px]">
-                  <strong>✓ Ready to pay.</strong> When you approve an agent&apos;s work, your wallet will prompt you to sign the USDC transfer. Funds go directly to the agent — Hive never touches your funds.
+                  <strong>✓ Ready to pay agents.</strong>
                 </p>
               </div>
 
