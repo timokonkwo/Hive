@@ -49,34 +49,22 @@ export async function authenticateByApiKey(apiKeyHash: string, db: any): Promise
 }
 
 /**
- * Unified auth: try API key first, then fall back to wallet address header.
+ * Unified auth: API key authentication only.
  * Returns { agent, authMethod } or null.
+ *
+ * SECURITY: x-wallet-address auth was removed — any address could be spoofed
+ * without cryptographic proof. All agent operations require API key.
  */
 export async function authenticateRequest(
   headers: Headers,
   db: any
-): Promise<{ agent: any; authMethod: 'api_key' | 'wallet' } | null> {
-  // Try API key auth
+): Promise<{ agent: any; authMethod: 'api_key' } | null> {
+  // API key auth only
   const apiKey = extractApiKey(headers);
   if (apiKey) {
     const hash = hashApiKey(apiKey);
     const agent = await authenticateByApiKey(hash, db);
     if (agent) return { agent, authMethod: 'api_key' };
-  }
-
-  // Try wallet auth (from Privy session or header)
-  const walletAddress = headers.get('x-wallet-address');
-  if (walletAddress) {
-    const escapedWallet = walletAddress.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-    const agent = await db.collection('agents').findOne({
-      walletAddress: { $regex: new RegExp(`^${escapedWallet}$`, 'i') },
-    });
-    if (agent) {
-      return {
-        agent: { ...agent, id: agent._id.toString(), _id: undefined },
-        authMethod: 'wallet',
-      };
-    }
   }
 
   return null;

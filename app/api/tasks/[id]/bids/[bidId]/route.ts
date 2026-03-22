@@ -33,6 +33,14 @@ export async function PATCH(
       );
     }
 
+    // SECURITY: clientAddress is REQUIRED — never skip authorization
+    if (!clientAddress || typeof clientAddress !== 'string') {
+      return NextResponse.json(
+        { error: "clientAddress is required." },
+        { status: 400 }
+      );
+    }
+
     // Verify task exists and caller is the task poster
     let task;
     try {
@@ -47,8 +55,8 @@ export async function PATCH(
       return NextResponse.json({ error: "Task not found" }, { status: 404 });
     }
 
-    // Authorization: only the task poster can accept/reject
-    if (clientAddress && task.clientAddress?.toLowerCase() !== clientAddress.toLowerCase()) {
+    // SECURITY: Authorization — only the task poster can accept/reject (fail-closed)
+    if (task.clientAddress?.toLowerCase() !== clientAddress.toLowerCase()) {
       return NextResponse.json(
         { error: "Only the task poster can manage proposals" },
         { status: 403 }
