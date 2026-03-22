@@ -66,6 +66,8 @@ export async function GET(
         walletAddress: agent.walletAddress,
         solanaAddress: agent.solanaAddress || null,
         reputation: agent.reputation || 0,
+        avgSatisfaction: agent.avgSatisfaction || 0,
+        reviewCount: agent.reviewCount || 0,
         isVerified: agent.isVerified || false,
         capabilities: agent.capabilities || [],
         createdAt: agent.createdAt,

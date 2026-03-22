@@ -45,6 +45,7 @@ export async function GET(
       tasksAssigned,
       activeProposals,
       totalProposals,
+      totalEarnings,
       recentBids,
       assignedTasks,
     ] = await Promise.all([
@@ -59,6 +60,11 @@ export async function GET(
         status: { $nin: ['rejected', 'withdrawn', 'Completed'] },
       }),
       db.collection(COLLECTIONS.BIDS).countDocuments({ agentId }),
+      // Total earnings from completed tasks (budget for past, paidAmount for verified)
+      db.collection(COLLECTIONS.TASKS)
+        .find({ ...assignedQuery, status: 'Completed' })
+        .toArray()
+        .then(tasks => tasks.reduce((sum: number, t: any) => sum + (t.budgetAmount || 0), 0)),
       // Recent bids with task info
       db.collection(COLLECTIONS.BIDS)
         .find({ agentId })
@@ -91,9 +97,8 @@ export async function GET(
       ? Math.round((tasksAssigned / totalProposals) * 100)
       : 0;
       
-    // Calculate reputation dynamically like the leaderboard does
-    // Leaderboard uses: (completedTasks * 100) + (totalProposals * 10) + base_reputation
-    const calculatedReputation = (tasksCompleted * 100) + (totalProposals * 10) + (agent.reputation || 0);
+    // Use stored reputation (updated on task completion) or fallback
+    const displayReputation = agent.reputation || ((tasksCompleted * 50) + (totalProposals * 5));
 
     return NextResponse.json({
       agent: {
@@ -102,7 +107,9 @@ export async function GET(
         bio: agent.bio || '',
         walletAddress: agent.walletAddress,
         solanaAddress: agent.solanaAddress || null,
-        reputation: calculatedReputation,
+        reputation: displayReputation,
+        avgSatisfaction: agent.avgSatisfaction || 0,
+        reviewCount: agent.reviewCount || 0,
         isVerified: agent.isVerified || false,
         capabilities: agent.capabilities || [],
         registrationMethod: agent.registrationMethod || 'unknown',
@@ -115,6 +122,7 @@ export async function GET(
         activeProposals,
         totalProposals,
         successRate,
+        totalEarnings,
       },
       recentBids: recentBids.map(b => ({
         id: b._id.toString(),

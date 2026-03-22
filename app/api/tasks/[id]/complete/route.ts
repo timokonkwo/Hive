@@ -39,7 +39,7 @@ export async function POST(
     }
 
     const body = await req.json();
-    const { clientAddress, txSignature } = body;
+    const { clientAddress, txSignature, satisfaction, comment, tags } = body;
 
     if (!clientAddress || typeof clientAddress !== 'string') {
       return NextResponse.json({ error: 'clientAddress is required.' }, { status: 400 });
@@ -263,6 +263,82 @@ export async function POST(
       },
       createdAt: now,
     });
+
+    // --- REVIEW & REPUTATION ---
+    // Find the agent for this task
+    const completionBid = await db.collection(COLLECTIONS.BIDS).findOne({
+      taskId,
+      status: 'Completed',
+    });
+    const agentId = completionBid?.agentId;
+    const agentName = completionBid?.agentName || task.assignedAgentName || '';
+
+    // Store review if satisfaction provided (1-5)
+    const satRating = parseInt(satisfaction);
+    if (agentId && satRating >= 1 && satRating <= 5) {
+      try {
+        await db.collection('reviews').insertOne({
+          taskId,
+          taskTitle: task.title,
+          agentId,
+          agentName,
+          clientAddress: clientAddress.toLowerCase(),
+          satisfaction: satRating,
+          comment: typeof comment === 'string' ? comment.slice(0, 500).trim() : null,
+          tags: Array.isArray(tags) ? tags.filter((t: any) => typeof t === 'string').slice(0, 5) : [],
+          createdAt: now,
+        });
+      } catch (e: any) {
+        // Duplicate review (unique index on taskId) — ignore
+        if (e?.code !== 11000) console.error('[HIVE] Review insert error:', e);
+      }
+    }
+
+    // Recalculate and persist agent reputation
+    if (agentId) {
+      try {
+        // Get all reviews for this agent
+        const allReviews = await db.collection('reviews')
+          .find({ agentId })
+          .project({ satisfaction: 1 })
+          .toArray();
+
+        const avgSatisfaction = allReviews.length > 0
+          ? allReviews.reduce((sum: number, r: any) => sum + r.satisfaction, 0) / allReviews.length
+          : 0;
+
+        // Count completed tasks and total proposals
+        const [completedCount, proposalCount] = await Promise.all([
+          db.collection(COLLECTIONS.TASKS).countDocuments({
+            $or: [
+              { assignedAgent: agentId },
+              ...(agentName ? [{ assignedAgentName: agentName }] : []),
+            ],
+            status: 'Completed',
+          }),
+          db.collection(COLLECTIONS.BIDS).countDocuments({ agentId }),
+        ]);
+
+        // reputation = (avgSatisfaction × 200) + (completedTasks × 50) + (proposals × 5)
+        const newReputation = Math.round(
+          (avgSatisfaction * 200) + (completedCount * 50) + (proposalCount * 5)
+        );
+
+        await db.collection(COLLECTIONS.AGENTS).updateOne(
+          { _id: new ObjectId(agentId) },
+          {
+            $set: {
+              reputation: newReputation,
+              avgSatisfaction: Math.round(avgSatisfaction * 10) / 10,
+              reviewCount: allReviews.length,
+              updatedAt: now,
+            },
+          }
+        );
+      } catch (repErr) {
+        console.error('[HIVE] Reputation update error:', repErr);
+      }
+    }
 
     return NextResponse.json({
       success: true,

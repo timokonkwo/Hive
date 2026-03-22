@@ -6,7 +6,7 @@ import { Footer } from "@/components/layout/Footer";
 import { 
   Shield, Star, Zap, Award, Copy, CheckCircle,
   Calendar, TrendingUp, Users, Bot, Loader2, Briefcase, Send,
-  ExternalLink, Clock, BarChart3, ArrowLeft
+  ExternalLink, Clock, BarChart3, ArrowLeft, DollarSign
 } from "lucide-react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
@@ -163,41 +163,52 @@ function AgentProfileContent() {
             </div>
           </div>
 
-          {/* Stats & Skills */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8 items-start">
-            <div className="md:col-span-2 grid grid-cols-2 gap-3 sm:gap-4 md:grid-cols-4">
-              <div className="bg-[#0A0A0A] border border-white/10 p-4 rounded-sm text-center group hover:border-emerald-500/30 transition-colors">
-                <div className="flex items-center justify-center gap-2 text-emerald-500 font-mono font-bold text-2xl group-hover:scale-110 transition-transform">
-                  <Star size={20} className="shrink-0" /> {agent.reputation}
-                </div>
-                <div className="text-[10px] text-gray-500 uppercase mt-1">Reputation</div>
+          {/* Stats */}
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-6">
+            <div className="bg-[#0A0A0A] border border-white/10 p-4 rounded-sm text-center group hover:border-emerald-500/30 transition-colors">
+              <div className="flex items-center justify-center gap-2 text-emerald-500 font-mono font-bold text-2xl group-hover:scale-110 transition-transform">
+                <Star size={18} className="shrink-0" /> {agent.reputation}
               </div>
-              <div className="bg-[#0A0A0A] border border-white/10 p-4 rounded-sm text-center group hover:border-blue-500/30 transition-colors">
-                <div className="flex items-center justify-center gap-2 text-blue-500 font-mono font-bold text-2xl group-hover:scale-110 transition-transform">
-                  <Award size={20} className="shrink-0" /> {stats?.tasksCompleted || 0}
-                </div>
-                <div className="text-[10px] text-gray-500 uppercase mt-1">Completed</div>
-              </div>
-              <div className="bg-[#0A0A0A] border border-white/10 p-4 rounded-sm text-center group hover:border-purple-500/30 transition-colors">
-                <div className="flex items-center justify-center gap-2 text-purple-500 font-mono font-bold text-2xl group-hover:scale-110 transition-transform">
-                  <Send size={20} className="shrink-0" /> {stats?.activeProposals || 0}
-                </div>
-                <div className="text-[10px] text-gray-500 uppercase mt-1">Active Proposals</div>
-              </div>
-              <div className="bg-[#0A0A0A] border border-white/10 p-4 rounded-sm text-center group hover:border-yellow-500/30 transition-colors">
-                <div className="flex items-center justify-center gap-2 text-yellow-500 font-mono font-bold text-2xl group-hover:scale-110 transition-transform">
-                  <BarChart3 size={20} className="shrink-0" /> {stats?.successRate || 0}%
-                </div>
-                <div className="text-[10px] text-gray-500 uppercase mt-1">Success Rate</div>
-              </div>
+              <div className="text-[10px] text-gray-500 uppercase mt-1">Reputation</div>
             </div>
+            <div className="bg-[#0A0A0A] border border-white/10 p-4 rounded-sm text-center group hover:border-blue-500/30 transition-colors">
+              <div className="flex items-center justify-center gap-2 text-blue-500 font-mono font-bold text-2xl group-hover:scale-110 transition-transform">
+                <Award size={18} className="shrink-0" /> {stats?.tasksCompleted || 0}
+              </div>
+              <div className="text-[10px] text-gray-500 uppercase mt-1">Completed</div>
+            </div>
+            <div className="bg-[#0A0A0A] border border-white/10 p-4 rounded-sm text-center group hover:border-green-500/30 transition-colors">
+              <div className="flex items-center justify-center gap-2 text-green-400 font-mono font-bold text-2xl group-hover:scale-110 transition-transform">
+                <DollarSign size={18} className="shrink-0" /> {(stats?.totalEarnings || 0).toFixed(0)}
+              </div>
+              <div className="text-[10px] text-gray-500 uppercase mt-1">Earned (USDC)</div>
+            </div>
+            <div className="bg-[#0A0A0A] border border-white/10 p-4 rounded-sm text-center group hover:border-yellow-500/30 transition-colors">
+              <div className="flex items-center justify-center gap-2 text-yellow-500 font-mono font-bold text-2xl group-hover:scale-110 transition-transform">
+                <BarChart3 size={18} className="shrink-0" /> {stats?.successRate || 0}%
+              </div>
+              <div className="text-[10px] text-gray-500 uppercase mt-1">Success Rate</div>
+            </div>
+          </div>
 
-            {/* Skills / Capabilities */}
-            <div className="bg-[#0A0A0A] border border-white/10 p-6 rounded-sm">
-              <h3 className="text-xs font-bold font-mono uppercase text-gray-500 mb-4 flex items-center gap-2">
-                <Zap size={14} /> Capabilities
-              </h3>
-              {agent.capabilities && agent.capabilities.length > 0 ? (
+          {/* Satisfaction + Capabilities */}
+          <div className={`grid ${agent.avgSatisfaction > 0 || (agent.capabilities && agent.capabilities.length > 0) ? 'grid-cols-1 md:grid-cols-2' : ''} gap-4 mb-8`}>
+            {agent.avgSatisfaction > 0 && (
+              <div className="bg-[#0A0A0A] border border-white/10 p-5 rounded-sm">
+                <h3 className="text-xs font-bold font-mono uppercase text-gray-500 mb-3 flex items-center gap-2">
+                  <Star size={14} className="fill-amber-400 text-amber-400" /> Rating
+                </h3>
+                <div className="flex items-center gap-3">
+                  <span className="text-2xl font-mono font-bold text-amber-400">{agent.avgSatisfaction.toFixed(1)}</span>
+                  <span className="text-xs text-zinc-500 font-mono">from {agent.reviewCount || 0} review{agent.reviewCount !== 1 ? 's' : ''}</span>
+                </div>
+              </div>
+            )}
+            {agent.capabilities && agent.capabilities.length > 0 && (
+              <div className="bg-[#0A0A0A] border border-white/10 p-5 rounded-sm">
+                <h3 className="text-xs font-bold font-mono uppercase text-gray-500 mb-3 flex items-center gap-2">
+                  <Zap size={14} /> Capabilities
+                </h3>
                 <div className="flex flex-wrap gap-2">
                   {agent.capabilities.map((skill: string) => (
                     <span key={skill} className="px-2 py-1 bg-white/5 border border-white/10 text-gray-300 text-[10px] font-mono uppercase rounded-sm hover:text-white hover:border-white/30 transition-colors">
@@ -205,10 +216,8 @@ function AgentProfileContent() {
                     </span>
                   ))}
                 </div>
-              ) : (
-                <p className="text-zinc-600 text-xs">No capabilities listed</p>
-              )}
-            </div>
+              </div>
+            )}
           </div>
 
           {/* Task History & Proposals */}
