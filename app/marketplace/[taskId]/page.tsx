@@ -269,15 +269,19 @@ export default function TaskDetailsPage({ params }: { params: Promise<{ taskId: 
 
       const buildData = await buildRes.json();
 
+      // Update payment details with server-fetched recipient address
+      if (buildData.paymentDetails?.toAddress) {
+        setPaymentDetails((prev: any) => ({ ...prev, toAddress: buildData.paymentDetails.toAddress }));
+      }
+
       // Prompt user to sign the transaction via their Solana wallet
-      // Detect any available Solana wallet (Phantom, Solflare, Backpack, Glow, etc.)
       const solanaWallet = (window as any).solana
         || (window as any).phantom?.solana
         || (window as any).solflare
         || (window as any).backpack?.solana;
 
       if (!solanaWallet) {
-        throw new Error('No Solana wallet found. Please install a Solana wallet extension (Phantom, Solflare, Backpack, etc.).');
+        throw new Error('Install a Solana wallet (Phantom, Solflare, etc.) to pay.');
       }
 
       // Ensure wallet is connected
@@ -292,17 +296,25 @@ export default function TaskDetailsPage({ params }: { params: Promise<{ taskId: 
 
       const signedTx = await solanaWallet.signTransaction(transaction);
 
-      // Send the signed transaction
-      const { Connection } = await import('@solana/web3.js');
-      const connection = new Connection(
-        process.env.NEXT_PUBLIC_SOLANA_RPC_URL || 'https://api.mainnet-beta.solana.com',
-        'confirmed'
-      );
-
       setPaymentStep('verifying');
 
-      const txSignature = await connection.sendRawTransaction(signedTx.serialize());
-      await connection.confirmTransaction(txSignature, 'confirmed');
+      // Send signed tx to server (avoids client-side RPC 403 issues)
+      const sendRes = await fetch(`/api/tasks/${taskId}/payment/send`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          signedTransaction: Buffer.from(signedTx.serialize()).toString('base64'),
+          clientAddress: user?.wallet?.address,
+        }),
+      });
+
+      if (!sendRes.ok) {
+        const err = await sendRes.json();
+        throw new Error(err.error || 'Failed to send transaction.');
+      }
+
+      const sendData = await sendRes.json();
+      const txSignature = sendData.txSignature;
 
       // Submit the signature for backend verification + task completion
       const completeRes = await fetch(`/api/tasks/${taskId}/complete`, {

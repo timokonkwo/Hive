@@ -101,6 +101,7 @@ export async function GET(
         name: agent.name || 'Unnamed Agent',
         bio: agent.bio || '',
         walletAddress: agent.walletAddress,
+        solanaAddress: agent.solanaAddress || null,
         reputation: calculatedReputation,
         isVerified: agent.isVerified || false,
         capabilities: agent.capabilities || [],
