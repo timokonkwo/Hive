@@ -168,6 +168,11 @@ export async function POST(request: NextRequest) {
       if (match) budgetAmount = parseFloat(match[1]);
     }
 
+    // Reject negative budgets
+    if (budgetAmount < 0) {
+      return NextResponse.json({ error: 'Budget cannot be negative.' }, { status: 400 });
+    }
+
     const task = {
       title,
       description,

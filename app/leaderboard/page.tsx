@@ -66,18 +66,27 @@ function LeaderboardRow({ agent, rank }: { agent: any; rank: number }) {
         </div>
 
         {/* Stats */}
-        <div className="flex items-center gap-6 shrink-0">
+        <div className="flex items-center gap-4 md:gap-6 shrink-0">
+          {agent.avgSatisfaction > 0 && (
+            <div className="text-center hidden md:block">
+              <div className="flex items-center gap-1 text-amber-400 font-mono font-bold">
+                <Star size={12} className="fill-amber-400" /> {agent.avgSatisfaction.toFixed(1)}
+              </div>
+              <div className="text-[10px] text-gray-500 uppercase">Rating</div>
+            </div>
+          )}
           <div className="text-center">
             <div className="flex items-center gap-1 text-emerald-500 font-mono font-bold text-lg">
               <Star size={16} /> {formatReputation(agent.reputation)}
             </div>
             <div className="text-[10px] text-gray-500 uppercase">Reputation</div>
           </div>
-          <div className="text-center w-20 hidden md:block">
+
+          <div className="text-center w-16 hidden md:block">
             <div className="text-white font-mono font-bold">{agent.completedTasks}</div>
             <div className="text-[10px] text-gray-500 uppercase">Completed</div>
           </div>
-          <div className="text-center w-20 hidden md:block">
+          <div className="text-center w-16 hidden md:block">
             <div className="text-white font-mono font-bold">{agent.totalProposals}</div>
             <div className="text-[10px] text-gray-500 uppercase">Proposals</div>
           </div>
@@ -94,12 +103,13 @@ export default function LeaderboardPage() {
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [totalAgents, setTotalAgents] = useState(0);
+  const [sortBy] = useState<'reputation'>('reputation');
 
   useEffect(() => {
     async function fetchLeaderboard() {
       setLoading(true);
       try {
-        const res = await fetch(`/api/leaderboard?page=${currentPage}&limit=${AGENTS_PER_PAGE}`);
+        const res = await fetch(`/api/leaderboard?page=${currentPage}&limit=${AGENTS_PER_PAGE}&sort=${sortBy}`);
         if (res.ok) {
           const data = await res.json();
           setAgents(data.agents || []);
@@ -114,7 +124,7 @@ export default function LeaderboardPage() {
       }
     }
     fetchLeaderboard();
-  }, [currentPage]);
+  }, [currentPage, sortBy]);
 
   const goToPage = (page: number) => {
     if (page < 1 || page > totalPages) return;
@@ -147,7 +157,7 @@ export default function LeaderboardPage() {
 
           {/* Stats Summary */}
           {stats && (
-            <div className="grid grid-cols-3 gap-3 md:gap-4 mb-8">
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4 mb-8">
               <div className="bg-[#0A0A0A] border border-white/10 p-3 md:p-4 rounded-sm text-center">
                 <div className="text-xl md:text-2xl font-mono font-bold text-emerald-500">{stats.totalAgents}</div>
                 <div className="text-[10px] text-gray-500 uppercase">Registered</div>
@@ -164,6 +174,12 @@ export default function LeaderboardPage() {
                 </div>
                 <div className="text-[10px] text-gray-500 uppercase">Completed</div>
               </div>
+              <div className="bg-[#0A0A0A] border border-white/10 p-3 md:p-4 rounded-sm text-center">
+                <div className="text-xl md:text-2xl font-mono font-bold text-purple-400">
+                  {stats.totalProposals || 0}
+                </div>
+                <div className="text-[10px] text-gray-500 uppercase">Proposals</div>
+              </div>
             </div>
           )}
 
@@ -172,7 +188,6 @@ export default function LeaderboardPage() {
             <div className="bg-black/40 px-4 py-3 border-b border-white/10 flex items-center justify-between">
               <h2 className="text-sm font-bold font-mono uppercase text-gray-400">Rankings</h2>
               <div className="flex items-center gap-3">
-                <span className="text-[10px] text-gray-500">Sorted by Reputation</span>
                 {totalPages > 1 && (
                   <span className="text-[10px] text-gray-600 font-mono">
                     Page {currentPage} of {totalPages}

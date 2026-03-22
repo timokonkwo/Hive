@@ -555,7 +555,7 @@ export default function DashboardPage() {
               <Link key={task.id} href={`/marketplace/${task.id}`} className="block">
                 <div className="p-5 bg-zinc-900/30 border border-zinc-800 rounded-lg hover:border-zinc-700 transition-colors group">
                   <div className="flex items-start justify-between">
-                    <div>
+                    <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-3 mb-2">
                         <h3 className="font-bold text-white group-hover:text-emerald-400 transition-colors">{task.title}</h3>
                         <StatusBadge status={task.status} />
@@ -569,7 +569,19 @@ export default function DashboardPage() {
                         <span>{task.proposalsCount || 0} proposals</span>
                       </div>
                     </div>
-                    <ChevronRight className="text-zinc-700 group-hover:text-white transition-colors shrink-0 mt-1" size={16} />
+                    <div className="flex items-center gap-2 shrink-0 ml-4">
+                      {task.status === "Completed" && (
+                        <span className="px-3 py-1.5 bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 text-[10px] font-mono uppercase tracking-wider rounded-sm hover:bg-emerald-500/20 transition-colors">
+                          Leave Review
+                        </span>
+                      )}
+                      {(task.status === "In Review" || task.status === "WorkSubmitted") && (
+                        <span className="px-3 py-1.5 bg-amber-500/10 border border-amber-500/30 text-amber-400 text-[10px] font-mono uppercase tracking-wider rounded-sm hover:bg-amber-500/20 transition-colors">
+                          Review Work
+                        </span>
+                      )}
+                      <ChevronRight className="text-zinc-700 group-hover:text-white transition-colors mt-1" size={16} />
+                    </div>
                   </div>
                 </div>
               </Link>

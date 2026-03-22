@@ -4,9 +4,10 @@ import { use, useState, useEffect } from "react";
 import { Navbar } from "@/components/layout/Navbar";
 import { Footer } from "@/components/layout/Footer";
 import { useAuth } from "@/hooks/useAuth";
-import { ArrowLeft, Clock, Coins, CheckCircle, X, Loader2, ChevronDown, ChevronUp, UserCheck, XCircle, ExternalLink, BadgeCheck, Rocket, Copy } from "lucide-react";
+import { ArrowLeft, Clock, Coins, CheckCircle, X, Loader2, ChevronDown, ChevronUp, UserCheck, XCircle, ExternalLink, BadgeCheck, Rocket, Copy, Star, MessageSquare, AlertTriangle } from "lucide-react";
 import Link from "next/link";
 import { toast } from "sonner";
+import ReactMarkdown from "react-markdown";
 
 export default function TaskDetailsPage({ params }: { params: Promise<{ taskId: string }> }) {
   const resolvedParams = use(params);
@@ -27,6 +28,17 @@ export default function TaskDetailsPage({ params }: { params: Promise<{ taskId: 
   const [paymentDetails, setPaymentDetails] = useState<any>(null);
   const [paymentStep, setPaymentStep] = useState<'confirm' | 'signing' | 'verifying' | 'done' | 'error'>('confirm');
   const [paymentError, setPaymentError] = useState<string | null>(null);
+
+  // Review state
+  const [showReviewModal, setShowReviewModal] = useState(false);
+  const [reviewSatisfaction, setReviewSatisfaction] = useState(0);
+  const [reviewComment, setReviewComment] = useState('');
+  const [reviewTags, setReviewTags] = useState<string[]>([]);
+
+  // Rejection state
+  const [showRejectModal, setShowRejectModal] = useState(false);
+  const [rejectReason, setRejectReason] = useState('');
+  const [rejecting, setRejecting] = useState(false);
 
   const userAddress = user?.wallet?.address?.toLowerCase();
   const isTaskPoster = task?.clientAddress?.toLowerCase() === userAddress;
@@ -323,6 +335,9 @@ export default function TaskDetailsPage({ params }: { params: Promise<{ taskId: 
         body: JSON.stringify({
           clientAddress: user?.wallet?.address,
           txSignature,
+          satisfaction: reviewSatisfaction || undefined,
+          comment: reviewComment.trim() || undefined,
+          tags: reviewTags.length > 0 ? reviewTags : undefined,
         }),
       });
 
@@ -343,6 +358,56 @@ export default function TaskDetailsPage({ params }: { params: Promise<{ taskId: 
       console.error('[Payment] Error:', error);
       setPaymentError(error.message || 'Payment failed.');
       setPaymentStep('error');
+    }
+  };
+
+  // === REVIEW FLOW ===
+  // Client clicks "Approve & Pay" → review modal opens first → then payment proceeds
+  const handleStartApproval = () => {
+    setShowReviewModal(true);
+    setReviewSatisfaction(0);
+    setReviewComment('');
+    setReviewTags([]);
+  };
+
+  const handleReviewSubmitAndPay = () => {
+    if (reviewSatisfaction < 1) {
+      toast.error('Please select a rating before proceeding.');
+      return;
+    }
+    setShowReviewModal(false);
+    handleCompleteTask();
+  };
+
+  // === REJECTION FLOW ===
+  const handleRejectWork = async () => {
+    if (rejectReason.trim().length < 10) {
+      toast.error('Please provide a reason (at least 10 characters).');
+      return;
+    }
+    setRejecting(true);
+    try {
+      const res = await fetch(`/api/tasks/${taskId}/reject`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          clientAddress: user?.wallet?.address,
+          reason: rejectReason.trim(),
+        }),
+      });
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.error);
+      }
+      setTask((prev: any) => prev ? { ...prev, status: 'In Progress' } : prev);
+      setSubmission(null);
+      setShowRejectModal(false);
+      setRejectReason('');
+      toast.success('Work rejected. Agent can revise and resubmit.');
+    } catch (error: any) {
+      toast.error(error.message || 'Failed to reject work.');
+    } finally {
+      setRejecting(false);
     }
   };
 
@@ -644,8 +709,8 @@ export default function TaskDetailsPage({ params }: { params: Promise<{ taskId: 
                                                     {d.content}
                                                 </a>
                                             ) : (
-                                                <div className="text-zinc-300 text-sm font-light whitespace-pre-wrap max-h-96 overflow-y-auto leading-relaxed">
-                                                    {d.content}
+                                                <div className="text-zinc-300 text-sm font-light max-h-96 overflow-y-auto leading-relaxed prose prose-invert prose-sm max-w-none prose-headings:text-white prose-headings:font-mono prose-headings:font-bold prose-p:text-zinc-300 prose-a:text-emerald-400 prose-strong:text-white prose-code:text-emerald-400 prose-code:bg-zinc-800 prose-code:px-1 prose-code:py-0.5 prose-code:rounded prose-pre:bg-zinc-900 prose-pre:border prose-pre:border-zinc-700 prose-li:text-zinc-300">
+                                                    <ReactMarkdown>{d.content}</ReactMarkdown>
                                                 </div>
                                             )}
                                         </div>
@@ -674,30 +739,49 @@ export default function TaskDetailsPage({ params }: { params: Promise<{ taskId: 
                                 </div>
                             )}
 
-                            <div className="pt-4 border-t border-emerald-500/20 flex items-center justify-between">
+                            <div className="pt-4 border-t border-emerald-500/20 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
                                 <span className="text-xs text-zinc-500 font-mono">
                                     Submitted on {new Date(submission.createdAt).toLocaleDateString()}
                                 </span>
-                                {task.status === 'In Review' && (
-                                    <button
-                                        onClick={handleCompleteTask}
-                                        disabled={completingTask}
-                                        className="px-6 py-2.5 bg-green-600 hover:bg-green-500 text-white font-bold font-mono text-xs uppercase tracking-widest rounded-lg flex items-center gap-2 shadow-[0_0_15px_rgba(34,197,94,0.3)] transition-all disabled:opacity-50"
-                                    >
-                                        {completingTask ? <Loader2 size={14} className="animate-spin" /> : <Coins size={14} />}
-                                        {task.budgetAmount > 0 ? `Approve & Pay $${task.budgetAmount} USDC` : 'Approve & Complete Task'}
-                                    </button>
-                                )}
+                                <div className="flex items-center gap-2">
+                                  {task.status === 'In Review' && (
+                                    <>
+                                      <button
+                                          onClick={() => setShowRejectModal(true)}
+                                          className="px-4 py-2.5 border border-red-500/30 text-red-500 hover:bg-red-500/10 font-bold font-mono text-xs uppercase tracking-widest rounded-lg flex items-center gap-2 transition-all"
+                                      >
+                                          <XCircle size={14} /> Reject
+                                      </button>
+                                      <button
+                                          onClick={handleStartApproval}
+                                          disabled={completingTask}
+                                          className="px-6 py-2.5 bg-green-600 hover:bg-green-500 text-white font-bold font-mono text-xs uppercase tracking-widest rounded-lg flex items-center gap-2 shadow-[0_0_15px_rgba(34,197,94,0.3)] transition-all disabled:opacity-50"
+                                      >
+                                          {completingTask ? <Loader2 size={14} className="animate-spin" /> : <Coins size={14} />}
+                                          {task.budgetAmount > 0 ? `Approve & Pay $${task.budgetAmount} USDC` : 'Approve & Complete Task'}
+                                      </button>
+                                    </>
+                                  )}
+                                </div>
 
-                                {task.status === 'Completed' && task.paymentTxSignature && (
-                                    <a
-                                        href={`https://solscan.io/tx/${task.paymentTxSignature}`}
-                                        target="_blank"
-                                        rel="noopener noreferrer"
-                                        className="text-xs text-emerald-500 font-mono flex items-center gap-1 hover:text-emerald-400 transition-colors"
-                                    >
-                                        <ExternalLink size={10} /> View Payment on Solscan
-                                    </a>
+                                {task.status === 'Completed' && (
+                                  <div className="flex items-center gap-3">
+                                    {task.paymentTxSignature && (
+                                      <span className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-emerald-500/10 border border-emerald-500/20 rounded-full text-xs font-mono text-emerald-400">
+                                        <CheckCircle size={10} /> Paid ${task.paidAmount || task.budgetAmount || '0'} USDC
+                                      </span>
+                                    )}
+                                    {task.paymentTxSignature && (
+                                      <a
+                                          href={`https://solscan.io/tx/${task.paymentTxSignature}`}
+                                          target="_blank"
+                                          rel="noopener noreferrer"
+                                          className="text-xs text-emerald-500 font-mono flex items-center gap-1 hover:text-emerald-400 transition-colors"
+                                      >
+                                          <ExternalLink size={10} /> Solscan
+                                      </a>
+                                    )}
+                                  </div>
                                 )}
                             </div>
                         </div>
@@ -972,6 +1056,120 @@ export default function TaskDetailsPage({ params }: { params: Promise<{ taskId: 
                 </div>
               </div>
             )}
+          </div>
+        </div>
+      )}
+
+      {/* Review Modal — appears before payment */}
+      {showReviewModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm">
+          <div className="bg-zinc-900 border border-zinc-700 rounded-xl p-8 max-w-md w-full mx-4 shadow-2xl">
+            <h3 className="text-lg font-bold font-mono uppercase tracking-widest text-white mb-2 flex items-center gap-2">
+              <Star className="text-amber-400" size={20} /> Rate this agent
+            </h3>
+            <p className="text-zinc-400 text-xs mb-6">How satisfied are you with the work?</p>
+
+            {/* Star rating */}
+            <div className="flex items-center gap-2 mb-6">
+              {[1, 2, 3, 4, 5].map((star) => (
+                <button
+                  key={star}
+                  onClick={() => setReviewSatisfaction(star)}
+                  className="transition-all hover:scale-110"
+                >
+                  <Star
+                    size={32}
+                    className={star <= reviewSatisfaction ? 'text-amber-400 fill-amber-400' : 'text-zinc-600'}
+                  />
+                </button>
+              ))}
+              {reviewSatisfaction > 0 && (
+                <span className="text-xs font-mono text-zinc-400 ml-2">
+                  {['', 'Poor', 'Fair', 'Good', 'Great', 'Excellent'][reviewSatisfaction]}
+                </span>
+              )}
+            </div>
+
+            {/* Quick tags */}
+            <div className="flex flex-wrap gap-2 mb-4">
+              {['Fast delivery', 'High quality', 'Good communication', 'Creative', 'Professional'].map(tag => (
+                <button
+                  key={tag}
+                  onClick={() => setReviewTags(prev => prev.includes(tag) ? prev.filter(t => t !== tag) : [...prev, tag])}
+                  className={`px-3 py-1 rounded-full text-[10px] font-mono uppercase tracking-wider border transition-all ${
+                    reviewTags.includes(tag)
+                      ? 'bg-emerald-500/20 border-emerald-500/40 text-emerald-400'
+                      : 'bg-zinc-800 border-zinc-700 text-zinc-500 hover:text-zinc-300'
+                  }`}
+                >
+                  {tag}
+                </button>
+              ))}
+            </div>
+
+            {/* Optional comment */}
+            <textarea
+              value={reviewComment}
+              onChange={(e) => setReviewComment(e.target.value.slice(0, 500))}
+              placeholder="Optional comment..."
+              rows={3}
+              className="w-full bg-black border border-zinc-700 rounded-lg px-3 py-2 text-white text-sm font-mono outline-none focus:border-emerald-500 transition-colors mb-1 resize-none"
+            />
+            <p className="text-[10px] text-zinc-600 font-mono mb-6">{reviewComment.length}/500</p>
+
+            <div className="flex gap-3">
+              <button
+                onClick={() => setShowReviewModal(false)}
+                className="flex-1 px-4 py-3 border border-zinc-700 text-zinc-400 hover:text-white rounded-lg font-mono text-xs uppercase tracking-widest transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleReviewSubmitAndPay}
+                disabled={reviewSatisfaction < 1}
+                className="flex-1 px-4 py-3 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg font-bold font-mono text-xs uppercase tracking-widest transition-colors disabled:opacity-40 flex items-center justify-center gap-2"
+              >
+                <Coins size={14} /> {task?.budgetAmount > 0 ? 'Continue to Payment' : 'Complete Task'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Reject Modal */}
+      {showRejectModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm">
+          <div className="bg-zinc-900 border border-zinc-700 rounded-xl p-8 max-w-md w-full mx-4 shadow-2xl">
+            <h3 className="text-lg font-bold font-mono uppercase tracking-widest text-white mb-2 flex items-center gap-2">
+              <AlertTriangle className="text-red-500" size={20} /> Reject Work
+            </h3>
+            <p className="text-zinc-400 text-xs mb-6">The agent will be able to revise and resubmit.</p>
+
+            <textarea
+              value={rejectReason}
+              onChange={(e) => setRejectReason(e.target.value.slice(0, 1000))}
+              placeholder="Why are you rejecting this work? (min 10 characters)"
+              rows={4}
+              className="w-full bg-black border border-zinc-700 rounded-lg px-3 py-2 text-white text-sm font-mono outline-none focus:border-red-500 transition-colors mb-1 resize-none"
+            />
+            <p className="text-[10px] text-zinc-600 font-mono mb-6">{rejectReason.length}/1000</p>
+
+            <div className="flex gap-3">
+              <button
+                onClick={() => { setShowRejectModal(false); setRejectReason(''); }}
+                className="flex-1 px-4 py-3 border border-zinc-700 text-zinc-400 hover:text-white rounded-lg font-mono text-xs uppercase tracking-widest transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleRejectWork}
+                disabled={rejecting || rejectReason.trim().length < 10}
+                className="flex-1 px-4 py-3 bg-red-600 hover:bg-red-500 text-white rounded-lg font-bold font-mono text-xs uppercase tracking-widest transition-colors disabled:opacity-40 flex items-center justify-center gap-2"
+              >
+                {rejecting ? <Loader2 size={14} className="animate-spin" /> : <XCircle size={14} />}
+                Reject & Request Revision
+              </button>
+            </div>
           </div>
         </div>
       )}

@@ -17,6 +17,8 @@ interface AgentData {
   bio: string;
   capabilities: string[];
   reputation: number;
+  avgSatisfaction: number;
+  reviewCount: number;
   isVerified: boolean;
   walletAddress: string | null;
   solanaAddress: string | null;
@@ -357,7 +359,11 @@ export default function AgentDashboardPage() {
                         {agent.isVerified && (
                           <span className="text-[9px] font-mono uppercase bg-emerald-500/20 text-emerald-500 px-1.5 py-0.5 rounded">Verified</span>
                         )}
-                        <span className="text-[9px] font-mono uppercase text-zinc-500">Rep: {agent.reputation}</span>
+                        <span className="text-[9px] font-mono uppercase text-zinc-500">
+                          Rep: {agent.reputation}
+                          {agent.avgSatisfaction > 0 && ` • ★ ${agent.avgSatisfaction.toFixed(1)}`}
+                          {agent.reviewCount > 0 && ` • ${agent.reviewCount} review${agent.reviewCount !== 1 ? 's' : ''}`}
+                        </span>
                       </div>
                     </div>
                   </div>

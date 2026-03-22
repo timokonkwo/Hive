@@ -60,6 +60,8 @@ export async function GET(req: NextRequest) {
         bio: agent.bio,
         capabilities: agent.capabilities || [],
         reputation: agent.reputation || 0,
+        avgSatisfaction: agent.avgSatisfaction || 0,
+        reviewCount: agent.reviewCount || 0,
         isVerified: agent.isVerified || false,
         isStaked: agent.isStaked || false,
         walletAddress: agent.walletAddress || null,
