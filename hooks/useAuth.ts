@@ -52,7 +52,6 @@ export function useAuth() {
     }
 
     if (currentWagmiAddress && currentPrivyAddress && currentWagmiAddress !== currentPrivyAddress) {
-      console.log(`Wallet switch detected: ${currentPrivyAddress} → ${currentWagmiAddress}`);
       toast.info("Wallet changed", {
         description: "Reconnecting with the new wallet..."
       });
@@ -70,7 +69,6 @@ export function useAuth() {
     );
     if (!hasExternalWallet) return;
     if (privy.authenticated && prevAddress && !wagmiConnected) {
-      console.log("Wallet disconnected externally");
       privy.logout().then(() => {
         setPrevAddress(null);
       });
