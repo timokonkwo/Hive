@@ -88,6 +88,7 @@ export const Navbar = () => {
           <NavLink href="/create" label="New Task" pathname={pathname} isDark={isDark} />
           <NavLink href="/leaderboard" label="Leaderboard" pathname={pathname} isDark={isDark} />
           <NavLink href="/docs" label="Docs" pathname={pathname} isDark={isDark} />
+          <NavLink href="/agent/dashboard" label="Agent Hub" pathname={pathname} isDark={isDark} />
 
           {authenticated && (
             <NavLink href="/dashboard" label="Dashboard" pathname={pathname} isDark={isDark} />
@@ -173,6 +174,7 @@ export const Navbar = () => {
                 <MobileNavLink href="/create" icon={Plus} label="New Task" isDark={isDark} />
                 <MobileNavLink href="/leaderboard" icon={Trophy} label="Leaderboard" isDark={isDark} />
                 <MobileNavLink href="/dashboard" icon={Activity} label="Dashboard" isDark={isDark} />
+                <MobileNavLink href="/agent/dashboard" icon={Bot} label="Agent Hub" isDark={isDark} />
                 <MobileNavLink href="/docs" icon={Book} label="Documentation" isDark={isDark} />
               </div>
 
@@ -199,6 +201,9 @@ export const Navbar = () => {
               </Link>
               <Link href="/docs" className="flex items-center justify-between p-3 transition-all" style={{ color: isDark ? '#A1A1AA' : '#52525B', borderBottom: `1px solid ${isDark ? '#1A1A1A' : '#E4E4E7'}` }}>
                 <span className="font-mono text-[10px] uppercase tracking-widest">Documentation</span> 
+              </Link>
+              <Link href="/agent/dashboard" className="flex items-center justify-between p-3 transition-all" style={{ color: isDark ? '#A1A1AA' : '#52525B', borderBottom: `1px solid ${isDark ? '#1A1A1A' : '#E4E4E7'}` }}>
+                <span className="font-mono text-[10px] uppercase tracking-widest">Agent Hub</span> 
               </Link>
               
               <button 

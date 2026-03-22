@@ -37,6 +37,21 @@ export async function GET() {
         description: 'Get your payment history and earnings summary.',
         auth: 'x-hive-api-key',
       },
+      'POST /api/agents/recover-key': {
+        description: 'Recover a lost API key. Supports recovery_code, wallet, or agent_id methods.',
+        auth: 'none',
+        body: { method: '"recovery_code" | "wallet" | "agent_id"', agentId: 'string', recoveryCode: 'string?', walletAddress: 'string?', agentName: 'string?' },
+      },
+      'POST /api/agents/verify-pin': {
+        description: 'Verify owner PIN for dashboard access. Requires API key + 6-digit PIN. Legacy agents (registered before PIN system) are allowed through with API key only.',
+        auth: 'x-hive-api-key',
+        body: { pin: 'string (6 digits)' },
+      },
+      'POST /api/agents/set-pin': {
+        description: 'Set or change the owner PIN. Requires API key auth. If a PIN already exists, the current PIN must also be provided.',
+        auth: 'x-hive-api-key',
+        body: { pin: 'string (6 digits)', currentPin: 'string? (required if changing existing PIN)' },
+      },
       'GET /api/agents/check-name': {
         description: 'Check if an agent name is available.',
         auth: 'none',

@@ -36,20 +36,57 @@ interface Payment {
 
 export default function AgentDashboardPage() {
   const [apiKey, setApiKey] = useState("");
+  const [ownerPin, setOwnerPin] = useState("");
   const [loading, setLoading] = useState(false);
   const [agent, setAgent] = useState<AgentData | null>(null);
   const [stats, setStats] = useState<any>(null);
   const [payments, setPayments] = useState<Payment[]>([]);
   const [paymentSummary, setPaymentSummary] = useState<any>(null);
   const [error, setError] = useState("");
+  const [isLegacy, setIsLegacy] = useState(false);
 
   // Solana balance state
   const [solBalance, setSolBalance] = useState<string | null>(null);
   const [usdcBalance, setUsdcBalance] = useState<string | null>(null);
+  const [showChangeWallet, setShowChangeWallet] = useState(false);
+  const [newWalletAddress, setNewWalletAddress] = useState("");
+  const [changingWallet, setChangingWallet] = useState(false);
+  const [setupPin, setSetupPin] = useState("");
+  const [settingPin, setSettingPin] = useState(false);
 
   const copyToClipboard = (text: string) => {
     navigator.clipboard.writeText(text);
     toast.success("Copied to clipboard");
+  };
+
+  const handleSetPin = async () => {
+    if (!/^\d{6}$/.test(setupPin)) {
+      toast.error("PIN must be exactly 6 digits");
+      return;
+    }
+    setSettingPin(true);
+    try {
+      const res = await fetch("/api/agents/set-pin", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "x-hive-api-key": apiKey,
+        },
+        body: JSON.stringify({ pin: setupPin }),
+      });
+      const data = await res.json();
+      if (res.ok) {
+        toast.success("Owner PIN set! You'll need it next time you log in.");
+        setIsLegacy(false);
+        setSetupPin("");
+      } else {
+        toast.error(data.error || "Failed to set PIN");
+      }
+    } catch {
+      toast.error("Failed to set PIN");
+    } finally {
+      setSettingPin(false);
+    }
   };
 
   const fetchBalances = useCallback(async (solanaAddr: string) => {
@@ -95,20 +132,38 @@ export default function AgentDashboardPage() {
     setError("");
 
     try {
-      // Fetch agent profile + stats
+      // Step 1: Verify PIN (or legacy access)
+      const pinRes = await fetch("/api/agents/verify-pin", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "x-hive-api-key": apiKey,
+        },
+        body: JSON.stringify({ pin: ownerPin || "000000" }),
+      });
+
+      const pinData = await pinRes.json();
+
+      if (!pinRes.ok) {
+        throw new Error(pinData.error || "Authentication failed");
+      }
+
+      if (pinData.legacy) {
+        setIsLegacy(true);
+      }
+
+      setAgent(pinData.agent);
+
+      // Step 2: Fetch payments + stats
       const [profileRes, paymentsRes] = await Promise.all([
         fetch("/api/agents/me", { headers: { "x-hive-api-key": apiKey } }),
         fetch("/api/agents/payments", { headers: { "x-hive-api-key": apiKey } }),
       ]);
 
-      if (!profileRes.ok) {
-        const data = await profileRes.json();
-        throw new Error(data.error || "Invalid API key");
+      if (profileRes.ok) {
+        const profileData = await profileRes.json();
+        setStats(profileData.stats);
       }
-
-      const profileData = await profileRes.json();
-      setAgent(profileData.agent);
-      setStats(profileData.stats);
 
       if (paymentsRes.ok) {
         const paymentsData = await paymentsRes.json();
@@ -117,8 +172,8 @@ export default function AgentDashboardPage() {
       }
 
       // Fetch Solana balance if address set
-      if (profileData.agent.solanaAddress) {
-        fetchBalances(profileData.agent.solanaAddress);
+      if (pinData.agent.solanaAddress) {
+        fetchBalances(pinData.agent.solanaAddress);
       }
     } catch (err: any) {
       setError(err.message);
@@ -128,7 +183,7 @@ export default function AgentDashboardPage() {
     }
   };
 
-  const connectSolanaWallet = async () => {
+  const connectSolanaWallet = async (isChange = false) => {
     try {
       const solWallet = (window as any).solana
         || (window as any).phantom?.solana
@@ -140,6 +195,11 @@ export default function AgentDashboardPage() {
           description: "Install Phantom, Solflare, or Backpack to connect.",
         });
         return;
+      }
+
+      // When changing wallet, disconnect first to force wallet selection
+      if (isChange && solWallet.disconnect) {
+        try { await solWallet.disconnect(); } catch { /* ignore */ }
       }
 
       const response = await solWallet.connect();
@@ -157,7 +217,7 @@ export default function AgentDashboardPage() {
 
       if (res.ok) {
         setAgent(prev => prev ? { ...prev, solanaAddress: connectedAddress } : prev);
-        toast.success("Solana wallet connected!");
+        toast.success(isChange ? "Wallet changed!" : "Solana wallet connected!");
         fetchBalances(connectedAddress);
       } else {
         const err = await res.json();
@@ -191,31 +251,39 @@ export default function AgentDashboardPage() {
             </p>
           </div>
 
-          {/* API Key Entry */}
+          {/* API Key + PIN Entry */}
           {!agent ? (
             <div className="max-w-md mx-auto space-y-4">
               <div className="bg-[#0A0A0A] border border-white/10 rounded-sm p-6">
                 <h3 className="font-bold font-mono text-sm uppercase mb-4 flex items-center gap-2">
-                  <Key size={14} /> Enter Agent API Key
+                  <Key size={14} /> Owner Authentication
                 </h3>
                 <p className="text-zinc-500 text-xs font-mono mb-4">
-                  Paste your agent&apos;s API key to access the dashboard.
+                  Enter your agent&apos;s API key and owner PIN to access the dashboard.
                 </p>
-                <div className="flex gap-2">
+                <div className="space-y-3">
                   <input
                     type="password"
                     value={apiKey}
                     onChange={(e) => setApiKey(e.target.value)}
-                    placeholder="hive_sk_..."
-                    className="flex-1 bg-black border border-zinc-800 rounded-sm px-4 py-3 text-white text-sm font-mono outline-none focus:border-emerald-500 transition-colors"
+                    placeholder="API Key: hive_sk_..."
+                    className="w-full bg-black border border-zinc-800 rounded-sm px-4 py-3 text-white text-sm font-mono outline-none focus:border-emerald-500 transition-colors"
+                  />
+                  <input
+                    type="password"
+                    value={ownerPin}
+                    onChange={(e) => setOwnerPin(e.target.value)}
+                    placeholder="Owner PIN: 6-digit code"
+                    maxLength={6}
+                    className="w-full bg-black border border-zinc-800 rounded-sm px-4 py-3 text-white text-sm font-mono outline-none focus:border-emerald-500 transition-colors"
                   />
                   <button
                     onClick={loadDashboard}
                     disabled={loading || !apiKey}
-                    className="px-6 py-3 bg-emerald-600 hover:bg-emerald-500 text-white font-bold font-mono text-xs uppercase tracking-widest rounded-sm transition-colors disabled:opacity-40 flex items-center gap-2"
+                    className="w-full px-6 py-3 bg-emerald-600 hover:bg-emerald-500 text-white font-bold font-mono text-xs uppercase tracking-widest rounded-sm transition-colors disabled:opacity-40 flex items-center justify-center gap-2"
                   >
                     {loading ? <Loader2 size={14} className="animate-spin" /> : <Shield size={14} />}
-                    {loading ? "Loading..." : "Access"}
+                    {loading ? "Verifying..." : "Access Dashboard"}
                   </button>
                 </div>
               </div>
@@ -229,14 +297,54 @@ export default function AgentDashboardPage() {
 
               <div className="bg-amber-500/5 border border-amber-500/20 p-3 rounded-sm">
                 <p className="text-amber-400 text-[11px]">
-                  <strong>For agent owners.</strong> This dashboard lets you manage your agent&apos;s payment wallet and view earnings. Your agent uses its API key via APIs to bid on and complete tasks.
+                  <strong>For agent owners.</strong> The owner PIN was provided at registration alongside your API key. Your agent uses the API key for task operations — the PIN is an additional layer required only for this dashboard.
                 </p>
               </div>
+
+              <a
+                href="/agent/recover"
+                className="block text-center text-[10px] text-zinc-600 hover:text-amber-400 font-mono uppercase tracking-widest transition-colors"
+              >
+                Lost your API key or PIN? → Recover
+              </a>
             </div>
           ) : (
-            <div className="grid md:grid-cols-3 gap-6">
+            <div className="space-y-6">
+              {/* Legacy PIN Setup — inline form */}
+              {isLegacy && (
+                <div className="bg-amber-500/5 border border-amber-500/30 rounded-lg p-5">
+                  <div className="flex items-start gap-3">
+                    <Shield size={18} className="text-amber-500 mt-0.5 shrink-0" />
+                    <div className="flex-1">
+                      <h3 className="font-bold font-mono text-sm text-amber-400 uppercase mb-1">Set Owner PIN</h3>
+                      <p className="text-zinc-400 text-xs font-mono mb-3 leading-relaxed">
+                        Your agent was registered before the PIN system. Set a 6-digit PIN now to secure your dashboard access.
+                      </p>
+                      <div className="flex gap-2">
+                        <input
+                          type="password"
+                          value={setupPin}
+                          onChange={(e) => setSetupPin(e.target.value)}
+                          placeholder="6-digit PIN"
+                          maxLength={6}
+                          className="flex-1 bg-black border border-zinc-700 rounded-sm px-3 py-2 text-white text-sm font-mono outline-none focus:border-amber-500 transition-colors"
+                        />
+                        <button
+                          onClick={handleSetPin}
+                          disabled={settingPin || setupPin.length !== 6}
+                          className="px-4 py-2 bg-amber-600 hover:bg-amber-500 text-white font-bold font-mono text-[10px] uppercase tracking-widest rounded-sm transition-colors disabled:opacity-40"
+                        >
+                          {settingPin ? "Saving..." : "Set PIN"}
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              <div className="grid md:grid-cols-5 gap-6">
               {/* Left Column — Profile & Wallet */}
-              <div className="space-y-6">
+              <div className="md:col-span-2 space-y-6">
                 {/* Agent Profile */}
                 <div className="bg-zinc-900/30 border border-zinc-800 rounded-lg p-6">
                   <div className="flex items-center gap-3 mb-4">
@@ -299,11 +407,58 @@ export default function AgentDashboardPage() {
                         </p>
                       </div>
                       <button
-                        onClick={connectSolanaWallet}
+                        onClick={() => setShowChangeWallet(!showChangeWallet)}
                         className="w-full text-center text-[10px] text-zinc-600 hover:text-amber-400 font-mono uppercase tracking-widest transition-colors py-1"
                       >
-                        Change wallet
+                        {showChangeWallet ? "Cancel" : "Change wallet"}
                       </button>
+
+                      {showChangeWallet && (
+                        <div className="space-y-2 pt-1">
+                          <input
+                            type="text"
+                            value={newWalletAddress}
+                            onChange={(e) => setNewWalletAddress(e.target.value)}
+                            placeholder="Paste new Solana address..."
+                            className="w-full bg-black border border-zinc-700 rounded-sm px-3 py-2 text-white text-xs font-mono outline-none focus:border-amber-500 transition-colors"
+                          />
+                          <button
+                            onClick={async () => {
+                              const addr = newWalletAddress.trim();
+                              if (!addr || addr.length < 32 || addr.length > 58) {
+                                toast.error("Invalid Solana address");
+                                return;
+                              }
+                              setChangingWallet(true);
+                              try {
+                                const res = await fetch("/api/agents/me", {
+                                  method: "PATCH",
+                                  headers: { "Content-Type": "application/json", "x-hive-api-key": apiKey },
+                                  body: JSON.stringify({ solanaAddress: addr }),
+                                });
+                                if (res.ok) {
+                                  setAgent(prev => prev ? { ...prev, solanaAddress: addr } : prev);
+                                  toast.success("Wallet updated!");
+                                  fetchBalances(addr);
+                                  setShowChangeWallet(false);
+                                  setNewWalletAddress("");
+                                } else {
+                                  const err = await res.json();
+                                  toast.error(err.error || "Failed to update wallet");
+                                }
+                              } catch {
+                                toast.error("Failed to update wallet");
+                              } finally {
+                                setChangingWallet(false);
+                              }
+                            }}
+                            disabled={changingWallet || !newWalletAddress.trim()}
+                            className="w-full py-2 bg-amber-600 hover:bg-amber-500 text-white font-bold font-mono text-[10px] uppercase tracking-widest rounded-sm transition-colors disabled:opacity-40"
+                          >
+                            {changingWallet ? "Saving..." : "Save New Address"}
+                          </button>
+                        </div>
+                      )}
                     </div>
                   ) : (
                     <div className="space-y-3">
@@ -311,8 +466,8 @@ export default function AgentDashboardPage() {
                         <Wallet className="w-8 h-8 text-purple-500 mx-auto mb-3 opacity-50" />
                         <p className="text-zinc-500 text-xs font-mono mb-4">No payment wallet set</p>
                         <button
-                          onClick={connectSolanaWallet}
-                          className="px-6 py-2.5 bg-purple-600 hover:bg-purple-500 text-white font-bold font-mono text-xs uppercase tracking-widest rounded-lg transition-all flex items-center gap-2 mx-auto shadow-[0_0_15px_rgba(147,51,234,0.2)]"
+                          onClick={() => connectSolanaWallet(false)}
+                          className="w-full px-6 py-2.5 bg-purple-600 hover:bg-purple-500 text-white font-bold font-mono text-xs uppercase tracking-widest rounded-sm transition-all flex items-center justify-center gap-2"
                         >
                           <Wallet size={14} /> Connect Solana Wallet
                         </button>
@@ -328,7 +483,7 @@ export default function AgentDashboardPage() {
               </div>
 
               {/* Right Column — Earnings & Payment History */}
-              <div className="md:col-span-2 space-y-6">
+              <div className="md:col-span-3 space-y-6">
                 {/* Stats */}
                 <div className="grid grid-cols-3 gap-4">
                   <div className="bg-zinc-900/30 border border-zinc-800 rounded-lg p-4">
@@ -405,6 +560,7 @@ export default function AgentDashboardPage() {
                   )}
                 </div>
               </div>
+            </div>
             </div>
           )}
 

@@ -167,7 +167,7 @@ export async function POST(
   } catch (error: any) {
     console.error('[HIVE] Work submission error:', error);
     return NextResponse.json(
-      { error: error.message || 'Failed to submit work' },
+      { error: 'Failed to submit work.' },
       { status: 500 }
     );
   }
