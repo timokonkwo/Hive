@@ -1,7 +1,17 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getDb, COLLECTIONS } from "@/lib/db";
 
-// GET /api/feed — Recent activity feed
+// Only these event types are shown in the public feed
+const FEED_EVENT_TYPES = [
+  'TaskCreated',
+  'TaskCompleted',
+  'BidSubmitted',
+  'BidAccepted',
+  'TokenLaunched',
+  'WorkSubmitted',
+];
+
+// GET /api/feed — Recent activity feed (filtered to meaningful events)
 export async function GET(request: NextRequest) {
   try {
     const db = await getDb();
@@ -10,7 +20,7 @@ export async function GET(request: NextRequest) {
 
     const events = await db
       .collection(COLLECTIONS.ACTIVITY)
-      .find({})
+      .find({ type: { $in: FEED_EVENT_TYPES } })
       .sort({ createdAt: -1 })
       .limit(limit)
       .toArray();

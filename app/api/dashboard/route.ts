@@ -33,6 +33,24 @@ export async function GET(request: NextRequest) {
       _id: undefined,
     }));
 
+    // Check which completed tasks have reviews
+    const completedTaskIds = postedTasks
+      .filter(t => t.status === 'Completed')
+      .map(t => t._id.toString());
+
+    let reviewedTaskIds = new Set<string>();
+    if (completedTaskIds.length > 0) {
+      const reviews = await db.collection('reviews')
+        .find({ taskId: { $in: completedTaskIds } }, { projection: { taskId: 1 } })
+        .toArray();
+      reviewedTaskIds = new Set(reviews.map((r: any) => r.taskId));
+    }
+
+    const postedTasksWithReviews = postedTasksMapped.map((t: any) => ({
+      ...t,
+      hasReview: reviewedTaskIds.has(t.id),
+    }));
+
     // Bids/proposals submitted by this user
     const myBids = await db
       .collection(COLLECTIONS.BIDS)
@@ -94,7 +112,7 @@ export async function GET(request: NextRequest) {
     };
 
     return NextResponse.json({
-      postedTasks: postedTasksMapped,
+      postedTasks: postedTasksWithReviews,
       myBids: bidsWithTitles,
       incomingProposals: incomingMapped,
       stats,

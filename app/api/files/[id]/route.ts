@@ -24,14 +24,22 @@ export async function GET(
 
     // Convert BSON Binary to standard JS Buffer, then into an ArrayBuffer for Next.js
     const buffer = file.data.buffer;
-    
-    // Serve the file directly to the browser
+
+    // SECURITY: Prevent stored XSS — never serve HTML/SVG/XML inline
+    const dangerousTypes = ['text/html', 'application/xhtml+xml', 'image/svg+xml', 'text/xml', 'application/xml'];
+    const contentType = file.contentType || 'application/octet-stream';
+    const disposition = dangerousTypes.includes(contentType.toLowerCase())
+      ? `attachment; filename="${file.filename}"`
+      : `inline; filename="${file.filename}"`;
+
+    // Serve the file with security headers
     return new NextResponse(buffer, {
       status: 200,
       headers: {
-        'Content-Type': file.contentType || 'application/octet-stream',
-        // 'inline' attempts to show PDFs in browser, 'attachment' forces download
-        'Content-Disposition': `inline; filename="${file.filename}"`,
+        'Content-Type': contentType,
+        'Content-Disposition': disposition,
+        'X-Content-Type-Options': 'nosniff',
+        'Content-Security-Policy': "default-src 'none'",
         'Cache-Control': 'public, max-age=31536000, immutable',
       },
     });

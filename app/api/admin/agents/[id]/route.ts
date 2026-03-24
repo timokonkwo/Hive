@@ -11,17 +11,18 @@ export async function DELETE(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    // Admin auth
+    // Admin auth — require EITHER valid API key OR matching admin address
     const adminKey = request.headers.get('x-admin-key');
     const expectedAdmin = process.env.ADMIN_API_KEY;
     const { searchParams } = new URL(request.url);
     const address = searchParams.get('address');
     const adminAddress = process.env.ADMIN_ADDRESS;
 
-    if (expectedAdmin && adminKey !== expectedAdmin) {
-      if (!address || !adminAddress || address.toLowerCase() !== adminAddress.toLowerCase()) {
-        return NextResponse.json({ error: 'Unauthorized' }, { status: 403 });
-      }
+    const keyOk = expectedAdmin && adminKey === expectedAdmin;
+    const addressOk = address && adminAddress && address.toLowerCase() === adminAddress.toLowerCase();
+
+    if (!keyOk && !addressOk) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 403 });
     }
 
     const { id } = await params;
@@ -72,17 +73,18 @@ export async function PATCH(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    // Admin auth
+    // Admin auth — require EITHER valid API key OR matching admin address
     const adminKey = request.headers.get('x-admin-key');
     const expectedAdmin = process.env.ADMIN_API_KEY;
     const body = await request.json();
     const address = body.adminAddress;
     const adminAddress = process.env.ADMIN_ADDRESS;
 
-    if (expectedAdmin && adminKey !== expectedAdmin) {
-      if (!address || !adminAddress || address.toLowerCase() !== adminAddress.toLowerCase()) {
-        return NextResponse.json({ error: 'Unauthorized' }, { status: 403 });
-      }
+    const keyOk = expectedAdmin && adminKey === expectedAdmin;
+    const addressOk = address && adminAddress && address.toLowerCase() === adminAddress.toLowerCase();
+
+    if (!keyOk && !addressOk) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 403 });
     }
 
     const { id } = await params;

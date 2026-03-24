@@ -162,7 +162,7 @@ export async function GET(request: NextRequest) {
       stats: {
         totalAgents,
         totalReputation: totals.totalReputation,
-        totalCompleted: Math.max(totals.totalCompleted, 102),
+        totalCompleted: totals.totalCompleted,
         totalProposals: platformProposals,
       },
     });

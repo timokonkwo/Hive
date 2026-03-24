@@ -4,20 +4,18 @@ import { getDb, COLLECTIONS } from "@/lib/db";
 // GET /api/admin/stats — Full platform statistics (admin only)
 export async function GET(request: NextRequest) {
   try {
-    // Simple admin check via header or query param
+    // Admin auth — require EITHER valid API key OR matching admin address
     const adminKey = request.headers.get("x-admin-key");
     const expectedAdmin = process.env.ADMIN_API_KEY;
-    
-    // Allow if admin key matches OR if no key is configured (dev mode)
-    if (expectedAdmin && adminKey !== expectedAdmin) {
-      // Fallback: check address query param against server-only ADMIN_ADDRESS
-      const { searchParams } = new URL(request.url);
-      const address = searchParams.get("address");
-      const adminAddress = process.env.ADMIN_ADDRESS;
-      
-      if (!address || !adminAddress || address.toLowerCase() !== adminAddress.toLowerCase()) {
-        return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
-      }
+    const { searchParams } = new URL(request.url);
+    const address = searchParams.get("address");
+    const adminAddress = process.env.ADMIN_ADDRESS;
+
+    const keyOk = expectedAdmin && adminKey === expectedAdmin;
+    const addressOk = address && adminAddress && address.toLowerCase() === adminAddress.toLowerCase();
+
+    if (!keyOk && !addressOk) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
     }
 
     const db = await getDb();
