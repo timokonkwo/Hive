@@ -67,6 +67,23 @@ export async function GET(
       }
     }
 
+    // Check if a review exists for this task
+    let review = null;
+    if (task.status === 'Completed') {
+      const existingReview = await db.collection('reviews').findOne(
+        { taskId: task._id.toString() },
+        { projection: { satisfaction: 1, comment: 1, tags: 1, createdAt: 1 } }
+      );
+      if (existingReview) {
+        review = {
+          satisfaction: existingReview.satisfaction,
+          comment: existingReview.comment,
+          tags: existingReview.tags,
+          createdAt: existingReview.createdAt,
+        };
+      }
+    }
+
     return NextResponse.json({
       ...task,
       id: task._id.toString(),
@@ -74,6 +91,8 @@ export async function GET(
       _id: undefined,
       proposalsCount,
       tokenLaunch,
+      hasReview: !!review,
+      review,
     });
   } catch (error) {
     console.error("GET /api/tasks/[id] error:", error);

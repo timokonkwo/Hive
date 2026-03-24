@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getDb } from '@/lib/db';
 
 const HIVE_TOKEN_CA = '6JfonM6a24xngXh5yJ1imZzbMhpfvEsiafkb4syHBAGS';
+const BAGS_API_BASE = 'https://public-api-v2.bags.fm/api/v1';
 const LAMPORTS_PER_SOL = 1_000_000_000;
 const FEES_CACHE_TTL = 5 * 60 * 1000; // 5 minutes
 
@@ -112,6 +113,54 @@ export async function GET(req: NextRequest) {
       }
     }
 
+    // Bags SDK: also fetch claim stats + creators
+    let claimStats: any[] = [];
+    let tokenCreators: any[] = [];
+
+    if (bagsApiKey && lifetimeFees) {
+      try {
+        const [claimRes, creatorsRes] = await Promise.allSettled([
+          withTimeout(
+            fetch(`${BAGS_API_BASE}/token-launch/claim-stats?tokenMint=${HIVE_TOKEN_CA}`, {
+              headers: { 'x-api-key': bagsApiKey },
+            }),
+            5000
+          ),
+          withTimeout(
+            fetch(`${BAGS_API_BASE}/token-launch/creator/v3?tokenMint=${HIVE_TOKEN_CA}`, {
+              headers: { 'x-api-key': bagsApiKey },
+            }),
+            5000
+          ),
+        ]);
+
+        if (claimRes.status === 'fulfilled' && claimRes.value.ok) {
+          const data = await claimRes.value.json();
+          claimStats = (data.response || []).map((c: any) => ({
+            wallet: c.wallet,
+            totalClaimed: c.totalClaimed,
+            username: c.providerUsername || c.bagsUsername || c.username,
+            pfp: c.pfp,
+            isCreator: c.isCreator,
+          }));
+        }
+
+        if (creatorsRes.status === 'fulfilled' && creatorsRes.value.ok) {
+          const data = await creatorsRes.value.json();
+          tokenCreators = (data.response || []).map((c: any) => ({
+            wallet: c.wallet,
+            username: c.providerUsername || c.bagsUsername || c.username,
+            pfp: c.pfp,
+            royaltyBps: c.royaltyBps,
+            twitter: c.twitterUsername,
+            isCreator: c.isCreator,
+          }));
+        }
+      } catch (e: any) {
+        console.error('[REVENUE] Bags additional data error:', e.message);
+      }
+    }
+
     return NextResponse.json({
       success: true,
       platform: {
@@ -124,6 +173,8 @@ export async function GET(req: NextRequest) {
         totalEarnings,
       },
       lifetimeFees,
+      claimStats,
+      tokenCreators,
       lastUpdated: new Date().toISOString(),
     });
   } catch (error: any) {

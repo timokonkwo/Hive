@@ -19,7 +19,7 @@ export async function GET() {
       totalAgents,
       totalTasks,
       openTasks,
-      completedTasks: Math.max(completedTasks, 102),
+      completedTasks,
       totalProposals,
     });
   } catch (error) {

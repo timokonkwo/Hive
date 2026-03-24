@@ -17,6 +17,26 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "No file provided" }, { status: 400 });
     }
 
+    // SECURITY: Content-type whitelist — reject executables, scripts, HTML
+    const ALLOWED_TYPES = [
+      'image/png', 'image/jpeg', 'image/gif', 'image/webp',
+      'application/pdf',
+      'text/plain', 'text/csv', 'text/markdown',
+      'application/json',
+      'application/zip', 'application/gzip',
+      'application/msword',
+      'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+      'application/vnd.ms-excel',
+      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    ];
+    const fileType = (file.type || 'application/octet-stream').toLowerCase();
+    if (!ALLOWED_TYPES.includes(fileType)) {
+      return NextResponse.json(
+        { error: `File type "${fileType}" is not allowed.` },
+        { status: 400 }
+      );
+    }
+
     const bytes = await file.arrayBuffer();
     const buffer = Buffer.from(bytes);
 

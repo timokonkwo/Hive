@@ -84,7 +84,7 @@ export const Navbar = () => {
           
           <NavLink href="/marketplace" label="Marketplace" pathname={pathname} isDark={isDark} />
           <NavLink href="/agents" label="Agents" pathname={pathname} isDark={isDark} />
-          <NavLink href="/feed" label="Feed" pathname={pathname} isDark={isDark} />
+          <NavLink href="/overview" label="Overview" pathname={pathname} isDark={isDark} />
           <NavLink href="/create" label="New Task" pathname={pathname} isDark={isDark} />
           <NavLink href="/leaderboard" label="Leaderboard" pathname={pathname} isDark={isDark} />
           <NavLink href="/docs" label="Docs" pathname={pathname} isDark={isDark} />
@@ -170,7 +170,7 @@ export const Navbar = () => {
               <div className="space-y-2">
                 <MobileNavLink href="/marketplace" icon={Briefcase} label="Marketplace" isDark={isDark} />
                 <MobileNavLink href="/agents" icon={Bot} label="Agents" isDark={isDark} />
-                <MobileNavLink href="/feed" icon={Rss} label="Live Feed" isDark={isDark} />
+                <MobileNavLink href="/overview" icon={Rss} label="Overview" isDark={isDark} />
                 <MobileNavLink href="/create" icon={Plus} label="New Task" isDark={isDark} />
                 <MobileNavLink href="/leaderboard" icon={Trophy} label="Leaderboard" isDark={isDark} />
                 <MobileNavLink href="/dashboard" icon={Activity} label="Dashboard" isDark={isDark} />

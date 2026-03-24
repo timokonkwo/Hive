@@ -379,6 +379,40 @@ export default function TaskDetailsPage({ params }: { params: Promise<{ taskId: 
     handleCompleteTask();
   };
 
+  // Standalone review for already-completed tasks
+  const [submittingReview, setSubmittingReview] = useState(false);
+
+  const handleStandaloneReview = async () => {
+    if (reviewSatisfaction < 1) {
+      toast.error('Please select a rating before submitting.');
+      return;
+    }
+    setSubmittingReview(true);
+    try {
+      const res = await fetch(`/api/tasks/${taskId}/review`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          clientAddress: user?.wallet?.address,
+          satisfaction: reviewSatisfaction,
+          comment: reviewComment.trim() || undefined,
+          tags: reviewTags.length > 0 ? reviewTags : undefined,
+        }),
+      });
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.error);
+      }
+      setShowReviewModal(false);
+      setTask((prev: any) => prev ? { ...prev, hasReview: true, review: { satisfaction: reviewSatisfaction, comment: reviewComment.trim(), tags: reviewTags, createdAt: new Date().toISOString() } } : prev);
+      toast.success('Review submitted!', { description: 'Thank you for your feedback.' });
+    } catch (error: any) {
+      toast.error(error.message || 'Failed to submit review.');
+    } finally {
+      setSubmittingReview(false);
+    }
+  };
+
   // === REJECTION FLOW ===
   const handleRejectWork = async () => {
     if (rejectReason.trim().length < 10) {
@@ -765,7 +799,7 @@ export default function TaskDetailsPage({ params }: { params: Promise<{ taskId: 
                                 </div>
 
                                 {task.status === 'Completed' && (
-                                  <div className="flex items-center gap-3">
+                                  <div className="flex items-center gap-3 flex-wrap">
                                     {task.paymentTxSignature && (
                                       <span className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-emerald-500/10 border border-emerald-500/20 rounded-full text-xs font-mono text-emerald-400">
                                         <CheckCircle size={10} /> Paid ${task.paidAmount || task.budgetAmount || '0'} USDC
@@ -780,6 +814,19 @@ export default function TaskDetailsPage({ params }: { params: Promise<{ taskId: 
                                       >
                                           <ExternalLink size={10} /> Solscan
                                       </a>
+                                    )}
+                                    {isTaskPoster && !task.hasReview && (
+                                      <button
+                                        onClick={handleStartApproval}
+                                        className="px-4 py-2 bg-amber-500/10 border border-amber-500/30 text-amber-400 hover:bg-amber-500/20 font-bold font-mono text-xs uppercase tracking-widest rounded-lg flex items-center gap-2 transition-all"
+                                      >
+                                        <Star size={14} /> Leave Review
+                                      </button>
+                                    )}
+                                    {task.hasReview && task.review && (
+                                      <span className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-amber-500/10 border border-amber-500/20 rounded-full text-xs font-mono text-amber-400">
+                                        <Star size={10} className="fill-amber-400" /> {task.review.satisfaction}/5 Reviewed
+                                      </span>
                                     )}
                                   </div>
                                 )}
@@ -1125,11 +1172,12 @@ export default function TaskDetailsPage({ params }: { params: Promise<{ taskId: 
                 Cancel
               </button>
               <button
-                onClick={handleReviewSubmitAndPay}
-                disabled={reviewSatisfaction < 1}
+                onClick={task?.status === 'Completed' ? handleStandaloneReview : handleReviewSubmitAndPay}
+                disabled={reviewSatisfaction < 1 || submittingReview}
                 className="flex-1 px-4 py-3 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg font-bold font-mono text-xs uppercase tracking-widest transition-colors disabled:opacity-40 flex items-center justify-center gap-2"
               >
-                <Coins size={14} /> {task?.budgetAmount > 0 ? 'Continue to Payment' : 'Complete Task'}
+                {submittingReview ? <Loader2 size={14} className="animate-spin" /> : task?.status === 'Completed' ? <Star size={14} /> : <Coins size={14} />}
+                {task?.status === 'Completed' ? 'Submit Review' : task?.budgetAmount > 0 ? 'Continue to Payment' : 'Complete Task'}
               </button>
             </div>
           </div>

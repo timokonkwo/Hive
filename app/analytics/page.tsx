@@ -26,6 +26,23 @@ function pct(count: number | undefined, total: number | undefined): string {
   return `${Math.round((count / total) * 100)}%`;
 }
 
+interface ClaimStat {
+  wallet: string;
+  totalClaimed: number;
+  username?: string;
+  pfp?: string;
+  isCreator?: boolean;
+}
+
+interface TokenCreator {
+  wallet: string;
+  username?: string;
+  pfp?: string;
+  royaltyBps?: number;
+  twitter?: string;
+  isCreator?: boolean;
+}
+
 interface AnalyticsData {
   platform: {
     totalTasks: number;
@@ -37,6 +54,8 @@ interface AnalyticsData {
     totalEarnings: number;
   };
   lifetimeFees: { sol: number; usd: number | null } | null;
+  claimStats: ClaimStat[];
+  tokenCreators: TokenCreator[];
   lastUpdated: string;
 }
 
@@ -181,6 +200,65 @@ export default function AnalyticsPage() {
             )}
           </div>
         </div>
+
+        {/* Bags Integration — Claim Stats & Token Creators */}
+        {(data?.claimStats?.length ?? 0) > 0 && (
+          <div className="mb-8 p-6 bg-zinc-900/30 border border-zinc-800/50 rounded-sm">
+            <h3 className="text-xs font-bold font-mono uppercase tracking-widest text-violet-400 mb-5 flex items-center gap-2">
+              <TrendingUp size={13} className="text-violet-400" />
+              Fee Claimants
+            </h3>
+            <div className="space-y-3">
+              {data!.claimStats.map((cs, i) => (
+                <div key={cs.wallet || i} className="flex items-center justify-between py-2 border-b border-zinc-800/40 last:border-0">
+                  <div className="flex items-center gap-3">
+                    {cs.pfp ? (
+                      <img src={cs.pfp} alt="" className="w-6 h-6 rounded-full object-cover" />
+                    ) : (
+                      <div className="w-6 h-6 rounded-full bg-zinc-800" />
+                    )}
+                    <div>
+                      <span className="text-sm text-white font-mono">{cs.username || `${cs.wallet.slice(0, 6)}...${cs.wallet.slice(-4)}`}</span>
+                      {cs.isCreator && <span className="ml-2 text-[9px] text-violet-400 font-mono uppercase">Creator</span>}
+                    </div>
+                  </div>
+                  <span className="text-sm font-bold text-emerald-400 font-mono">
+                    {typeof cs.totalClaimed === 'number' ? `${(cs.totalClaimed / 1e9).toFixed(4)} SOL` : '—'}
+                  </span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {(data?.tokenCreators?.length ?? 0) > 0 && (
+          <div className="mb-8 p-6 bg-zinc-900/30 border border-zinc-800/50 rounded-sm">
+            <h3 className="text-xs font-bold font-mono uppercase tracking-widest text-violet-400 mb-5 flex items-center gap-2">
+              <Users size={13} className="text-violet-400" />
+              HIVE Token Creators
+            </h3>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              {data!.tokenCreators.map((tc, i) => (
+                <div key={tc.wallet || i} className="flex items-center gap-3 p-3 bg-zinc-800/20 rounded-sm border border-zinc-800/30">
+                  {tc.pfp ? (
+                    <img src={tc.pfp} alt="" className="w-8 h-8 rounded-full object-cover" />
+                  ) : (
+                    <div className="w-8 h-8 rounded-full bg-zinc-700" />
+                  )}
+                  <div className="flex-1 min-w-0">
+                    <div className="text-sm text-white font-mono truncate">{tc.username || `${tc.wallet.slice(0, 6)}...${tc.wallet.slice(-4)}`}</div>
+                    <div className="flex items-center gap-3 text-[10px] text-zinc-500 font-mono">
+                      {tc.royaltyBps != null && <span>Royalty: {(tc.royaltyBps / 100).toFixed(2)}%</span>}
+                      {tc.twitter && (
+                        <a href={`https://x.com/${tc.twitter}`} target="_blank" rel="noopener noreferrer" className="text-blue-400 hover:text-blue-300">@{tc.twitter}</a>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
 
         {/* Footer */}
         <div className="text-center text-[10px] font-mono text-zinc-600">

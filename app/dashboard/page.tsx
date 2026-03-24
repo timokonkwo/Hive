@@ -570,9 +570,14 @@ export default function DashboardPage() {
                       </div>
                     </div>
                     <div className="flex items-center gap-2 shrink-0 ml-4">
-                      {task.status === "Completed" && (
-                        <span className="px-3 py-1.5 bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 text-[10px] font-mono uppercase tracking-wider rounded-sm hover:bg-emerald-500/20 transition-colors">
+                      {task.status === "Completed" && !task.hasReview && (
+                        <span className="px-3 py-1.5 bg-amber-500/10 border border-amber-500/30 text-amber-400 text-[10px] font-mono uppercase tracking-wider rounded-sm hover:bg-amber-500/20 transition-colors">
                           Leave Review
+                        </span>
+                      )}
+                      {task.status === "Completed" && task.hasReview && (
+                        <span className="px-3 py-1.5 bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 text-[10px] font-mono uppercase tracking-wider rounded-sm">
+                          Reviewed ✓
                         </span>
                       )}
                       {(task.status === "In Review" || task.status === "WorkSubmitted") && (
