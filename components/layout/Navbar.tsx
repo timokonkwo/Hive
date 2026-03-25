@@ -4,7 +4,7 @@ import React from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { usePathname } from "next/navigation";
-import { Menu, X, Book, Activity, Trophy, Rss, LogOut, Briefcase, Plus, Sun, Moon, Bot } from "lucide-react";
+import { Menu, X, Book, Activity, Trophy, Rss, LogOut, Briefcase, Plus, Sun, Moon, Bot, Map } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { useTheme } from "@/components/providers/ThemeProvider";
 
@@ -88,6 +88,7 @@ export const Navbar = () => {
           <NavLink href="/create" label="New Task" pathname={pathname} isDark={isDark} />
           <NavLink href="/leaderboard" label="Leaderboard" pathname={pathname} isDark={isDark} />
           <NavLink href="/docs" label="Docs" pathname={pathname} isDark={isDark} />
+          <NavLink href="/roadmap" label="Roadmap" pathname={pathname} isDark={isDark} />
           <NavLink href="/agent/dashboard" label="Agent Hub" pathname={pathname} isDark={isDark} />
 
           {authenticated && (
@@ -176,6 +177,7 @@ export const Navbar = () => {
                 <MobileNavLink href="/dashboard" icon={Activity} label="Dashboard" isDark={isDark} />
                 <MobileNavLink href="/agent/dashboard" icon={Bot} label="Agent Hub" isDark={isDark} />
                 <MobileNavLink href="/docs" icon={Book} label="Documentation" isDark={isDark} />
+                <MobileNavLink href="/roadmap" icon={Map} label="Roadmap" isDark={isDark} />
               </div>
 
               <div className="h-[1px]" style={{ background: isDark ? '#1A1A1A' : '#E4E4E7' }}></div>
@@ -201,6 +203,9 @@ export const Navbar = () => {
               </Link>
               <Link href="/docs" className="flex items-center justify-between p-3 transition-all" style={{ color: isDark ? '#A1A1AA' : '#52525B', borderBottom: `1px solid ${isDark ? '#1A1A1A' : '#E4E4E7'}` }}>
                 <span className="font-mono text-[10px] uppercase tracking-widest">Documentation</span> 
+              </Link>
+              <Link href="/roadmap" className="flex items-center justify-between p-3 transition-all" style={{ color: isDark ? '#A1A1AA' : '#52525B', borderBottom: `1px solid ${isDark ? '#1A1A1A' : '#E4E4E7'}` }}>
+                <span className="font-mono text-[10px] uppercase tracking-widest">Roadmap</span> 
               </Link>
               <Link href="/agent/dashboard" className="flex items-center justify-between p-3 transition-all" style={{ color: isDark ? '#A1A1AA' : '#52525B', borderBottom: `1px solid ${isDark ? '#1A1A1A' : '#E4E4E7'}` }}>
                 <span className="font-mono text-[10px] uppercase tracking-widest">Agent Hub</span> 
