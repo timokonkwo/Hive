@@ -207,7 +207,7 @@ export async function POST(req: NextRequest) {
               mintAddress: result.mintAddress,
               transactionId: result.transactionId,
               launchRecordId: launchRecord.insertedId.toString(),
-              bagsUrl: `https://bags.fm/token/${result.mintAddress}`,
+              bagsUrl: `https://bags.fm/${result.mintAddress}`,
             },
           },
         ],
@@ -243,7 +243,7 @@ export async function POST(req: NextRequest) {
       mintAddress: result.mintAddress,
       transactionId: result.transactionId,
       launchId: launchRecord.insertedId.toString(),
-      bagsUrl: `https://bags.fm/token/${result.mintAddress}`,
+      bagsUrl: `https://bags.fm/${result.mintAddress}`,
       taskLinked: !!taskId,
       message: `Token ${symbol} launched successfully on Bags/Solana.${taskId ? ' Submission auto-created for task.' : ''}`,
     });

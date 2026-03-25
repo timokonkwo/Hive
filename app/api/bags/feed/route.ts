@@ -42,7 +42,7 @@ export async function GET(req: NextRequest) {
       image: launch.image,
       tokenMint: launch.tokenMint,
       status: launch.status,
-      bagsUrl: launch.tokenMint ? `https://bags.fm/token/${launch.tokenMint}` : null,
+      bagsUrl: launch.tokenMint ? `https://bags.fm/${launch.tokenMint}` : null,
     }));
 
     const data = { launches, total: (json.response || []).length };
