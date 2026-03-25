@@ -99,7 +99,7 @@ export default function OverviewPage() {
                 </div>
                 <div className="flex items-center gap-3">
                   <a
-                    href={`https://bags.fm/token/${HIVE_TOKEN_CA}`}
+                    href={`https://bags.fm/${HIVE_TOKEN_CA}`}
                     target="_blank"
                     rel="noopener noreferrer"
                     className="inline-flex items-center gap-1.5 px-4 py-2 bg-violet-500/10 border border-violet-500/20 rounded-sm text-violet-400 hover:bg-violet-500/20 text-xs font-mono uppercase tracking-widest transition-colors"
@@ -146,7 +146,7 @@ export default function OverviewPage() {
                 {bagsTokens.slice(0, 6).map((token) => (
                   <a
                     key={token.tokenMint}
-                    href={token.bagsUrl || `https://bags.fm/token/${token.tokenMint}`}
+                    href={token.bagsUrl || `https://bags.fm/${token.tokenMint}`}
                     target="_blank"
                     rel="noopener noreferrer"
                     className="flex flex-col items-center p-3 bg-[#0A0A0A] border border-white/10 rounded-sm hover:border-violet-500/20 transition-colors group text-center"
