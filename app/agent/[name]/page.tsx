@@ -6,7 +6,7 @@ import { Footer } from "@/components/layout/Footer";
 import { 
   Shield, Star, Zap, Award, Copy, CheckCircle,
   Calendar, TrendingUp, Users, Bot, Loader2, Briefcase, Send,
-  ExternalLink, Clock, BarChart3, ArrowLeft, DollarSign
+  ExternalLink, Clock, BarChart3, ArrowLeft, DollarSign, Rocket
 } from "lucide-react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
@@ -28,10 +28,11 @@ function AgentProfileContent() {
   const [stats, setStats] = useState<any>(null);
   const [recentBids, setRecentBids] = useState<any[]>([]);
   const [taskHistory, setTaskHistory] = useState<any[]>([]);
+  const [tokenLaunches, setTokenLaunches] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
   const [copied, setCopied] = useState(false);
-  const [activeSection, setActiveSection] = useState<"tasks" | "proposals">("tasks");
+  const [activeSection, setActiveSection] = useState<"tasks" | "proposals" | "launches">("tasks");
 
   useEffect(() => {
     const fetchAgent = async () => {
@@ -47,6 +48,7 @@ function AgentProfileContent() {
         setStats(data.stats);
         setRecentBids(data.recentBids || []);
         setTaskHistory(data.taskHistory || []);
+        setTokenLaunches(data.tokenLaunches || []);
       } catch (err) {
         console.error("Failed to fetch agent:", err);
         setError(true);
@@ -219,6 +221,42 @@ function AgentProfileContent() {
               </div>
             )}
           </div>
+
+          {/* Token Launches */}
+          {tokenLaunches.length > 0 && (
+            <div className="bg-[#0A0A0A] border border-white/10 rounded-sm p-5 mb-6">
+              <h3 className="text-xs font-bold font-mono uppercase text-gray-500 mb-4 flex items-center gap-2">
+                <Rocket size={14} className="text-purple-400" /> Token Launches
+              </h3>
+              <div className="space-y-3">
+                {tokenLaunches.map((launch: any) => (
+                  <a
+                    key={launch.id}
+                    href={`https://bags.fm/${launch.mintAddress}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="block"
+                  >
+                    <div className="flex items-center justify-between p-3 bg-black/30 rounded hover:bg-black/50 transition-colors group border border-transparent hover:border-purple-500/20">
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 mb-1">
+                          <span className="text-sm text-white font-bold group-hover:text-purple-400 transition-colors">${launch.tokenSymbol}</span>
+                          <span className="text-xs text-zinc-400">{launch.tokenName}</span>
+                          <span className="inline-flex px-2 py-0.5 rounded-full border text-[10px] font-bold uppercase bg-purple-500/10 text-purple-400 border-purple-500/20">
+                            Launched
+                          </span>
+                        </div>
+                        <div className="text-[10px] text-zinc-600 font-mono">
+                          {launch.mintAddress.slice(0, 8)}...{launch.mintAddress.slice(-4)} • {new Date(launch.createdAt).toLocaleDateString()}
+                        </div>
+                      </div>
+                      <ExternalLink size={14} className="text-zinc-700 group-hover:text-purple-400 shrink-0 transition-colors" />
+                    </div>
+                  </a>
+                ))}
+              </div>
+            </div>
+          )}
 
           {/* Task History & Proposals */}
           <div className="bg-[#0A0A0A] border border-white/10 rounded-sm overflow-hidden mb-6">

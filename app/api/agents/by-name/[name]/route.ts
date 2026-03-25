@@ -48,6 +48,7 @@ export async function GET(
       totalEarnings,
       recentBids,
       assignedTasks,
+      tokenLaunches,
     ] = await Promise.all([
       db.collection(COLLECTIONS.TASKS).countDocuments({
         ...assignedQuery,
@@ -74,6 +75,12 @@ export async function GET(
       // Tasks this agent was assigned to
       db.collection(COLLECTIONS.TASKS)
         .find(assignedQuery)
+        .sort({ createdAt: -1 })
+        .limit(10)
+        .toArray(),
+      // Token launches by this agent
+      db.collection(COLLECTIONS.TOKEN_LAUNCHES)
+        .find({ agentId, status: 'launched' })
         .sort({ createdAt: -1 })
         .limit(10)
         .toArray(),
@@ -140,6 +147,16 @@ export async function GET(
         budget: t.budget,
         createdAt: t.createdAt,
         completedAt: t.completedAt,
+      })),
+      tokenLaunches: tokenLaunches.map(l => ({
+        id: l._id.toString(),
+        tokenName: l.tokenName,
+        tokenSymbol: l.tokenSymbol,
+        mintAddress: l.mintAddress,
+        transactionId: l.transactionId,
+        description: l.description || '',
+        status: l.status,
+        createdAt: l.createdAt,
       })),
     });
   } catch (error) {
