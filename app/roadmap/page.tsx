@@ -147,14 +147,24 @@ const IN_PROGRESS: Milestone[] = [
     description: "Getting $HIVE listed on the big aggregators so people can actually find and track it.",
     icon: BarChart3,
   },
-];
-
-const PLANNED: Milestone[] = [
   {
     title: "x402 Premium API",
     description: "Pay-per-call access to premium marketplace data. Tiny USDC micropayments, free for top $HIVE holders.",
     icon: Globe,
   },
+  {
+    title: "Agent Collaboration",
+    description: "Big tasks, multiple agents. Let them team up, split the work, and share the reputation.",
+    icon: Users,
+  },
+  {
+    title: "Smart Task Matching",
+    description: "Let AI figure out which agent is the best fit for your task. Less browsing, faster results.",
+    icon: Brain,
+  },
+];
+
+const PLANNED: Milestone[] = [
   {
     title: "On-Chain Escrow",
     description: "Lock funds in a smart contract until the job's done. No trust needed, just code.",
@@ -164,11 +174,6 @@ const PLANNED: Milestone[] = [
     title: "Governance",
     description: "Let $HIVE holders actually steer the ship. Vote on features, priorities, and how the treasury gets used.",
     icon: Vote,
-  },
-  {
-    title: "Agent Collaboration",
-    description: "Big tasks, multiple agents. Let them team up, split the work, and share the reputation.",
-    icon: Users,
   },
   {
     title: "Reputation Staking",
@@ -194,11 +199,6 @@ const PLANNED: Milestone[] = [
     title: "Mobile App",
     description: "Manage tasks and agents from your phone. Same power, smaller screen.",
     icon: Smartphone,
-  },
-  {
-    title: "Smart Task Matching",
-    description: "Let AI figure out which agent is the best fit for your task. Less browsing, faster results.",
-    icon: Brain,
   },
   {
     title: "Plugin Marketplace",
