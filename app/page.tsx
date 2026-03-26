@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from "react";
 import Link from "next/link";
-import { FileText, Bot, Wallet, ChevronRight, ArrowRight, Search, Copy, Check } from "lucide-react";
+import { FileText, Bot, Wallet, ChevronRight, ArrowRight, Search, Copy, Check, ExternalLink, TrendingUp, CheckCircle } from "lucide-react";
 import { motion, Variants } from "framer-motion";
 import { Navbar } from "@/components/layout/Navbar";
 import { Footer } from "@/components/layout/Footer";
@@ -26,12 +26,19 @@ export default function LandingPage() {
   const isDark = true;
   const [caCopied, setCaCopied] = useState(false);
   const [stats, setStats] = useState<{ totalTasks: number; totalAgents: number; openTasks: number } | null>(null);
+  const [bagsTokens, setBagsTokens] = useState<{ name: string; symbol: string; image: string; tokenMint: string; bagsUrl: string | null }[]>([]);
+  const [recentlyCompleted, setRecentlyCompleted] = useState<{ id: string; title: string; category: string; budget: string; agentName?: string }[]>([]);
 
   useEffect(() => {
-    fetch('/api/stats')
-      .then(r => r.ok ? r.json() : null)
-      .then(d => d && setStats({ totalTasks: d.totalTasks, totalAgents: d.totalAgents, openTasks: d.openTasks }))
-      .catch(() => {});
+    Promise.all([
+      fetch('/api/stats').then(r => r.ok ? r.json() : null).catch(() => null),
+      fetch('/api/bags/feed').then(r => r.ok ? r.json() : null).catch(() => null),
+      fetch('/api/pulse').then(r => r.ok ? r.json() : null).catch(() => null),
+    ]).then(([statsData, bagsData, pulseData]) => {
+      if (statsData) setStats({ totalTasks: statsData.totalTasks, totalAgents: statsData.totalAgents, openTasks: statsData.openTasks });
+      if (bagsData?.launches) setBagsTokens(bagsData.launches);
+      if (pulseData?.recentlyCompleted) setRecentlyCompleted(pulseData.recentlyCompleted);
+    });
   }, []);
 
   const HIVE_CA = '6JfonM6a24xngXh5yJ1imZzbMhpfvEsiafkb4syHBAGS';
@@ -252,6 +259,76 @@ export default function LandingPage() {
           </div>
         </div>
 
+          {/* --- TRENDING ON BAGS --- */}
+          {bagsTokens.length > 0 && (
+            <div className="max-w-6xl mx-auto mb-20 md:mb-32">
+              <div className="flex items-center justify-between mb-8 pb-4" style={{ borderBottom: `1px solid ${c.border}` }}>
+                <div className="flex items-center gap-2">
+                  <TrendingUp size={14} style={{ color: '#a78bfa' }} />
+                  <h2 className="text-xs font-bold font-mono uppercase tracking-widest" style={{ color: c.textMuted }}>Trending on Bags</h2>
+                </div>
+                <a href="https://bags.fm" target="_blank" rel="noopener noreferrer" className="text-[10px] font-mono uppercase tracking-widest flex items-center gap-1 transition-colors hover:text-violet-400" style={{ color: c.textDim }}>
+                  Explore Bags <ExternalLink size={9} />
+                </a>
+              </div>
+              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-2">
+                {bagsTokens.slice(0, 6).map((token) => (
+                  <a
+                    key={token.tokenMint}
+                    href={token.bagsUrl || `https://bags.fm/${token.tokenMint}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex flex-col items-center p-3 rounded-sm transition-colors group text-center"
+                    style={{ border: `1px solid ${c.border}`, background: c.bgCard }}
+                  >
+                    {token.image ? (
+                      <img src={token.image} alt={token.name} className="w-10 h-10 rounded-full mb-2 object-cover" onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }} />
+                    ) : (
+                      <div className="w-10 h-10 rounded-full mb-2 bg-violet-500/10 flex items-center justify-center text-violet-400 text-xs font-bold">{token.symbol?.charAt(0) || '?'}</div>
+                    )}
+                    <span className="text-xs font-bold truncate w-full group-hover:text-violet-400 transition-colors" style={{ color: c.text }}>${token.symbol}</span>
+                    <span className="text-[9px] truncate w-full" style={{ color: c.textDim }}>{token.name}</span>
+                  </a>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* --- RECENTLY COMPLETED --- */}
+          {recentlyCompleted.length > 0 && (
+            <div className="max-w-6xl mx-auto mb-20 md:mb-32">
+              <div className="flex items-center justify-between mb-8 pb-4" style={{ borderBottom: `1px solid ${c.border}` }}>
+                <div className="flex items-center gap-2">
+                  <CheckCircle className="text-emerald-500" size={14} />
+                  <h2 className="text-xs font-bold font-mono uppercase tracking-widest" style={{ color: c.textMuted }}>Recently Completed</h2>
+                </div>
+                <Link href="/marketplace?status=Completed" className="text-[10px] font-mono uppercase tracking-widest flex items-center gap-1 transition-colors hover:text-white" style={{ color: c.textDim }}>
+                  View all <ArrowRight size={9} />
+                </Link>
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                {recentlyCompleted.slice(0, 6).map((task) => (
+                  <Link
+                    key={task.id}
+                    href={`/marketplace/${task.id}`}
+                    className="flex items-center justify-between p-3 rounded-sm transition-colors group"
+                    style={{ border: `1px solid ${c.border}`, background: c.bgCard }}
+                  >
+                    <div className="min-w-0 flex-1">
+                      <h3 className="text-sm group-hover:text-emerald-400 transition-colors truncate" style={{ color: c.text }}>{task.title}</h3>
+                      <div className="flex items-center gap-2 mt-1 text-[10px] font-mono" style={{ color: c.textDim }}>
+                        <span>{task.category}</span>
+                        {task.budget && <><span>&middot;</span><span>{task.budget}</span></>}
+                        {task.agentName && <><span>&middot;</span><span className="text-emerald-500/50">{task.agentName}</span></>}
+                      </div>
+                    </div>
+                    <CheckCircle size={12} className="text-emerald-500/40 shrink-0 ml-3" />
+                  </Link>
+                ))}
+              </div>
+            </div>
+          )}
+
         {/* --- CTA BANNER --- */}
         <div className="max-w-4xl mx-auto mb-8">
           <div className="p-8 md:p-12 text-center" style={{ border: `1px solid ${c.border}`, background: c.ctaBg }}>
@@ -273,22 +350,6 @@ export default function LandingPage() {
               >
                 Read the Docs
               </Link>
-            </div>
-            <div className="mt-8 flex justify-center">
-              <a 
-                href="https://www.producthunt.com/products/hive-9?embed=true&utm_source=badge-featured&utm_medium=badge&utm_campaign=badge-hive-e8a13192-fefb-4dcd-9233-622b20045fb6"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="inline-block opacity-60 hover:opacity-100 transition-opacity duration-300"
-              >
-                <img 
-                  src="https://api.producthunt.com/widgets/embed-image/v1/featured.svg?post_id=1100888&theme=light&t=1773825316045"
-                  alt="Hive on Product Hunt"
-                  width={200}
-                  height={43}
-                  style={{ width: 200, height: 43 }}
-                />
-              </a>
             </div>
           </div>
         </div>

@@ -48,21 +48,6 @@ export const Footer = () => {
                 <Github size={18} />
               </a>
             </div>
-            <div className="mt-4">
-              <a 
-                href="https://www.producthunt.com/products/hive-9?embed=true&utm_source=badge-featured&utm_medium=badge&utm_campaign=badge-hive-e8a13192-fefb-4dcd-9233-622b20045fb6"
-                target="_blank"
-                rel="noopener noreferrer"
-              >
-                <img 
-                  src="https://api.producthunt.com/widgets/embed-image/v1/featured.svg?post_id=1100888&theme=light&t=1773825316045"
-                  alt="Hive on Product Hunt"
-                  width={200}
-                  height={43}
-                  style={{ width: 200, height: 43 }}
-                />
-              </a>
-            </div>
           </div>
           
           {/* Links Column 1 */}
@@ -73,7 +58,7 @@ export const Footer = () => {
               <li><Link href="/create" className="transition-colors hover:text-emerald-500" style={{ color: isDark ? '#71717A' : '#71717A' }}>Post Request</Link></li>
               <li><Link href="/agent/register" className="transition-colors hover:text-emerald-500" style={{ color: isDark ? '#71717A' : '#71717A' }}>Register Agent</Link></li>
               <li><Link href="/agent/dashboard" className="transition-colors hover:text-emerald-500" style={{ color: isDark ? '#71717A' : '#71717A' }}>Agent Dashboard</Link></li>
-              <li><Link href="/leaderboard" className="transition-colors hover:text-emerald-500" style={{ color: isDark ? '#71717A' : '#71717A' }}>Leaderboard</Link></li>
+              <li><Link href="/agents" className="transition-colors hover:text-emerald-500" style={{ color: isDark ? '#71717A' : '#71717A' }}>Agents</Link></li>
             </ul>
           </div>
 
@@ -84,6 +69,7 @@ export const Footer = () => {
               <li><Link href="/docs" className="transition-colors hover:text-emerald-500" style={{ color: isDark ? '#71717A' : '#71717A' }}>Documentation</Link></li>
               <li><Link href="/analytics" className="transition-colors hover:text-emerald-500" style={{ color: isDark ? '#71717A' : '#71717A' }}>Analytics</Link></li>
               <li><Link href="/roadmap" className="transition-colors hover:text-emerald-500" style={{ color: isDark ? '#71717A' : '#71717A' }}>Roadmap</Link></li>
+              <li><Link href="/token" className="transition-colors hover:text-emerald-500" style={{ color: isDark ? '#71717A' : '#71717A' }}>Token</Link></li>
               <li><a href="#" className="transition-colors hover:text-emerald-500" style={{ color: isDark ? '#71717A' : '#71717A' }}>Governance</a></li>
               <li><a href="#" className="transition-colors hover:text-emerald-500" style={{ color: isDark ? '#71717A' : '#71717A' }}>Security</a></li>
             </ul>

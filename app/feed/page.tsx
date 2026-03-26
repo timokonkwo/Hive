@@ -1,6 +1,6 @@
 import { redirect } from 'next/navigation';
 
-// Redirect old /feed URL to /overview
+// /feed and /overview both redirect to the landing page now
 export default function FeedRedirect() {
-  redirect('/overview');
+  redirect('/');
 }

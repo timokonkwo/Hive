@@ -228,7 +228,7 @@ export default function AdminDashboardPage() {
         <StatCard label="Agents" value={stats.totalAgents} icon={<Users size={16} />} color="text-purple-500" />
       </div>
 
-      <div className="grid grid-cols-3 gap-4 mb-8">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
         <StatCard label="Total Proposals" value={stats.totalBids} icon={<Inbox size={16} />} />
         <StatCard label="Pending" value={stats.pendingBids} icon={<Clock size={16} />} color="text-yellow-500" />
         <StatCard label="Accepted" value={stats.acceptedBids} icon={<CheckCircle size={16} />} color="text-emerald-500" />
@@ -356,9 +356,9 @@ export default function AdminDashboardPage() {
           </div>
 
           {/* Table */}
-          <div className="bg-zinc-900/30 border border-zinc-800 rounded-lg overflow-hidden">
+          <div className="bg-zinc-900/30 border border-zinc-800 rounded-lg overflow-hidden overflow-x-auto">
             {/* Header */}
-            <div className="grid grid-cols-[1fr_120px_80px_80px_100px_120px] gap-4 px-4 py-3 bg-black/40 border-b border-zinc-800 text-[10px] font-mono uppercase tracking-widest text-zinc-500">
+            <div className="hidden md:grid grid-cols-[1fr_120px_80px_80px_100px_120px] gap-4 px-4 py-3 bg-black/40 border-b border-zinc-800 text-[10px] font-mono uppercase tracking-widest text-zinc-500 min-w-[700px]">
               <SortHeader label="Name" field="name" current={agentsSort} order={agentsOrder} onToggle={toggleSort} />
               <span>Wallet</span>
               <SortHeader label="Rep" field="reputation" current={agentsSort} order={agentsOrder} onToggle={toggleSort} />
@@ -376,7 +376,7 @@ export default function AdminDashboardPage() {
               <div className="py-12 text-center text-zinc-600 text-sm font-mono">No agents found</div>
             ) : (
               agents.map((agent) => (
-                <div key={agent.id} className="grid grid-cols-[1fr_120px_80px_80px_100px_120px] gap-4 px-4 py-3 border-b border-zinc-800/50 hover:bg-white/[0.02] transition-colors items-center text-sm">
+                <div key={agent.id} className="grid grid-cols-[1fr_120px_80px_80px_100px_120px] gap-4 px-4 py-3 border-b border-zinc-800/50 hover:bg-white/[0.02] transition-colors items-center text-sm min-w-[700px]">
                   <div className="flex items-center gap-3 min-w-0">
                     <div className="w-8 h-8 rounded-full bg-zinc-800 flex items-center justify-center text-zinc-400 text-xs font-bold shrink-0">
                       {(agent.name || "AG").substring(0, 2).toUpperCase()}

@@ -166,18 +166,12 @@ function AgentProfileContent() {
           </div>
 
           {/* Stats */}
-          <div className="grid grid-cols-3 gap-3 mb-6">
+          <div className="grid grid-cols-2 gap-3 mb-6">
             <div className="bg-[#0A0A0A] border border-white/10 p-4 rounded-sm text-center group hover:border-emerald-500/30 transition-colors">
               <div className="flex items-center justify-center gap-2 text-emerald-500 font-mono font-bold text-2xl group-hover:scale-110 transition-transform">
                 <Star size={18} className="shrink-0" /> {agent.reputation}
               </div>
               <div className="text-[10px] text-gray-500 uppercase mt-1">Reputation</div>
-            </div>
-            <div className="bg-[#0A0A0A] border border-white/10 p-4 rounded-sm text-center group hover:border-blue-500/30 transition-colors">
-              <div className="flex items-center justify-center gap-2 text-blue-500 font-mono font-bold text-2xl group-hover:scale-110 transition-transform">
-                <Award size={18} className="shrink-0" /> {stats?.tasksCompleted || 0}
-              </div>
-              <div className="text-[10px] text-gray-500 uppercase mt-1">Completed</div>
             </div>
             <div className="bg-[#0A0A0A] border border-white/10 p-4 rounded-sm text-center group hover:border-yellow-500/30 transition-colors">
               <div className="flex items-center justify-center gap-2 text-yellow-500 font-mono font-bold text-2xl group-hover:scale-110 transition-transform">
