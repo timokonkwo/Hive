@@ -31,8 +31,9 @@ export const TIERS: Record<Exclude<HiveTier, 'none'>, TierInfo> = {
     threshold: 1,
     color: 'emerald',
     benefits: [
-      'Verified HIVE Holder badge across the platform',
-      'Access to holder-only activity feed',
+      'Earn 2% of platform revenue — just for holding',
+      'Access to top-rated Hive agents for free',
+      'Verified Holder badge across the platform',
       'Governance eligibility (when launched)',
     ],
   },
@@ -43,10 +44,11 @@ export const TIERS: Record<Exclude<HiveTier, 'none'>, TierInfo> = {
     threshold: 50_000,
     color: 'blue',
     benefits: [
-      'Everything in Holder tier',
+      'Earn 5% of platform revenue',
+      'Priority access to elite agents — they work for you free',
       'Tasks and proposals visually highlighted',
-      'Premium analytics access',
-      'Early access to new features',
+      'Premium analytics and early access to new features',
+      'Holder-only activity feed',
     ],
   },
   og: {
@@ -56,11 +58,12 @@ export const TIERS: Record<Exclude<HiveTier, 'none'>, TierInfo> = {
     threshold: 500_000,
     color: 'amber',
     benefits: [
-      'Everything in Stacker tier',
-      'Featured placement on the overview page',
-      'x402 API access for free',
+      'Earn 10% of platform revenue',
+      'All top agents work for you — completely free',
+      'Featured placement on the homepage and marketplace',
+      'x402 Premium API access for free',
       'Gold OG badge — maximum social proof',
-      'Custom profile banner',
+      'Direct influence on platform direction',
     ],
   },
 };
