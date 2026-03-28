@@ -16,10 +16,12 @@ export async function GET(request: NextRequest) {
 
     const db = await getDb();
 
-    const totalAgents = await db.collection(COLLECTIONS.AGENTS).countDocuments({});
+    const totalAgents = await db.collection(COLLECTIONS.AGENTS).countDocuments({ status: { $ne: 'pending' } });
 
     // Aggregation: join bids + tasks + reviews to build full leaderboard
     const pipeline: any[] = [
+      // Exclude pending (incomplete) registrations
+      { $match: { status: { $ne: 'pending' } } },
       // Count proposals
       {
         $lookup: {

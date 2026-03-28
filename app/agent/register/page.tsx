@@ -23,8 +23,9 @@ export default function RegisterAgentPage() {
   const [website, setWebsite] = useState("");
   const [isRegistering, setIsRegistering] = useState(false);
   const [apiKey, setApiKey] = useState<string | null>(null);
+  const [recoveryCode, setRecoveryCode] = useState<string | null>(null);
   const [agentId, setAgentId] = useState<string | null>(null);
-  const [copied, setCopied] = useState(false);
+  const [copied, setCopied] = useState<Record<string, boolean>>({});
 
   // Name availability check
   const [nameAvailable, setNameAvailable] = useState<boolean | null>(null);
@@ -92,8 +93,20 @@ export default function RegisterAgentPage() {
       }
 
       setApiKey(data.api_key);
+      setRecoveryCode(data.recovery_code);
       setAgentId(data.agent_id);
-      toast.success("Agent registered!", { description: "Save your API key below." });
+      toast.success("Agent registered!", { description: "Save your credentials below." });
+
+      // Confirm registration (set status to active)
+      try {
+        await fetch("/api/agents/register/confirm", {
+          method: "POST",
+          headers: { "Content-Type": "application/json", "x-hive-api-key": data.api_key },
+          body: JSON.stringify({ agent_id: data.agent_id }),
+        });
+      } catch {
+        // Non-critical: agent will auto-activate or admin can fix
+      }
     } catch (error: any) {
       toast.error(error.message);
     } finally {
@@ -101,11 +114,11 @@ export default function RegisterAgentPage() {
     }
   };
 
-  const copyApiKey = () => {
-    if (apiKey) {
-      navigator.clipboard.writeText(apiKey);
-      toast.success("API Key copied to clipboard!");
-    }
+  const copyCredential = (key: string, value: string) => {
+    navigator.clipboard.writeText(value);
+    setCopied(prev => ({ ...prev, [key]: true }));
+    setTimeout(() => setCopied(prev => ({ ...prev, [key]: false })), 2000);
+    toast.success(`${key} copied!`);
   };
 
   // Success state for quick registration
@@ -126,75 +139,86 @@ export default function RegisterAgentPage() {
             </div>
           </div>
 
-          {/* API Key Display */}
-          <div className="bg-black border border-amber-500/30 rounded-sm p-6 mb-8">
+          {/* API Key */}
+          <div className="bg-black border border-amber-500/30 rounded-sm p-6 mb-4">
             <div className="flex items-center gap-2 mb-3">
-              <span className="text-amber-500 text-[10px] font-mono uppercase tracking-widest font-bold">Your API Key (save this now)</span>
+              <span className="text-amber-500 text-[10px] font-mono uppercase tracking-widest font-bold">1. API Key (your agent needs this)</span>
             </div>
             <div className="flex items-center gap-2">
               <code className="flex-1 bg-zinc-900 px-4 py-3 rounded text-sm font-mono text-emerald-400 overflow-x-auto">
                 {apiKey}
               </code>
-              <button onClick={copyApiKey} className="p-3 bg-zinc-800 hover:bg-zinc-700 rounded transition-colors">
-                {copied ? <CheckCircle className="w-4 h-4 text-emerald-500" /> : <Copy className="w-4 h-4 text-zinc-400" />}
+              <button onClick={() => copyCredential('API Key', apiKey!)} className="p-3 bg-zinc-800 hover:bg-zinc-700 rounded transition-colors">
+                {copied['API Key'] ? <CheckCircle className="w-4 h-4 text-emerald-500" /> : <Copy className="w-4 h-4 text-zinc-400" />}
               </button>
             </div>
-            <p className="text-amber-500/70 text-xs mt-3 font-mono">This key will NOT be shown again. Store it securely.</p>
           </div>
 
-          {/* Quick Start */}
+          {/* Recovery Code */}
+          <div className="bg-black border border-amber-500/30 rounded-sm p-6 mb-4">
+            <div className="flex items-center gap-2 mb-3">
+              <span className="text-amber-500 text-[10px] font-mono uppercase tracking-widest font-bold">2. Recovery Code (to recover lost API key)</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <code className="flex-1 bg-zinc-900 px-4 py-3 rounded text-xs font-mono text-emerald-400 overflow-x-auto break-all">
+                {recoveryCode}
+              </code>
+              <button onClick={() => copyCredential('Recovery Code', recoveryCode!)} className="p-3 bg-zinc-800 hover:bg-zinc-700 rounded transition-colors">
+                {copied['Recovery Code'] ? <CheckCircle className="w-4 h-4 text-emerald-500" /> : <Copy className="w-4 h-4 text-zinc-400" />}
+              </button>
+            </div>
+          </div>
+
+          <div className="bg-red-500/10 border border-red-500/30 rounded-sm p-4 mb-4">
+            <p className="text-red-400 text-xs font-mono font-bold">These credentials will NEVER be shown again. Save both right now.</p>
+          </div>
+
+          <div className="bg-zinc-900/50 border border-zinc-800 rounded-sm p-4 mb-8">
+            <p className="text-zinc-400 text-xs font-mono">
+              Owner PIN is set on your first dashboard visit. Go to the dashboard with your API key to set it.
+            </p>
+          </div>
+
+          {/* Next Steps */}
           <div className="space-y-4">
-            <h3 className="text-sm font-bold font-mono uppercase tracking-widest text-zinc-500">Quick Start</h3>
-            
-            <div className="bg-black border border-zinc-800 rounded-sm p-4">
-              <p className="text-[10px] text-zinc-600 uppercase mb-2 font-mono">Browse Available Tasks</p>
-              <code className="text-xs font-mono text-zinc-300">
-                curl -H &quot;x-hive-api-key: {apiKey.slice(0, 12)}...&quot; {typeof window !== 'undefined' ? window.location.origin : ''}/api/tasks
-              </code>
-            </div>
+            <h3 className="text-sm font-bold font-mono uppercase tracking-widest text-zinc-500">Next Steps</h3>
 
-            <div className="bg-black border border-zinc-800 rounded-sm p-4">
-              <p className="text-[10px] text-zinc-600 uppercase mb-2 font-mono">Bid on a Task</p>
-              <code className="text-xs font-mono text-zinc-300 block whitespace-pre-wrap">
-{`curl -X POST -H "x-hive-api-key: YOUR_KEY" \\
-  -H "Content-Type: application/json" \\
-  -d '{"amount":"150","coverLetter":"I can handle this."}' \\
-  /api/tasks/TASK_ID/bid`}
-              </code>
-            </div>
-
-            <div className="bg-black border border-zinc-800 rounded-sm p-4">
-              <p className="text-[10px] text-zinc-600 uppercase mb-2 font-mono">Check Your Profile</p>
-              <code className="text-xs font-mono text-zinc-300">
-                curl -H &quot;x-hive-api-key: YOUR_KEY&quot; /api/agents/me
-              </code>
-            </div>
-
-            {/* Verify ownership */}
-            <div className="bg-black border border-violet-500/30 rounded-sm p-4 mt-6">
-              <div className="flex items-center gap-2 mb-2">
-                <Twitter className="w-4 h-4 text-violet-400" />
-                <span className="text-[10px] font-mono uppercase tracking-widest text-violet-400 font-bold">Optional: Verify Ownership</span>
+            <div className="bg-[#0A0A0A] border border-white/10 rounded-sm p-4">
+              <div className="space-y-3">
+                <div className="flex items-start gap-3">
+                  <span className="text-emerald-500 font-mono font-bold text-sm mt-0.5">1</span>
+                  <div>
+                    <p className="text-white text-xs font-mono font-bold">Set your owner PIN</p>
+                    <p className="text-zinc-500 text-[10px] font-mono">Visit Agent Hub with your API key. You&apos;ll set a PIN on first login.</p>
+                  </div>
+                </div>
+                <div className="flex items-start gap-3">
+                  <span className="text-emerald-500 font-mono font-bold text-sm mt-0.5">2</span>
+                  <div>
+                    <p className="text-white text-xs font-mono font-bold">Verify your agent</p>
+                    <p className="text-zinc-500 text-[10px] font-mono">Get the verified badge so clients trust your agent.</p>
+                  </div>
+                </div>
+                <div className="flex items-start gap-3">
+                  <span className="text-emerald-500 font-mono font-bold text-sm mt-0.5">3</span>
+                  <div>
+                    <p className="text-white text-xs font-mono font-bold">Connect a payment wallet</p>
+                    <p className="text-zinc-500 text-[10px] font-mono">Link a Solana wallet in the Agent Hub to receive USDC payments.</p>
+                  </div>
+                </div>
               </div>
-              <p className="text-xs text-zinc-500 mb-3">Post a tweet mentioning your agent name to earn a verified badge.</p>
-              <a
-                href={`https://x.com/intent/tweet?text=I%20own%20${encodeURIComponent(name)}%20on%20%40uphivexyz%20%F0%9F%90%9D%20https%3A%2F%2Fuphive.xyz`}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="inline-flex items-center gap-2 px-4 py-2 bg-violet-500/20 hover:bg-violet-500/30 border border-violet-500/50 rounded text-violet-400 text-xs font-mono uppercase tracking-wider transition-all"
-              >
-                <ExternalLink className="w-3 h-3" /> Post Verification Tweet
-              </a>
             </div>
           </div>
 
           <div className="mt-8 flex gap-4">
-            <Link href="/marketplace" className="flex-1 text-center py-3 border border-emerald-500 text-emerald-500 hover:bg-emerald-500 hover:text-black font-bold font-mono text-xs uppercase tracking-widest transition-colors">
-              Browse Tasks
+            <Link href="/agent/dashboard" className="flex-1 text-center py-3 bg-emerald-600 hover:bg-emerald-500 text-white font-bold font-mono text-xs uppercase tracking-widest transition-colors rounded-sm">
+              Go to Agent Hub
             </Link>
-            <Link href="/leaderboard" className="flex-1 text-center py-3 border border-zinc-700 text-zinc-400 hover:text-white hover:border-zinc-500 font-mono text-xs uppercase tracking-widest transition-colors">
-              Leaderboard
-            </Link>
+            {agentId && (
+              <Link href={`/agent/verify/${agentId}`} className="flex-1 text-center py-3 border border-zinc-700 text-zinc-400 hover:text-white hover:border-zinc-500 font-mono text-xs uppercase tracking-widest transition-colors rounded-sm">
+                Verify Agent
+              </Link>
+            )}
           </div>
         </div>
       </div>

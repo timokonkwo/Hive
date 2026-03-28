@@ -5,20 +5,19 @@ import { Navbar } from "@/components/layout/Navbar";
 import { Footer } from "@/components/layout/Footer";
 import {
   Key, Shield, Loader2, AlertTriangle, CheckCircle, Copy,
-  Wallet, Bot, Lock, Hash
+  Wallet, Bot, Lock,
 } from "lucide-react";
 import { toast } from "sonner";
+import Link from "next/link";
 
-type RecoveryMethod = "recovery_code" | "wallet" | "agent_id";
+type RecoveryMethod = "recovery_code" | "wallet";
 
 export default function AgentRecoverPage() {
   const [method, setMethod] = useState<RecoveryMethod>("recovery_code");
-  const [agentId, setAgentId] = useState("");
-  const [recoveryCode, setRecoveryCode] = useState("");
   const [agentName, setAgentName] = useState("");
+  const [recoveryCode, setRecoveryCode] = useState("");
   const [loading, setLoading] = useState(false);
   const [newApiKey, setNewApiKey] = useState("");
-  const [newOwnerPin, setNewOwnerPin] = useState("");
   const [error, setError] = useState("");
 
   const copyToClipboard = (text: string) => {
@@ -27,7 +26,6 @@ export default function AgentRecoverPage() {
   };
 
   const handleWalletRecovery = async () => {
-    // Detect any Solana wallet
     const solWallet = (window as any).solana
       || (window as any).phantom?.solana
       || (window as any).solflare
@@ -35,7 +33,7 @@ export default function AgentRecoverPage() {
 
     if (!solWallet) {
       toast.error("No Solana wallet found", {
-        description: "Install Phantom, Solflare, or Backpack to connect.",
+        description: "Install Phantom, Solflare, or Backpack.",
       });
       return;
     }
@@ -52,16 +50,14 @@ export default function AgentRecoverPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           method: "wallet",
-          agentId,
+          agentName: agentName.trim(),
           walletAddress,
         }),
       });
 
       const data = await res.json();
-
       if (res.ok) {
         setNewApiKey(data.api_key);
-        setNewOwnerPin(data.owner_pin || "");
       } else {
         setError(data.error || "Recovery failed.");
       }
@@ -77,8 +73,8 @@ export default function AgentRecoverPage() {
   };
 
   const handleRecover = async () => {
-    if (!agentId) {
-      setError("Agent ID is required.");
+    if (!agentName.trim()) {
+      setError("Agent name is required.");
       return;
     }
 
@@ -86,31 +82,28 @@ export default function AgentRecoverPage() {
       return handleWalletRecovery();
     }
 
+    if (!recoveryCode.trim()) {
+      setError("Recovery code is required.");
+      return;
+    }
+
     setLoading(true);
     setError("");
 
     try {
-      const body: any = { method, agentId };
-
-      if (method === "recovery_code") {
-        if (!recoveryCode) { setError("Recovery code is required."); setLoading(false); return; }
-        body.recoveryCode = recoveryCode;
-      } else if (method === "agent_id") {
-        if (!agentName) { setError("Agent name is required."); setLoading(false); return; }
-        body.agentName = agentName;
-      }
-
       const res = await fetch("/api/agents/recover-key", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(body),
+        body: JSON.stringify({
+          method: "recovery_code",
+          agentName: agentName.trim(),
+          recoveryCode: recoveryCode.trim(),
+        }),
       });
 
       const data = await res.json();
-
       if (res.ok) {
         setNewApiKey(data.api_key);
-        setNewOwnerPin(data.owner_pin || "");
       } else {
         setError(data.error || "Recovery failed.");
       }
@@ -124,7 +117,6 @@ export default function AgentRecoverPage() {
   const methods: { id: RecoveryMethod; label: string; icon: React.ReactNode; desc: string }[] = [
     { id: "recovery_code", label: "Recovery Code", icon: <Lock size={14} />, desc: "Use the code from registration" },
     { id: "wallet", label: "Linked Wallet", icon: <Wallet size={14} />, desc: "Connect the wallet linked to your agent" },
-    { id: "agent_id", label: "Agent ID", icon: <Hash size={14} />, desc: "Last resort — limited to 1x per 24h" },
   ];
 
   return (
@@ -139,20 +131,20 @@ export default function AgentRecoverPage() {
               <Key className="text-amber-500" size={32} />
             </div>
             <h1 className="text-2xl font-black font-mono uppercase tracking-tight mb-2">
-              Recover Credentials
+              Recover API Key
             </h1>
             <p className="text-zinc-400 font-mono text-sm leading-relaxed">
-              Regenerate your agent&apos;s API key and owner PIN. Old credentials will be invalidated.
+              Regenerate your agent&apos;s API key. Your old key will stop working.
             </p>
           </div>
 
-          {/* Success — Show New Key */}
+          {/* Success */}
           {newApiKey ? (
             <div className="space-y-4">
               <div className="bg-emerald-500/5 border border-emerald-500/20 rounded-sm p-6 text-center">
                 <CheckCircle className="mx-auto text-emerald-500 mb-4" size={48} />
-                <h2 className="text-lg font-bold font-mono uppercase mb-2">Credentials Recovered!</h2>
-                <p className="text-zinc-400 text-xs font-mono mb-4">Your old API key and PIN are now invalid. Save both below.</p>
+                <h2 className="text-lg font-bold font-mono uppercase mb-2">Key Recovered</h2>
+                <p className="text-zinc-400 text-xs font-mono">Your old API key no longer works. Save the new one below.</p>
               </div>
 
               <div className="bg-[#0A0A0A] border border-amber-500/30 rounded-sm p-4">
@@ -162,58 +154,50 @@ export default function AgentRecoverPage() {
                     <Copy size={14} />
                   </button>
                 </div>
-                <div className="bg-black rounded p-3 font-mono text-sm text-white break-all select-all">
+                <div className="bg-black rounded p-3 font-mono text-sm text-emerald-400 break-all select-all">
                   {newApiKey}
                 </div>
               </div>
 
-              {newOwnerPin && (
-                <div className="bg-[#0A0A0A] border border-emerald-500/30 rounded-sm p-4">
-                  <div className="flex items-center justify-between mb-2">
-                    <span className="text-[10px] text-emerald-500 font-mono uppercase tracking-widest font-bold">New Owner PIN</span>
-                    <button onClick={() => copyToClipboard(newOwnerPin)} className="text-zinc-500 hover:text-white transition-colors">
-                      <Copy size={14} />
-                    </button>
-                  </div>
-                  <div className="bg-black rounded p-3 font-mono text-lg text-white text-center tracking-[0.3em] select-all">
-                    {newOwnerPin}
-                  </div>
-                </div>
-              )}
-
               <div className="bg-red-500/5 border border-red-500/20 p-3 rounded-sm">
-                <p className="text-red-400 text-[11px] font-mono">
-                  <strong>⚠ Save these now.</strong> They will not be shown again. Your old API key and PIN no longer work.
+                <p className="text-red-400 text-[11px] font-mono font-bold">
+                  Save this now. It will not be shown again.
                 </p>
               </div>
 
-              <a
+              <div className="bg-zinc-900/50 border border-zinc-800 p-3 rounded-sm">
+                <p className="text-zinc-400 text-[11px] font-mono">
+                  Your owner PIN is unchanged. If you haven&apos;t set one yet, visit the Agent Hub to set it.
+                </p>
+              </div>
+
+              <Link
                 href="/agent/dashboard"
-                className="block text-center w-full py-3 bg-zinc-800 hover:bg-zinc-700 text-white font-bold font-mono text-xs uppercase tracking-widest rounded-sm transition-colors"
+                className="block text-center w-full py-3 bg-emerald-600 hover:bg-emerald-500 text-white font-bold font-mono text-xs uppercase tracking-widest rounded-sm transition-colors"
               >
-                <Bot className="inline mr-2" size={14} /> Go to Agent Dashboard
-              </a>
+                <Bot className="inline mr-2" size={14} /> Go to Agent Hub
+              </Link>
             </div>
           ) : (
             <div className="space-y-6">
-              {/* Agent ID  */}
+              {/* Agent Name */}
               <div className="bg-[#0A0A0A] border border-white/10 rounded-sm p-6">
                 <h3 className="font-bold font-mono text-xs uppercase mb-3 flex items-center gap-2">
-                  <Bot size={14} /> Agent ID
+                  <Bot size={14} /> Agent Name
                 </h3>
-                <p className="text-zinc-500 text-xs font-mono mb-3 leading-relaxed">
-                  Your agent&apos;s ID from the registration response or your verify/manage URL.
+                <p className="text-zinc-500 text-xs font-mono mb-3">
+                  The name your agent registered with.
                 </p>
                 <input
                   type="text"
-                  value={agentId}
-                  onChange={(e) => setAgentId(e.target.value)}
-                  placeholder="e.g. 6741a2b3c4d5e6f7..."
+                  value={agentName}
+                  onChange={(e) => setAgentName(e.target.value)}
+                  placeholder="e.g. Rex"
                   className="w-full bg-black border border-zinc-800 rounded-sm px-4 py-3 text-white text-sm font-mono outline-none focus:border-emerald-500 transition-colors"
                 />
               </div>
 
-              {/* Method Selection */}
+              {/* Method */}
               <div className="bg-[#0A0A0A] border border-white/10 rounded-sm p-6">
                 <h3 className="font-bold font-mono text-xs uppercase mb-4 flex items-center gap-2">
                   <Shield size={14} /> Recovery Method
@@ -248,14 +232,14 @@ export default function AgentRecoverPage() {
                 </div>
               </div>
 
-              {/* Method-specific inputs */}
+              {/* Recovery Code Input */}
               {method === "recovery_code" && (
                 <div className="bg-[#0A0A0A] border border-white/10 rounded-sm p-6">
                   <h3 className="font-bold font-mono text-xs uppercase mb-3 flex items-center gap-2">
                     <Lock size={14} /> Recovery Code
                   </h3>
                   <p className="text-zinc-500 text-xs font-mono mb-3">
-                    The code you received when you registered the agent.
+                    The 32-character code you received at registration.
                   </p>
                   <input
                     type="text"
@@ -272,36 +256,12 @@ export default function AgentRecoverPage() {
                   <h3 className="font-bold font-mono text-xs uppercase mb-3 flex items-center gap-2">
                     <Wallet size={14} /> Wallet Connection
                   </h3>
-                  <p className="text-zinc-500 text-xs font-mono mb-3">
-                    Connect the Solana wallet that is already linked to your agent. Works with Phantom, Solflare, Backpack, and more.
+                  <p className="text-zinc-500 text-xs font-mono">
+                    Connect the Solana wallet linked to your agent. Works with Phantom, Solflare, and Backpack.
                   </p>
                 </div>
               )}
 
-              {method === "agent_id" && (
-                <div className="bg-[#0A0A0A] border border-white/10 rounded-sm p-6">
-                  <h3 className="font-bold font-mono text-xs uppercase mb-3 flex items-center gap-2">
-                    <Hash size={14} /> Agent Name
-                  </h3>
-                  <p className="text-zinc-500 text-xs font-mono mb-3">
-                    Enter the exact name of your agent (case-insensitive).
-                  </p>
-                  <input
-                    type="text"
-                    value={agentName}
-                    onChange={(e) => setAgentName(e.target.value)}
-                    placeholder="e.g. Mance"
-                    className="w-full bg-black border border-zinc-800 rounded-sm px-4 py-3 text-white text-sm font-mono outline-none focus:border-emerald-500 transition-colors"
-                  />
-                  <div className="mt-3 bg-amber-500/5 border border-amber-500/20 p-2 rounded">
-                    <p className="text-amber-400 text-[10px] font-mono">
-                      This method is limited to <strong>1 attempt per 24 hours</strong> per IP address.
-                    </p>
-                  </div>
-                </div>
-              )}
-
-              {/* Error */}
               {error && (
                 <div className="flex items-center gap-3 p-3 bg-red-500/5 border border-red-500/20 rounded-sm">
                   <AlertTriangle size={14} className="text-red-500 shrink-0" />
@@ -309,10 +269,9 @@ export default function AgentRecoverPage() {
                 </div>
               )}
 
-              {/* Submit */}
               <button
                 onClick={handleRecover}
-                disabled={loading || !agentId}
+                disabled={loading || !agentName.trim()}
                 className="w-full py-4 bg-amber-600 hover:bg-amber-500 text-white font-bold font-mono text-sm uppercase tracking-widest rounded-sm transition-colors disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-2"
               >
                 {loading ? (
@@ -322,8 +281,8 @@ export default function AgentRecoverPage() {
                 )}
               </button>
 
-              <p className="text-zinc-600 text-[10px] font-mono text-center leading-relaxed">
-                Your old API key and owner PIN will be permanently invalidated when new ones are generated.
+              <p className="text-zinc-600 text-[10px] font-mono text-center">
+                Only regenerates your API key. Your owner PIN stays the same and cannot be recovered.
               </p>
             </div>
           )}

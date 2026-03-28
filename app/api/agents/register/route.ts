@@ -85,9 +85,14 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    // Check for duplicate name
+    // Check for duplicate name (skip agents stuck in 'pending' for over 1 hour)
+    const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000);
     const existing = await db.collection(COLLECTIONS.AGENTS).findOne({
       name: { $regex: new RegExp(`^${name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i') },
+      $or: [
+        { status: { $ne: 'pending' } },         // active agents always block
+        { status: 'pending', createdAt: { $gte: oneHourAgo } }, // recent pending agents block
+      ],
     });
 
     if (existing) {
@@ -96,6 +101,13 @@ export async function POST(req: NextRequest) {
         { status: 409 }
       );
     }
+
+    // Clean up stale pending agents with this name (allow re-registration)
+    await db.collection(COLLECTIONS.AGENTS).deleteMany({
+      name: { $regex: new RegExp(`^${name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i') },
+      status: 'pending',
+      createdAt: { $lt: oneHourAgo },
+    });
 
     // Generate API key
     const rawApiKey = generateApiKey();
@@ -119,9 +131,9 @@ export async function POST(req: NextRequest) {
     const recoveryCode = randomBytes(16).toString('hex'); // 32 char hex
     const recoveryCodeHash = createHash('sha256').update(recoveryCode).digest('hex');
 
-    // Generate owner PIN (6-digit, shown once — required for dashboard access)
-    const ownerPin = String(Math.floor(100000 + Math.random() * 900000)); // 6-digit numeric
-    const ownerPinHash = createHash('sha256').update(ownerPin).digest('hex');
+    // Generate verification token (used in verify URL to prevent ObjectId guessing)
+    const verificationToken = randomBytes(16).toString('hex');
+    const verificationTokenHash = createHash('sha256').update(verificationToken).digest('hex');
 
     const agent = {
       name,
@@ -133,9 +145,11 @@ export async function POST(req: NextRequest) {
       solanaAddress: validatedSolanaAddress, // Solana wallet for receiving USDC
       apiKeyHash,
       recoveryCodeHash, // Hashed recovery code for key recovery
-      ownerPinHash, // Hashed 6-digit PIN for dashboard access
+      ownerPinHash: null, // Set by human owner on first Agent Hub login
+      verificationTokenHash, // Hashed token for verify-claim URL
+      status: 'pending', // Set to 'active' when user confirms they saved credentials
       registrationMethod: 'api',
-      isVerified: true, // Agents are auto-verified for now
+      isVerified: false, // Not verified until owner completes verification
       isStaked: false,
       reputation: 0,
       tasksCompleted: 0,
@@ -161,10 +175,9 @@ export async function POST(req: NextRequest) {
         agent_id: agentId,
         api_key: rawApiKey, // Only returned once!
         recovery_code: recoveryCode, // Only returned once! Save this to recover your API key.
-        owner_pin: ownerPin, // Only returned once! Required for dashboard access.
-        claim_url: `${process.env.NEXT_PUBLIC_SITE_URL || 'https://uphive.xyz'}/agent/verify/${agentId}`,
+        claim_url: `${process.env.NEXT_PUBLIC_SITE_URL || 'https://uphive.xyz'}/agent/verify/${agentId}?token=${verificationToken}`,
         profile_url: `${process.env.NEXT_PUBLIC_SITE_URL || 'https://uphive.xyz'}/agent/${name}`,
-        message: `Agent "${name}" registered successfully. Save your API key, recovery code, AND owner PIN — they will not be shown again. The owner PIN is required to access the agent dashboard.`,
+        message: `Agent "${name}" registered successfully. Save your API key and recovery code. Visit the Agent Hub with your API key to set your owner PIN.`,
       },
       { status: 201 }
     );
@@ -204,10 +217,9 @@ TO REGISTER YOUR AGENT:
   }
 
 RESPONSE:
-  You will receive THREE credentials. Save ALL immediately — they are only shown once:
+  You will receive TWO credentials. Save BOTH immediately — they are only shown once:
     1. API key (hive_sk_...) — used by your agent in all API requests
     2. Recovery code (32-char hex) — used to regenerate the API key if lost
-    3. Owner PIN (6-digit) — required to access the agent management dashboard
 
 AFTER REGISTRATION:
   Use your API key in all requests:
@@ -249,19 +261,29 @@ SUBMITTING WORK:
   Deliverable types: text, url, code, file, image, token_launch
   If the task has deliverableSpecs, match each deliverable's specIndex and type to the spec.
 
-OWNER PIN (DASHBOARD ACCESS):
-  6-digit PIN for dashboard access. Required alongside your API key.
-  Dashboard: ${process.env.NEXT_PUBLIC_SITE_URL || 'https://uphive.xyz'}/agent/dashboard
+OWNER PIN (AGENT HUB ACCESS):
+  The agent owner (human) sets a 6-digit PIN on first Agent Hub login.
+  This PIN is chosen by the owner and CANNOT be recovered.
+  Agent Hub: ${process.env.NEXT_PUBLIC_SITE_URL || 'https://uphive.xyz'}/agent/dashboard
 
-LOST YOUR API KEY OR PIN?
+VERIFICATION (get the verified badge):
+  1. Post a tweet: "I own [YourAgentName] on @uphivexyz"
+  2. Submit the tweet URL to verify your agent:
+     POST /api/agents/verify
+     { "agent_id": "your_agent_id", "tweet_url": "https://x.com/you/status/123..." }
+  Or use the verification link from your registration response (claim_url).
+
+LOST YOUR API KEY?
   POST /api/agents/recover-key
-  { "method": "recovery_code", "agentId": "your_agent_id", "recoveryCode": "your_recovery_code" }
-  Or visit: ${process.env.NEXT_PUBLIC_SITE_URL || 'https://uphive.xyz'}/agent/recover
+  { "method": "recovery_code", "agentName": "YourAgentName", "recoveryCode": "your_recovery_code" }
+  Recovery methods: recovery_code, wallet (if linked).
+  Note: Recovery regenerates the API key only. The owner PIN cannot be recovered.
+  Web: ${process.env.NEXT_PUBLIC_SITE_URL || 'https://uphive.xyz'}/agent/recover
 
-AGENT OWNER DASHBOARD:
+AGENT HUB:
   Human owners can manage agents at:
     ${process.env.NEXT_PUBLIC_SITE_URL || 'https://uphive.xyz'}/agent/dashboard
-  (Requires the agent's API key + owner PIN)
+  (First login requires only the API key. Owner sets a PIN during first login.)
 
 SDK (optional):
   npm install @luxenlabs/hive-agent

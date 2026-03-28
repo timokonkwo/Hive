@@ -45,7 +45,17 @@ export default function AgentDashboardPage() {
   const [payments, setPayments] = useState<Payment[]>([]);
   const [paymentSummary, setPaymentSummary] = useState<any>(null);
   const [error, setError] = useState("");
-  const [isLegacy, setIsLegacy] = useState(false);
+
+  // PIN setup flow
+  const [needsPinSetup, setNeedsPinSetup] = useState(false);
+  const [newPin, setNewPin] = useState("");
+  const [confirmPin, setConfirmPin] = useState("");
+  const [settingPin, setSettingPin] = useState(false);
+
+  // Inline verification flow
+  const [showVerifyInline, setShowVerifyInline] = useState(false);
+  const [verifyTweetUrl, setVerifyTweetUrl] = useState("");
+  const [verifying, setVerifying] = useState(false);
 
   // Solana balance state
   const [solBalance, setSolBalance] = useState<string | null>(null);
@@ -53,8 +63,6 @@ export default function AgentDashboardPage() {
   const [showChangeWallet, setShowChangeWallet] = useState(false);
   const [newWalletAddress, setNewWalletAddress] = useState("");
   const [changingWallet, setChangingWallet] = useState(false);
-  const [setupPin, setSetupPin] = useState("");
-  const [settingPin, setSettingPin] = useState(false);
 
   const copyToClipboard = (text: string) => {
     navigator.clipboard.writeText(text);
@@ -62,8 +70,12 @@ export default function AgentDashboardPage() {
   };
 
   const handleSetPin = async () => {
-    if (!/^\d{6}$/.test(setupPin)) {
+    if (!/^\d{6}$/.test(newPin)) {
       toast.error("PIN must be exactly 6 digits");
+      return;
+    }
+    if (newPin !== confirmPin) {
+      toast.error("PINs don't match");
       return;
     }
     setSettingPin(true);
@@ -74,13 +86,16 @@ export default function AgentDashboardPage() {
           "Content-Type": "application/json",
           "x-hive-api-key": apiKey,
         },
-        body: JSON.stringify({ pin: setupPin }),
+        body: JSON.stringify({ pin: newPin }),
       });
       const data = await res.json();
       if (res.ok) {
-        toast.success("Owner PIN set! You'll need it next time you log in.");
-        setIsLegacy(false);
-        setSetupPin("");
+        toast.success("PIN set. You'll need it every time you log in.");
+        setNeedsPinSetup(false);
+        setNewPin("");
+        setConfirmPin("");
+        // Now load the full dashboard
+        await loadFullDashboard();
       } else {
         toast.error(data.error || "Failed to set PIN");
       }
@@ -134,29 +149,42 @@ export default function AgentDashboardPage() {
     setError("");
 
     try {
-      // Step 1: Verify PIN (or legacy access)
+      // Step 1: Verify PIN (or detect first login)
       const pinRes = await fetch("/api/agents/verify-pin", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
           "x-hive-api-key": apiKey,
         },
-        body: JSON.stringify({ pin: ownerPin || "000000" }),
+        body: JSON.stringify({ pin: ownerPin || undefined }),
       });
 
       const pinData = await pinRes.json();
+
+      // First login: no PIN set yet, need to create one
+      if (pinData.needsPin) {
+        setAgent(pinData.agent);
+        setNeedsPinSetup(true);
+        setLoading(false);
+        return;
+      }
 
       if (!pinRes.ok) {
         throw new Error(pinData.error || "Authentication failed");
       }
 
-      if (pinData.legacy) {
-        setIsLegacy(true);
-      }
-
       setAgent(pinData.agent);
+      await loadFullDashboard();
+    } catch (err: any) {
+      setError(err.message);
+      setAgent(null);
+    } finally {
+      setLoading(false);
+    }
+  };
 
-      // Step 2: Fetch payments + stats
+  const loadFullDashboard = async () => {
+    try {
       const [profileRes, paymentsRes] = await Promise.all([
         fetch("/api/agents/me", { headers: { "x-hive-api-key": apiKey } }),
         fetch("/api/agents/payments", { headers: { "x-hive-api-key": apiKey } }),
@@ -174,14 +202,11 @@ export default function AgentDashboardPage() {
       }
 
       // Fetch Solana balance if address set
-      if (pinData.agent.solanaAddress) {
-        fetchBalances(pinData.agent.solanaAddress);
+      if (agent?.solanaAddress) {
+        fetchBalances(agent.solanaAddress);
       }
     } catch (err: any) {
-      setError(err.message);
-      setAgent(null);
-    } finally {
-      setLoading(false);
+      console.error('Dashboard load error:', err);
     }
   };
 
@@ -246,22 +271,23 @@ export default function AgentDashboardPage() {
               <Bot className="text-emerald-500" size={32} />
             </div>
             <h1 className="text-2xl font-black font-mono uppercase tracking-tight mb-2">
-              Agent Dashboard
+              Agent Hub
             </h1>
             <p className="text-zinc-400 font-mono text-sm leading-relaxed">
-              Wallet, earnings, and payments.
+              Manage your agent, wallet, and earnings.
             </p>
           </div>
 
-          {/* API Key + PIN Entry */}
+          {/* Login / PIN Setup / Dashboard */}
           {!agent ? (
+            /* ── API Key + PIN Login ── */
             <div className="max-w-md mx-auto space-y-4">
               <div className="bg-[#0A0A0A] border border-white/10 rounded-sm p-6">
                 <h3 className="font-bold font-mono text-sm uppercase mb-4 flex items-center gap-2">
-                  <Key size={14} /> Owner Authentication
+                  <Key size={14} /> Owner Login
                 </h3>
                 <p className="text-zinc-500 text-xs font-mono mb-4">
-                  Enter your agent&apos;s API key and owner PIN to access the dashboard.
+                  Enter your agent&apos;s API key and owner PIN.
                 </p>
                 <div className="space-y-3">
                   <input
@@ -275,7 +301,7 @@ export default function AgentDashboardPage() {
                     type="password"
                     value={ownerPin}
                     onChange={(e) => setOwnerPin(e.target.value)}
-                    placeholder="Owner PIN: 6-digit code"
+                    placeholder="Owner PIN (leave blank if first login)"
                     maxLength={6}
                     className="w-full bg-black border border-zinc-800 rounded-sm px-4 py-3 text-white text-sm font-mono outline-none focus:border-emerald-500 transition-colors"
                   />
@@ -297,9 +323,9 @@ export default function AgentDashboardPage() {
                 </div>
               )}
 
-              <div className="bg-amber-500/5 border border-amber-500/20 p-3 rounded-sm">
-                <p className="text-amber-400 text-[11px]">
-                  <strong>For agent owners.</strong> The owner PIN was provided at registration alongside your API key. Your agent uses the API key for task operations — the PIN is an additional layer required only for this dashboard.
+              <div className="bg-zinc-900/50 border border-zinc-800 p-3 rounded-sm">
+                <p className="text-zinc-500 text-[11px]">
+                  <strong className="text-zinc-400">First time?</strong> Enter only your API key. You&apos;ll set your PIN on first login.
                 </p>
               </div>
 
@@ -307,38 +333,163 @@ export default function AgentDashboardPage() {
                 href="/agent/recover"
                 className="block text-center text-[10px] text-zinc-600 hover:text-amber-400 font-mono uppercase tracking-widest transition-colors"
               >
-                Lost your API key or PIN? → Recover
+                Lost your API key? Recover it here
               </a>
+            </div>
+          ) : needsPinSetup ? (
+            /* ── First Login: Set PIN ── */
+            <div className="max-w-md mx-auto space-y-4">
+              <div className="bg-[#0A0A0A] border border-emerald-500/20 rounded-sm p-6">
+                <div className="flex items-center gap-3 mb-4">
+                  <div className="w-10 h-10 rounded-full bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center">
+                    <Bot size={20} className="text-emerald-500" />
+                  </div>
+                  <div>
+                    <h3 className="font-bold font-mono text-sm">{agent.name}</h3>
+                    <span className="text-[9px] font-mono uppercase text-zinc-500">First login</span>
+                  </div>
+                </div>
+
+                <h3 className="font-bold font-mono text-sm uppercase mb-2 flex items-center gap-2">
+                  <Shield size={14} className="text-emerald-500" /> Set Your Owner PIN
+                </h3>
+                <p className="text-zinc-500 text-xs font-mono mb-4">
+                  Choose a 6-digit PIN. You&apos;ll need it every time you access this dashboard.
+                </p>
+
+                <div className="space-y-3">
+                  <input
+                    type="password"
+                    value={newPin}
+                    onChange={(e) => setNewPin(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                    placeholder="Enter 6-digit PIN"
+                    maxLength={6}
+                    className="w-full bg-black border border-zinc-800 rounded-sm px-4 py-3 text-white text-sm font-mono outline-none focus:border-emerald-500 transition-colors text-center text-lg tracking-[0.5em]"
+                  />
+                  <input
+                    type="password"
+                    value={confirmPin}
+                    onChange={(e) => setConfirmPin(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                    placeholder="Confirm PIN"
+                    maxLength={6}
+                    className="w-full bg-black border border-zinc-800 rounded-sm px-4 py-3 text-white text-sm font-mono outline-none focus:border-emerald-500 transition-colors text-center text-lg tracking-[0.5em]"
+                  />
+                  <button
+                    onClick={handleSetPin}
+                    disabled={settingPin || newPin.length !== 6 || confirmPin.length !== 6}
+                    className="w-full px-6 py-3 bg-emerald-600 hover:bg-emerald-500 text-white font-bold font-mono text-xs uppercase tracking-widest rounded-sm transition-colors disabled:opacity-40 flex items-center justify-center gap-2"
+                  >
+                    {settingPin ? <Loader2 size={14} className="animate-spin" /> : <Shield size={14} />}
+                    {settingPin ? "Setting PIN..." : "Set PIN & Continue"}
+                  </button>
+                </div>
+              </div>
+
+              <div className="bg-red-500/5 border border-red-500/20 p-3 rounded-sm">
+                <p className="text-red-400 text-xs font-mono font-bold">
+                  This PIN cannot be recovered. If you lose it, you will lose access to this dashboard permanently. Choose something you will remember.
+                </p>
+              </div>
             </div>
           ) : (
             <div className="space-y-6">
-              {/* Legacy PIN Setup — inline form */}
-              {isLegacy && (
-                <div className="bg-amber-500/5 border border-amber-500/30 rounded-lg p-5">
-                  <div className="flex items-start gap-3">
-                    <Shield size={18} className="text-amber-500 mt-0.5 shrink-0" />
-                    <div className="flex-1">
-                      <h3 className="font-bold font-mono text-sm text-amber-400 uppercase mb-1">Set Owner PIN</h3>
-                      <p className="text-zinc-400 text-xs font-mono mb-3 leading-relaxed">
-                        Your agent was registered before the PIN system. Set a 6-digit PIN now to secure your dashboard access.
-                      </p>
-                      <div className="flex gap-2">
-                        <input
-                          type="password"
-                          value={setupPin}
-                          onChange={(e) => setSetupPin(e.target.value)}
-                          placeholder="6-digit PIN"
-                          maxLength={6}
-                          className="flex-1 bg-black border border-zinc-700 rounded-sm px-3 py-2 text-white text-sm font-mono outline-none focus:border-amber-500 transition-colors"
-                        />
-                        <button
-                          onClick={handleSetPin}
-                          disabled={settingPin || setupPin.length !== 6}
-                          className="px-4 py-2 bg-amber-600 hover:bg-amber-500 text-white font-bold font-mono text-[10px] uppercase tracking-widest rounded-sm transition-colors disabled:opacity-40"
-                        >
-                          {settingPin ? "Saving..." : "Set PIN"}
-                        </button>
+
+              {/* Onboarding Checklist — show if not fully set up */}
+              {(!agent.isVerified || !agent.solanaAddress) && (
+                <div className="bg-[#0A0A0A] border border-amber-500/20 rounded-sm p-5">
+                  <h3 className="font-bold font-mono text-xs uppercase mb-4 text-amber-400 flex items-center gap-2">
+                    <AlertTriangle size={14} /> Setup Checklist
+                  </h3>
+                  <div className="space-y-3">
+                    {/* Step 1: PIN (always done if they're here) */}
+                    <div className="flex items-center gap-3">
+                      <div className="w-5 h-5 rounded-full border-2 border-emerald-500 bg-emerald-500/20 text-emerald-500 flex items-center justify-center text-[10px]">
+                        ✓
                       </div>
+                      <span className="text-zinc-400 text-xs font-mono line-through">Set owner PIN</span>
+                    </div>
+
+                    {/* Step 2: Verify */}
+                    <div>
+                      <div className="flex items-center gap-3">
+                        <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center text-[10px] ${agent.isVerified ? 'border-emerald-500 bg-emerald-500/20 text-emerald-500' : 'border-zinc-700 text-zinc-700'}`}>
+                          {agent.isVerified ? '✓' : '2'}
+                        </div>
+                        <span className={`text-xs font-mono ${agent.isVerified ? 'text-zinc-400 line-through' : 'text-white font-bold'}`}>
+                          Verify your agent
+                        </span>
+                        {!agent.isVerified && !showVerifyInline && (
+                          <button
+                            onClick={() => setShowVerifyInline(true)}
+                            className="text-[10px] font-mono uppercase text-amber-400 hover:text-amber-300 transition-colors"
+                          >
+                            Verify now →
+                          </button>
+                        )}
+                      </div>
+
+                      {/* Inline tweet verification */}
+                      {!agent.isVerified && showVerifyInline && (
+                        <div className="mt-3 ml-8 space-y-3">
+                          <p className="text-zinc-500 text-[11px] font-mono">
+                            Post a tweet, then paste the link below.
+                          </p>
+                          <a
+                            href={`https://x.com/intent/tweet?text=${encodeURIComponent(`I own ${agent.name} on @uphivexyz 🐝 https://uphive.xyz`)}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="inline-flex items-center gap-2 px-4 py-2 bg-zinc-800 hover:bg-zinc-700 border border-zinc-700 text-white font-mono text-[10px] uppercase tracking-widest rounded-sm transition-colors"
+                          >
+                            <ExternalLink size={12} /> Post on X
+                          </a>
+                          <input
+                            type="url"
+                            value={verifyTweetUrl}
+                            onChange={(e) => setVerifyTweetUrl(e.target.value)}
+                            placeholder="https://x.com/you/status/123456..."
+                            className="w-full bg-black border border-zinc-800 rounded-sm px-3 py-2 text-white text-xs font-mono outline-none focus:border-emerald-500 transition-colors"
+                          />
+                          <button
+                            onClick={async () => {
+                              if (!verifyTweetUrl.trim()) { toast.error("Paste tweet URL first"); return; }
+                              const tweetPattern = /^https?:\/\/(x\.com|twitter\.com)\/\w+\/status\/\d+/;
+                              if (!tweetPattern.test(verifyTweetUrl.trim())) { toast.error("Invalid tweet URL"); return; }
+                              setVerifying(true);
+                              try {
+                                const res = await fetch("/api/agents/verify", {
+                                  method: "POST",
+                                  headers: { "Content-Type": "application/json" },
+                                  body: JSON.stringify({ agent_id: agent.id, tweet_url: verifyTweetUrl.trim() }),
+                                });
+                                const data = await res.json();
+                                if (res.ok) {
+                                  toast.success("Agent verified!");
+                                  setAgent(prev => prev ? { ...prev, isVerified: true } : prev);
+                                  setShowVerifyInline(false);
+                                } else {
+                                  toast.error(data.error || "Verification failed");
+                                }
+                              } catch { toast.error("Network error"); }
+                              finally { setVerifying(false); }
+                            }}
+                            disabled={verifying || !verifyTweetUrl.trim()}
+                            className="w-full px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white font-bold font-mono text-[10px] uppercase tracking-widest rounded-sm transition-colors disabled:opacity-40 flex items-center justify-center gap-2"
+                          >
+                            {verifying ? <Loader2 size={12} className="animate-spin" /> : <Shield size={12} />}
+                            {verifying ? "Verifying..." : "Verify"}
+                          </button>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Step 3: Wallet */}
+                    <div className="flex items-center gap-3">
+                      <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center text-[10px] ${agent.solanaAddress ? 'border-emerald-500 bg-emerald-500/20 text-emerald-500' : 'border-zinc-700 text-zinc-700'}`}>
+                        {agent.solanaAddress ? '✓' : '3'}
+                      </div>
+                      <span className={`text-xs font-mono ${agent.solanaAddress ? 'text-zinc-400 line-through' : 'text-white'}`}>
+                        Connect payment wallet
+                      </span>
                     </div>
                   </div>
                 </div>

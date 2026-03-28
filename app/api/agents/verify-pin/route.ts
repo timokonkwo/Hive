@@ -37,6 +37,41 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    // Authenticate via API key
+    const db = await getDb();
+    const apiKeyHash = hashApiKey(apiKey);
+    const agent = await db.collection(COLLECTIONS.AGENTS).findOne({ apiKeyHash });
+
+    if (!agent) {
+      return NextResponse.json({ error: 'Invalid API key.' }, { status: 401 });
+    }
+
+    const agentPayload = {
+      id: agent._id.toString(),
+      name: agent.name,
+      bio: agent.bio,
+      capabilities: agent.capabilities || [],
+      reputation: agent.reputation || 0,
+      avgSatisfaction: agent.avgSatisfaction || 0,
+      reviewCount: agent.reviewCount || 0,
+      isVerified: agent.isVerified || false,
+      walletAddress: agent.walletAddress || null,
+      solanaAddress: agent.solanaAddress || null,
+      website: agent.website || null,
+      createdAt: agent.createdAt,
+    };
+
+    // No PIN set yet — first login, must set PIN
+    if (!agent.ownerPinHash) {
+      return NextResponse.json({
+        verified: false,
+        needsPin: true,
+        agent: agentPayload,
+        message: 'No owner PIN set. You must set a 6-digit PIN to access the dashboard.',
+      });
+    }
+
+    // PIN provided — verify it
     const body = await req.json();
     const { pin } = body;
 
@@ -47,40 +82,6 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // Authenticate via API key
-    const db = await getDb();
-    const apiKeyHash = hashApiKey(apiKey);
-    const agent = await db.collection(COLLECTIONS.AGENTS).findOne({ apiKeyHash });
-
-    if (!agent) {
-      return NextResponse.json({ error: 'Invalid API key.' }, { status: 401 });
-    }
-
-    // Verify PIN
-    if (!agent.ownerPinHash) {
-      // Agent was registered before PIN system — allow access with API key only
-      // but warn that they should update
-      return NextResponse.json({
-        verified: true,
-        legacy: true,
-        agent: {
-          id: agent._id.toString(),
-          name: agent.name,
-          bio: agent.bio,
-          capabilities: agent.capabilities || [],
-          reputation: agent.reputation || 0,
-          avgSatisfaction: agent.avgSatisfaction || 0,
-          reviewCount: agent.reviewCount || 0,
-          isVerified: agent.isVerified || false,
-          walletAddress: agent.walletAddress || null,
-          solanaAddress: agent.solanaAddress || null,
-          website: agent.website || null,
-          createdAt: agent.createdAt,
-        },
-        message: 'This agent was registered before the PIN system. Dashboard access granted with API key only. Re-register or contact support to set a PIN.',
-      });
-    }
-
     const providedPinHash = createHash('sha256').update(pin).digest('hex');
     if (providedPinHash !== agent.ownerPinHash) {
       return NextResponse.json({ error: 'Invalid owner PIN.' }, { status: 403 });
@@ -88,20 +89,7 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json({
       verified: true,
-      agent: {
-        id: agent._id.toString(),
-        name: agent.name,
-        bio: agent.bio,
-        capabilities: agent.capabilities || [],
-        reputation: agent.reputation || 0,
-        avgSatisfaction: agent.avgSatisfaction || 0,
-        reviewCount: agent.reviewCount || 0,
-        isVerified: agent.isVerified || false,
-        walletAddress: agent.walletAddress || null,
-        solanaAddress: agent.solanaAddress || null,
-        website: agent.website || null,
-        createdAt: agent.createdAt,
-      },
+      agent: agentPayload,
     });
   } catch (error: any) {
     console.error('[HIVE] Verify PIN error:', error);

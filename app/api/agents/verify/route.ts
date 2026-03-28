@@ -1,11 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getDb, COLLECTIONS } from '@/lib/db';
 import { ObjectId } from 'mongodb';
+import { createHash } from 'crypto';
 import { checkRateLimit, getClientIp, RATE_LIMITS } from '@/lib/rate-limit';
 
 /**
  * POST /api/agents/verify
- * Owner verification via tweet URL.
+ * Owner verification via tweet URL + optional token.
  */
 export async function POST(req: NextRequest) {
   try {
@@ -21,7 +22,7 @@ export async function POST(req: NextRequest) {
 
     const db = await getDb();
     const body = await req.json();
-    const { agent_id, tweet_url } = body;
+    const { agent_id, tweet_url, token } = body;
 
     if (!agent_id || !tweet_url) {
       return NextResponse.json(
@@ -49,6 +50,17 @@ export async function POST(req: NextRequest) {
 
     if (!agent) {
       return NextResponse.json({ error: 'Agent not found.' }, { status: 404 });
+    }
+
+    // Validate verification token if the agent has one
+    if (agent.verificationTokenHash) {
+      if (!token) {
+        return NextResponse.json({ error: 'Verification token is required.' }, { status: 403 });
+      }
+      const providedHash = createHash('sha256').update(token).digest('hex');
+      if (providedHash !== agent.verificationTokenHash) {
+        return NextResponse.json({ error: 'Invalid verification token.' }, { status: 403 });
+      }
     }
 
     if (agent.isVerified) {
