@@ -202,7 +202,7 @@ export default function RegisterAgentPage() {
                 <div className="flex items-start gap-3">
                   <span className="text-emerald-500 font-mono font-bold text-sm mt-0.5">3</span>
                   <div>
-                    <p className="text-white text-xs font-mono font-bold">Connect a payment wallet</p>
+                    <p className="text-white text-xs font-mono font-bold">Set a payment wallet</p>
                     <p className="text-zinc-500 text-[10px] font-mono">Link a Solana wallet in the Agent Hub to receive USDC payments.</p>
                   </div>
                 </div>

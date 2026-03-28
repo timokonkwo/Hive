@@ -488,7 +488,7 @@ export default function AgentDashboardPage() {
                         {agent.solanaAddress ? '✓' : '3'}
                       </div>
                       <span className={`text-xs font-mono ${agent.solanaAddress ? 'text-zinc-400 line-through' : 'text-white'}`}>
-                        Connect payment wallet
+                        Set payment wallet
                       </span>
                     </div>
                   </div>
@@ -642,10 +642,56 @@ export default function AgentDashboardPage() {
                         >
                           <Wallet size={14} /> Connect Solana Wallet
                         </button>
+                        <div className="my-3 flex items-center gap-3">
+                          <div className="flex-1 h-px bg-zinc-800" />
+                          <span className="text-zinc-600 text-[10px] font-mono uppercase">or paste address</span>
+                          <div className="flex-1 h-px bg-zinc-800" />
+                        </div>
+                        <input
+                          type="text"
+                          value={newWalletAddress}
+                          onChange={(e) => setNewWalletAddress(e.target.value)}
+                          placeholder="Solana wallet address..."
+                          className="w-full bg-black border border-zinc-800 rounded-sm px-3 py-2.5 text-white text-xs font-mono outline-none focus:border-purple-500 transition-colors mb-2"
+                        />
+                        <button
+                          onClick={async () => {
+                            const addr = newWalletAddress.trim();
+                            if (!addr || addr.length < 32 || addr.length > 44) {
+                              toast.error("Invalid Solana address");
+                              return;
+                            }
+                            setChangingWallet(true);
+                            try {
+                              const res = await fetch("/api/agents/me", {
+                                method: "PATCH",
+                                headers: { "Content-Type": "application/json", "x-hive-api-key": apiKey },
+                                body: JSON.stringify({ solanaAddress: addr }),
+                              });
+                              if (res.ok) {
+                                setAgent(prev => prev ? { ...prev, solanaAddress: addr } : prev);
+                                toast.success("Wallet saved!");
+                                fetchBalances(addr);
+                                setNewWalletAddress("");
+                              } else {
+                                const err = await res.json();
+                                toast.error(err.error || "Failed to save wallet");
+                              }
+                            } catch {
+                              toast.error("Failed to save wallet");
+                            } finally {
+                              setChangingWallet(false);
+                            }
+                          }}
+                          disabled={changingWallet || !newWalletAddress.trim()}
+                          className="w-full py-2 bg-zinc-800 hover:bg-zinc-700 text-white font-bold font-mono text-[10px] uppercase tracking-widest rounded-sm transition-colors disabled:opacity-40"
+                        >
+                          {changingWallet ? "Saving..." : "Save Address"}
+                        </button>
                       </div>
-                      <div className="bg-red-500/5 border border-red-500/20 p-3 rounded">
-                        <p className="text-red-400 text-[11px]">
-                          <strong>⚠ Connect a wallet to get paid.</strong>
+                      <div className="bg-amber-500/5 border border-amber-500/20 p-3 rounded">
+                        <p className="text-amber-400 text-[11px]">
+                          <strong>Set a wallet to receive USDC payments.</strong>
                         </p>
                       </div>
                     </div>
