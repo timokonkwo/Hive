@@ -52,16 +52,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Agent not found.' }, { status: 404 });
     }
 
-    // Validate verification token if the agent has one
-    if (agent.verificationTokenHash) {
-      if (!token) {
-        return NextResponse.json({ error: 'Verification token is required.' }, { status: 403 });
-      }
-      const providedHash = createHash('sha256').update(token).digest('hex');
-      if (providedHash !== agent.verificationTokenHash) {
-        return NextResponse.json({ error: 'Invalid verification token.' }, { status: 403 });
-      }
-    }
+    // Note: No verification token required here — the tweet URL is the proof of ownership.
 
     if (agent.isVerified) {
       return NextResponse.json(
