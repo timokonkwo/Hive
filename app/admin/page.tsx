@@ -7,12 +7,12 @@ import {
   Loader2, Shield, Users, FileText, CheckCircle,
   Clock, ChevronRight, AlertTriangle, Inbox, Zap,
   Search, Trash2, ChevronLeft, ChevronsLeft, ChevronsRight,
-  ArrowUpDown, X, Bot
+  ArrowUpDown, X, Bot, MessageSquare, Bug, Lightbulb
 } from "lucide-react";
 import Link from "next/link";
 import { toast } from "sonner";
 
-type AdminTab = "overview" | "tasks" | "agents" | "activity";
+type AdminTab = "overview" | "tasks" | "agents" | "activity" | "feedback";
 
 const AGENTS_PER_PAGE = 20;
 
@@ -35,6 +35,14 @@ export default function AdminDashboardPage() {
   const [agentsLoading, setAgentsLoading] = useState(false);
   const [deleteModal, setDeleteModal] = useState<{ id: string; name: string } | null>(null);
   const [deleting, setDeleting] = useState(false);
+
+  // Feedback management state
+  const [feedbackItems, setFeedbackItems] = useState<any[]>([]);
+  const [feedbackTotal, setFeedbackTotal] = useState(0);
+  const [feedbackPage, setFeedbackPage] = useState(1);
+  const [feedbackTypeFilter, setFeedbackTypeFilter] = useState("all");
+  const [feedbackStatusFilter, setFeedbackStatusFilter] = useState("all");
+  const [feedbackLoading, setFeedbackLoading] = useState(false);
 
   const address = user?.wallet?.address;
 
@@ -111,6 +119,45 @@ export default function AdminDashboardPage() {
 
   // Reset to page 1 on filter change
   useEffect(() => { setAgentsPage(1); }, [agentsSearch, agentsVerifiedFilter, agentsSort, agentsOrder]);
+
+  // Fetch feedback
+  const fetchFeedback = useCallback(async () => {
+    if (!isAdmin || !address) return;
+    setFeedbackLoading(true);
+    try {
+      const params = new URLSearchParams({ page: String(feedbackPage), address });
+      if (feedbackTypeFilter !== "all") params.set("type", feedbackTypeFilter);
+      if (feedbackStatusFilter !== "all") params.set("status", feedbackStatusFilter);
+      const res = await fetch(`/api/admin/feedback?${params.toString()}`);
+      if (res.ok) {
+        const data = await res.json();
+        setFeedbackItems(data.feedback || []);
+        setFeedbackTotal(data.total || 0);
+      }
+    } catch (err) { console.error("Feedback fetch error:", err); }
+    finally { setFeedbackLoading(false); }
+  }, [isAdmin, address, feedbackPage, feedbackTypeFilter, feedbackStatusFilter]);
+
+  useEffect(() => {
+    if (activeTab === "feedback") fetchFeedback();
+  }, [activeTab, fetchFeedback]);
+
+  useEffect(() => { setFeedbackPage(1); }, [feedbackTypeFilter, feedbackStatusFilter]);
+
+  const updateFeedbackStatus = async (id: string, newStatus: string) => {
+    if (!address) return;
+    try {
+      const res = await fetch("/api/admin/feedback", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id, status: newStatus, address }),
+      });
+      if (res.ok) {
+        toast.success("Status updated");
+        fetchFeedback();
+      }
+    } catch { toast.error("Failed to update"); }
+  };
 
   const handleDeleteAgent = async () => {
     if (!deleteModal || !address) return;
@@ -236,7 +283,7 @@ export default function AdminDashboardPage() {
 
       {/* Tabs */}
       <div className="flex border-b border-zinc-800 mb-8 gap-1">
-        {(["overview", "tasks", "agents", "activity"] as AdminTab[]).map((tab) => (
+        {(["overview", "tasks", "agents", "activity", "feedback"] as AdminTab[]).map((tab) => (
           <button
             key={tab}
             onClick={() => setActiveTab(tab)}
@@ -475,6 +522,93 @@ export default function AdminDashboardPage() {
           ))}
           {(!data?.recentActivity || data.recentActivity.length === 0) && (
             <div className="py-12 text-center text-zinc-600 border border-dashed border-zinc-800 rounded-lg">No activity yet</div>
+          )}
+        </div>
+      )}
+
+      {/* ── Feedback Tab ── */}
+      {activeTab === "feedback" && (
+        <div>
+          <div className="flex items-center gap-3 mb-6">
+            <select
+              value={feedbackTypeFilter}
+              onChange={(e) => setFeedbackTypeFilter(e.target.value)}
+              className="bg-zinc-900 border border-zinc-800 text-white text-xs font-mono px-3 py-2 rounded-sm outline-none"
+            >
+              <option value="all">All Types</option>
+              <option value="bug">Bug Reports</option>
+              <option value="feature">Feature Requests</option>
+            </select>
+            <select
+              value={feedbackStatusFilter}
+              onChange={(e) => setFeedbackStatusFilter(e.target.value)}
+              className="bg-zinc-900 border border-zinc-800 text-white text-xs font-mono px-3 py-2 rounded-sm outline-none"
+            >
+              <option value="all">All Status</option>
+              <option value="open">Open</option>
+              <option value="reviewed">Reviewed</option>
+              <option value="resolved">Resolved</option>
+              <option value="dismissed">Dismissed</option>
+            </select>
+            <span className="text-zinc-600 text-xs font-mono ml-auto">{feedbackTotal} total</span>
+          </div>
+
+          {feedbackLoading ? (
+            <div className="py-12 text-center"><Loader2 className="w-6 h-6 text-emerald-500 animate-spin mx-auto" /></div>
+          ) : feedbackItems.length === 0 ? (
+            <div className="py-12 text-center text-zinc-600 border border-dashed border-zinc-800 rounded-lg font-mono text-sm">No feedback yet</div>
+          ) : (
+            <div className="space-y-3">
+              {feedbackItems.map((item: any) => (
+                <div key={item.id} className="p-4 bg-zinc-900/30 border border-zinc-800 rounded-lg">
+                  <div className="flex items-start gap-3">
+                    <div className={`w-8 h-8 rounded-full flex items-center justify-center shrink-0 mt-0.5 ${
+                      item.type === "bug" ? "bg-red-500/10 text-red-500" : "bg-blue-500/10 text-blue-500"
+                    }`}>
+                      {item.type === "bug" ? <Bug size={14} /> : <Lightbulb size={14} />}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 mb-1">
+                        <span className="text-sm font-bold text-white truncate">{item.title}</span>
+                        <span className={`text-[9px] font-mono uppercase px-1.5 py-0.5 rounded border ${
+                          item.status === "open" ? "bg-amber-500/10 text-amber-400 border-amber-500/20" :
+                          item.status === "reviewed" ? "bg-blue-500/10 text-blue-400 border-blue-500/20" :
+                          item.status === "resolved" ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/20" :
+                          "bg-zinc-800 text-zinc-500 border-zinc-700"
+                        }`}>{item.status}</span>
+                      </div>
+                      <p className="text-zinc-400 text-xs font-mono mb-2 whitespace-pre-wrap">{item.description}</p>
+                      <div className="flex items-center gap-4 text-[10px] text-zinc-600 font-mono">
+                        <span>{new Date(item.createdAt).toLocaleString()}</span>
+                        {item.contactInfo && <span>Contact: {item.contactInfo}</span>}
+                      </div>
+                    </div>
+                    <select
+                      value={item.status}
+                      onChange={(e) => updateFeedbackStatus(item.id, e.target.value)}
+                      className="bg-zinc-900 border border-zinc-800 text-zinc-400 text-[10px] font-mono px-2 py-1 rounded-sm outline-none shrink-0"
+                    >
+                      <option value="open">Open</option>
+                      <option value="reviewed">Reviewed</option>
+                      <option value="resolved">Resolved</option>
+                      <option value="dismissed">Dismissed</option>
+                    </select>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {feedbackTotal > 20 && (
+            <div className="flex items-center justify-center gap-2 mt-6">
+              <PaginationBtn onClick={() => setFeedbackPage(p => Math.max(1, p - 1))} disabled={feedbackPage <= 1}>
+                <ChevronLeft size={14} />
+              </PaginationBtn>
+              <span className="text-xs font-mono text-zinc-500">Page {feedbackPage} of {Math.ceil(feedbackTotal / 20)}</span>
+              <PaginationBtn onClick={() => setFeedbackPage(p => p + 1)} disabled={feedbackPage >= Math.ceil(feedbackTotal / 20)}>
+                <ChevronRight size={14} />
+              </PaginationBtn>
+            </div>
           )}
         </div>
       )}

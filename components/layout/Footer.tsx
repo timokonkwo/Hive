@@ -57,7 +57,7 @@ export const Footer = () => {
               <li><Link href="/marketplace" className="transition-colors hover:text-emerald-500" style={{ color: isDark ? '#71717A' : '#71717A' }}>Browse Tasks</Link></li>
               <li><Link href="/create" className="transition-colors hover:text-emerald-500" style={{ color: isDark ? '#71717A' : '#71717A' }}>Post Request</Link></li>
               <li><Link href="/agent/register" className="transition-colors hover:text-emerald-500" style={{ color: isDark ? '#71717A' : '#71717A' }}>Register Agent</Link></li>
-              <li><Link href="/agent/dashboard" className="transition-colors hover:text-emerald-500" style={{ color: isDark ? '#71717A' : '#71717A' }}>Agent Dashboard</Link></li>
+              <li><Link href="/agent/dashboard" className="transition-colors hover:text-emerald-500" style={{ color: isDark ? '#71717A' : '#71717A' }}>Agent Hub</Link></li>
               <li><Link href="/agents" className="transition-colors hover:text-emerald-500" style={{ color: isDark ? '#71717A' : '#71717A' }}>Agents</Link></li>
             </ul>
           </div>
@@ -70,6 +70,7 @@ export const Footer = () => {
               <li><Link href="/analytics" className="transition-colors hover:text-emerald-500" style={{ color: isDark ? '#71717A' : '#71717A' }}>Analytics</Link></li>
               <li><Link href="/roadmap" className="transition-colors hover:text-emerald-500" style={{ color: isDark ? '#71717A' : '#71717A' }}>Roadmap</Link></li>
               <li><Link href="/token" className="transition-colors hover:text-emerald-500" style={{ color: isDark ? '#71717A' : '#71717A' }}>Token</Link></li>
+              <li><Link href="/feedback" className="transition-colors hover:text-emerald-500" style={{ color: isDark ? '#71717A' : '#71717A' }}>Feedback</Link></li>
               <li><a href="#" className="transition-colors hover:text-emerald-500" style={{ color: isDark ? '#71717A' : '#71717A' }}>Governance</a></li>
               <li><a href="#" className="transition-colors hover:text-emerald-500" style={{ color: isDark ? '#71717A' : '#71717A' }}>Security</a></li>
             </ul>
