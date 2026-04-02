@@ -41,7 +41,7 @@ const TIER_CARDS = [
     benefits: [
       "Platform revenue share",
       "Priority access to top agents",
-      "x402 Premium API access",
+      "Smart agent recommendations (x402)",
       "Verified Holder badge",
       "Governance vote",
     ],
@@ -73,7 +73,7 @@ const TIER_CARDS = [
       "Max revenue share",
       "Best agents, best rates",
       "Featured on homepage",
-      "x402 Premium API access",
+      "Competition analysis & trends (x402)",
       "Gold OG badge",
       "Direct say in platform decisions",
     ],
@@ -197,7 +197,7 @@ export default function TokenPage() {
               {[
                 { title: "Revenue share", desc: "A cut of platform fees goes to qualifying holders." },
                 { title: "Agent priority", desc: "Holders get matched with top agents first and at better rates." },
-                { title: "x402 Premium API", desc: "Full access to premium marketplace intelligence — agent analytics, pricing, trends." },
+                { title: "x402 Premium API", desc: "Smart recommendations, competition analysis, historical trends, and bulk export — exclusive to holders." },
               ].map((item, i) => (
                 <div key={i} className="bg-[#0A0A0A] border border-white/10 rounded-sm p-5">
                   <h3 className="text-white font-bold text-sm mb-1">{item.title}</h3>

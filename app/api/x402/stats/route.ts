@@ -87,12 +87,50 @@ export async function GET(req: NextRequest) {
       db.collection(COLLECTIONS.TASKS).countDocuments({ status: 'Completed', updatedAt: { $gte: weekAgo } }),
     ]);
 
-    // Total volume (sum of budgetAmount for completed tasks)
+    // Total volume
     const volumeResult = await db.collection(COLLECTIONS.TASKS).aggregate([
       { $match: { status: 'Completed', budgetAmount: { $gt: 0 } } },
       { $group: { _id: null, total: { $sum: '$budgetAmount' } } },
     ]).toArray();
     const totalVolumeUSDC = volumeResult[0]?.total || 0;
+
+    // Historical trends: 7d, 30d, 90d (NOT available via public API)
+    const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
+    const ninetyDaysAgo = new Date(Date.now() - 90 * 24 * 60 * 60 * 1000);
+
+    const [tasks30d, bids30d, completions30d, tasks90d, bids90d, completions90d] = await Promise.all([
+      db.collection(COLLECTIONS.TASKS).countDocuments({ createdAt: { $gte: thirtyDaysAgo } }),
+      db.collection(COLLECTIONS.BIDS).countDocuments({ createdAt: { $gte: thirtyDaysAgo } }),
+      db.collection(COLLECTIONS.TASKS).countDocuments({ status: 'Completed', updatedAt: { $gte: thirtyDaysAgo } }),
+      db.collection(COLLECTIONS.TASKS).countDocuments({ createdAt: { $gte: ninetyDaysAgo } }),
+      db.collection(COLLECTIONS.BIDS).countDocuments({ createdAt: { $gte: ninetyDaysAgo } }),
+      db.collection(COLLECTIONS.TASKS).countDocuments({ status: 'Completed', updatedAt: { $gte: ninetyDaysAgo } }),
+    ]);
+
+    // Competition analysis: bid-to-task ratio per category (opportunity finder)
+    const competitionAgg = await db.collection(COLLECTIONS.TASKS).aggregate([
+      { $match: { status: 'Open' } },
+      {
+        $lookup: {
+          from: COLLECTIONS.BIDS,
+          let: { taskId: { $toString: '$_id' } },
+          pipeline: [
+            { $match: { $expr: { $eq: ['$taskId', '$$taskId'] } } },
+            { $count: 'count' },
+          ],
+          as: 'bidInfo',
+        },
+      },
+      {
+        $group: {
+          _id: '$category',
+          openTasks: { $sum: 1 },
+          totalBids: { $sum: { $ifNull: [{ $arrayElemAt: ['$bidInfo.count', 0] }, 0] } },
+          avgBudget: { $avg: '$budgetAmount' },
+        },
+      },
+      { $sort: { totalBids: 1 } }, // Lowest competition first
+    ]).toArray();
 
     return NextResponse.json(
       {
@@ -105,11 +143,19 @@ export async function GET(req: NextRequest) {
           totalVolumeUSDC: Math.round(totalVolumeUSDC * 100) / 100,
           completionRate: totalTasks > 0 ? Math.round((completedTasks / totalTasks) * 100) / 100 : 0,
         },
-        weekly: {
-          newTasks: recentTasks,
-          newBids: recentBids,
-          completions: recentCompletions,
+        trends: {
+          '7d': { newTasks: recentTasks, newBids: recentBids, completions: recentCompletions },
+          '30d': { newTasks: tasks30d, newBids: bids30d, completions: completions30d },
+          '90d': { newTasks: tasks90d, newBids: bids90d, completions: completions90d },
         },
+        competition: competitionAgg.map(c => ({
+          category: c._id,
+          openTasks: c.openTasks,
+          totalBids: c.totalBids,
+          bidToTaskRatio: c.openTasks > 0 ? Math.round((c.totalBids / c.openTasks) * 10) / 10 : 0,
+          avgBudget: c.avgBudget ? Math.round(c.avgBudget) : null,
+          opportunity: c.openTasks > 0 && (c.totalBids / c.openTasks) < 3 ? 'HIGH' : 'NORMAL',
+        })),
         categories: categoryStats.map(c => ({ category: c._id, taskCount: c.count })),
         pricing: budgetByCategory.map(b => ({
           category: b._id,
