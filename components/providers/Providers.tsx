@@ -6,6 +6,7 @@ import { WagmiProvider, createConfig, http } from "wagmi";
 import { mainnet } from "wagmi/chains";
 import { useState } from "react";
 import { ThemeProvider } from "./ThemeProvider";
+import { HolderProvider } from "./HolderContext";
 
 const config = createConfig({
   chains: [mainnet],
@@ -42,7 +43,9 @@ export function Providers({ children }: { children: React.ReactNode }) {
       >
         <QueryClientProvider client={queryClient}>
           <WagmiProvider config={config}>
-            {children}
+            <HolderProvider>
+              {children}
+            </HolderProvider>
           </WagmiProvider>
         </QueryClientProvider>
       </PrivyProvider>

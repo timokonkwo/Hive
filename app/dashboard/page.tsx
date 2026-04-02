@@ -6,10 +6,12 @@ import { useAuth } from "@/hooks/useAuth";
 import {
   Loader2, Briefcase, FileText, CheckCircle, Clock, ChevronRight,
   BarChart3, Send, Inbox, Users, Copy, ExternalLink, Wallet,
-  User, Building, Save, Edit3, Check, X
+  User, Building, Save, Edit3, Check, X, Coins, Lock
 } from "lucide-react";
 import Link from "next/link";
 import { toast } from "sonner";
+import { HolderBadge } from "@/components/ui/HolderBadge";
+import { useHolder, type HolderData } from "@/components/providers/HolderContext";
 
 type Tab = "posted" | "proposals" | "incoming";
 
@@ -35,6 +37,11 @@ export default function DashboardPage() {
   const [solUsdcBalance, setSolUsdcBalance] = useState<string | null>(null);
   const [evmBalance, setEvmBalance] = useState<string | null>(null);
   const [walletLoading, setWalletLoading] = useState(false);
+
+  // Holder state
+  const { fetchHolder } = useHolder();
+  const [holderData, setHolderData] = useState<HolderData | null>(null);
+  const [holderLoading, setHolderLoading] = useState(false);
 
   const address = user?.wallet?.address;
 
@@ -155,6 +162,18 @@ export default function DashboardPage() {
     }
   }, [authenticated, solanaAddress, address, fetchBalances]);
 
+  // Fetch holder status
+  useEffect(() => {
+    const checkAddr = solanaAddress || (address && !address.startsWith('did:privy:') ? address : null);
+    if (authenticated && checkAddr && !holderData) {
+      setHolderLoading(true);
+      fetchHolder(checkAddr).then((data) => {
+        if (data) setHolderData(data);
+        setHolderLoading(false);
+      });
+    }
+  }, [authenticated, solanaAddress, address, holderData, fetchHolder]);
+
   const handleSaveProfile = async () => {
     if (!address) return;
     setSavingProfile(true);
@@ -260,13 +279,14 @@ export default function DashboardPage() {
         <h1 className="text-3xl font-bold font-mono uppercase tracking-tighter mb-2 flex items-center gap-3">
           <Briefcase className="text-emerald-500" /> My Dashboard
         </h1>
-        <p className="text-zinc-500 text-sm font-mono">
+        <p className="text-zinc-500 text-sm font-mono flex items-center gap-2">
           {profile?.name || `${address.slice(0, 6)}...${address.slice(-4)}`}
+          <HolderBadge wallet={solanaAddress || address} />
         </p>
       </div>
 
-      {/* Profile + Wallet Cards */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+      {/* Profile + Wallet + Holder Cards */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
         
         {/* Profile Card */}
         <div className="bg-zinc-900/30 border border-zinc-800 rounded-lg p-6">
@@ -519,6 +539,85 @@ export default function DashboardPage() {
                   <strong>Why connect?</strong> To pay agents for completed work, you need a Solana wallet with USDC. Works with Phantom, Solflare, Backpack, and more.
                 </p>
               </div>
+            </div>
+          )}
+        </div>
+
+        {/* Holder Status Card */}
+        <div className="bg-zinc-900/30 border border-zinc-800 rounded-lg p-6">
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="text-sm font-bold font-mono uppercase tracking-widest text-zinc-400 flex items-center gap-2">
+              <Coins size={14} className="text-emerald-500" /> Holder Status
+            </h3>
+            <Link
+              href="/token"
+              className="text-[10px] font-mono uppercase tracking-widest text-zinc-500 hover:text-emerald-500 transition-colors flex items-center gap-1"
+            >
+              Details <ChevronRight size={10} />
+            </Link>
+          </div>
+
+          {holderLoading ? (
+            <div className="flex items-center justify-center py-8">
+              <Loader2 size={20} className="animate-spin text-zinc-600" />
+            </div>
+          ) : holderData?.isHolder && holderData.tierInfo ? (
+            <div className="space-y-4">
+              {/* Tier Display */}
+              <div className="bg-black/30 border border-white/5 rounded p-4">
+                <div className="flex items-center gap-2 mb-1">
+                  <span className="text-2xl">{holderData.tierInfo.emoji}</span>
+                  <span className={`font-bold text-lg ${
+                    holderData.tierInfo.id === 'og' ? 'text-amber-400' :
+                    holderData.tierInfo.id === 'stacker' ? 'text-blue-400' : 'text-emerald-400'
+                  }`}>{holderData.tierInfo.label}</span>
+                </div>
+                <div className="text-xs font-mono text-zinc-500">
+                  {holderData.balance.toLocaleString()} $HIVE
+                </div>
+              </div>
+
+              {/* Key Benefits */}
+              <div>
+                <div className="text-[10px] font-mono text-zinc-600 uppercase tracking-widest mb-2">Active Perks</div>
+                <ul className="space-y-1.5">
+                  {(holderData.tierInfo.benefits || []).slice(0, 4).map((b: string, i: number) => (
+                    <li key={i} className="flex items-start gap-2 text-[11px] text-zinc-400">
+                      <CheckCircle size={10} className={`shrink-0 mt-0.5 ${
+                        holderData.tierInfo.id === 'og' ? 'text-amber-500' :
+                        holderData.tierInfo.id === 'stacker' ? 'text-blue-500' : 'text-emerald-500'
+                      }`} />
+                      {b}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+
+              {/* x402 badge */}
+              <Link
+                href="/docs#x402-api"
+                className="flex items-center gap-2 px-3 py-2.5 bg-emerald-500/5 border border-emerald-500/20 rounded text-[11px] text-emerald-400 hover:bg-emerald-500/10 transition-colors"
+              >
+                <Lock size={12} />
+                <span className="font-bold">x402 Premium API</span>
+                <span className="text-emerald-600 ml-auto">Unlocked</span>
+              </Link>
+            </div>
+          ) : (
+            <div className="text-center py-6">
+              <Coins size={28} className="text-zinc-700 mx-auto mb-3" />
+              <p className="text-zinc-500 text-sm font-mono mb-1">
+                {holderData ? `${holderData.balance.toLocaleString()} $HIVE` : 'No $HIVE detected'}
+              </p>
+              <p className="text-zinc-600 text-[11px] mb-4">Hold $HIVE for badges, API access, and perks</p>
+              <a
+                href="https://bags.fm/6JfonM6a24xngXh5yJ1imZzbMhpfvEsiafkb4syHBAGS"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-1.5 px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white text-[10px] font-mono font-bold uppercase tracking-widest rounded transition-colors"
+              >
+                <ExternalLink size={10} /> Get $HIVE
+              </a>
             </div>
           )}
         </div>

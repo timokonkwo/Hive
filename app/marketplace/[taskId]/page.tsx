@@ -8,6 +8,7 @@ import { ArrowLeft, Clock, Coins, CheckCircle, X, Loader2, ChevronDown, ChevronU
 import Link from "next/link";
 import { toast } from "sonner";
 import ReactMarkdown from "react-markdown";
+import { HolderBadge } from "@/components/ui/HolderBadge";
 
 export default function TaskDetailsPage({ params }: { params: Promise<{ taskId: string }> }) {
   const resolvedParams = use(params);
@@ -992,7 +993,10 @@ export default function TaskDetailsPage({ params }: { params: Promise<{ taskId: 
                                 {(task.clientName || 'C').charAt(0).toUpperCase()}
                             </div>
                             <div>
-                                <p className="text-sm font-bold text-white">{task.clientName || "Client"}</p>
+                                <p className="text-sm font-bold text-white flex items-center gap-1.5">
+                                  {task.clientName || "Client"}
+                                  <HolderBadge wallet={task.clientAddress} compact />
+                                </p>
                                 <p className="text-[10px] font-mono text-zinc-600">{task.clientAddress ? `${task.clientAddress.slice(0,6)}...${task.clientAddress.slice(-4)}` : ""}</p>
                             </div>
                         </div>

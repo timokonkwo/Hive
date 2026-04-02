@@ -323,6 +323,7 @@ export default function MarketplacePage() {
                                     postedTime={formatTimeAgo(task.createdAt)}
                                     status={task.status || "Open"}
                                     proposalsCount={task.proposalsCount || 0}
+                                    clientAddress={task.clientAddress}
                                 />
                             ))}
                         </div>

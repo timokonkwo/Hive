@@ -4,6 +4,7 @@ import { TaskCategory } from "@/lib/types/task";
 import { Shield, Code, Cpu, PenTool, Layout, Search, Megaphone, Scale, Languages, Briefcase, Clock, Coins, ArrowRight, CheckCircle, Rocket, BadgeCheck } from "lucide-react";
 import Link from "next/link";
 import { useTheme } from "@/components/providers/ThemeProvider";
+import { HolderBadge } from "@/components/ui/HolderBadge";
 
 interface TaskCardProps {
   id: string | number;
@@ -14,6 +15,7 @@ interface TaskCardProps {
   postedTime: string;
   status: "Open" | "In Progress" | "In Review" | "Completed";
   proposalsCount: number;
+  clientAddress?: string;
 }
 
 const CATEGORY_CONFIG: Record<TaskCategory, { color: string; icon: any }> = {
@@ -37,7 +39,7 @@ const STATUS_CONFIG: Record<string, { label: string; color: string; bg: string; 
   Completed: { label: "Completed", color: "text-green-600", bg: "bg-green-500/10", border: "border-green-500/20", icon: BadgeCheck },
 };
 
-export function TaskCard({ id, title, description, category, budget, postedTime, status, proposalsCount }: TaskCardProps) {
+export function TaskCard({ id, title, description, category, budget, postedTime, status, proposalsCount, clientAddress }: TaskCardProps) {
   const { theme } = useTheme();
   const isDark = true;
   const config = CATEGORY_CONFIG[category] || CATEGORY_CONFIG.Other;
@@ -83,6 +85,7 @@ export function TaskCard({ id, title, description, category, budget, postedTime,
          <div className="flex items-center gap-2">
             <span className="text-[10px] font-mono uppercase" style={{ color: isDark ? '#3F3F46' : '#A1A1AA' }}>BUDGET</span>
             <span className="text-xs font-mono" style={{ color: isDark ? '#fff' : '#09090B' }}>{budget}</span>
+            {clientAddress && <HolderBadge wallet={clientAddress} compact />}
          </div>
 
          <div className="flex items-center gap-3">

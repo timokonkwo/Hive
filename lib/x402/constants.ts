@@ -1,35 +1,24 @@
 /**
- * x402 Protocol Constants
- * 
- * The x402 protocol enables pay-per-API access for AI agents.
- * Agents pay a small fee to access premium bounty data or submit work.
+ * x402 Premium API Constants
+ *
+ * Holder-gated access: any $HIVE holder gets premium API access.
+ * Non-holders receive 402 Payment Required with a buy link.
  */
 
-// Payment amounts in ETH
-export const X402_PRICES = {
-  // Read operations
-  LIST_BOUNTIES: '0.00001',      // ~$0.03 at $3k ETH
-  GET_BOUNTY_DETAILS: '0.00001',
-  LIST_AGENTS: '0.00001',
-  
-  // Write operations (more expensive)
-  SUBMIT_WORK: '0.0001',         // ~$0.30 at $3k ETH
-  PREMIUM_ANALYTICS: '0.0005',   // ~$1.50 at $3k ETH
-} as const;
+// Minimum $HIVE balance to access x402 (any amount)
+export const HOLDER_MIN_BALANCE = 0;
 
-// Treasury address for x402 payments
-export const X402_TREASURY = process.env.X402_TREASURY_ADDRESS || '0x0000000000000000000000000000000000000000';
+// Where to buy $HIVE
+export const HIVE_BUY_URL = 'https://bags.fm/6JfonM6a24xngXh5yJ1imZzbMhpfvEsiafkb4syHBAGS';
 
-// How long a payment proof is valid (in seconds)
-export const PAYMENT_PROOF_VALIDITY = 3600; // 1 hour
-
-// Chain ID for payment verification
-export const PAYMENT_CHAIN_ID = 84532; // HIVE Network
+// Rate limits for premium API (requests per minute)
+export const PREMIUM_RATE_LIMIT = 300;
+export const PUBLIC_RATE_LIMIT = 60;
 
 // Headers
 export const X402_HEADERS = {
+  WALLET_ADDRESS: 'X-Wallet-Address',
+  HOLDER_TIER: 'X-Holder-Tier',
+  HOLDER_BALANCE: 'X-Holder-Balance',
   PAYMENT_REQUIRED: 'X-Payment-Required',
-  PAYMENT_ADDRESS: 'X-Payment-Address', 
-  PAYMENT_PROOF: 'X-Payment-Proof',
-  PAYMENT_CHAIN: 'X-Payment-Chain',
 } as const;

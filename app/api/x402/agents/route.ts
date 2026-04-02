@@ -1,97 +1,114 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { verifyPayment, getPaymentRequiredHeaders, X402_PRICES, X402_HEADERS } from '@/lib/x402';
+import { verifyHolderAccess, getHolderRequiredHeaders, X402_HEADERS, HIVE_BUY_URL } from '@/lib/x402';
+import { getDb, COLLECTIONS } from '@/lib/db';
 
 /**
- * x402 Protected API: List Agents
- * 
- * GET /api/hive/x402/agents
- * 
- * Returns premium agent data including reputation scores.
- * Requires payment proof in X-Payment-Proof header.
+ * GET /api/x402/agents — Premium Agent Intelligence
+ *
+ * Returns agents with performance analytics: completion rate,
+ * avg delivery time, review scores, bid win rate, top categories.
+ *
+ * Requires $HIVE holdings (any amount).
  */
-export async function GET(request: NextRequest) {
-  const paymentProof = request.headers.get(X402_HEADERS.PAYMENT_PROOF);
-  const requiredAmount = X402_PRICES.LIST_AGENTS;
+export async function GET(req: NextRequest) {
+  const wallet = req.headers.get(X402_HEADERS.WALLET_ADDRESS);
 
-  // If no payment proof, return 402 Payment Required
-  if (!paymentProof) {
+  if (!wallet) {
     return NextResponse.json(
       {
         error: 'Payment Required',
-        message: 'This API requires payment. Send ETH to the specified address and include the transaction hash in X-Payment-Proof header.',
-        required: {
-          amount: `${requiredAmount} ETH`,
-          chain: 'HIVE Network',
-        },
+        message: 'Hold any amount of $HIVE to access premium agent data.',
+        buyUrl: HIVE_BUY_URL,
+        header: `Set "${X402_HEADERS.WALLET_ADDRESS}" to your Solana wallet address`,
       },
-      {
-        status: 402,
-        headers: getPaymentRequiredHeaders(requiredAmount),
-      }
+      { status: 402, headers: getHolderRequiredHeaders() }
     );
   }
 
-  // Verify the payment
-  const verification = await verifyPayment(paymentProof, requiredAmount);
-  
-  if (!verification.valid) {
+  const verification = await verifyHolderAccess(wallet);
+
+  if (!verification.allowed) {
     return NextResponse.json(
       {
-        error: 'Payment Verification Failed',
-        message: verification.error,
+        error: 'Payment Required',
+        message: verification.error || 'You need to hold $HIVE tokens to access this endpoint.',
+        buyUrl: HIVE_BUY_URL,
+        balance: verification.balance,
       },
-      { status: 402, headers: getPaymentRequiredHeaders(requiredAmount) }
+      { status: 402, headers: getHolderRequiredHeaders() }
     );
   }
 
-  // Payment verified! Fetch and return agent data
   try {
-    const INDEXER_URL = process.env.NEXT_PUBLIC_HIVE_INDEXER_URL || 'http://localhost:4350/graphql';
-    
-    const response = await fetch(INDEXER_URL, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        query: `{
-          agents(limit: 100, orderBy: reputation_DESC) {
-            id
-            name
-            bio
-            registeredAt
-            reputation
-            isActive
-          }
-        }`,
-      }),
-    });
+    const db = await getDb();
 
-    const data = await response.json();
-    
-    if (data.errors) {
-      throw new Error(data.errors[0].message);
-    }
+    // Fetch all agents
+    const agents = await db.collection(COLLECTIONS.AGENTS).find({}).toArray();
 
-    return NextResponse.json({
-      success: true,
-      payment: {
-        verified: true,
-        txHash: paymentProof,
-        amount: verification.amount,
-        from: verification.from,
+    // Fetch aggregated bid stats per agent
+    const bidStats = await db.collection(COLLECTIONS.BIDS).aggregate([
+      {
+        $group: {
+          _id: '$agentId',
+          totalBids: { $sum: 1 },
+          acceptedBids: { $sum: { $cond: [{ $eq: ['$status', 'accepted'] }, 1, 0] } },
+          completedBids: { $sum: { $cond: [{ $eq: ['$status', 'Completed'] }, 1, 0] } },
+        },
       },
-      data: data.data.agents,
+    ]).toArray();
+
+    const bidStatsMap = new Map(bidStats.map(s => [s._id, s]));
+
+    // Fetch review stats per agent
+    const reviewStats = await db.collection('reviews').aggregate([
+      {
+        $group: {
+          _id: '$agentId',
+          avgRating: { $avg: '$satisfaction' },
+          reviewCount: { $sum: 1 },
+        },
+      },
+    ]).toArray();
+
+    const reviewMap = new Map(reviewStats.map(r => [r._id, r]));
+
+    const enrichedAgents = agents.map(agent => {
+      const agentId = agent._id.toString();
+      const bids = bidStatsMap.get(agentId) || { totalBids: 0, acceptedBids: 0, completedBids: 0 };
+      const reviews = reviewMap.get(agentId) || { avgRating: null, reviewCount: 0 };
+      const winRate = bids.totalBids > 0 ? (bids.acceptedBids / bids.totalBids) : 0;
+
+      return {
+        name: agent.name,
+        reputation: agent.reputation || 0,
+        isVerified: agent.isVerified || false,
+        totalBids: bids.totalBids,
+        acceptedBids: bids.acceptedBids,
+        completedTasks: bids.completedBids,
+        bidWinRate: Math.round(winRate * 100) / 100,
+        avgReviewScore: reviews.avgRating ? Math.round(reviews.avgRating * 10) / 10 : null,
+        reviewCount: reviews.reviewCount,
+        categories: agent.categories || [],
+        createdAt: agent.createdAt,
+      };
     });
+
+    return NextResponse.json(
+      {
+        agents: enrichedAgents,
+        total: enrichedAgents.length,
+        premium: true,
+        holder: { tier: verification.tier, balance: verification.balance },
+      },
+      {
+        headers: {
+          [X402_HEADERS.HOLDER_TIER]: verification.tier,
+          [X402_HEADERS.HOLDER_BALANCE]: String(verification.balance),
+        },
+      }
+    );
   } catch (error: any) {
-    return NextResponse.json({
-      success: true,
-      payment: {
-        verified: true,
-        txHash: paymentProof,
-        amount: verification.amount,
-        from: verification.from,
-      },
-      data: [],
-      note: 'Indexer unavailable. Please use on-chain data.',
-    });
+    console.error('[x402] Agents error:', error);
+    return NextResponse.json({ error: 'Failed to fetch agent data' }, { status: 500 });
   }
 }

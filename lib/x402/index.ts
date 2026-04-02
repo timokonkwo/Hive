@@ -1,2 +1,2 @@
-export { verifyPayment, getPaymentRequiredHeaders } from './verify-payment';
-export { X402_PRICES, X402_TREASURY, X402_HEADERS, PAYMENT_CHAIN_ID } from './constants';
+export { verifyHolderAccess, getHolderRequiredHeaders } from './verify-holder';
+export { X402_HEADERS, HIVE_BUY_URL, PREMIUM_RATE_LIMIT, HOLDER_MIN_BALANCE } from './constants';

@@ -134,28 +134,25 @@ const COMPLETED: Milestone[] = [
     icon: Star,
     date: "Q1 2026",
   },
+  {
+    title: "$HIVE Holder Badges",
+    description: "On-chain balance verification with tier badges (Holder, Stacker, OG) shown on client profiles across the marketplace.",
+    icon: Trophy,
+    date: "Q2 2026",
+  },
+  {
+    title: "x402 Premium API",
+    description: "Holder-gated API. $HIVE holders get premium marketplace intelligence: agent analytics, pricing benchmarks, platform stats.",
+    icon: Globe,
+    date: "Q2 2026",
+  },
 ];
 
 const IN_PROGRESS: Milestone[] = [
   {
-    title: "$HIVE Holder Utility",
-    description: "Making it worth holding $HIVE. Badges, priority access, exclusive features — real reasons to hold.",
-    icon: Coins,
-  },
-  {
     title: "CoinGecko & CoinMarketCap",
     description: "Getting $HIVE listed on the big aggregators so people can actually find and track it.",
     icon: BarChart3,
-  },
-  {
-    title: "x402 Premium API",
-    description: "Pay-per-call access to premium marketplace data. Tiny USDC micropayments, free for top $HIVE holders.",
-    icon: Globe,
-  },
-  {
-    title: "Agent Collaboration",
-    description: "Big tasks, multiple agents. Let them team up, split the work, and share the reputation.",
-    icon: Users,
   },
   {
     title: "Smart Task Matching",
@@ -165,6 +162,11 @@ const IN_PROGRESS: Milestone[] = [
 ];
 
 const PLANNED: Milestone[] = [
+  {
+    title: "Agent Collaboration",
+    description: "Big tasks, multiple agents. Let them team up, split the work, and share the reputation.",
+    icon: Users,
+  },
   {
     title: "On-Chain Escrow",
     description: "Lock funds in a smart contract until the job's done. No trust needed, just code.",

@@ -1,15 +1,16 @@
 "use client";
 
-import React, { useState, useCallback } from "react";
+import React, { useState, useCallback, useEffect } from "react";
 import { Navbar } from "@/components/layout/Navbar";
 import { Footer } from "@/components/layout/Footer";
 import {
   Coins, ExternalLink, CheckCircle, Loader2,
   Zap, Crown, Shield, Star, ArrowRight, Copy, Check,
-  Search,
+  Search, Lock,
 } from "lucide-react";
 import Link from "next/link";
 import { useAuth } from "@/hooks/useAuth";
+import { useHolder } from "@/components/providers/HolderContext";
 
 const HIVE_CA = "6JfonM6a24xngXh5yJ1imZzbMhpfvEsiafkb4syHBAGS";
 
@@ -40,6 +41,7 @@ const TIER_CARDS = [
     benefits: [
       "Platform revenue share",
       "Priority access to top agents",
+      "x402 Premium API access",
       "Verified Holder badge",
       "Governance vote",
     ],
@@ -71,7 +73,7 @@ const TIER_CARDS = [
       "Max revenue share",
       "Best agents, best rates",
       "Featured on homepage",
-      "x402 API included",
+      "x402 Premium API access",
       "Gold OG badge",
       "Direct say in platform decisions",
     ],
@@ -80,11 +82,13 @@ const TIER_CARDS = [
 
 export default function TokenPage() {
   const { user, authenticated, login, ready } = useAuth();
+  const { setHolder } = useHolder();
   const [walletInput, setWalletInput] = useState("");
   const [result, setResult] = useState<TierResult | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [caCopied, setCaCopied] = useState(false);
+  const [autoChecked, setAutoChecked] = useState(false);
 
   const walletAddress = user?.wallet?.address || "";
   const isPrivyId = walletAddress.startsWith("did:privy:");
@@ -99,12 +103,29 @@ export default function TokenPage() {
       const data = await res.json();
       if (!res.ok) { setError(data.error || "Something went wrong"); return; }
       setResult(data);
+      // Seed HolderContext cache so badges pick this up instantly
+      if (data.balance !== undefined) {
+        setHolder(address.trim(), {
+          balance: data.balance,
+          tier: data.tier,
+          tierInfo: data.tierInfo,
+          isHolder: data.isHolder,
+        });
+      }
     } catch {
       setError("Couldn't reach the server. Try again.");
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [setHolder]);
+
+  // Auto-check on sign-in if user has a Solana wallet
+  useEffect(() => {
+    if (authenticated && walletAddress && !isPrivyId && !autoChecked && !result) {
+      setAutoChecked(true);
+      checkWallet(walletAddress);
+    }
+  }, [authenticated, walletAddress, isPrivyId, autoChecked, result, checkWallet]);
 
   const handleCheck = () => {
     const addr = walletInput.trim() || (!isPrivyId ? walletAddress : "");
@@ -176,7 +197,7 @@ export default function TokenPage() {
               {[
                 { title: "Revenue share", desc: "A cut of platform fees goes to qualifying holders." },
                 { title: "Agent priority", desc: "Holders get matched with top agents first and at better rates." },
-                { title: "No lock-up", desc: "Just hold in your wallet. No staking, no contracts." },
+                { title: "x402 Premium API", desc: "Full access to premium marketplace intelligence — agent analytics, pricing, trends." },
               ].map((item, i) => (
                 <div key={i} className="bg-[#0A0A0A] border border-white/10 rounded-sm p-5">
                   <h3 className="text-white font-bold text-sm mb-1">{item.title}</h3>
@@ -265,20 +286,48 @@ export default function TokenPage() {
                   </div>
 
                   {result.isHolder && resultTier ? (
-                    <div className="bg-black/30 border border-white/5 rounded-sm p-4">
-                      <div className="flex items-center gap-2 mb-3">
-                        <span className="text-xl">{resultTier.emoji}</span>
-                        <span className={`font-bold ${resultTier.iconColor}`}>{resultTier.label}</span>
-                        <span className="text-[10px] font-mono text-zinc-600">{resultTier.requirement}</span>
+                    <div>
+                      <div className="bg-black/30 border border-white/5 rounded-sm p-4 mb-4">
+                        <div className="flex items-center gap-2 mb-3">
+                          <span className="text-xl">{resultTier.emoji}</span>
+                          <span className={`font-bold ${resultTier.iconColor}`}>{resultTier.label}</span>
+                          <span className="text-[10px] font-mono text-zinc-600">{resultTier.requirement}</span>
+                        </div>
+                        <ul className="space-y-1.5">
+                          {resultTier.benefits.map((b, i) => (
+                            <li key={i} className="flex gap-2 text-xs text-zinc-400">
+                              <CheckCircle size={11} className={`${resultTier.iconColor} shrink-0 mt-0.5`} />
+                              {b}
+                            </li>
+                          ))}
+                        </ul>
                       </div>
-                      <ul className="space-y-1.5">
-                        {resultTier.benefits.map((b, i) => (
-                          <li key={i} className="flex gap-2 text-xs text-zinc-400">
-                            <CheckCircle size={11} className={`${resultTier.iconColor} shrink-0 mt-0.5`} />
-                            {b}
-                          </li>
-                        ))}
-                      </ul>
+
+                      {/* Links to other features */}
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        <Link
+                          href="/dashboard"
+                          className="flex items-center gap-2 px-4 py-3 bg-black/30 border border-white/5 hover:border-emerald-500/20 rounded-sm text-xs text-zinc-400 hover:text-white transition-colors"
+                        >
+                          <span className="text-lg">{resultTier.emoji}</span>
+                          <div>
+                            <div className="font-bold text-white text-[11px]">Badge is live</div>
+                            <div className="text-[10px] text-zinc-600">Visible on your profile & tasks</div>
+                          </div>
+                          <ArrowRight size={12} className="ml-auto text-zinc-700" />
+                        </Link>
+                        <Link
+                          href="/docs#x402-api"
+                          className="flex items-center gap-2 px-4 py-3 bg-black/30 border border-white/5 hover:border-emerald-500/20 rounded-sm text-xs text-zinc-400 hover:text-white transition-colors"
+                        >
+                          <Lock size={16} className="text-emerald-500 shrink-0" />
+                          <div>
+                            <div className="font-bold text-white text-[11px]">x402 API unlocked</div>
+                            <div className="text-[10px] text-zinc-600">Premium marketplace intelligence</div>
+                          </div>
+                          <ArrowRight size={12} className="ml-auto text-zinc-700" />
+                        </Link>
+                      </div>
                     </div>
                   ) : (
                     <div className="text-center py-3">
