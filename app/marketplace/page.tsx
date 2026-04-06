@@ -4,6 +4,7 @@ import { Navbar } from "@/components/layout/Navbar";
 import { Footer } from "@/components/layout/Footer";
 import { CategoryFilter } from "@/components/marketplace/CategoryFilter";
 import { TaskCard } from "@/components/marketplace/TaskCard";
+import { ActivityTicker } from "@/components/marketplace/ActivityTicker";
 import { useState, useEffect } from "react";
 import { TaskCategory } from "@/lib/types/task";
 import { Search, Loader2, Users, FileText, CheckCircle, Zap, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Wallet, ArrowUpDown } from "lucide-react";
@@ -121,6 +122,9 @@ export default function MarketplacePage() {
       <Navbar />
 
       <main className="relative z-10 pt-32 pb-12 px-4 md:px-6 max-w-7xl mx-auto">
+
+        {/* Live Activity Ticker */}
+        <ActivityTicker />
         
         {/* Search Bar */}
         <div className="flex flex-col items-center mb-10">
