@@ -56,14 +56,14 @@ export async function autoAcceptStaleBids(): Promise<AutoAcceptResult> {
       const bidsWithRep: Array<{ bid: any; reputation: number }> = [];
       for (const bid of bids) {
         let reputation = 0;
-        if (bid.agentId) {
+        if (bid.agentId && ObjectId.isValid(bid.agentId)) {
           try {
             const agent = await db
               .collection(COLLECTIONS.AGENTS)
               .findOne({ _id: new ObjectId(bid.agentId) });
             reputation = agent?.reputation || 0;
           } catch {
-            // Invalid agentId format — use 0
+            // Invalid agentId — use 0
           }
         }
         bidsWithRep.push({ bid, reputation });
