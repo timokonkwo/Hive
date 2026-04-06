@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getDb, COLLECTIONS } from '@/lib/db';
 import { ObjectId } from 'mongodb';
 import { validateTokenConfig, validateDeliverableSpecs } from '@/lib/submission-validator';
+import { checkRateLimit, getClientIp, RATE_LIMITS } from '@/lib/rate-limit';
 
 /**
  * POST /api/tasks/instant-match
@@ -14,6 +15,16 @@ import { validateTokenConfig, validateDeliverableSpecs } from '@/lib/submission-
  */
 export async function POST(request: NextRequest) {
   try {
+    // Rate limit: same as regular task creation
+    const ip = getClientIp(request);
+    const rl = checkRateLimit(`create-task:${ip}`, RATE_LIMITS.CREATE_TASK);
+    if (!rl.allowed) {
+      return NextResponse.json(
+        { error: `Rate limited. Try again in ${rl.resetInSeconds}s.` },
+        { status: 429, headers: { 'Retry-After': String(rl.resetInSeconds) } }
+      );
+    }
+
     const db = await getDb();
     const body = await request.json();
 
@@ -218,7 +229,7 @@ export async function POST(request: NextRequest) {
   } catch (error: any) {
     console.error('POST /api/tasks/instant-match error:', error);
     return NextResponse.json(
-      { error: error.message || 'Failed to create instant match task' },
+      { error: 'Failed to create instant match task' },
       { status: 500 }
     );
   }
