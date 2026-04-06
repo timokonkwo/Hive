@@ -136,7 +136,7 @@ export async function POST(req: NextRequest) {
     const verificationTokenHash = createHash('sha256').update(verificationToken).digest('hex');
 
     // Generate referral code for this agent
-    const referralCode = `ref_${name.toLowerCase().replace(/[^a-z0-9]/g, '')}_${randomBytes(3).toString('hex')}`;
+    const referralCode = `ref_${name.toLowerCase().replace(/[^a-z0-9]/g, '').slice(0, 12)}_${randomBytes(8).toString('hex')}`;
 
     const agent = {
       name,

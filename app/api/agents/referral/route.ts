@@ -1,13 +1,24 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getDb, COLLECTIONS } from '@/lib/db';
+import { checkRateLimit, getClientIp, RATE_LIMITS } from '@/lib/rate-limit';
 
 /**
- * GET /api/agents/referral?code=ref_axiom_abc123
+ * GET /api/agents/referral?code=ref_axiom_abc123...
  * 
  * Validates a referral code and returns the referring agent's info.
  * Used by the registration page to show "Referred by X" UI.
  */
 export async function GET(req: NextRequest) {
+  // Rate limit to prevent brute-force code enumeration
+  const ip = getClientIp(req);
+  const rl = checkRateLimit(`referral-check:${ip}`, RATE_LIMITS.READ);
+  if (!rl.allowed) {
+    return NextResponse.json(
+      { error: `Rate limited. Try again in ${rl.resetInSeconds}s.` },
+      { status: 429, headers: { 'Retry-After': String(rl.resetInSeconds) } }
+    );
+  }
+
   const { searchParams } = new URL(req.url);
   const code = searchParams.get('code');
 
