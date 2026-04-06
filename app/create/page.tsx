@@ -46,6 +46,7 @@ function CreateTaskContent() {
 
   const [isPending, setIsPending] = useState(false);
   const [isSuccess, setIsSuccess] = useState(false);
+  const [instantMatch, setInstantMatch] = useState(false);
 
   // Token Launch config
   const [tokenConfig, setTokenConfig] = useState<{
@@ -99,7 +100,12 @@ function CreateTaskContent() {
         };
       }
 
-      const response = await fetch("/api/tasks", {
+      // Use instant-match endpoint when enabled (and not direct-hire)
+      const endpoint = instantMatch && !directHireAgent
+        ? '/api/tasks/instant-match'
+        : '/api/tasks';
+
+      const response = await fetch(endpoint, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
@@ -136,11 +142,14 @@ function CreateTaskContent() {
       setIsSuccess(true);
       // Clear the saved draft
       try { sessionStorage.removeItem('hive_create_task_draft'); } catch {}
+      const matchedAgent = instantMatch && !directHireAgent ? taskData.assignedAgentName : null;
       toast.success(
-        directHireAgent ? "Agent Hired!" : "Request Posted!", 
+        directHireAgent ? "Agent Hired!" : matchedAgent ? "Agent Matched!" : "Request Posted!", 
         { description: directHireAgent 
           ? `"${directHireAgent.name}" has been assigned to your task.`
-          : "Agents will now be able to bid on your task." 
+          : matchedAgent
+            ? `Instantly matched with ${matchedAgent}. They'll start working now.`
+            : "Agents will now be able to bid on your task." 
         }
       );
 
@@ -490,6 +499,42 @@ function CreateTaskContent() {
                             </div>
                         </div>
                     </div>
+
+                    {/* Instant Match Toggle */}
+                    {!directHireAgent && (
+                      <button
+                        type="button"
+                        onClick={() => setInstantMatch(!instantMatch)}
+                        className={`w-full p-4 rounded-sm border text-left transition-all flex items-start gap-3 ${
+                          instantMatch
+                            ? 'bg-amber-500/10 border-amber-500/30'
+                            : 'bg-zinc-900/50 border-zinc-800 hover:border-zinc-700'
+                        }`}
+                      >
+                        <div className={`p-1.5 rounded-sm mt-0.5 ${
+                          instantMatch ? 'bg-amber-500/20 text-amber-500' : 'bg-zinc-800 text-zinc-500'
+                        }`}>
+                          <Zap size={14} />
+                        </div>
+                        <div className="flex-1">
+                          <div className="flex items-center gap-2 mb-0.5">
+                            <span className={`font-bold font-mono text-xs uppercase tracking-widest ${
+                              instantMatch ? 'text-amber-500' : 'text-white'
+                            }`}>Instant Match</span>
+                            <span className={`w-8 h-4 rounded-full relative transition-colors ${
+                              instantMatch ? 'bg-amber-500' : 'bg-zinc-700'
+                            }`}>
+                              <span className={`absolute top-0.5 w-3 h-3 rounded-full bg-white transition-all ${
+                                instantMatch ? 'left-4' : 'left-0.5'
+                              }`} />
+                            </span>
+                          </div>
+                          <p className="text-[11px] text-zinc-500 leading-relaxed">
+                            Skip the bidding stage — Hive will auto-assign the best available agent for this category immediately.
+                          </p>
+                        </div>
+                      </button>
+                    )}
 
                     <div className="bg-zinc-900 border border-zinc-800 p-4 rounded-sm text-xs font-mono text-zinc-400">
                         <div className="flex justify-between mb-2">
