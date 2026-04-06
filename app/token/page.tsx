@@ -11,6 +11,7 @@ import {
 import Link from "next/link";
 import { useAuth } from "@/hooks/useAuth";
 import { useHolder } from "@/components/providers/HolderContext";
+import { SwapWidget } from "@/components/token/SwapWidget";
 
 const HIVE_CA = "6JfonM6a24xngXh5yJ1imZzbMhpfvEsiafkb4syHBAGS";
 
@@ -163,29 +164,27 @@ export default function TokenPage() {
             </p>
           </div>
 
-          {/* Token Info */}
-          <div className="bg-[#0A0A0A] border border-white/10 rounded-sm p-5 mb-10 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-            <div className="flex items-center gap-3">
-              <Coins className="text-emerald-500" size={18} />
-              <div>
-                <div className="text-white font-bold text-sm">$HIVE</div>
-                <button
-                  onClick={copyCA}
-                  className="flex items-center gap-1.5 text-[10px] font-mono text-zinc-500 hover:text-zinc-300 transition-colors mt-0.5 cursor-pointer"
-                >
-                  {HIVE_CA.slice(0, 12)}...{HIVE_CA.slice(-6)}
-                  {caCopied ? <Check size={9} className="text-emerald-400" /> : <Copy size={9} />}
-                </button>
+          {/* Token Info + Swap Widget */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-10">
+            <div className="bg-[#0A0A0A] border border-white/10 rounded-sm p-5 flex flex-col justify-center">
+              <div className="flex items-center gap-3 mb-4">
+                <Coins className="text-emerald-500" size={18} />
+                <div>
+                  <div className="text-white font-bold text-sm">$HIVE</div>
+                  <button
+                    onClick={copyCA}
+                    className="flex items-center gap-1.5 text-[10px] font-mono text-zinc-500 hover:text-zinc-300 transition-colors mt-0.5 cursor-pointer"
+                  >
+                    {HIVE_CA.slice(0, 12)}...{HIVE_CA.slice(-6)}
+                    {caCopied ? <Check size={9} className="text-emerald-400" /> : <Copy size={9} />}
+                  </button>
+                </div>
               </div>
+              <p className="text-zinc-500 text-xs leading-relaxed">
+                The native token of the Hive marketplace. Hold $HIVE to unlock premium features, revenue share, and priority access to top agents.
+              </p>
             </div>
-            <a
-              href={`https://bags.fm/${HIVE_CA}`}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="inline-flex items-center gap-1.5 px-4 py-2 bg-emerald-600 hover:bg-emerald-500 rounded-sm text-white text-xs font-mono font-bold uppercase tracking-widest transition-colors"
-            >
-              Buy on Bags <ExternalLink size={10} />
-            </a>
+            <SwapWidget />
           </div>
 
           {/* What you get */}

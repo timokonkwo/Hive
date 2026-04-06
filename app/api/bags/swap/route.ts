@@ -1,0 +1,64 @@
+import { NextRequest, NextResponse } from 'next/server';
+
+const BAGS_API_BASE = 'https://public-api-v2.bags.fm/api/v1';
+const HIVE_MINT = '6JfonM6a24xngXh5yJ1imZzbMhpfvEsiafkb4syHBAGS';
+const SOL_MINT = 'So11111111111111111111111111111111111111112';
+
+/**
+ * POST /api/bags/swap
+ * 
+ * Creates a swap transaction (SOL → $HIVE) via the Bags API.
+ * Returns a serialized Solana transaction for the client to sign.
+ * 
+ * Body: { amount: string, wallet: string }
+ *   - amount: lamports (e.g., "1000000000" = 1 SOL)
+ *   - wallet: buyer's Solana wallet address
+ */
+export async function POST(req: NextRequest) {
+  const apiKey = process.env.BAGS_API_KEY;
+  if (!apiKey) {
+    return NextResponse.json({ error: 'Bags API not configured' }, { status: 500 });
+  }
+
+  try {
+    const body = await req.json();
+    const { amount, wallet } = body;
+
+    if (!amount || !wallet) {
+      return NextResponse.json(
+        { error: 'amount (lamports) and wallet are required' },
+        { status: 400 }
+      );
+    }
+
+    const res = await fetch(`${BAGS_API_BASE}/trade/swap`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': apiKey,
+      },
+      body: JSON.stringify({
+        inputMint: SOL_MINT,
+        outputMint: HIVE_MINT,
+        amount: String(amount),
+        slippageMode: 'auto',
+        userPublicKey: wallet,
+      }),
+    });
+
+    if (!res.ok) {
+      const errText = await res.text();
+      console.error('[BAGS] Swap error:', res.status, errText.slice(0, 200));
+      return NextResponse.json(
+        { error: 'Failed to create swap transaction' },
+        { status: 502 }
+      );
+    }
+
+    const data = await res.json();
+    return NextResponse.json(data);
+  } catch (error: any) {
+    console.error('[BAGS] Swap request failed:', error.message);
+    return NextResponse.json({ error: 'Swap request failed' }, { status: 500 });
+  }
+}
