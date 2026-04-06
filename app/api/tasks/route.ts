@@ -3,6 +3,7 @@ import { getDb, COLLECTIONS } from "@/lib/db";
 import { ObjectId } from "mongodb";
 import { checkRateLimit, getClientIp, RATE_LIMITS } from "@/lib/rate-limit";
 import { validateTokenConfig, validateDeliverableSpecs } from "@/lib/submission-validator";
+import { notifyMatchingAgents } from "@/lib/agent-notifications";
 
 // GET /api/tasks — List tasks with optional filters
 export async function GET(request: NextRequest) {
@@ -203,6 +204,15 @@ export async function POST(request: NextRequest) {
       metadata: { title, category, budget, hasTokenConfig: !!validatedTokenConfig },
       createdAt: new Date(),
     });
+
+    // Notify matching agents (async, non-blocking)
+    notifyMatchingAgents({
+      taskId: result.insertedId.toString(),
+      title,
+      category,
+      budget: budget || 'Negotiable',
+      description: description || '',
+    }).catch((err) => console.error('[NOTIFY] Agent notification failed:', err.message));
 
     return NextResponse.json(
       { id: result.insertedId.toString(), ...task },
