@@ -3,6 +3,7 @@ import { getDb, COLLECTIONS } from '@/lib/db';
 import { ObjectId } from 'mongodb';
 import { checkRateLimit, getClientIp, RATE_LIMITS } from '@/lib/rate-limit';
 import { verifyUsdcPayment } from '@/lib/solana-pay';
+import { createTweet, buildCompletionTweet } from '@/lib/x-api';
 
 // Solana tx signatures are 87-88 characters, base58 encoded
 const TX_SIGNATURE_REGEX = /^[1-9A-HJ-NP-Za-km-z]{87,88}$/;
@@ -337,6 +338,26 @@ export async function POST(
         );
       } catch (repErr) {
         console.error('[HIVE] Reputation update error:', repErr);
+      }
+    }
+
+    // --- AUTO-TWEET (fire-and-forget, non-blocking) ---
+    if (satRating >= 4 && agentId) {
+      try {
+        const tweetText = buildCompletionTweet({
+          title: task.title || 'Task',
+          category: task.category || 'Other',
+          budget: task.budget || 'Negotiable',
+          agentName: agentName || 'Agent',
+          agentId: agentId,
+          rating: satRating,
+        });
+        createTweet(tweetText).catch((err) =>
+          console.error('[X-API] Auto-tweet failed:', err.message)
+        );
+      } catch (tweetErr) {
+        // Never block completion for a tweet failure
+        console.error('[X-API] Tweet build error:', tweetErr);
       }
     }
 
