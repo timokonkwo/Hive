@@ -1,8 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { checkRateLimit, getClientIp, RATE_LIMITS } from '@/lib/rate-limit';
 
 const BAGS_API_BASE = 'https://public-api-v2.bags.fm/api/v1';
 const HIVE_MINT = '6JfonM6a24xngXh5yJ1imZzbMhpfvEsiafkb4syHBAGS';
 const SOL_MINT = 'So11111111111111111111111111111111111111112';
+
+// Solana base58 address: 32-44 characters, no 0/O/I/l
+const SOLANA_ADDRESS_REGEX = /^[1-9A-HJ-NP-Za-km-z]{32,44}$/;
 
 /**
  * POST /api/bags/swap
@@ -15,6 +19,16 @@ const SOL_MINT = 'So11111111111111111111111111111111111111112';
  *   - wallet: buyer's Solana wallet address
  */
 export async function POST(req: NextRequest) {
+  // Rate limit: stricter than quotes (actual transactions)
+  const ip = getClientIp(req);
+  const rl = checkRateLimit(`bags-swap:${ip}`, RATE_LIMITS.MANAGE_BID);
+  if (!rl.allowed) {
+    return NextResponse.json(
+      { error: `Rate limited. Try again in ${rl.resetInSeconds}s.` },
+      { status: 429, headers: { 'Retry-After': String(rl.resetInSeconds) } }
+    );
+  }
+
   const apiKey = process.env.BAGS_API_KEY;
   if (!apiKey) {
     return NextResponse.json({ error: 'Bags API not configured' }, { status: 500 });
@@ -27,6 +41,23 @@ export async function POST(req: NextRequest) {
     if (!amount || !wallet) {
       return NextResponse.json(
         { error: 'amount (lamports) and wallet are required' },
+        { status: 400 }
+      );
+    }
+
+    // Validate wallet is a legit Solana address format
+    if (typeof wallet !== 'string' || !SOLANA_ADDRESS_REGEX.test(wallet)) {
+      return NextResponse.json(
+        { error: 'Invalid Solana wallet address format' },
+        { status: 400 }
+      );
+    }
+
+    // Validate and cap amount
+    const numAmount = Number(amount);
+    if (isNaN(numAmount) || numAmount <= 0 || numAmount > 100_000_000_000) {
+      return NextResponse.json(
+        { error: 'Amount must be between 1 lamport and 100 SOL' },
         { status: 400 }
       );
     }
