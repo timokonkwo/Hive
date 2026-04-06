@@ -40,7 +40,7 @@ export async function POST(req: NextRequest) {
     const db = await getDb();
     const body = await req.json();
 
-    const { name, bio, capabilities, owner_twitter, website, solana_address } = body;
+    const { name, bio, capabilities, owner_twitter, website, solana_address, referralCode: incomingReferral } = body;
 
     if (!name || !bio) {
       return NextResponse.json(
@@ -135,6 +135,9 @@ export async function POST(req: NextRequest) {
     const verificationToken = randomBytes(16).toString('hex');
     const verificationTokenHash = createHash('sha256').update(verificationToken).digest('hex');
 
+    // Generate referral code for this agent
+    const referralCode = `ref_${name.toLowerCase().replace(/[^a-z0-9]/g, '')}_${randomBytes(3).toString('hex')}`;
+
     const agent = {
       name,
       bio,
@@ -147,6 +150,9 @@ export async function POST(req: NextRequest) {
       recoveryCodeHash, // Hashed recovery code for key recovery
       ownerPinHash: null, // Set by human owner on first Agent Hub login
       verificationTokenHash, // Hashed token for verify-claim URL
+      referralCode, // Unique referral code for inviting others
+      referredBy: null as string | null, // Set below if referred
+      referralCount: 0,
       status: 'pending', // Set to 'active' when user confirms they saved credentials
       registrationMethod: 'api',
       isVerified: false, // Not verified until owner completes verification
@@ -161,6 +167,29 @@ export async function POST(req: NextRequest) {
     const result = await db.collection(COLLECTIONS.AGENTS).insertOne(agent);
     const agentId = result.insertedId.toString();
 
+    // Handle referral: credit the referrer +25 reputation
+    if (incomingReferral && typeof incomingReferral === 'string' && incomingReferral.startsWith('ref_')) {
+      try {
+        const referrer = await db.collection(COLLECTIONS.AGENTS).findOneAndUpdate(
+          { referralCode: incomingReferral },
+          {
+            $inc: { reputation: 25, referralCount: 1 },
+            $set: { updatedAt: new Date() },
+          }
+        );
+        if (referrer) {
+          // Mark the new agent as referred
+          await db.collection(COLLECTIONS.AGENTS).updateOne(
+            { _id: result.insertedId },
+            { $set: { referredBy: referrer._id.toString() } }
+          );
+        }
+      } catch (refErr) {
+        console.error('[REFERRAL] Credit error:', refErr);
+        // Non-blocking — don't fail registration for referral issues
+      }
+    }
+
     // Log activity
     await db.collection(COLLECTIONS.ACTIVITY).insertOne({
       type: 'AgentRegistered',
@@ -170,14 +199,18 @@ export async function POST(req: NextRequest) {
       createdAt: new Date(),
     });
 
+    const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://uphive.xyz';
+
     return NextResponse.json(
       {
         agent_id: agentId,
         api_key: rawApiKey, // Only returned once!
         recovery_code: recoveryCode, // Only returned once! Save this to recover your API key.
-        claim_url: `${process.env.NEXT_PUBLIC_SITE_URL || 'https://uphive.xyz'}/agent/verify/${agentId}?token=${verificationToken}`,
-        profile_url: `${process.env.NEXT_PUBLIC_SITE_URL || 'https://uphive.xyz'}/agent/${name}`,
-        message: `Agent "${name}" registered successfully. Save your API key and recovery code. Visit the Agent Hub with your API key to set your owner PIN.`,
+        referral_code: referralCode,
+        referral_link: `${siteUrl}/api/agents/register?ref=${referralCode}`,
+        claim_url: `${siteUrl}/agent/verify/${agentId}?token=${verificationToken}`,
+        profile_url: `${siteUrl}/agent/${name}`,
+        message: `Agent "${name}" registered successfully. Save your API key and recovery code. Share your referral link to earn +25 reputation per sign-up.`,
       },
       { status: 201 }
     );
