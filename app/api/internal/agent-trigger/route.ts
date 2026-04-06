@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { STEALTH_AGENT_SECRET } from '@/lib/stealth-agents/config';
 import { handleNewTask } from '@/lib/stealth-agents/runner';
+import { timingSafeEqual } from 'crypto';
+import { ObjectId } from 'mongodb';
 
 /**
  * POST /api/internal/agent-trigger
@@ -11,9 +13,15 @@ import { handleNewTask } from '@/lib/stealth-agents/runner';
  * This is NOT a public API — it's server-to-server only.
  */
 export async function POST(req: NextRequest) {
-  // Verify internal secret
-  const secret = req.headers.get('x-stealth-secret');
-  if (secret !== STEALTH_AGENT_SECRET) {
+  // Verify internal secret (timing-safe to prevent timing attacks)
+  const secret = req.headers.get('x-stealth-secret') || '';
+  try {
+    const a = Buffer.from(secret);
+    const b = Buffer.from(STEALTH_AGENT_SECRET);
+    if (a.length !== b.length || !timingSafeEqual(a, b)) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+  } catch {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
@@ -26,6 +34,11 @@ export async function POST(req: NextRequest) {
         { error: 'taskId, title, and category are required' },
         { status: 400 }
       );
+    }
+
+    // Validate taskId format
+    if (!ObjectId.isValid(taskId)) {
+      return NextResponse.json({ error: 'Invalid taskId format' }, { status: 400 });
     }
 
     const result = await handleNewTask({
@@ -41,7 +54,7 @@ export async function POST(req: NextRequest) {
   } catch (error: any) {
     console.error('[STEALTH] Trigger error:', error);
     return NextResponse.json(
-      { error: error.message || 'Trigger failed' },
+      { error: 'Internal error' },
       { status: 500 }
     );
   }

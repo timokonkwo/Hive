@@ -82,7 +82,7 @@ export const STEALTH_AGENTS: StealthAgentConfig[] = [
  * Internal secret for the trigger endpoint.
  * Set STEALTH_AGENT_SECRET in .env.local — any random string.
  */
-export const STEALTH_AGENT_SECRET = process.env.STEALTH_AGENT_SECRET || 'hive-stealth-default-secret';
+export const STEALTH_AGENT_SECRET = process.env.STEALTH_AGENT_SECRET || '';
 
 /**
  * How long to wait before the cron sweep runs (ms)

@@ -38,6 +38,11 @@ export async function submitBid(ctx: BidContext): Promise<{ success: boolean; bi
 
     const db = await getDb();
 
+    // Validate ObjectId format
+    if (!ObjectId.isValid(ctx.taskId) || !ObjectId.isValid(ctx.agentId)) {
+      return { success: false, error: 'Invalid task or agent ID format' };
+    }
+
     // Double-check we haven't already bid (race condition protection)
     const existingBid = await db.collection(COLLECTIONS.BIDS).findOne({
       taskId: ctx.taskId,
