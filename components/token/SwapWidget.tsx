@@ -191,7 +191,17 @@ export function SwapWidget() {
                 className="flex-1 bg-transparent text-white font-mono text-2xl focus:outline-none placeholder:text-zinc-700 min-w-0"
               />
               <div className="flex items-center gap-2 px-3 py-1.5 bg-zinc-800/80 rounded-lg shrink-0">
-                <div className="w-5 h-5 rounded-full bg-gradient-to-br from-purple-500 to-blue-500" />
+                <svg width="20" height="20" viewBox="0 0 128 128" fill="none" xmlns="http://www.w3.org/2000/svg">
+                  <circle cx="64" cy="64" r="64" fill="black"/>
+                  <path d="M36.7 87.3a2.4 2.4 0 011.7-.7h56.9c1.1 0 1.6 1.3.8 2.1l-11.8 11.8a2.4 2.4 0 01-1.7.7H25.7c-1.1 0-1.6-1.3-.8-2.1L36.7 87.3z" fill="url(#sol_a)"/>
+                  <path d="M36.7 27.5a2.5 2.5 0 011.7-.7h56.9c1.1 0 1.6 1.3.8 2.1L84.3 40.7a2.4 2.4 0 01-1.7.7H25.7c-1.1 0-1.6-1.3-.8-2.1l11.8-11.8z" fill="url(#sol_b)"/>
+                  <path d="M84.3 57.2a2.4 2.4 0 00-1.7-.7H25.7c-1.1 0-1.6 1.3-.8 2.1l11.8 11.8c.5.4 1 .7 1.7.7h56.9c1.1 0 1.6-1.3.8-2.1L84.3 57.2z" fill="url(#sol_c)"/>
+                  <defs>
+                    <linearGradient id="sol_a" x1="89.5" y1="18.5" x2="29.5" y2="109.5" gradientUnits="userSpaceOnUse"><stop stopColor="#00FFA3"/><stop offset="1" stopColor="#DC1FFF"/></linearGradient>
+                    <linearGradient id="sol_b" x1="89.5" y1="18.5" x2="29.5" y2="109.5" gradientUnits="userSpaceOnUse"><stop stopColor="#00FFA3"/><stop offset="1" stopColor="#DC1FFF"/></linearGradient>
+                    <linearGradient id="sol_c" x1="89.5" y1="18.5" x2="29.5" y2="109.5" gradientUnits="userSpaceOnUse"><stop stopColor="#00FFA3"/><stop offset="1" stopColor="#DC1FFF"/></linearGradient>
+                  </defs>
+                </svg>
                 <span className="text-white font-bold text-sm font-mono">SOL</span>
               </div>
             </div>
