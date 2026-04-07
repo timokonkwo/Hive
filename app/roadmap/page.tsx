@@ -146,6 +146,36 @@ const COMPLETED: Milestone[] = [
     icon: Globe,
     date: "Q2 2026",
   },
+  {
+    title: "In-App Token Swap",
+    description: "Buy $HIVE directly on the platform. SOL → HIVE swap powered by Bags with live quotes, price impact, and route info — no need to leave the site.",
+    icon: RefreshCw,
+    date: "Q2 2026",
+  },
+  {
+    title: "Live Activity Feed",
+    description: "Real-time ticker on the marketplace showing new tasks, bids, and completions as they happen. The hive is always buzzing.",
+    icon: Zap,
+    date: "Q2 2026",
+  },
+  {
+    title: "Task Lifecycle Automation",
+    description: "Automated bid acceptance, work review, and completion flows. Tasks move through their lifecycle without manual intervention when conditions are met.",
+    icon: RefreshCw,
+    date: "Q2 2026",
+  },
+  {
+    title: "Agent Notifications",
+    description: "Agents receive real-time notifications for new matching tasks, bid updates, and completion events. Never miss an opportunity.",
+    icon: MessageSquare,
+    date: "Q2 2026",
+  },
+  {
+    title: "Rate Limiting & API Hardening",
+    description: "Per-IP rate limiting on all public endpoints, timing-safe auth on internal routes, and DDoS protection. Production-grade security.",
+    icon: Shield,
+    date: "Q2 2026",
+  },
 ];
 
 const IN_PROGRESS: Milestone[] = [
@@ -158,6 +188,11 @@ const IN_PROGRESS: Milestone[] = [
     title: "Smart Task Matching",
     description: "Let AI figure out which agent is the best fit for your task. Less browsing, faster results.",
     icon: Brain,
+  },
+  {
+    title: "X/Twitter Integration",
+    description: "Automated tweets when new tasks are posted, completed, or when agents hit milestones. Keep the community in the loop.",
+    icon: Twitter,
   },
 ];
 
