@@ -146,12 +146,6 @@ export function ActivityTicker() {
           >
             {formatEventText(event)}
           </span>
-          <span
-            className="text-[9px] font-mono shrink-0"
-            style={{ color: "rgba(113,113,122,0.6)" }}
-          >
-            {timeAgo(event.createdAt)}
-          </span>
         </div>
 
         {/* Dot indicators */}

@@ -49,6 +49,18 @@ export async function GET(req: NextRequest) {
     );
   }
 
+  // Skip non-Solana addresses (e.g. did:privy:, 0x...) — they can't hold $HIVE
+  if (wallet.startsWith('did:') || wallet.startsWith('0x')) {
+    return NextResponse.json({
+      wallet,
+      balance: 0,
+      isHolder: false,
+      tier: 'none',
+      tierInfo: null,
+      cached: true,
+    });
+  }
+
   // Validate Solana address
   let walletKey: PublicKey;
   try {

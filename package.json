@@ -32,6 +32,7 @@
     "wagmi": "^3.4.2"
   },
   "devDependencies": {
+    "@netlify/functions": "^5.1.5",
     "@tailwindcss/postcss": "^4",
     "@types/node": "^20",
     "@types/react": "^19",
