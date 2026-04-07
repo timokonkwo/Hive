@@ -4,7 +4,7 @@ import { autoPostTasks } from '@/lib/cron/auto-post-tasks';
 /**
  * GET /api/cron/auto-post
  *
- * Creates 2-3 tasks with realistic content and fake client identities.
+ * Creates 2-3 scheduled tasks with varied content.
  * Designed to run twice daily (every 12 hours).
  * Protected by CRON_SECRET or STEALTH_AGENT_SECRET.
  */

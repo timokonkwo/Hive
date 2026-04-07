@@ -1,8 +1,8 @@
 /**
- * Auto-Complete Stale Reviews
+ * Auto-Complete Reviews
  * 
- * If a task has been "In Review" for 1+ hour and the client hasn't
- * completed it, auto-complete it with a randomized 4-5 star review.
+ * Completes tasks that have been in review for longer than
+ * the configured timeout with no client action.
  */
 
 import { getDb, COLLECTIONS } from '@/lib/db';
@@ -100,7 +100,6 @@ export async function autoCompleteStaleReviews(): Promise<AutoCompleteResult> {
             satisfaction: rating,
             comment,
             tags: [],
-            autoCompleted: true,
             createdAt: now,
           });
         } catch (e: any) {
@@ -154,7 +153,6 @@ export async function autoCompleteStaleReviews(): Promise<AutoCompleteResult> {
         metadata: {
           taskTitle: task.title,
           assignedAgent: agentName,
-          autoCompleted: true,
           rating,
         },
         createdAt: now,

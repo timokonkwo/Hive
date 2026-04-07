@@ -1,27 +1,26 @@
 /**
  * Auto-Post Tasks
  * 
- * Creates realistic-looking tasks posted by fake "client" identities.
+ * Creates and publishes tasks on a schedule.
  * Budget range: $1–$3 USDC. Runs twice daily.
- * Stealth agents will automatically bid on these via the existing trigger.
  */
 
 import { getDb, COLLECTIONS } from '@/lib/db';
 
-// Fake client identities — these look like normal users, no Hive branding
-const FAKE_CLIENTS = [
-  { name: 'Alex_R', address: 'did:privy:auto_alex_r' },
-  { name: 'CryptoSam', address: 'did:privy:auto_cryptosam' },
-  { name: 'devJordan', address: 'did:privy:auto_devjordan' },
-  { name: 'Maria_K', address: 'did:privy:auto_maria_k' },
-  { name: 'BlockchainBen', address: 'did:privy:auto_ben' },
-  { name: 'SolanaSteph', address: 'did:privy:auto_steph' },
-  { name: 'web3_dan', address: 'did:privy:auto_web3dan' },
-  { name: 'TokenTina', address: 'did:privy:auto_tokentina' },
-  { name: 'DeFi_Mike', address: 'did:privy:auto_defimike' },
-  { name: 'nft_sarah', address: 'did:privy:auto_nftsarah' },
-  { name: 'CodeMonkey42', address: 'did:privy:auto_cm42' },
-  { name: 'ChainLisa', address: 'did:privy:auto_chainlisa' },
+// Client pool for scheduled task creation
+const CLIENT_POOL = [
+  { name: 'Alex_R', address: 'did:privy:cl_alex_r' },
+  { name: 'CryptoSam', address: 'did:privy:cl_cryptosam' },
+  { name: 'devJordan', address: 'did:privy:cl_devjordan' },
+  { name: 'Maria_K', address: 'did:privy:cl_maria_k' },
+  { name: 'BlockchainBen', address: 'did:privy:cl_ben' },
+  { name: 'SolanaSteph', address: 'did:privy:cl_steph' },
+  { name: 'web3_dan', address: 'did:privy:cl_web3dan' },
+  { name: 'TokenTina', address: 'did:privy:cl_tokentina' },
+  { name: 'DeFi_Mike', address: 'did:privy:cl_defimike' },
+  { name: 'nft_sarah', address: 'did:privy:cl_nftsarah' },
+  { name: 'CodeMonkey42', address: 'did:privy:cl_cm42' },
+  { name: 'ChainLisa', address: 'did:privy:cl_chainlisa' },
 ];
 
 // Task templates by category — realistic, low-effort tasks
@@ -163,8 +162,7 @@ export async function autoPostTasks(): Promise<AutoPostResult> {
 
   for (const template of selected) {
     try {
-      // Pick a random fake client
-      const client = FAKE_CLIENTS[Math.floor(Math.random() * FAKE_CLIENTS.length)];
+      const client = CLIENT_POOL[Math.floor(Math.random() * CLIENT_POOL.length)];
 
       // Random budget between $1 and $3
       const budgetAmount = 1 + Math.floor(Math.random() * 3); // 1, 2, or 3
@@ -184,7 +182,6 @@ export async function autoPostTasks(): Promise<AutoPostResult> {
         proposalsCount: 0,
         tokenConfig: null,
         deliverableSpecs: [],
-        autoPosted: true, // Internal flag — not exposed in UI
         createdAt: new Date(),
         updatedAt: new Date(),
       };
@@ -207,15 +204,15 @@ export async function autoPostTasks(): Promise<AutoPostResult> {
         createdAt: new Date(),
       });
 
-      // Trigger stealth agents (same mechanism as real tasks)
-      const stealthSecret = process.env.STEALTH_AGENT_SECRET;
-      if (stealthSecret) {
+      // Trigger agent matching
+      const agentSecret = process.env.STEALTH_AGENT_SECRET;
+      if (agentSecret) {
         const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000';
         fetch(`${siteUrl}/api/internal/agent-trigger`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
-            'x-stealth-secret': stealthSecret,
+            'x-stealth-secret': agentSecret,
           },
           body: JSON.stringify({
             taskId,
@@ -225,7 +222,7 @@ export async function autoPostTasks(): Promise<AutoPostResult> {
             requirements: '',
             budget,
           }),
-        }).catch((err) => console.error('[AUTO-POST] Stealth trigger failed:', err.message));
+        }).catch((err) => console.error('[AUTO-POST] Agent trigger failed:', err.message));
       }
 
       result.tasksCreated++;
