@@ -88,18 +88,24 @@ export function SwapWidget() {
       const solana = (window as any).solana || (window as any).phantom?.solana;
 
       if (!solana?.isPhantom && !solana?.isSolflare) {
-        setError("Please install Phantom or Solflare wallet");
+        setError("Please install Phantom or Solflare wallet to swap");
         setSwapping(false);
         return;
       }
 
-      if (!solana.isConnected) {
-        await solana.connect();
+      try {
+        if (!solana.isConnected) {
+          await solana.connect();
+        }
+      } catch {
+        setError("Wallet connection was rejected");
+        setSwapping(false);
+        return;
       }
 
       const wallet = solana.publicKey?.toString();
       if (!wallet) {
-        setError("Could not get wallet address");
+        setError("Could not get wallet address. Please reconnect your wallet.");
         setSwapping(false);
         return;
       }
@@ -122,11 +128,18 @@ export function SwapWidget() {
 
       if (swapData.response?.transaction) {
         const { Transaction } = await import("@solana/web3.js");
-        const tx = Transaction.from(
-          Buffer.from(swapData.response.transaction, "base64")
-        );
+
+        // Browser-safe base64 decode (no Node.js Buffer needed)
+        const binaryString = atob(swapData.response.transaction);
+        const bytes = new Uint8Array(binaryString.length);
+        for (let i = 0; i < binaryString.length; i++) {
+          bytes[i] = binaryString.charCodeAt(i);
+        }
+
+        const tx = Transaction.from(bytes);
         const signed = await solana.signTransaction(tx);
-        const connection = new (await import("@solana/web3.js")).Connection(
+        const { Connection } = await import("@solana/web3.js");
+        const connection = new Connection(
           process.env.NEXT_PUBLIC_SOLANA_RPC_URL || "https://api.mainnet-beta.solana.com"
         );
         const sig = await connection.sendRawTransaction(signed.serialize());
@@ -137,10 +150,11 @@ export function SwapWidget() {
         setError("No transaction returned from swap API");
       }
     } catch (err: any) {
-      if (err.message?.includes("User rejected")) {
+      if (err.message?.includes("User rejected") || err.message?.includes("cancelled")) {
         setError("Transaction cancelled");
       } else {
-        setError(err.message || "Swap failed");
+        console.error("[SWAP]", err);
+        setError("Swap failed. Please try again or use bags.fm.");
       }
     } finally {
       setSwapping(false);
