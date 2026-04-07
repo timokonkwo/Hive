@@ -108,7 +108,8 @@ export async function PATCH(req: NextRequest) {
     if (body.notificationIds && Array.isArray(body.notificationIds)) {
       const { ObjectId } = await import('mongodb');
       const ids = body.notificationIds
-        .filter((id: string) => ObjectId.isValid(id))
+        .slice(0, 100) // Cap at 100 to prevent DoS
+        .filter((id: string) => typeof id === 'string' && ObjectId.isValid(id))
         .map((id: string) => new ObjectId(id));
 
       const result = await db.collection('agent_notifications').updateMany(
