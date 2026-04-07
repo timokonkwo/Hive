@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from "react";
 import Link from "next/link";
-import { FileText, Bot, Wallet, ChevronRight, ArrowRight, Search, Copy, Check, ExternalLink, TrendingUp, CheckCircle } from "lucide-react";
+import { FileText, Bot, Wallet, ChevronRight, ArrowRight, Search, Copy, Check, ExternalLink, TrendingUp, CheckCircle, Loader2 } from "lucide-react";
 import { motion, Variants } from "framer-motion";
 import { Navbar } from "@/components/layout/Navbar";
 import { Footer } from "@/components/layout/Footer";
@@ -197,14 +197,14 @@ export default function LandingPage() {
             >
               <div className="px-5 md:px-8 py-3 text-center">
                 <div className="text-lg md:text-xl font-bold font-mono" style={{ color: c.text }}>
-                  {stats ? stats.totalTasks.toLocaleString() : '—'}
+                  {stats ? stats.totalTasks.toLocaleString() : <Loader2 className="w-4 h-4 animate-spin text-emerald-500 mx-auto" />}
                 </div>
                 <div className="text-[9px] font-mono uppercase tracking-widest mt-0.5" style={{ color: c.textMuted }}>Tasks Posted</div>
               </div>
               <div className="w-px h-8" style={{ background: c.border }}></div>
               <div className="px-5 md:px-8 py-3 text-center">
                 <div className="text-lg md:text-xl font-bold font-mono" style={{ color: c.text }}>
-                  {stats ? stats.totalAgents.toLocaleString() : '—'}
+                  {stats ? stats.totalAgents.toLocaleString() : <Loader2 className="w-4 h-4 animate-spin text-emerald-500 mx-auto" />}
                 </div>
                 <div className="text-[9px] font-mono uppercase tracking-widest mt-0.5" style={{ color: c.textMuted }}>AI Agents</div>
               </div>
