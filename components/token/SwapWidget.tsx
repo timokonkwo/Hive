@@ -25,6 +25,17 @@ export function SwapWidget() {
   const [swapping, setSwapping] = useState(false);
   const [error, setError] = useState("");
   const [swapResult, setSwapResult] = useState<string | null>(null);
+  const [walletConnected, setWalletConnected] = useState(false);
+
+  // Check if wallet is already connected on mount
+  useEffect(() => {
+    const phantom = (window as any).phantom?.solana;
+    const solflare = (window as any).solflare;
+    const solana = phantom || solflare || (window as any).solana;
+    if (solana?.publicKey || solana?.isConnected) {
+      setWalletConnected(true);
+    }
+  }, []);
 
   const fetchQuote = useCallback(async (amount: string) => {
     const numAmount = parseFloat(amount);
@@ -85,27 +96,50 @@ export function SwapWidget() {
     setSwapping(true);
 
     try {
-      const solana = (window as any).solana || (window as any).phantom?.solana;
+      // Detect Solana wallet provider
+      const phantom = (window as any).phantom?.solana;
+      const solflare = (window as any).solflare;
+      const solana = phantom || solflare || (window as any).solana;
 
-      if (!solana?.isPhantom && !solana?.isSolflare) {
-        setError("Please install Phantom or Solflare wallet to swap");
+      if (!solana) {
+        window.open("https://phantom.app/", "_blank");
+        setError("No Solana wallet found. Install Phantom to continue.");
         setSwapping(false);
         return;
       }
 
-      try {
-        if (!solana.isConnected) {
-          await solana.connect();
-        }
-      } catch {
-        setError("Wallet connection was rejected");
-        setSwapping(false);
-        return;
-      }
-
-      const wallet = solana.publicKey?.toString();
+      // Try silent connect first, then prompt
+      let wallet: string | null = solana.publicKey?.toString() || null;
+      
       if (!wallet) {
-        setError("Could not get wallet address. Please reconnect your wallet.");
+        try {
+          // Try silent connect (won't show popup if already trusted)
+          const resp = await solana.connect({ onlyIfTrusted: true });
+          wallet = resp?.publicKey?.toString() || null;
+        } catch {
+          // Silent connect failed — do a full connect with popup
+          try {
+            const resp = await solana.connect();
+            wallet = resp?.publicKey?.toString() || null;
+          } catch {
+            setError("Please approve the wallet connection in your Phantom extension.");
+            setSwapping(false);
+            return;
+          }
+        }
+      }
+
+      if (!wallet) {
+        setError("Could not get wallet address. Please unlock your wallet and try again.");
+        setSwapping(false);
+        return;
+      }
+
+      // Mark as connected
+      setWalletConnected(true);
+
+      // If no amount entered, this was just a connect action
+      if (!solAmount || parseFloat(solAmount) <= 0) {
         setSwapping(false);
         return;
       }
@@ -302,15 +336,17 @@ export function SwapWidget() {
           {/* Buy button */}
           <button
             onClick={handleSwap}
-            disabled={!solAmount || parseFloat(solAmount) <= 0 || swapping || loadingQuote}
+            disabled={(walletConnected && (!solAmount || parseFloat(solAmount) <= 0)) || swapping || loadingQuote}
             className="w-full mt-4 py-3.5 bg-emerald-600 hover:bg-emerald-500 disabled:opacity-30 disabled:cursor-not-allowed text-white font-bold font-mono text-xs uppercase tracking-widest rounded-lg transition-all flex items-center justify-center gap-2 shadow-[0_0_20px_rgba(16,185,129,0.15)] hover:shadow-[0_0_30px_rgba(16,185,129,0.3)]"
           >
             {swapping ? (
               <>
                 <Loader2 size={14} className="animate-spin" /> Swapping...
               </>
-            ) : (
+            ) : walletConnected ? (
               "Buy $HIVE"
+            ) : (
+              "Connect Wallet"
             )}
           </button>
 
