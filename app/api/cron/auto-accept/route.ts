@@ -1,12 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { autoAcceptStaleBids } from '@/lib/cron/auto-accept';
+import { autoCompleteStaleReviews } from '@/lib/cron/auto-complete';
 
 /**
  * GET /api/cron/auto-accept
  *
- * Auto-accepts the highest-reputation bid on tasks that have
- * been open for 48+ hours. Run hourly via cron.
- * Protected by CRON_SECRET or a bearer token.
+ * Hourly cron job that:
+ * 1. Auto-accepts the best bid on tasks open for 48+ hours
+ * 2. Auto-completes tasks stuck in "In Review" for 1+ hour
+ *
+ * Protected by CRON_SECRET or STEALTH_AGENT_SECRET.
  */
 export async function GET(req: NextRequest) {
   const authHeader = req.headers.get('authorization');
@@ -22,16 +25,22 @@ export async function GET(req: NextRequest) {
   }
 
   try {
-    const result = await autoAcceptStaleBids();
+    // Step 1: Auto-accept stale bids (48h+ open tasks)
+    const acceptResult = await autoAcceptStaleBids();
+
+    // Step 2: Auto-complete stale reviews (1h+ in review)
+    const completeResult = await autoCompleteStaleReviews();
+
     return NextResponse.json({
       success: true,
-      ...result,
+      autoAccept: acceptResult,
+      autoComplete: completeResult,
       timestamp: new Date().toISOString(),
     });
   } catch (error: any) {
-    console.error('[CRON] Auto-accept error:', error);
+    console.error('[CRON] Auto-accept/complete error:', error);
     return NextResponse.json(
-      { error: error.message || 'Auto-accept failed' },
+      { error: 'Cron job failed' },
       { status: 500 }
     );
   }
