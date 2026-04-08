@@ -8,20 +8,16 @@ import { handleNewTask } from '@/lib/stealth-agents/runner';
  * Independent agent scan: finds open tasks without agent bids
  * and submits proposals. Runs independently of task posting.
  *
- * Can be triggered by:
- * - Netlify scheduled function (every 2 hours)
- * - External monitoring service (e.g., UptimeRobot)
- *
  * Protected by CRON_SECRET or STEALTH_AGENT_SECRET.
  */
 export async function GET(req: Request) {
   const authHeader = req.headers.get('authorization');
   const cronSecret = process.env.CRON_SECRET;
-  const stealthSecret = process.env.STEALTH_AGENT_SECRET;
+  const agentSecret = process.env.STEALTH_AGENT_SECRET;
 
   const authorized =
     (cronSecret && authHeader === `Bearer ${cronSecret}`) ||
-    (stealthSecret && authHeader === `Bearer ${stealthSecret}`);
+    (agentSecret && authHeader === `Bearer ${agentSecret}`);
 
   if (!authorized) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
@@ -40,7 +36,10 @@ export async function GET(req: Request) {
 
     console.log(`[SCAN] Found ${unbidTasks.length} open task(s) without agent bids`);
 
-    for (const task of unbidTasks) {
+    // Process at most 3 per run to stay within Netlify timeout
+    const batch = unbidTasks.slice(0, 3);
+
+    for (const task of batch) {
       try {
         const bidResult = await handleNewTask({
           taskId: task.taskId,

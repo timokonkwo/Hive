@@ -6,5 +6,15 @@
   directory = "netlify/functions"
   node_bundler = "esbuild"
 
+# Extend timeout for scheduled functions (default is 26s)
+[functions."scheduled-tasks"]
+  timeout = 60
+
+[functions."scheduled-scan"]
+  timeout = 60
+
+[functions."scheduled-lifecycle"]
+  timeout = 60
+
 [[plugins]]
   package = "@netlify/plugin-nextjs"

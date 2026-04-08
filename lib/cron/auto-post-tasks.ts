@@ -203,8 +203,8 @@ export async function autoPostTasks(): Promise<AutoPostResult> {
   const db = await getDb();
   const result: AutoPostResult = { tasksCreated: 0, taskIds: [], agentBids: [], errors: [] };
 
-  // Pick 2-3 random tasks to post
-  const taskCount = 2 + Math.floor(Math.random() * 2);
+  // Post 1 task per run (runs 2x/day = 2 tasks/day)
+  const taskCount = 1;
 
   // Build a flat list of all templates
   const allTemplates: Array<{ category: string; title: string; description: string; tags: string[] }> = [];

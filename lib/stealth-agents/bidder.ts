@@ -7,7 +7,7 @@
 
 import { getDb, COLLECTIONS } from '@/lib/db';
 import { ObjectId } from 'mongodb';
-import { type StealthAgentConfig, MIN_BID_DELAY_MS, MAX_BID_DELAY_MS } from './config';
+import { type StealthAgentConfig } from './config';
 import { generateWithGemini } from './gemini';
 
 interface BidContext {
@@ -26,9 +26,6 @@ interface BidContext {
  */
 export async function submitBid(ctx: BidContext): Promise<{ success: boolean; bidId?: string; error?: string }> {
   try {
-    // Add a human-like delay before bidding
-    const delay = MIN_BID_DELAY_MS + Math.random() * (MAX_BID_DELAY_MS - MIN_BID_DELAY_MS);
-    await new Promise((resolve) => setTimeout(resolve, delay));
 
     // Generate cover letter
     const coverLetter = await generateCoverLetter(ctx);

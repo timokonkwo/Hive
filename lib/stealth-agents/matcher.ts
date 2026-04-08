@@ -1,8 +1,8 @@
 /**
- * Stealth Agent Matcher
+ * Agent Matcher
  * 
- * Matches open tasks to the best stealth agent based on category and capabilities.
- * Prevents duplicate bids — an agent never bids twice on the same task.
+ * Matches open tasks to the best available agent based on category.
+ * Ensures agent records exist in the database before matching.
  */
 
 import { getDb, COLLECTIONS } from '@/lib/db';
@@ -14,14 +14,55 @@ export interface MatchResult {
   apiKey: string;
 }
 
+/** Tracks whether agents have been seeded this process lifecycle */
+let agentsSeeded = false;
+
 /**
- * Find the best stealth agent for a given task.
+ * Ensure all configured agents exist in the database.
+ * Idempotent — safe to call on every invocation. Only does DB writes on first run.
+ */
+async function ensureAgentsExist(): Promise<void> {
+  if (agentsSeeded) return; // Already checked this process
+
+  const db = await getDb();
+  for (const agent of STEALTH_AGENTS) {
+    const exists = await db.collection(COLLECTIONS.AGENTS).findOne({
+      name: agent.name,
+      isHiveOwned: true,
+    });
+
+    if (!exists) {
+      await db.collection(COLLECTIONS.AGENTS).insertOne({
+        name: agent.name,
+        bio: agent.bio,
+        capabilities: agent.capabilities,
+        isHiveOwned: true,
+        reputation: 50,
+        avgSatisfaction: 0,
+        reviewCount: 0,
+        tasksCompleted: 0,
+        status: 'active',
+        walletAddress: null,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      });
+      console.log(`[AGENTS] Registered agent: ${agent.name}`);
+    }
+  }
+
+  agentsSeeded = true;
+}
+
+/**
+ * Find the best agent for a given task.
  * Returns null if no agent is suitable or all have already bid.
  */
 export async function findMatchingAgent(
   taskId: string,
   taskCategory: string
 ): Promise<MatchResult | null> {
+  await ensureAgentsExist();
+
   const db = await getDb();
 
   // Find agents whose categories include this task's category
@@ -30,7 +71,7 @@ export async function findMatchingAgent(
   );
 
   if (candidates.length === 0) {
-    // Fallback: if no category match (e.g., "Other"), use Echo (catch-all)
+    // Fallback: use the agent that handles 'Other'
     const fallback = STEALTH_AGENTS.find((a) => a.categories.includes('Other'));
     if (fallback) candidates.push(fallback);
     else return null;
@@ -55,7 +96,7 @@ export async function findMatchingAgent(
 
     if (existingBid) continue; // Already bid, skip
 
-    // Check if the task already has an accepted bid (someone else is working on it)
+    // Check if the task already has an accepted bid
     const acceptedBid = await db.collection(COLLECTIONS.BIDS).findOne({
       taskId,
       status: 'accepted',
@@ -66,7 +107,7 @@ export async function findMatchingAgent(
     return {
       agent: candidate,
       agentId,
-      apiKey: agentDoc.rawApiKey || '', // We'll use internal DB access instead
+      apiKey: agentDoc.rawApiKey || '',
     };
   }
 
@@ -74,38 +115,42 @@ export async function findMatchingAgent(
 }
 
 /**
- * Find all open tasks that stealth agents haven't bid on yet.
- * Used by the cron sweep.
+ * Find open tasks that agents haven't bid on yet.
+ * Used by the scan endpoint.
  */
 export async function findUnbidTasks(): Promise<
   Array<{ taskId: string; category: string; title: string; description: string; requirements: string; budget: string; deliverableSpecs: any[] }>
 > {
+  await ensureAgentsExist();
+
   const db = await getDb();
 
-  // Get all open tasks
+  // Get open tasks (limit to 10 per scan to stay within timeout)
   const openTasks = await db
     .collection(COLLECTIONS.TASKS)
     .find({ status: 'Open' })
     .sort({ createdAt: -1 })
-    .limit(50) // Process newest 50 at most per sweep
+    .limit(10)
     .toArray();
 
-  // Get all stealth agent IDs
-  const stealthAgents = await db
+  // Get all platform agent IDs
+  const platformAgents = await db
     .collection(COLLECTIONS.AGENTS)
     .find({ isHiveOwned: true })
     .project({ _id: 1 })
     .toArray();
 
-  const stealthAgentIds = new Set(stealthAgents.map((a) => a._id.toString()));
+  const platformAgentIds = new Set(platformAgents.map((a) => a._id.toString()));
 
-  // Filter to tasks where no stealth agent has bid
+  if (platformAgentIds.size === 0) return [];
+
+  // Filter to tasks where not all agents have bid
   const unbidTasks: Array<{ taskId: string; category: string; title: string; description: string; requirements: string; budget: string; deliverableSpecs: any[] }> = [];
 
   for (const task of openTasks) {
     const taskId = task._id.toString();
 
-    // Check if any stealth agent already bid on this task
+    // Get existing bids on this task
     const existingBids = await db
       .collection(COLLECTIONS.BIDS)
       .find({ taskId })
@@ -113,12 +158,11 @@ export async function findUnbidTasks(): Promise<
       .toArray();
 
     const biddingAgentIds = new Set(existingBids.map((b) => b.agentId));
-    const allStealthBid = [...stealthAgentIds].every((id) =>
-      biddingAgentIds.has(id)
-    );
 
-    // If not all stealth agents have bid, we should bid
-    if (!allStealthBid) {
+    // Check if at least one platform agent hasn't bid yet
+    const hasUnbidAgent = [...platformAgentIds].some((id) => !biddingAgentIds.has(id));
+
+    if (hasUnbidAgent) {
       unbidTasks.push({
         taskId,
         category: task.category || 'Other',
