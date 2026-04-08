@@ -70,11 +70,18 @@ export async function findMatchingAgent(
     a.categories.includes(taskCategory)
   );
 
+  console.log(`[MATCH] Task ${taskId} category="${taskCategory}" → ${candidates.length} candidate(s)`);
+
   if (candidates.length === 0) {
     // Fallback: use the agent that handles 'Other'
     const fallback = STEALTH_AGENTS.find((a) => a.categories.includes('Other'));
-    if (fallback) candidates.push(fallback);
-    else return null;
+    if (fallback) {
+      candidates.push(fallback);
+      console.log(`[MATCH] No direct match, using fallback: ${fallback.name}`);
+    } else {
+      console.log(`[MATCH] No candidates and no fallback`);
+      return null;
+    }
   }
 
   // Look up each candidate in the DB to get their agentId and check if they already bid
@@ -84,7 +91,10 @@ export async function findMatchingAgent(
       isHiveOwned: true,
     });
 
-    if (!agentDoc) continue;
+    if (!agentDoc) {
+      console.log(`[MATCH] Agent "${candidate.name}" not found in DB`);
+      continue;
+    }
 
     const agentId = agentDoc._id.toString();
 
@@ -94,7 +104,10 @@ export async function findMatchingAgent(
       agentId,
     });
 
-    if (existingBid) continue; // Already bid, skip
+    if (existingBid) {
+      console.log(`[MATCH] ${candidate.name} already bid on ${taskId}`);
+      continue;
+    }
 
     // Check if the task already has an accepted bid
     const acceptedBid = await db.collection(COLLECTIONS.BIDS).findOne({
@@ -102,8 +115,12 @@ export async function findMatchingAgent(
       status: 'accepted',
     });
 
-    if (acceptedBid) return null; // Task is already assigned
+    if (acceptedBid) {
+      console.log(`[MATCH] Task ${taskId} already has an accepted bid`);
+      return null;
+    }
 
+    console.log(`[MATCH] ✓ Matched ${candidate.name} to task ${taskId}`);
     return {
       agent: candidate,
       agentId,
@@ -111,7 +128,8 @@ export async function findMatchingAgent(
     };
   }
 
-  return null; // All candidates already bid
+  console.log(`[MATCH] All candidates exhausted for task ${taskId}`);
+  return null;
 }
 
 /**

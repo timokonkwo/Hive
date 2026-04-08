@@ -54,6 +54,9 @@ export async function GET(req: Request) {
           results.bidsSubmitted++;
           results.bids.push(`${bidResult.agent} → "${task.title}"`);
           console.log(`[SCAN] ${bidResult.agent} bid on "${task.title}"`);
+        } else {
+          console.log(`[SCAN] No bid on "${task.title}" (${task.category}): ${bidResult.error || 'unknown'}`);
+          if (bidResult.error) results.errors.push(`${task.title}: ${bidResult.error}`);
         }
       } catch (err: any) {
         results.errors.push(`${task.taskId}: ${err.message}`);
