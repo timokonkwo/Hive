@@ -1,60 +1,38 @@
 import type { Config } from '@netlify/functions';
 
 /**
- * Scheduled function: auto-post tasks twice per day (8 AM and 8 PM UTC).
- * Also runs auto-accept (stale bids) and auto-complete (stale reviews).
+ * Netlify Scheduled Function: triggers the master cron endpoint.
+ * Runs at 8 AM and 8 PM UTC daily.
  */
 export default async () => {
-  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || process.env.URL || 'https://uphive.xyz';
+  const siteUrl = process.env.URL || process.env.NEXT_PUBLIC_SITE_URL || 'https://uphive.xyz';
   const secret = process.env.CRON_SECRET || process.env.STEALTH_AGENT_SECRET;
 
   if (!secret) {
-    console.error('[CRON] No CRON_SECRET or STEALTH_AGENT_SECRET set');
-    return new Response('Missing secret', { status: 500 });
+    console.error('[SCHEDULED] No CRON_SECRET or STEALTH_AGENT_SECRET set');
+    return new Response(JSON.stringify({ error: 'Missing secret' }), { status: 500 });
   }
 
-  const headers = {
-    'Authorization': `Bearer ${secret}`,
-  };
-
-  const results: Record<string, any> = {};
-
-  // 1. Auto-post new tasks
   try {
-    const postRes = await fetch(`${siteUrl}/api/cron/auto-post`, { headers });
-    results.autoPost = await postRes.json();
-    console.log('[CRON] Auto-post:', JSON.stringify(results.autoPost));
-  } catch (err: any) {
-    results.autoPost = { error: err.message };
-    console.error('[CRON] Auto-post failed:', err.message);
-  }
+    console.log(`[SCHEDULED] Triggering ${siteUrl}/api/cron/run-all`);
+    
+    const res = await fetch(`${siteUrl}/api/cron/run-all`, {
+      headers: { 'Authorization': `Bearer ${secret}` },
+    });
 
-  // 2. Auto-accept stale bids + auto-complete reviews
-  try {
-    const acceptRes = await fetch(`${siteUrl}/api/cron/auto-accept`, { headers });
-    results.autoAccept = await acceptRes.json();
-    console.log('[CRON] Auto-accept/complete:', JSON.stringify(results.autoAccept));
-  } catch (err: any) {
-    results.autoAccept = { error: err.message };
-    console.error('[CRON] Auto-accept failed:', err.message);
-  }
+    const data = await res.json();
+    console.log('[SCHEDULED] Result:', JSON.stringify(data));
 
-  // 3. Sweep for unbid tasks
-  try {
-    const sweepRes = await fetch(`${siteUrl}/api/cron/stealth-sweep`, { headers });
-    results.sweep = await sweepRes.json();
-    console.log('[CRON] Sweep:', JSON.stringify(results.sweep));
+    return new Response(JSON.stringify(data), {
+      status: res.status,
+      headers: { 'Content-Type': 'application/json' },
+    });
   } catch (err: any) {
-    results.sweep = { error: err.message };
-    console.error('[CRON] Sweep failed:', err.message);
+    console.error('[SCHEDULED] Failed:', err.message);
+    return new Response(JSON.stringify({ error: err.message }), { status: 500 });
   }
-
-  return new Response(JSON.stringify(results), {
-    headers: { 'Content-Type': 'application/json' },
-  });
 };
 
-// Run at 8 AM and 8 PM UTC every day
 export const config: Config = {
   schedule: '0 8,20 * * *',
 };
