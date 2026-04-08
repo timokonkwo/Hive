@@ -205,26 +205,17 @@ export async function POST(request: NextRequest) {
       createdAt: new Date(),
     });
 
-    // Fire stealth agent trigger (async, non-blocking — never delays response)
-    const stealthSecret = process.env.STEALTH_AGENT_SECRET;
-    if (stealthSecret) {
-      const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000';
-      fetch(`${siteUrl}/api/internal/agent-trigger`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'x-stealth-secret': stealthSecret,
-        },
-        body: JSON.stringify({
-          taskId: result.insertedId.toString(),
-          title,
-          description,
-          category,
-          requirements: requirements || '',
-          budget: budget || 'Negotiable',
-        }),
-      }).catch((err) => console.error('[STEALTH] Trigger fire failed:', err.message));
-    }
+    // Trigger agent bidding directly (same-process, no HTTP)
+    import('@/lib/stealth-agents/runner').then(({ handleNewTask }) => {
+      handleNewTask({
+        taskId: result.insertedId.toString(),
+        title,
+        description,
+        category,
+        requirements: requirements || '',
+        budget: budget || 'Negotiable',
+      }).catch((err: any) => console.error('[STEALTH] Agent bid failed:', err.message));
+    }).catch((err) => console.error('[STEALTH] Runner import failed:', err.message));
 
     // Notify matching agents (async, non-blocking)
     notifyMatchingAgents({
