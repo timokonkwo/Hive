@@ -1,20 +1,19 @@
 import { NextResponse } from 'next/server';
 import { autoPostTasks } from '@/lib/cron/auto-post-tasks';
-import { autoAcceptStaleBids } from '@/lib/cron/auto-accept';
-import { autoCompleteStaleReviews } from '@/lib/cron/auto-complete';
-import { runSweep } from '@/lib/stealth-agents/runner';
+import { findUnbidTasks } from '@/lib/stealth-agents/matcher';
+import { handleNewTask } from '@/lib/stealth-agents/runner';
 
 /**
  * GET /api/cron/run-all
  *
- * Master cron endpoint that runs all scheduled jobs:
- * 1. Auto-post new tasks
- * 2. Auto-accept stale bids
- * 3. Auto-complete stale reviews
- * 4. Sweep for unbid tasks
+ * Posting & bidding endpoint:
+ * 1. Post new tasks to the marketplace
+ * 2. Scan for open tasks and submit agent bids
+ *
+ * Lifecycle operations (accept, fulfill, complete) run on
+ * a separate schedule via /api/cron/lifecycle.
  *
  * Protected by CRON_SECRET or STEALTH_AGENT_SECRET.
- * Triggered by Netlify Scheduled Functions or external cron.
  */
 export async function GET(req: Request) {
   const authHeader = req.headers.get('authorization');
@@ -31,7 +30,7 @@ export async function GET(req: Request) {
 
   const results: Record<string, any> = {};
 
-  // 1. Auto-post new tasks
+  // 1. Post new tasks (also triggers bidding on newly created tasks)
   try {
     results.autoPost = await autoPostTasks();
   } catch (err: any) {
@@ -39,28 +38,35 @@ export async function GET(req: Request) {
     console.error('[CRON] Auto-post error:', err.message);
   }
 
-  // 2. Auto-accept stale bids
+  // 2. Scan for any open tasks that agents haven't bid on yet
   try {
-    results.autoAccept = await autoAcceptStaleBids();
-  } catch (err: any) {
-    results.autoAccept = { error: err.message };
-    console.error('[CRON] Auto-accept error:', err.message);
-  }
+    const unbidTasks = await findUnbidTasks();
+    let bidsSubmitted = 0;
+    const bids: string[] = [];
 
-  // 3. Auto-complete stale reviews
-  try {
-    results.autoComplete = await autoCompleteStaleReviews();
-  } catch (err: any) {
-    results.autoComplete = { error: err.message };
-    console.error('[CRON] Auto-complete error:', err.message);
-  }
+    for (const task of unbidTasks) {
+      try {
+        const bidResult = await handleNewTask({
+          taskId: task.taskId,
+          title: task.title,
+          description: task.description,
+          category: task.category,
+          requirements: task.requirements,
+          budget: task.budget,
+        });
+        if (bidResult.bid) {
+          bidsSubmitted++;
+          bids.push(`${bidResult.agent} → "${task.title}"`);
+        }
+      } catch (err: any) {
+        console.error(`[CRON] Scan bid error: ${err.message}`);
+      }
+    }
 
-  // 4. Sweep for unbid tasks
-  try {
-    results.sweep = await runSweep();
+    results.scan = { tasksFound: unbidTasks.length, bidsSubmitted, bids };
   } catch (err: any) {
-    results.sweep = { error: err.message };
-    console.error('[CRON] Sweep error:', err.message);
+    results.scan = { error: err.message };
+    console.error('[CRON] Scan error:', err.message);
   }
 
   return NextResponse.json({

@@ -1,15 +1,15 @@
 /**
  * Auto-Accept Stale Bids
  * 
- * If a task has been Open for 48+ hours and has at least one bid,
- * auto-accept the bid from the agent with the highest reputation.
- * This keeps the pipeline flowing when clients ghost.
+ * If a task has been Open for 72+ hours and has at least one pending bid,
+ * accept the bid from the agent with the highest reputation.
+ * Keeps the pipeline flowing when clients are unresponsive.
  */
 
 import { getDb, COLLECTIONS } from '@/lib/db';
 import { ObjectId } from 'mongodb';
 
-const STALE_THRESHOLD_MS = 48 * 60 * 60 * 1000; // 48 hours
+const STALE_THRESHOLD_MS = 72 * 60 * 60 * 1000; // 72 hours
 
 export interface AutoAcceptResult {
   tasksProcessed: number;
@@ -97,17 +97,15 @@ export async function autoAcceptStaleBids(): Promise<AutoAcceptResult> {
         }
       );
 
-      // Log activity
+      // Log activity — attributed to the task's client
       await db.collection(COLLECTIONS.ACTIVITY).insertOne({
-        type: 'BidAccepted',
+        type: 'ProposalAccepted',
         taskId: task._id,
-        actorName: 'Hive Marketplace',
+        actorName: task.clientName || 'Client',
         metadata: {
           taskTitle: task.title,
           agentName: bestBid.agentName,
           agentId: bestBid.agentId,
-          autoAccepted: true,
-          reason: 'Task was open for 48+ hours',
           bidAmount: bestBid.amount,
         },
         createdAt: new Date(),
