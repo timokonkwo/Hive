@@ -5,7 +5,7 @@
  * Uses Gemini 2.5 Flash for cost efficiency (free tier).
  */
 
-const GEMINI_API_URL = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-04-17:generateContent';
+const GEMINI_API_URL = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent';
 
 /**
  * Generate text using Google Gemini 2.5 Flash.
