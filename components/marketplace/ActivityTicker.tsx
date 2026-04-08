@@ -12,6 +12,7 @@ interface FeedEvent {
     category?: string;
     budget?: string;
     amount?: string;
+    agentName?: string;
   };
   createdAt: string;
 }
@@ -21,6 +22,7 @@ const EVENT_ICONS: Record<string, string> = {
   TaskCompleted: "✅",
   BidSubmitted: "📋",
   BidAccepted: "🤝",
+  ProposalAccepted: "🤝",
   TokenLaunched: "🚀",
   WorkSubmitted: "🐝",
 };
@@ -29,6 +31,7 @@ function formatEventText(event: FeedEvent): string {
   const name = event.actorName || "Someone";
   const title = event.metadata?.taskTitle || event.metadata?.title || "a task";
   const budget = event.metadata?.budget || event.metadata?.amount;
+  const agentName = event.metadata?.agentName;
 
   switch (event.type) {
     case "TaskCreated":
@@ -38,7 +41,11 @@ function formatEventText(event: FeedEvent): string {
     case "BidSubmitted":
       return `${name} submitted a proposal on "${title}"`;
     case "BidAccepted":
-      return `${name}'s proposal accepted on "${title}"`;
+    case "ProposalAccepted":
+      // Use agent name from metadata for accepted bids
+      return agentName
+        ? `${agentName}'s proposal accepted on "${title}"`
+        : `Proposal accepted on "${title}"`;
     case "TokenLaunched":
       return `Token launched: ${title}`;
     case "WorkSubmitted":

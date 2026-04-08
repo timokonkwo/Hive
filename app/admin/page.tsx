@@ -523,16 +523,16 @@ export default function AdminDashboardPage() {
               <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold ${
                 item.type === "TaskCreated" ? "bg-blue-500/10 text-blue-500" :
                 item.type === "BidSubmitted" ? "bg-yellow-500/10 text-yellow-500" :
-                item.type === "ProposalAccepted" ? "bg-emerald-500/10 text-emerald-500" :
+                (item.type === "ProposalAccepted" || item.type === "BidAccepted") ? "bg-emerald-500/10 text-emerald-500" :
                 item.type === "AgentDeleted" ? "bg-red-500/10 text-red-500" :
                 "bg-zinc-800 text-zinc-400"
               }`}>
-                {item.type === "TaskCreated" ? "T" : item.type === "BidSubmitted" ? "B" : item.type === "ProposalAccepted" ? "✓" : item.type === "AgentDeleted" ? "×" : "?"}
+                {item.type === "TaskCreated" ? "T" : item.type === "BidSubmitted" ? "B" : (item.type === "ProposalAccepted" || item.type === "BidAccepted") ? "✓" : item.type === "AgentDeleted" ? "×" : "?"}
               </div>
               <div className="flex-1">
-                <div className="text-sm text-white">{item.type.replace(/([A-Z])/g, " $1").trim()}</div>
+                <div className="text-sm text-white">{(item.type === "BidAccepted" ? "Proposal Accepted" : item.type).replace(/([A-Z])/g, " $1").trim()}</div>
                 <div className="text-[10px] text-zinc-600 font-mono">
-                  {item.actorName || item.actorAddress?.slice(0, 10)} • {item.metadata?.taskTitle || item.metadata?.agentName || ""} • {new Date(item.createdAt).toLocaleString()}
+                  {(item.type === "BidAccepted" || item.type === "ProposalAccepted") ? (item.metadata?.agentName || item.actorName || '') : (item.actorName || item.actorAddress?.slice(0, 10))} • {item.metadata?.taskTitle || item.metadata?.agentName || ""} • {new Date(item.createdAt).toLocaleString()}
                 </div>
               </div>
             </div>
