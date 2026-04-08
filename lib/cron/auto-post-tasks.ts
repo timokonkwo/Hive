@@ -3,9 +3,11 @@
  * 
  * Creates and publishes tasks on a schedule.
  * Budget range: $1–$3 USDC. Runs twice daily.
+ * Tasks are general-purpose — not crypto-specific.
  */
 
 import { getDb, COLLECTIONS } from '@/lib/db';
+import { handleNewTask } from '@/lib/stealth-agents/runner';
 
 // Client pool for scheduled task creation
 const CLIENT_POOL = [
@@ -13,17 +15,17 @@ const CLIENT_POOL = [
   { name: 'CryptoSam', address: 'did:privy:cl_cryptosam' },
   { name: 'devJordan', address: 'did:privy:cl_devjordan' },
   { name: 'Maria_K', address: 'did:privy:cl_maria_k' },
-  { name: 'BlockchainBen', address: 'did:privy:cl_ben' },
-  { name: 'SolanaSteph', address: 'did:privy:cl_steph' },
+  { name: 'StartupBen', address: 'did:privy:cl_ben' },
+  { name: 'SarahLee', address: 'did:privy:cl_steph' },
   { name: 'web3_dan', address: 'did:privy:cl_web3dan' },
-  { name: 'TokenTina', address: 'did:privy:cl_tokentina' },
-  { name: 'DeFi_Mike', address: 'did:privy:cl_defimike' },
-  { name: 'nft_sarah', address: 'did:privy:cl_nftsarah' },
+  { name: 'TinaWorks', address: 'did:privy:cl_tokentina' },
+  { name: 'MikeOps', address: 'did:privy:cl_defimike' },
+  { name: 'SarahDesign', address: 'did:privy:cl_nftsarah' },
   { name: 'CodeMonkey42', address: 'did:privy:cl_cm42' },
-  { name: 'ChainLisa', address: 'did:privy:cl_chainlisa' },
+  { name: 'LisaMarketing', address: 'did:privy:cl_chainlisa' },
 ];
 
-// Task templates by category — realistic, low-effort tasks
+// Task templates by category — general-purpose, AI-friendly tasks
 const TASK_TEMPLATES: Array<{
   category: string;
   tasks: Array<{ title: string; description: string; tags: string[] }>;
@@ -32,29 +34,29 @@ const TASK_TEMPLATES: Array<{
     category: 'Research',
     tasks: [
       {
-        title: 'Summarize top 5 DeFi trends this week',
-        description: 'Research and provide a brief summary of the top 5 trending DeFi protocols or developments from the past week. Include key metrics, notable launches, and any significant governance proposals. Format as a numbered list with 2-3 sentences per item.',
-        tags: ['DeFi', 'Research', 'Crypto'],
+        title: 'Summarize this research paper into key takeaways',
+        description: 'Take the following topic area (AI in healthcare) and compile a 500-word summary of the latest trends, key players, and notable breakthroughs from the past 6 months. Include 3-5 bullet points of actionable insights.',
+        tags: ['Research', 'Summary', 'AI'],
       },
       {
-        title: 'Compare gas fees across Solana, Base, and Arbitrum',
-        description: 'Provide a comparison of current average transaction costs across Solana, Base, and Arbitrum. Include typical swap fees, transfer costs, and any notable fee mechanisms. Present in a clear table format.',
-        tags: ['L2', 'Gas Fees', 'Research'],
+        title: 'Find 10 competitors for a SaaS scheduling tool',
+        description: 'Research and compile a list of 10 competitors in the SaaS meeting/scheduling space. For each, include: company name, website, pricing tier, key differentiator, and approximate user base. Present as a table.',
+        tags: ['Market Research', 'SaaS', 'Competitive Analysis'],
       },
       {
-        title: 'List the top 10 AI crypto projects by market cap',
-        description: 'Compile a list of the top 10 AI-related crypto tokens by market capitalization. For each, include: name, ticker, market cap, brief description (1 sentence), and what AI capability they provide.',
-        tags: ['AI', 'Crypto', 'Market Research'],
+        title: 'Research remote work productivity statistics for 2025-2026',
+        description: 'Compile recent statistics on remote work productivity, employee satisfaction, and employer adoption rates. Include data from reputable sources. Present findings in a structured format with citations.',
+        tags: ['Research', 'Remote Work', 'Statistics'],
       },
       {
-        title: 'Analyze the latest Solana validator economics',
-        description: 'Provide a brief analysis of current Solana validator economics including staking yields, hardware requirements, and profitability. Include any recent changes to the staking program.',
-        tags: ['Solana', 'Staking', 'Analysis'],
+        title: 'List the top 10 no-code tools for building MVPs',
+        description: 'Research and rank the top 10 no-code/low-code platforms for building MVPs. For each, include: name, pricing, best use case, limitations, and a 1-sentence review. Organize by category (web apps, mobile, automation).',
+        tags: ['No-Code', 'Tools', 'Startup'],
       },
       {
-        title: 'Research the latest NFT marketplace trends',
-        description: 'Identify the top 3 NFT marketplace platforms by volume in the past 30 days. What types of NFTs are trending? Are there any emerging use cases beyond art? Provide data-backed insights.',
-        tags: ['NFT', 'Research', 'Trends'],
+        title: 'Compile a reading list on leadership for first-time managers',
+        description: 'Create a curated list of 10 books and 5 online courses on leadership for first-time managers. Include: title, author, key topics covered, estimated time to complete, and why it is recommended.',
+        tags: ['Leadership', 'Learning', 'Management'],
       },
     ],
   },
@@ -62,24 +64,29 @@ const TASK_TEMPLATES: Array<{
     category: 'Content',
     tasks: [
       {
-        title: 'Write a short explainer on Account Abstraction',
-        description: 'Write a beginner-friendly 300-word article explaining Account Abstraction in crypto. Cover: what it is, why it matters, and how it improves UX. Use simple language, no jargon. Include a practical example.',
-        tags: ['Content', 'Writing', 'ERC-4337'],
+        title: 'Write a blog post about productivity tips for remote teams',
+        description: 'Write a 600-word blog post with 5-7 actionable productivity tips for remote teams. Tone: professional but conversational. Include a compelling intro, subheadings for each tip, and a brief conclusion. SEO-friendly.',
+        tags: ['Content', 'Writing', 'Productivity'],
       },
       {
-        title: 'Draft 5 tweet ideas about Web3 developer tools',
-        description: 'Create 5 engaging tweet drafts about useful Web3 developer tools and SDKs. Each tweet should be under 280 characters, use relevant hashtags, and be informative yet engaging. Mix educational and opinion-style tweets.',
-        tags: ['Social Media', 'Content', 'Web3'],
+        title: 'Draft 5 LinkedIn post ideas for a tech startup',
+        description: 'Create 5 ready-to-post LinkedIn updates for a B2B tech startup. Mix: 2 thought leadership, 1 behind-the-scenes, 1 product update, 1 industry insight. Each should be 100-200 words with a hook and CTA.',
+        tags: ['Social Media', 'LinkedIn', 'Content'],
       },
       {
-        title: 'Write a comparison: Solana vs Ethereum for new devs',
-        description: 'Write a 400-word comparison piece aimed at new blockchain developers choosing between Solana and Ethereum. Cover: language differences, dev tooling, deployment costs, and community resources. Be balanced and objective.',
-        tags: ['Content', 'Development', 'Comparison'],
+        title: 'Write an email sequence for onboarding new users',
+        description: 'Draft a 3-email welcome sequence for new SaaS users. Email 1: Welcome + quick start. Email 2: Feature highlight (day 3). Email 3: Check-in + tips (day 7). Keep each under 150 words. Friendly, helpful tone.',
+        tags: ['Email', 'Copywriting', 'Onboarding'],
       },
       {
-        title: 'Create a glossary of 10 DeFi terms',
-        description: 'Write clear, concise definitions for 10 commonly used DeFi terms. Include: AMM, TVL, Impermanent Loss, Yield Farming, Liquidity Pool, Flash Loan, Governance Token, Slippage, APY vs APR, and Rug Pull. Each definition should be 1-2 sentences.',
-        tags: ['DeFi', 'Education', 'Content'],
+        title: 'Create a FAQ page for a freelancing platform',
+        description: 'Write 10 frequently asked questions and answers for a freelancing platform. Cover: how it works, payments, disputes, account setup, pricing, and trust/safety. Each answer should be 2-3 sentences, clear and direct.',
+        tags: ['Content', 'FAQ', 'UX Writing'],
+      },
+      {
+        title: 'Write a product description for an AI writing assistant',
+        description: 'Write a compelling 200-word product description for an AI-powered writing assistant tool. Highlight 3 key features, the target audience, and a clear value proposition. Include a tagline.',
+        tags: ['Copywriting', 'Product', 'Marketing'],
       },
     ],
   },
@@ -87,19 +94,19 @@ const TASK_TEMPLATES: Array<{
     category: 'Analysis',
     tasks: [
       {
-        title: 'Analyze SOL price action over the past 7 days',
-        description: 'Provide a technical analysis of SOL token price movement over the past 7 days. Include: key support/resistance levels, volume trends, any notable on-chain metrics, and a brief outlook. Use data, not speculation.',
-        tags: ['Solana', 'Technical Analysis', 'Price'],
+        title: 'Analyze the pros and cons of 3 popular CRM tools',
+        description: 'Compare HubSpot, Salesforce, and Pipedrive across: pricing, ease of use, integrations, reporting, and scalability. Create a pros/cons list for each and a final recommendation based on company size.',
+        tags: ['Analysis', 'CRM', 'Software'],
       },
       {
-        title: 'Break down the tokenomics of a top memecoin',
-        description: 'Choose one of the current top 5 memecoins by market cap and analyze its tokenomics. Cover: supply distribution, burn mechanism (if any), holder concentration, and liquidity depth. Identify any red flags.',
-        tags: ['Memecoin', 'Tokenomics', 'Analysis'],
+        title: 'Break down the unit economics of a subscription business',
+        description: 'Explain the key unit economics metrics for a SaaS subscription business: CAC, LTV, churn rate, MRR, and payback period. Provide example calculations with sample numbers and explain what "good" looks like.',
+        tags: ['Business', 'SaaS', 'Economics'],
       },
       {
-        title: 'Compare staking rewards: SOL vs ETH vs AVAX',
-        description: 'Create a data-driven comparison of current staking rewards for SOL, ETH, and AVAX. Include: annual yield, lock-up periods, minimum stake requirements, and validator counts. Present as a clear comparison table.',
-        tags: ['Staking', 'Comparison', 'Data'],
+        title: 'Evaluate 5 AI image generation tools for marketing teams',
+        description: 'Compare 5 AI image generation tools (e.g., Midjourney, DALL-E, Stable Diffusion, Leonardo, Ideogram). Rate each on: quality, ease of use, pricing, commercial licensing, and best use case. Provide a recommendation.',
+        tags: ['AI', 'Tools', 'Marketing'],
       },
     ],
   },
@@ -107,14 +114,19 @@ const TASK_TEMPLATES: Array<{
     category: 'Social',
     tasks: [
       {
-        title: 'Draft a Discord announcement for a token airdrop',
-        description: 'Write a professional Discord announcement template for a hypothetical token airdrop campaign. Include: eligibility criteria, claim process, timeline, and community engagement hooks. Make it exciting but not spammy.',
-        tags: ['Discord', 'Community', 'Social'],
+        title: 'Create a 1-week social media content calendar',
+        description: 'Design a 7-day social media content calendar for a small business (coffee shop). Include: platform (Instagram/Twitter), post type, caption draft, suggested image description, and best posting time. Mix promotional and engagement content.',
+        tags: ['Social Media', 'Planning', 'Marketing'],
       },
       {
-        title: 'Create a community engagement poll strategy',
-        description: 'Design 5 Twitter/X poll questions that a crypto project could use to engage their community. Each poll should have 2-4 options and drive meaningful discussion. Include the poll text, options, and a brief rationale for each.',
-        tags: ['Social Media', 'Engagement', 'Strategy'],
+        title: 'Write 10 engaging Twitter/X thread hooks',
+        description: 'Create 10 attention-grabbing first tweets for Twitter/X threads on various business topics (productivity, startup lessons, marketing tips, hiring, remote work). Each hook should make people want to read more.',
+        tags: ['Twitter', 'Copywriting', 'Engagement'],
+      },
+      {
+        title: 'Draft a community welcome message and rules',
+        description: 'Write a welcoming introduction message and set of 8-10 community rules for a Discord/Slack community of indie developers. Tone: friendly but clear. Include: purpose, expectations, and how to get started.',
+        tags: ['Community', 'Moderation', 'Discord'],
       },
     ],
   },
@@ -122,14 +134,59 @@ const TASK_TEMPLATES: Array<{
     category: 'Development',
     tasks: [
       {
-        title: 'Review this Solana program snippet for bugs',
-        description: 'Review the following conceptual Solana program flow and identify potential bugs or security issues:\n- Program accepts SOL deposits into a PDA\n- Users can withdraw proportional to their deposit\n- No reentrancy guard\n- Uses u64 for amounts\nList all potential vulnerabilities and suggest fixes.',
-        tags: ['Solana', 'Security', 'Code Review'],
+        title: 'Write a Python script to clean CSV data',
+        description: 'Write a Python script that reads a CSV file, removes duplicate rows, handles missing values (fill with "N/A"), standardizes date formats to YYYY-MM-DD, and exports the cleaned data. Include error handling and usage instructions.',
+        tags: ['Python', 'Data', 'Automation'],
       },
       {
-        title: 'Explain how to set up a basic Anchor project',
-        description: 'Write a step-by-step guide for setting up a new Solana Anchor project from scratch. Include: prerequisites, installation commands, project initialization, building, testing, and deploying to devnet. Target audience: developers new to Solana.',
-        tags: ['Solana', 'Anchor', 'Tutorial'],
+        title: 'Create a README template for an open-source project',
+        description: 'Write a comprehensive README.md template for an open-source project. Include: project title, description, badges, installation, usage, API reference, contributing guidelines, license, and contact info. Use markdown best practices.',
+        tags: ['Documentation', 'Open Source', 'GitHub'],
+      },
+      {
+        title: 'Review this API endpoint design for best practices',
+        description: 'Review the following REST API structure for a task management app:\n- POST /tasks (create)\n- GET /tasks (list)\n- PATCH /tasks/:id (update)\n- DELETE /tasks/:id\n- GET /tasks/:id/comments\nIdentify improvements for: naming, error handling, pagination, auth, and rate limiting.',
+        tags: ['API', 'Code Review', 'Best Practices'],
+      },
+    ],
+  },
+  {
+    category: 'Design',
+    tasks: [
+      {
+        title: 'Suggest a color palette and typography for a fintech app',
+        description: 'Propose a modern color palette (primary, secondary, accent, neutrals) and typography pairing for a fintech mobile app targeting millennials. Include hex codes, font names (Google Fonts), and usage guidelines.',
+        tags: ['Design', 'UI', 'Branding'],
+      },
+      {
+        title: 'Write UX copy for a signup flow',
+        description: 'Write microcopy for a 3-step signup flow: Step 1 (email/password), Step 2 (profile), Step 3 (preferences). Include: headings, subtext, button labels, placeholder text, validation errors, and success messages. Friendly and clear.',
+        tags: ['UX Writing', 'Design', 'Onboarding'],
+      },
+    ],
+  },
+  {
+    category: 'Translation',
+    tasks: [
+      {
+        title: 'Translate a product landing page to Spanish',
+        description: 'Translate the following English landing page copy (approximately 300 words) to natural, marketing-appropriate Spanish. Maintain the persuasive tone and cultural relevance. Adapt idioms rather than translating literally.',
+        tags: ['Translation', 'Spanish', 'Marketing'],
+      },
+    ],
+  },
+  {
+    category: 'Other',
+    tasks: [
+      {
+        title: 'Create a SWOT analysis template for a startup',
+        description: 'Build a SWOT analysis framework for an early-stage startup entering the EdTech space. Fill in 3-4 example items per quadrant (Strengths, Weaknesses, Opportunities, Threats) with realistic examples and brief explanations.',
+        tags: ['Strategy', 'Business', 'Planning'],
+      },
+      {
+        title: 'Draft an agenda for a 30-minute team standup',
+        description: 'Create a structured agenda template for a 30-minute daily standup meeting for a remote team of 6. Include: time allocations, discussion prompts, a section for blockers, and async follow-up guidelines.',
+        tags: ['Productivity', 'Management', 'Meetings'],
       },
     ],
   },
@@ -138,15 +195,16 @@ const TASK_TEMPLATES: Array<{
 export interface AutoPostResult {
   tasksCreated: number;
   taskIds: string[];
+  agentBids: string[];
   errors: string[];
 }
 
 export async function autoPostTasks(): Promise<AutoPostResult> {
   const db = await getDb();
-  const result: AutoPostResult = { tasksCreated: 0, taskIds: [], errors: [] };
+  const result: AutoPostResult = { tasksCreated: 0, taskIds: [], agentBids: [], errors: [] };
 
   // Pick 2-3 random tasks to post
-  const taskCount = 2 + Math.floor(Math.random() * 2); // 2 or 3
+  const taskCount = 2 + Math.floor(Math.random() * 2);
 
   // Build a flat list of all templates
   const allTemplates: Array<{ category: string; title: string; description: string; tags: string[] }> = [];
@@ -165,7 +223,7 @@ export async function autoPostTasks(): Promise<AutoPostResult> {
       const client = CLIENT_POOL[Math.floor(Math.random() * CLIENT_POOL.length)];
 
       // Random budget between $1 and $3
-      const budgetAmount = 1 + Math.floor(Math.random() * 3); // 1, 2, or 3
+      const budgetAmount = 1 + Math.floor(Math.random() * 3);
       const budget = `$${budgetAmount} USDC`;
 
       const task = {
@@ -204,25 +262,25 @@ export async function autoPostTasks(): Promise<AutoPostResult> {
         createdAt: new Date(),
       });
 
-      // Trigger agent matching
-      const agentSecret = process.env.STEALTH_AGENT_SECRET;
-      if (agentSecret) {
-        const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000';
-        fetch(`${siteUrl}/api/internal/agent-trigger`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'x-stealth-secret': agentSecret,
-          },
-          body: JSON.stringify({
-            taskId,
-            title: template.title,
-            description: template.description,
-            category: template.category,
-            requirements: '',
-            budget,
-          }),
-        }).catch((err) => console.error('[AUTO-POST] Agent trigger failed:', err.message));
+      // Directly trigger agent bidding (no HTTP call — runs in same process)
+      try {
+        const bidResult = await handleNewTask({
+          taskId,
+          title: template.title,
+          description: template.description,
+          category: template.category,
+          requirements: '',
+          budget,
+        });
+
+        if (bidResult.bid) {
+          result.agentBids.push(`${bidResult.agent} → "${template.title}"`);
+          console.log(`[AUTO-POST] ${bidResult.agent} bid on "${template.title}"`);
+        } else {
+          console.log(`[AUTO-POST] No agent bid on "${template.title}": ${bidResult.error || 'no match'}`);
+        }
+      } catch (err: any) {
+        console.error(`[AUTO-POST] Agent bidding failed for "${template.title}":`, err.message);
       }
 
       result.tasksCreated++;

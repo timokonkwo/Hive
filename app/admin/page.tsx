@@ -35,6 +35,7 @@ export default function AdminDashboardPage() {
   const [agentsLoading, setAgentsLoading] = useState(false);
   const [deleteModal, setDeleteModal] = useState<{ id: string; name: string } | null>(null);
   const [deleting, setDeleting] = useState(false);
+  const [deleteType, setDeleteType] = useState<'agent' | 'task'>('agent');
 
   // Feedback management state
   const [feedbackItems, setFeedbackItems] = useState<any[]>([]);
@@ -159,23 +160,25 @@ export default function AdminDashboardPage() {
     } catch { toast.error("Failed to update"); }
   };
 
-  const handleDeleteAgent = async () => {
+  const handleDelete = async () => {
     if (!deleteModal || !address) return;
     setDeleting(true);
     try {
-      const res = await fetch(`/api/admin/agents/${deleteModal.id}?address=${address}`, {
-        method: "DELETE",
-      });
+      const endpoint = deleteType === 'agent'
+        ? `/api/admin/agents/${deleteModal.id}?address=${address}`
+        : `/api/admin/tasks/${deleteModal.id}?address=${address}`;
+      
+      const res = await fetch(endpoint, { method: "DELETE" });
       if (res.ok) {
-        toast.success(`Agent "${deleteModal.name}" deleted.`);
+        toast.success(`${deleteType === 'agent' ? 'Agent' : 'Task'} "${deleteModal.name}" deleted.`);
         setDeleteModal(null);
-        fetchAgents();
+        if (deleteType === 'agent') fetchAgents();
         // Refresh stats
         const statsRes = await fetch(`/api/admin/stats?address=${address}`);
         if (statsRes.ok) setData(await statsRes.json());
       } else {
         const err = await res.json();
-        toast.error(err.error || "Failed to delete agent.");
+        toast.error(err.error || `Failed to delete ${deleteType}.`);
       }
     } catch {
       toast.error("Network error.");
@@ -342,23 +345,37 @@ export default function AdminDashboardPage() {
       {activeTab === "tasks" && (
         <div className="space-y-3">
           {data?.recentTasks?.map((task: any) => (
-            <Link key={task.id} href={`/marketplace/${task.id}`} className="block">
-              <div className="p-4 bg-zinc-900/30 border border-zinc-800 rounded-lg hover:border-zinc-700 transition-colors group">
-                <div className="flex items-center justify-between">
-                  <div className="flex-1">
-                    <div className="flex items-center gap-3 mb-1">
-                      <span className="text-white font-medium group-hover:text-emerald-400 transition-colors">{task.title}</span>
-                      <StatusBadge status={task.status} />
-                    </div>
-                    <div className="text-xs text-zinc-600 font-mono">
-                      {task.category} • Budget: {task.budget || "Negotiable"} • {task.proposalsCount || 0} proposals
-                    </div>
+            <div key={task.id} className="p-4 bg-zinc-900/30 border border-zinc-800 rounded-lg hover:border-zinc-700 transition-colors group">
+              <div className="flex items-center justify-between">
+                <Link href={`/marketplace/${task.id}`} className="flex-1 min-w-0">
+                  <div className="flex items-center gap-3 mb-1">
+                    <span className="text-white font-medium group-hover:text-emerald-400 transition-colors">{task.title}</span>
+                    <StatusBadge status={task.status} />
                   </div>
-                  <ChevronRight size={14} className="text-zinc-700 shrink-0" />
+                  <div className="text-xs text-zinc-600 font-mono">
+                    {task.category} • Budget: {task.budget || "Negotiable"} • {task.proposalsCount || 0} proposals
+                  </div>
+                </Link>
+                <div className="flex items-center gap-2 shrink-0 ml-4">
+                  <Link
+                    href={`/marketplace/${task.id}`}
+                    className="px-2 py-1 text-[10px] font-mono uppercase border border-zinc-700 text-zinc-400 hover:text-white hover:border-zinc-500 rounded transition-colors"
+                  >
+                    View
+                  </Link>
+                  <button
+                    onClick={() => { setDeleteType('task'); setDeleteModal({ id: task.id, name: task.title }); }}
+                    className="p-1.5 text-zinc-500 hover:text-red-500 hover:bg-red-500/10 rounded transition-colors"
+                  >
+                    <Trash2 size={14} />
+                  </button>
                 </div>
               </div>
-            </Link>
+            </div>
           ))}
+          {(!data?.recentTasks || data.recentTasks.length === 0) && (
+            <div className="py-12 text-center text-zinc-600 border border-dashed border-zinc-800 rounded-lg font-mono text-sm">No tasks found</div>
+          )}
         </div>
       )}
 
@@ -459,7 +476,7 @@ export default function AdminDashboardPage() {
                       View
                     </Link>
                     <button
-                      onClick={() => setDeleteModal({ id: agent.id, name: agent.name })}
+                      onClick={() => { setDeleteType('agent'); setDeleteModal({ id: agent.id, name: agent.name }); }}
                       className="p-1.5 text-zinc-500 hover:text-red-500 hover:bg-red-500/10 rounded transition-colors"
                     >
                       <Trash2 size={14} />
@@ -621,13 +638,13 @@ export default function AdminDashboardPage() {
               <div className="w-10 h-10 rounded-full bg-red-500/10 flex items-center justify-center">
                 <Trash2 className="text-red-500" size={20} />
               </div>
-              <h3 className="text-lg font-bold font-mono uppercase">Delete Agent</h3>
+              <h3 className="text-lg font-bold font-mono uppercase">Delete {deleteType === 'agent' ? 'Agent' : 'Task'}</h3>
             </div>
             <p className="text-zinc-400 text-sm mb-2">
               Are you sure you want to delete <span className="text-white font-bold">{deleteModal.name}</span>?
             </p>
             <p className="text-zinc-600 text-xs mb-6 font-mono">
-              This will permanently remove the agent and all their proposals. This action cannot be undone.
+              This will permanently remove the {deleteType} and all associated data. This action cannot be undone.
             </p>
             <div className="flex items-center gap-3 justify-end">
               <button
@@ -638,7 +655,7 @@ export default function AdminDashboardPage() {
                 Cancel
               </button>
               <button
-                onClick={handleDeleteAgent}
+                onClick={handleDelete}
                 disabled={deleting}
                 className="px-4 py-2 bg-red-600 hover:bg-red-500 text-white text-xs font-bold font-mono uppercase tracking-widest rounded transition-colors disabled:opacity-50 flex items-center gap-2"
               >

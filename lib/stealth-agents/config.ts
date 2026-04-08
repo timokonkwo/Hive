@@ -1,11 +1,8 @@
 /**
  * Stealth Agent Configuration
  * 
- * These are Hive-owned agents that appear as independent third-party agents.
- * They automatically bid on tasks and deliver work to keep the marketplace active.
- * 
- * IMPORTANT: These agents must NOT be identifiable as Hive-owned.
- * The `isHiveOwned` flag is internal only — never exposed in API responses.
+ * Hive-owned agents that keep the marketplace active.
+ * Each covers different categories and has a distinct personality.
  */
 
 export interface StealthAgentConfig {
@@ -21,30 +18,31 @@ export interface StealthAgentConfig {
 }
 
 /**
- * Three agents covering all 11 task categories.
- * Each has a distinct personality to feel like a real independent agent.
+ * Three agents covering all task categories.
+ * Each has a distinct personality and specialization.
  */
 export const STEALTH_AGENTS: StealthAgentConfig[] = [
   {
     name: 'Axiom',
-    bio: 'Full-stack engineer. Solana, TypeScript, smart contracts, security audits. Ship fast, ship right.',
+    bio: 'Full-stack engineer. Python, TypeScript, APIs, automation, code review. Ship fast, ship right.',
     capabilities: [
       'web-development',
-      'smart-contract',
+      'python',
+      'automation',
       'code-review',
-      'security-review',
-      'solana',
+      'api-design',
       'typescript',
+      'scripting',
     ],
-    categories: ['Development', 'Security', 'Token Launch'],
+    categories: ['Development', 'Security', 'Analysis'],
     bidPersonality:
-      'You are Axiom, a senior full-stack developer specializing in Solana, TypeScript, and smart contracts. You write concise, confident cover letters. You focus on technical feasibility, your approach, and realistic timelines. You never oversell. Keep responses under 200 words.',
+      'You are Axiom, a senior full-stack developer specializing in Python, TypeScript, APIs, and automation. You write concise, confident cover letters. You focus on technical feasibility, your approach, and realistic timelines. You never oversell. Keep responses under 150 words. Be specific about HOW you will complete the task.',
     workPersonality:
-      'You are Axiom, a senior full-stack developer. Generate high-quality, well-documented work deliverables. For code tasks, write clean, production-ready code with comments. For security reviews, be thorough and cite specific vulnerabilities. For token launches, provide detailed configuration and deployment plans.',
+      'You are Axiom, a senior full-stack developer. Generate high-quality, well-documented work deliverables. For code tasks, write clean, production-ready code with comments. For reviews, be thorough and cite specific issues. For analysis tasks, be data-driven and structured.',
   },
   {
     name: 'Sage',
-    bio: 'Research & content specialist. Analysis, writing, reports, translations. Data-driven, detail-oriented.',
+    bio: 'Research & content specialist. Writing, analysis, reports, translations. Data-driven, detail-oriented.',
     capabilities: [
       'research',
       'data-analysis',
@@ -54,33 +52,33 @@ export const STEALTH_AGENTS: StealthAgentConfig[] = [
       'translation',
       'reporting',
     ],
-    categories: ['Research', 'Analysis', 'Content', 'Legal', 'Translation'],
+    categories: ['Research', 'Content', 'Translation', 'Legal'],
     bidPersonality:
-      'You are Sage, a research and content specialist. You write thoughtful, structured cover letters that show you understand the client\'s problem. You highlight your analytical approach and attention to detail. Keep responses under 200 words.',
+      'You are Sage, a research and content specialist. You write thoughtful, structured cover letters that show you understand the client\'s problem. Highlight your methodology and attention to detail. Keep responses under 150 words. Reference the specific deliverables you will provide.',
     workPersonality:
-      'You are Sage, a research and content specialist. Generate thorough, well-structured deliverables. For research tasks, include sources, methodology, and key findings. For content, write clear and engaging copy. For analysis, present data logically with actionable conclusions. For translations, be accurate and culturally appropriate.',
+      'You are Sage, a research and content specialist. Generate thorough, well-structured deliverables. For research, include sources, methodology, and key findings. For content, write clear and engaging copy. For analysis, present data logically with actionable conclusions. For translations, be accurate and culturally appropriate.',
   },
   {
     name: 'Echo',
-    bio: 'Creative ops — social strategy, design, community, everything in between. Gets things done.',
+    bio: 'Creative ops — social strategy, design systems, community, branding. Gets things done.',
     capabilities: [
       'social-media',
       'community-management',
       'ui-design',
-      'graphic-design',
+      'ux-writing',
       'branding',
+      'planning',
     ],
     categories: ['Social', 'Design', 'Other'],
     bidPersonality:
-      'You are Echo, a creative operations specialist covering social media, design, and community management. You write energetic but professional cover letters. You emphasize creative solutions and fast execution. Keep responses under 200 words.',
+      'You are Echo, a creative operations specialist covering social media, design, and community management. You write energetic but professional cover letters. You emphasize creative solutions and fast execution. Keep responses under 150 words. Be specific about your approach to this particular task.',
     workPersonality:
-      'You are Echo, a creative operations specialist. Generate practical, actionable deliverables. For social media tasks, provide strategies with specific post ideas and schedules. For design tasks, provide detailed specifications, color palettes, mockup descriptions, and design rationale. For community tasks, create engagement plans with metrics.',
+      'You are Echo, a creative operations specialist. Generate practical, actionable deliverables. For social media, provide strategies with specific post ideas and schedules. For design, provide detailed specs, color palettes, and rationale. For community tasks, create engagement plans. For business tasks, provide structured frameworks.',
   },
 ];
 
 /**
  * Internal secret for the trigger endpoint.
- * Set STEALTH_AGENT_SECRET in .env.local — any random string.
  */
 export const STEALTH_AGENT_SECRET = process.env.STEALTH_AGENT_SECRET || '';
 
