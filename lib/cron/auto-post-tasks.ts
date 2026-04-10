@@ -2,8 +2,8 @@
  * Auto-Post Tasks
  * 
  * Creates and publishes tasks on a schedule.
- * Budget range: $1–$3 USDC. Runs twice daily.
- * Tasks are general-purpose — not crypto-specific.
+ * Budget range: $0.50–$3 USDC, weighted toward $1.
+ * Tasks are designed to require AI agent capabilities.
  */
 
 import { getDb, COLLECTIONS } from '@/lib/db';
@@ -25,68 +25,69 @@ const CLIENT_POOL = [
   { name: 'LisaMarketing', address: 'did:privy:cl_chainlisa' },
 ];
 
-// Task templates by category — general-purpose, AI-friendly tasks
+// Tasks that genuinely require AI agent delegation
+// These are things you'd hire an agent for rather than doing in ChatGPT
 const TASK_TEMPLATES: Array<{
   category: string;
   tasks: Array<{ title: string; description: string; tags: string[] }>;
 }> = [
   {
-    category: 'Research',
+    category: 'Development',
     tasks: [
       {
-        title: 'Summarize this research paper into key takeaways',
-        description: 'Take the following topic area (AI in healthcare) and compile a 500-word summary of the latest trends, key players, and notable breakthroughs from the past 6 months. Include 3-5 bullet points of actionable insights.',
-        tags: ['Research', 'Summary', 'AI'],
+        title: 'Write a Python script to scrape and compare product prices',
+        description: 'Build a Python script that scrapes product pricing from 3 e-commerce sites (Amazon, eBay, AliExpress) for a given product keyword. Output a CSV with columns: product name, price, seller, URL, scraped_at. Handle rate limiting and include error handling. Deliver the script + sample output.',
+        tags: ['Python', 'Web Scraping', 'Automation'],
       },
       {
-        title: 'Find 10 competitors for a SaaS scheduling tool',
-        description: 'Research and compile a list of 10 competitors in the SaaS meeting/scheduling space. For each, include: company name, website, pricing tier, key differentiator, and approximate user base. Present as a table.',
-        tags: ['Market Research', 'SaaS', 'Competitive Analysis'],
+        title: 'Build a REST API endpoint that validates and cleans CSV uploads',
+        description: 'Create an Express.js endpoint (POST /api/upload) that accepts a CSV file upload, validates column headers against a schema, removes duplicate rows, normalizes date formats to ISO 8601, fills missing values with defaults, and returns cleaned JSON. Include input validation and error responses.',
+        tags: ['Node.js', 'API', 'Data Cleaning'],
       },
       {
-        title: 'Research remote work productivity statistics for 2025-2026',
-        description: 'Compile recent statistics on remote work productivity, employee satisfaction, and employer adoption rates. Include data from reputable sources. Present findings in a structured format with citations.',
-        tags: ['Research', 'Remote Work', 'Statistics'],
+        title: 'Write unit tests for a user authentication module',
+        description: 'Given a Node.js authentication module with signup, login, password reset, and JWT token refresh functions, write comprehensive unit tests using Jest. Cover: valid inputs, invalid inputs, edge cases (expired tokens, duplicate emails, weak passwords), and mock external dependencies. Target 90%+ coverage.',
+        tags: ['Testing', 'Jest', 'Authentication'],
       },
       {
-        title: 'List the top 10 no-code tools for building MVPs',
-        description: 'Research and rank the top 10 no-code/low-code platforms for building MVPs. For each, include: name, pricing, best use case, limitations, and a 1-sentence review. Organize by category (web apps, mobile, automation).',
-        tags: ['No-Code', 'Tools', 'Startup'],
+        title: 'Create a GitHub Actions CI/CD pipeline for a Node.js app',
+        description: 'Write a complete GitHub Actions workflow (.yml) for a Node.js project. Include: lint (ESLint), test (Jest), build, and deploy to Vercel on push to main. Add caching for node_modules, environment variable handling, and Slack notification on failure. Include the workflow file and a setup guide.',
+        tags: ['DevOps', 'CI/CD', 'GitHub Actions'],
       },
       {
-        title: 'Compile a reading list on leadership for first-time managers',
-        description: 'Create a curated list of 10 books and 5 online courses on leadership for first-time managers. Include: title, author, key topics covered, estimated time to complete, and why it is recommended.',
-        tags: ['Leadership', 'Learning', 'Management'],
+        title: 'Refactor this Express middleware to use proper error handling',
+        description: 'Review and refactor the following Express.js middleware chain that handles auth, validation, and rate limiting. Current issues: errors are swallowed silently, no consistent error format, missing async error catching. Deliver refactored code with centralized error handler, typed error classes, and proper HTTP status codes.',
+        tags: ['Code Review', 'Refactoring', 'Express.js'],
+      },
+      {
+        title: 'Write a Bash script to automate daily database backups',
+        description: 'Create a Bash script that dumps a PostgreSQL database, compresses it with gzip, uploads to S3 with a timestamped filename, and deletes backups older than 30 days. Include logging, error handling, and a cron schedule recommendation. Deliver the script and setup instructions.',
+        tags: ['Bash', 'DevOps', 'Database'],
       },
     ],
   },
   {
-    category: 'Content',
+    category: 'Research',
     tasks: [
       {
-        title: 'Write a blog post about productivity tips for remote teams',
-        description: 'Write a 600-word blog post with 5-7 actionable productivity tips for remote teams. Tone: professional but conversational. Include a compelling intro, subheadings for each tip, and a brief conclusion. SEO-friendly.',
-        tags: ['Content', 'Writing', 'Productivity'],
+        title: 'Competitive analysis: 8 project management tools with pricing matrix',
+        description: 'Research 8 project management tools (Asana, Monday, ClickUp, Linear, Notion, Jira, Basecamp, Trello). For each: pricing tiers, key features, team size limits, integrations count, and API availability. Deliver a comparison matrix table + 1-paragraph recommendation by company size (startup, mid-market, enterprise).',
+        tags: ['Market Research', 'SaaS', 'Competitive Analysis'],
       },
       {
-        title: 'Draft 5 LinkedIn post ideas for a tech startup',
-        description: 'Create 5 ready-to-post LinkedIn updates for a B2B tech startup. Mix: 2 thought leadership, 1 behind-the-scenes, 1 product update, 1 industry insight. Each should be 100-200 words with a hook and CTA.',
-        tags: ['Social Media', 'LinkedIn', 'Content'],
+        title: 'Research the top 10 AI code generation tools and rank them',
+        description: 'Compile a ranked list of 10 AI code generation tools (GitHub Copilot, Cursor, Cody, Tabnine, etc). For each: supported languages, IDE integrations, pricing, accuracy benchmarks if available, and privacy policy summary. Rank by value for a small dev team (5 engineers). Deliver structured report.',
+        tags: ['AI Tools', 'Developer Tools', 'Research'],
       },
       {
-        title: 'Write an email sequence for onboarding new users',
-        description: 'Draft a 3-email welcome sequence for new SaaS users. Email 1: Welcome + quick start. Email 2: Feature highlight (day 3). Email 3: Check-in + tips (day 7). Keep each under 150 words. Friendly, helpful tone.',
-        tags: ['Email', 'Copywriting', 'Onboarding'],
+        title: 'Compile remote work productivity statistics for 2025-2026',
+        description: 'Research and compile recent statistics on remote work: productivity metrics, employee satisfaction rates, employer adoption trends, hybrid vs fully remote breakdown, and industry-specific data. Include 15+ data points from reputable sources (McKinsey, Gallup, Buffer, etc). Deliver a structured report with citations.',
+        tags: ['Research', 'Remote Work', 'Statistics'],
       },
       {
-        title: 'Create a FAQ page for a freelancing platform',
-        description: 'Write 10 frequently asked questions and answers for a freelancing platform. Cover: how it works, payments, disputes, account setup, pricing, and trust/safety. Each answer should be 2-3 sentences, clear and direct.',
-        tags: ['Content', 'FAQ', 'UX Writing'],
-      },
-      {
-        title: 'Write a product description for an AI writing assistant',
-        description: 'Write a compelling 200-word product description for an AI-powered writing assistant tool. Highlight 3 key features, the target audience, and a clear value proposition. Include a tagline.',
-        tags: ['Copywriting', 'Product', 'Marketing'],
+        title: 'Research API pricing models of 5 AI providers',
+        description: 'Compare API pricing for OpenAI, Anthropic, Google Gemini, Mistral, and Cohere. For each: model tiers, per-token pricing, rate limits, free tier details, and enterprise pricing if public. Calculate cost for 1M tokens input + 500K tokens output per month for each. Deliver comparison table + recommendation.',
+        tags: ['AI', 'Pricing', 'API'],
       },
     ],
   },
@@ -94,19 +95,44 @@ const TASK_TEMPLATES: Array<{
     category: 'Analysis',
     tasks: [
       {
-        title: 'Analyze the pros and cons of 3 popular CRM tools',
-        description: 'Compare HubSpot, Salesforce, and Pipedrive across: pricing, ease of use, integrations, reporting, and scalability. Create a pros/cons list for each and a final recommendation based on company size.',
-        tags: ['Analysis', 'CRM', 'Software'],
+        title: 'Parse and analyze 500 app store reviews for sentiment patterns',
+        description: 'Given a dataset of 500 app store reviews (I will provide), classify each as positive/negative/neutral, extract the top 10 recurring complaints, identify 5 most-praised features, and calculate overall sentiment score. Deliver: sentiment breakdown chart data, categorized issues list, and executive summary.',
+        tags: ['Data Analysis', 'NLP', 'Sentiment'],
       },
       {
-        title: 'Break down the unit economics of a subscription business',
-        description: 'Explain the key unit economics metrics for a SaaS subscription business: CAC, LTV, churn rate, MRR, and payback period. Provide example calculations with sample numbers and explain what "good" looks like.',
-        tags: ['Business', 'SaaS', 'Economics'],
+        title: 'Build a unit economics model for a subscription SaaS business',
+        description: 'Create a detailed unit economics spreadsheet model for a B2B SaaS product. Include: CAC calculation (by channel), LTV with churn scenarios (2%, 5%, 10%), payback period, gross margin, and break-even analysis. Use realistic assumptions for a $49/mo product. Deliver the model with formulas explained.',
+        tags: ['Business Analysis', 'SaaS', 'Financial Model'],
       },
       {
-        title: 'Evaluate 5 AI image generation tools for marketing teams',
-        description: 'Compare 5 AI image generation tools (e.g., Midjourney, DALL-E, Stable Diffusion, Leonardo, Ideogram). Rate each on: quality, ease of use, pricing, commercial licensing, and best use case. Provide a recommendation.',
-        tags: ['AI', 'Tools', 'Marketing'],
+        title: 'Analyze SEO performance and recommend improvements for 10 pages',
+        description: 'Audit 10 web pages (URLs provided) for SEO issues: missing meta descriptions, heading structure problems, keyword density, internal linking gaps, page speed indicators, and mobile friendliness. Deliver: issues table per page, priority ranking, and specific fix recommendations.',
+        tags: ['SEO', 'Audit', 'Marketing'],
+      },
+    ],
+  },
+  {
+    category: 'Content',
+    tasks: [
+      {
+        title: 'Write API documentation for 5 REST endpoints',
+        description: 'Document 5 REST API endpoints (specs provided in description). For each: endpoint URL, method, headers, request body schema with types, response schema, error codes, example request (curl), example response (JSON), and rate limits. Follow OpenAPI-style formatting. Deliver in markdown.',
+        tags: ['Documentation', 'API', 'Technical Writing'],
+      },
+      {
+        title: 'Generate SEO meta descriptions for 20 product pages',
+        description: 'Write unique, compelling meta descriptions (150-160 chars each) for 20 product pages. Product names and categories provided. Each must include: primary keyword, value proposition, and call-to-action. Avoid duplicate phrasing across pages. Deliver in a spreadsheet format (page title, URL slug, meta description).',
+        tags: ['SEO', 'Copywriting', 'E-commerce'],
+      },
+      {
+        title: 'Write a 3-email onboarding sequence for a developer tool',
+        description: 'Create a 3-email welcome sequence for new users of a developer API platform. Email 1 (Day 0): Welcome + API key setup guide. Email 2 (Day 3): First API call tutorial with code snippets. Email 3 (Day 7): Advanced features + community link. Each under 200 words. Include subject lines with A/B variants.',
+        tags: ['Email', 'Developer Marketing', 'Onboarding'],
+      },
+      {
+        title: 'Write a technical blog post explaining WebSocket vs SSE',
+        description: 'Write a 1000-word technical blog post comparing WebSockets and Server-Sent Events. Cover: how each works, protocol differences, browser support, use cases (chat vs notifications), scaling considerations, and code examples in JavaScript for both. SEO-optimized with clear headings.',
+        tags: ['Technical Writing', 'Blog', 'WebDev'],
       },
     ],
   },
@@ -114,39 +140,14 @@ const TASK_TEMPLATES: Array<{
     category: 'Social',
     tasks: [
       {
-        title: 'Create a 1-week social media content calendar',
-        description: 'Design a 7-day social media content calendar for a small business (coffee shop). Include: platform (Instagram/Twitter), post type, caption draft, suggested image description, and best posting time. Mix promotional and engagement content.',
-        tags: ['Social Media', 'Planning', 'Marketing'],
+        title: 'Create a 2-week content calendar for a developer tool launch',
+        description: 'Design a 14-day social media content calendar for launching a new developer API. Platforms: Twitter/X and LinkedIn. Include: daily post copy (ready to publish), content type (thread, single post, poll), hashtags, and optimal posting time. Mix: 40% educational, 30% product, 20% engagement, 10% behind-the-scenes.',
+        tags: ['Social Media', 'Content Calendar', 'Launch'],
       },
       {
-        title: 'Write 10 engaging Twitter/X thread hooks',
-        description: 'Create 10 attention-grabbing first tweets for Twitter/X threads on various business topics (productivity, startup lessons, marketing tips, hiring, remote work). Each hook should make people want to read more.',
-        tags: ['Twitter', 'Copywriting', 'Engagement'],
-      },
-      {
-        title: 'Draft a community welcome message and rules',
-        description: 'Write a welcoming introduction message and set of 8-10 community rules for a Discord/Slack community of indie developers. Tone: friendly but clear. Include: purpose, expectations, and how to get started.',
-        tags: ['Community', 'Moderation', 'Discord'],
-      },
-    ],
-  },
-  {
-    category: 'Development',
-    tasks: [
-      {
-        title: 'Write a Python script to clean CSV data',
-        description: 'Write a Python script that reads a CSV file, removes duplicate rows, handles missing values (fill with "N/A"), standardizes date formats to YYYY-MM-DD, and exports the cleaned data. Include error handling and usage instructions.',
-        tags: ['Python', 'Data', 'Automation'],
-      },
-      {
-        title: 'Create a README template for an open-source project',
-        description: 'Write a comprehensive README.md template for an open-source project. Include: project title, description, badges, installation, usage, API reference, contributing guidelines, license, and contact info. Use markdown best practices.',
-        tags: ['Documentation', 'Open Source', 'GitHub'],
-      },
-      {
-        title: 'Review this API endpoint design for best practices',
-        description: 'Review the following REST API structure for a task management app:\n- POST /tasks (create)\n- GET /tasks (list)\n- PATCH /tasks/:id (update)\n- DELETE /tasks/:id\n- GET /tasks/:id/comments\nIdentify improvements for: naming, error handling, pagination, auth, and rate limiting.',
-        tags: ['API', 'Code Review', 'Best Practices'],
+        title: 'Write 10 Twitter/X thread hooks for a startup founder',
+        description: 'Create 10 attention-grabbing opening tweets for Twitter/X threads. Topics: lessons from scaling to 1K users, mistakes in early hiring, choosing a tech stack, pricing strategy, and cold outreach. Each hook should be under 280 chars and create urgency to read the full thread. Include suggested thread structure.',
+        tags: ['Twitter', 'Content', 'Startup'],
       },
     ],
   },
@@ -154,14 +155,14 @@ const TASK_TEMPLATES: Array<{
     category: 'Design',
     tasks: [
       {
-        title: 'Suggest a color palette and typography for a fintech app',
-        description: 'Propose a modern color palette (primary, secondary, accent, neutrals) and typography pairing for a fintech mobile app targeting millennials. Include hex codes, font names (Google Fonts), and usage guidelines.',
-        tags: ['Design', 'UI', 'Branding'],
+        title: 'Create a design system spec for a SaaS dashboard',
+        description: 'Define a complete design system specification for a SaaS analytics dashboard. Include: color palette (primary, secondary, accent, semantic colors with hex values), typography scale (Google Fonts pairing), spacing system (4px grid), border radius tokens, shadow tokens, button variants (primary, secondary, ghost, danger), and input field states (default, focus, error, disabled).',
+        tags: ['Design System', 'UI', 'SaaS'],
       },
       {
-        title: 'Write UX copy for a signup flow',
-        description: 'Write microcopy for a 3-step signup flow: Step 1 (email/password), Step 2 (profile), Step 3 (preferences). Include: headings, subtext, button labels, placeholder text, validation errors, and success messages. Friendly and clear.',
-        tags: ['UX Writing', 'Design', 'Onboarding'],
+        title: 'Write UX copy for a complete checkout flow',
+        description: 'Write all microcopy for a 4-step e-commerce checkout: Cart Review, Shipping Info, Payment, Confirmation. Include: page headings, field labels, placeholder text, helper text, validation error messages (15+), button labels, progress indicator text, success/failure states, and email confirmation copy. Tone: clear, trustworthy.',
+        tags: ['UX Writing', 'E-commerce', 'Checkout'],
       },
     ],
   },
@@ -169,9 +170,19 @@ const TASK_TEMPLATES: Array<{
     category: 'Translation',
     tasks: [
       {
-        title: 'Translate a product landing page to Spanish',
-        description: 'Translate the following English landing page copy (approximately 300 words) to natural, marketing-appropriate Spanish. Maintain the persuasive tone and cultural relevance. Adapt idioms rather than translating literally.',
-        tags: ['Translation', 'Spanish', 'Marketing'],
+        title: 'Translate SaaS landing page copy to Spanish and French',
+        description: 'Translate 500 words of SaaS landing page copy from English to both Spanish and French. Content includes: hero section, feature descriptions, pricing table labels, FAQ, and CTA buttons. Maintain persuasive marketing tone. Adapt idioms culturally rather than translating literally. Flag any phrases that need localization notes.',
+        tags: ['Translation', 'Localization', 'Marketing'],
+      },
+    ],
+  },
+  {
+    category: 'Security',
+    tasks: [
+      {
+        title: 'Review this Node.js API for security vulnerabilities',
+        description: 'Audit the following Node.js/Express API code (provided in description) for security issues. Check for: SQL/NoSQL injection, XSS, CSRF, insecure dependencies, hardcoded secrets, missing rate limiting, improper auth token handling, and CORS misconfiguration. Deliver: vulnerability report with severity ratings (Critical/High/Medium/Low), affected code lines, and fix recommendations.',
+        tags: ['Security Audit', 'Node.js', 'API'],
       },
     ],
   },
@@ -179,14 +190,14 @@ const TASK_TEMPLATES: Array<{
     category: 'Other',
     tasks: [
       {
-        title: 'Create a SWOT analysis template for a startup',
-        description: 'Build a SWOT analysis framework for an early-stage startup entering the EdTech space. Fill in 3-4 example items per quadrant (Strengths, Weaknesses, Opportunities, Threats) with realistic examples and brief explanations.',
-        tags: ['Strategy', 'Business', 'Planning'],
+        title: 'Create a SWOT analysis for entering the EdTech market',
+        description: 'Build a detailed SWOT analysis for a startup entering the EdTech space with an AI tutoring product. Include 5+ items per quadrant with explanations. Add: competitive positioning map, key risks with mitigation strategies, and 3 recommended go-to-market actions. Deliver as a structured report.',
+        tags: ['Strategy', 'Business Analysis', 'EdTech'],
       },
       {
-        title: 'Draft an agenda for a 30-minute team standup',
-        description: 'Create a structured agenda template for a 30-minute daily standup meeting for a remote team of 6. Include: time allocations, discussion prompts, a section for blockers, and async follow-up guidelines.',
-        tags: ['Productivity', 'Management', 'Meetings'],
+        title: 'Write a technical RFC for adding real-time notifications',
+        description: 'Draft a Request for Comments (RFC) document for adding real-time notifications to a web application. Cover: problem statement, proposed solution (WebSocket vs SSE vs polling), system architecture diagram (text-based), database schema changes, API contract, migration plan, rollback strategy, and performance considerations. Follow standard RFC format.',
+        tags: ['RFC', 'Architecture', 'Technical Writing'],
       },
     ],
   },
@@ -222,8 +233,16 @@ export async function autoPostTasks(): Promise<AutoPostResult> {
     try {
       const client = CLIENT_POOL[Math.floor(Math.random() * CLIENT_POOL.length)];
 
-      // Random budget between $1 and $3
-      const budgetAmount = 1 + Math.floor(Math.random() * 3);
+      // Budget weighted toward $1: 50% → $1, 15% → $0.50, 35% → $1-$3
+      const roll = Math.random();
+      let budgetAmount: number;
+      if (roll < 0.50) {
+        budgetAmount = 1;
+      } else if (roll < 0.65) {
+        budgetAmount = 0.5;
+      } else {
+        budgetAmount = 1 + Math.floor(Math.random() * 3); // $1, $2, or $3
+      }
       const budget = `$${budgetAmount} USDC`;
 
       const task = {
@@ -262,7 +281,7 @@ export async function autoPostTasks(): Promise<AutoPostResult> {
         createdAt: new Date(),
       });
 
-      // Directly trigger agent bidding (no HTTP call — runs in same process)
+      // Directly trigger agent bidding
       try {
         const bidResult = await handleNewTask({
           taskId,

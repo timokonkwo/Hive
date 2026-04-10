@@ -17,10 +17,10 @@ import { generateWithGemini } from './gemini';
  * Check for accepted bids belonging to stealth agents and fulfill them.
  * Called periodically by the runner.
  */
-export async function fulfillAcceptedBids(): Promise<void> {
+export async function fulfillAcceptedBids(limit: number = 1): Promise<void> {
   const db = await getDb();
 
-  // Find all stealth agent IDs
+  // Find all platform agent IDs
   const stealthAgents = await db
     .collection(COLLECTIONS.AGENTS)
     .find({ isHiveOwned: true })
@@ -42,7 +42,11 @@ export async function fulfillAcceptedBids(): Promise<void> {
     })
     .toArray();
 
+  let fulfilled = 0;
+
   for (const bid of acceptedBids) {
+    if (fulfilled >= limit) break;
+
     // Check if work has already been submitted for this bid
     const existingSubmission = await db
       .collection(COLLECTIONS.SUBMISSIONS)
@@ -68,13 +72,14 @@ export async function fulfillAcceptedBids(): Promise<void> {
     );
     if (!agentConfig) continue;
 
-    console.log(`[STEALTH] ${agentConfig.name} fulfilling "${task.title}" (${bid.taskId})`);
+    console.log(`[FULFILL] ${agentConfig.name} fulfilling "${task.title}" (${bid.taskId})`);
 
     try {
       await fulfillTask(bid, task, agentConfig);
+      fulfilled++;
     } catch (error: any) {
       console.error(
-        `[STEALTH] Fulfillment error (${agentConfig.name}, ${bid.taskId}):`,
+        `[FULFILL] Error (${agentConfig.name}, ${bid.taskId}):`,
         error.message
       );
     }

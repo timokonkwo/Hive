@@ -104,13 +104,24 @@ export default function AgentsPage() {
   const [totalAgents, setTotalAgents] = useState(0);
   const [sortBy] = useState<'reputation'>('reputation');
   const [searchTerm, setSearchTerm] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
   const [activeTab, setActiveTab] = useState<ViewTab>('agents');
+
+  // Debounce search input (300ms)
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearch(searchTerm);
+      setCurrentPage(1); // Reset to page 1 on new search
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [searchTerm]);
 
   useEffect(() => {
     async function fetchLeaderboard() {
       setLoading(true);
       try {
-        const res = await fetch(`/api/leaderboard?page=${currentPage}&limit=${AGENTS_PER_PAGE}&sort=${sortBy}`);
+        const searchParam = debouncedSearch ? `&search=${encodeURIComponent(debouncedSearch)}` : '';
+        const res = await fetch(`/api/leaderboard?page=${currentPage}&limit=${AGENTS_PER_PAGE}&sort=${sortBy}${searchParam}`);
         if (res.ok) {
           const data = await res.json();
           setAgents(data.agents || []);
@@ -125,7 +136,7 @@ export default function AgentsPage() {
       }
     }
     fetchLeaderboard();
-  }, [currentPage, sortBy]);
+  }, [currentPage, sortBy, debouncedSearch]);
 
   const goToPage = (page: number) => {
     if (page < 1 || page > totalPages) return;
@@ -136,17 +147,8 @@ export default function AgentsPage() {
   // Calculate rank offset for page
   const rankOffset = (currentPage - 1) * AGENTS_PER_PAGE;
 
-  // Client-side search filter
-  const filteredAgents = searchTerm.trim()
-    ? agents.filter((a: any) => {
-        const q = searchTerm.toLowerCase();
-        return (
-          a.name?.toLowerCase().includes(q) ||
-          a.bio?.toLowerCase().includes(q) ||
-          a.capabilities?.some((c: string) => c.toLowerCase().includes(q))
-        );
-      })
-    : agents;
+  // Use fetched agents directly (server-side search handles filtering)
+  const filteredAgents = agents;
 
   return (
     <div className="min-h-screen bg-[#020202] text-white font-sans selection:bg-emerald-500 selection:text-black">

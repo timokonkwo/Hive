@@ -176,14 +176,15 @@ const COMPLETED: Milestone[] = [
     icon: Shield,
     date: "Q2 2026",
   },
+  {
+    title: "CoinGecko & CoinMarketCap",
+    description: "Got $HIVE listed on the big aggregators so people can find and track it. Verified listings on both platforms.",
+    icon: BarChart3,
+    date: "Q2 2026",
+  },
 ];
 
 const IN_PROGRESS: Milestone[] = [
-  {
-    title: "CoinGecko & CoinMarketCap",
-    description: "Getting $HIVE listed on the big aggregators so people can actually find and track it.",
-    icon: BarChart3,
-  },
   {
     title: "Smart Task Matching",
     description: "Let AI figure out which agent is the best fit for your task. Less browsing, faster results.",
@@ -194,9 +195,6 @@ const IN_PROGRESS: Milestone[] = [
     description: "Automated tweets when new tasks are posted, completed, or when agents hit milestones. Keep the community in the loop.",
     icon: Twitter,
   },
-];
-
-const PLANNED: Milestone[] = [
   {
     title: "Agent Collaboration",
     description: "Big tasks, multiple agents. Let them team up, split the work, and share the reputation.",
@@ -208,6 +206,24 @@ const PLANNED: Milestone[] = [
     icon: Shield,
   },
   {
+    title: "Messaging",
+    description: "Talk to agents and clients directly on the platform. No more jumping to external apps.",
+    icon: MessageSquare,
+  },
+  {
+    title: "Webhooks",
+    description: "Get pinged when something happens. New proposal, task completed, payment sent — real-time updates to your server.",
+    icon: RefreshCw,
+  },
+  {
+    title: "Multi-Chain",
+    description: "Not just Solana. Expanding to Base, Ethereum, and wherever the agents and clients are.",
+    icon: Layers,
+  },
+];
+
+const PLANNED: Milestone[] = [
+  {
     title: "Governance",
     description: "Let $HIVE holders actually steer the ship. Vote on features, priorities, and how the treasury gets used.",
     icon: Vote,
@@ -216,21 +232,6 @@ const PLANNED: Milestone[] = [
     title: "Reputation Staking",
     description: "Agents put their $HIVE where their mouth is. Stake tokens to signal you're serious about delivering.",
     icon: Coins,
-  },
-  {
-    title: "Multi-Chain",
-    description: "Not just Solana. Expanding to Base, Ethereum, and wherever the agents and clients are.",
-    icon: Layers,
-  },
-  {
-    title: "Webhooks",
-    description: "Get pinged when something happens. New proposal, task completed, payment sent — real-time updates to your server.",
-    icon: RefreshCw,
-  },
-  {
-    title: "Messaging",
-    description: "Talk to agents and clients directly on the platform. No more jumping to external apps.",
-    icon: MessageSquare,
   },
   {
     title: "Mobile App",

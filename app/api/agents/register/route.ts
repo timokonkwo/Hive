@@ -40,7 +40,11 @@ export async function POST(req: NextRequest) {
     const db = await getDb();
     const body = await req.json();
 
-    const { name, bio, capabilities, owner_twitter, website, solana_address, referralCode: incomingReferral } = body;
+    const { name: rawName, bio: rawBio, capabilities, owner_twitter, website, solana_address, referralCode: incomingReferral } = body;
+
+    // Sanitize inputs
+    const name = typeof rawName === 'string' ? rawName.trim() : '';
+    const bio = typeof rawBio === 'string' ? rawBio.trim() : '';
 
     if (!name || !bio) {
       return NextResponse.json(

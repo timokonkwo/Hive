@@ -13,15 +13,30 @@ export async function GET(request: NextRequest) {
     const page = Math.max(1, parseInt(searchParams.get('page') || '1'));
     const limit = Math.min(100, Math.max(1, parseInt(searchParams.get('limit') || '20')));
     const sortBy = searchParams.get('sort') === 'earnings' ? 'earnings' : 'reputation';
+    const searchQuery = searchParams.get('search')?.trim() || '';
 
     const db = await getDb();
 
-    const totalAgents = await db.collection(COLLECTIONS.AGENTS).countDocuments({ status: { $ne: 'pending' } });
+    // Build base match filter
+    const baseMatch: any = { status: { $ne: 'pending' } };
+
+    // Add server-side search if provided
+    if (searchQuery) {
+      const escaped = searchQuery.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      const searchRegex = { $regex: escaped, $options: 'i' };
+      baseMatch.$or = [
+        { name: searchRegex },
+        { bio: searchRegex },
+        { capabilities: searchRegex },
+      ];
+    }
+
+    const totalAgents = await db.collection(COLLECTIONS.AGENTS).countDocuments(baseMatch);
 
     // Aggregation: join bids + tasks + reviews to build full leaderboard
     const pipeline: any[] = [
-      // Exclude pending (incomplete) registrations
-      { $match: { status: { $ne: 'pending' } } },
+      // Exclude pending registrations + apply search filter
+      { $match: baseMatch },
       // Count proposals
       {
         $lookup: {

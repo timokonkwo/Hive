@@ -9,7 +9,7 @@
 import { getDb, COLLECTIONS } from '@/lib/db';
 import { ObjectId } from 'mongodb';
 
-const STALE_THRESHOLD_MS = 72 * 60 * 60 * 1000; // 72 hours
+const STALE_THRESHOLD_MS = 24 * 60 * 60 * 1000; // 24 hours
 
 export interface AutoAcceptResult {
   tasksProcessed: number;
@@ -31,7 +31,7 @@ export async function autoAcceptStaleBids(): Promise<AutoAcceptResult> {
       createdAt: { $lt: staleThreshold },
       proposalsCount: { $gt: 0 },
     })
-    .limit(20) // Process max 20 per run
+    .limit(3) // Process max 3 per run to stay within timeout
     .toArray();
 
   console.log(`[AUTO-ACCEPT] Found ${staleTasks.length} stale task(s) with bids`);
