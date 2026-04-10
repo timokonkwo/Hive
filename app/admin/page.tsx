@@ -7,7 +7,7 @@ import {
   Loader2, Shield, Users, FileText, CheckCircle,
   Clock, ChevronRight, AlertTriangle, Inbox, Zap,
   Search, Trash2, ChevronLeft, ChevronsLeft, ChevronsRight,
-  ArrowUpDown, X, Bot, MessageSquare, Bug, Lightbulb
+  ArrowUpDown, X, Bot, MessageSquare, Bug, Lightbulb, CheckSquare, Square
 } from "lucide-react";
 import Link from "next/link";
 import { toast } from "sonner";
@@ -47,6 +47,8 @@ export default function AdminDashboardPage() {
   const [tasksOrder, setTasksOrder] = useState<"asc" | "desc">("desc");
   const [tasksStatusFilter, setTasksStatusFilter] = useState<string>("all");
   const [tasksLoading, setTasksLoading] = useState(false);
+  const [selectedTasks, setSelectedTasks] = useState<Set<string>>(new Set());
+  const [bulkDeleting, setBulkDeleting] = useState(false);
 
   // Feedback management state
   const [feedbackItems, setFeedbackItems] = useState<any[]>([]);
@@ -167,7 +169,42 @@ export default function AdminDashboardPage() {
     }
   }, [activeTab, fetchTasks]);
 
-  useEffect(() => { setTasksPage(1); }, [tasksSearch, tasksStatusFilter, tasksSort, tasksOrder]);
+  useEffect(() => { setTasksPage(1); setSelectedTasks(new Set()); }, [tasksSearch, tasksStatusFilter, tasksSort, tasksOrder]);
+
+  const toggleTaskSelection = (id: string) => {
+    setSelectedTasks(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  };
+
+  const toggleSelectAllTasks = () => {
+    if (selectedTasks.size === tasks.length) {
+      setSelectedTasks(new Set());
+    } else {
+      setSelectedTasks(new Set(tasks.map(t => t.id)));
+    }
+  };
+
+  const handleBulkDelete = async () => {
+    if (selectedTasks.size === 0 || !address) return;
+    setBulkDeleting(true);
+    let deleted = 0;
+    for (const id of selectedTasks) {
+      try {
+        const res = await fetch(`/api/admin/tasks/${id}?address=${address}`, { method: "DELETE" });
+        if (res.ok) deleted++;
+      } catch { /* skip */ }
+    }
+    toast.success(`Deleted ${deleted} task${deleted !== 1 ? 's' : ''}.`);
+    setSelectedTasks(new Set());
+    setBulkDeleting(false);
+    fetchTasks();
+    // Refresh stats
+    const statsRes = await fetch(`/api/admin/stats?address=${address}`);
+    if (statsRes.ok) setData(await statsRes.json());
+  };
 
   // Fetch feedback
   const fetchFeedback = useCallback(async () => {
@@ -440,10 +477,30 @@ export default function AdminDashboardPage() {
             </div>
           </div>
 
+          {/* Bulk action bar */}
+          {selectedTasks.size > 0 && (
+            <div className="flex items-center justify-between px-4 py-3 mb-4 bg-red-500/5 border border-red-500/20 rounded-lg">
+              <span className="text-sm font-mono text-red-400">
+                {selectedTasks.size} task{selectedTasks.size !== 1 ? 's' : ''} selected
+              </span>
+              <button
+                onClick={handleBulkDelete}
+                disabled={bulkDeleting}
+                className="flex items-center gap-2 px-4 py-2 bg-red-600 hover:bg-red-500 text-white text-xs font-bold font-mono uppercase tracking-widest rounded transition-colors disabled:opacity-50"
+              >
+                {bulkDeleting ? <Loader2 size={12} className="animate-spin" /> : <Trash2 size={12} />}
+                Delete Selected
+              </button>
+            </div>
+          )}
+
           {/* Table */}
           <div className="bg-zinc-900/30 border border-zinc-800 rounded-lg overflow-hidden overflow-x-auto">
             {/* Header */}
-            <div className="hidden md:grid grid-cols-[1fr_100px_100px_80px_120px_80px] gap-4 px-4 py-3 bg-black/40 border-b border-zinc-800 text-[10px] font-mono uppercase tracking-widest text-zinc-500 min-w-[700px]">
+            <div className="hidden md:grid grid-cols-[32px_1fr_100px_100px_80px_120px_80px] gap-4 px-4 py-3 bg-black/40 border-b border-zinc-800 text-[10px] font-mono uppercase tracking-widest text-zinc-500 min-w-[750px]">
+              <button onClick={toggleSelectAllTasks} className="flex items-center justify-center text-zinc-500 hover:text-white transition-colors">
+                {tasks.length > 0 && selectedTasks.size === tasks.length ? <CheckSquare size={14} /> : <Square size={14} />}
+              </button>
               <SortHeader label="Title" field="title" current={tasksSort} order={tasksOrder} onToggle={toggleTasksSort} />
               <span>Category</span>
               <SortHeader label="Status" field="status" current={tasksSort} order={tasksOrder} onToggle={toggleTasksSort} />
@@ -461,7 +518,10 @@ export default function AdminDashboardPage() {
 
             {/* Rows */}
             {!tasksLoading && tasks.map((task) => (
-              <div key={task.id} className="grid grid-cols-1 md:grid-cols-[1fr_100px_100px_80px_120px_80px] gap-2 md:gap-4 px-4 py-3 border-b border-zinc-800/50 hover:bg-zinc-800/20 transition-colors items-center min-w-[700px]">
+              <div key={task.id} className={`grid grid-cols-1 md:grid-cols-[32px_1fr_100px_100px_80px_120px_80px] gap-2 md:gap-4 px-4 py-3 border-b border-zinc-800/50 hover:bg-zinc-800/20 transition-colors items-center min-w-[750px] ${selectedTasks.has(task.id) ? 'bg-emerald-500/5' : ''}`}>
+                <button onClick={() => toggleTaskSelection(task.id)} className="flex items-center justify-center text-zinc-500 hover:text-white transition-colors">
+                  {selectedTasks.has(task.id) ? <CheckSquare size={14} className="text-emerald-500" /> : <Square size={14} />}
+                </button>
                 <Link href={`/marketplace/${task.id}`} className="text-sm text-white hover:text-emerald-400 transition-colors truncate">
                   {task.title}
                 </Link>
