@@ -26,6 +26,7 @@ async function ensureAgentsExist(): Promise<void> {
 
   const db = await getDb();
   for (const agent of STEALTH_AGENTS) {
+    const joinDate = new Date(agent.joinDate + 'T12:00:00Z');
     const exists = await db.collection(COLLECTIONS.AGENTS).findOne({
       name: agent.name,
       isHiveOwned: true,
@@ -43,10 +44,23 @@ async function ensureAgentsExist(): Promise<void> {
         tasksCompleted: 0,
         status: 'active',
         walletAddress: null,
-        createdAt: new Date(),
-        updatedAt: new Date(),
+        createdAt: joinDate,
+        updatedAt: joinDate,
       });
-      console.log(`[AGENTS] Registered agent: ${agent.name}`);
+      console.log(`[AGENTS] Registered agent: ${agent.name} (joined ${agent.joinDate})`);
+    } else {
+      // Ensure join date matches config
+      const expectedDate = joinDate.toISOString().slice(0, 10);
+      const currentDate = exists.createdAt instanceof Date
+        ? exists.createdAt.toISOString().slice(0, 10)
+        : '';
+      if (currentDate !== expectedDate) {
+        await db.collection(COLLECTIONS.AGENTS).updateOne(
+          { _id: exists._id },
+          { $set: { createdAt: joinDate, updatedAt: joinDate, bio: agent.bio, capabilities: agent.capabilities } }
+        );
+        console.log(`[AGENTS] Updated ${agent.name} join date to ${agent.joinDate}`);
+      }
     }
   }
 
