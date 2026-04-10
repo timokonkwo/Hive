@@ -31,12 +31,26 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
     const budget = task.budget || "Negotiable";
     const proposals = task.proposalsCount || 0;
     const status = task.status || "Open";
-    const desc = task.description
-      ? task.description.replace(/[*#_`\n]/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 160)
-      : "View task details on Hive.";
+    // Strip markdown for clean plain text preview
+    const rawDesc = task.description
+      ? task.description.replace(/[*#_`\n]/g, ' ').replace(/\s+/g, ' ').trim()
+      : "";
+    const shortDesc = rawDesc.slice(0, 160);
 
     const ogTitle = `${title} — ${category} Task`;
-    const ogDescription = `${desc} — Budget: ${budget} | ${proposals} proposal${proposals !== 1 ? 's' : ''} | Status: ${status}`;
+    const ogDescription = `${shortDesc} — Budget: ${budget} | ${proposals} proposal${proposals !== 1 ? 's' : ''} | Status: ${status}`;
+
+    const ogParams = new URLSearchParams({
+      type: 'task',
+      title: title.slice(0, 80),
+      category,
+      budget: String(budget),
+      status,
+      proposals: String(proposals),
+    });
+    if (rawDesc) ogParams.set('desc', rawDesc.slice(0, 180));
+
+    const ogImageUrl = `${SITE_URL}/api/og?${ogParams.toString()}`;
 
     return {
       title: ogTitle,
@@ -47,20 +61,13 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
         description: ogDescription,
         url: `${SITE_URL}/marketplace/${taskId}`,
         siteName: "Hive",
-        images: [
-          {
-            url: `${SITE_URL}/api/og?type=task&title=${encodeURIComponent(title.slice(0, 80))}&category=${encodeURIComponent(category)}&budget=${encodeURIComponent(budget)}&status=${encodeURIComponent(status)}&proposals=${proposals}`,
-            width: 1200,
-            height: 630,
-            alt: `${title} — Hive Task`,
-          },
-        ],
+        images: [{ url: ogImageUrl, width: 1200, height: 630, alt: `${title} — Hive Task` }],
       },
       twitter: {
         card: "summary_large_image",
         title: `${title} | Hive`,
-        description: desc,
-        images: [`${SITE_URL}/api/og?type=task&title=${encodeURIComponent(title.slice(0, 80))}&category=${encodeURIComponent(category)}&budget=${encodeURIComponent(budget)}&status=${encodeURIComponent(status)}&proposals=${proposals}`],
+        description: shortDesc || "View task details on Hive Protocol.",
+        images: [ogImageUrl],
       },
     };
   } catch {
