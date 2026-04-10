@@ -71,6 +71,26 @@ const CATEGORIES = [
         title: 'Write unit tests for a user authentication module',
         description: 'Given a Node.js authentication module with signup, login, password reset, and token refresh endpoints, write comprehensive Jest tests. Cover valid inputs, invalid inputs, edge cases like expired JWTs, duplicate emails, and weak passwords. Mock external dependencies (database, email service). Target 90%+ code coverage. Deliver the test file and a coverage report.',
       },
+      {
+        title: 'Build a CLI tool that converts JSON config files to environment variables',
+        description: 'Write a Node.js CLI tool that reads a nested JSON config file (e.g. {"db": {"host": "...", "port": 5432}}) and outputs a flat .env file (DB_HOST=..., DB_PORT=5432). Support multiple environments (dev, staging, prod) via a --env flag. Handle arrays, booleans, and null values gracefully. Include --dry-run mode, validation for missing required keys, and npm publishing instructions.',
+      },
+      {
+        title: 'Refactor a monolithic Express app into a modular route structure',
+        description: 'Take a single-file Express.js server (500+ lines, provided) and refactor it into a clean modular structure: separate route files by domain (users, products, orders), extract middleware into its own directory, create a centralized error handler, and add request validation using Zod or Joi. Preserve all existing functionality. Deliver the refactored codebase with a folder structure diagram.',
+      },
+      {
+        title: 'Write a Python data pipeline that cleans and normalizes a messy CSV',
+        description: 'Build a Python script using pandas that takes a messy CSV (inconsistent date formats, mixed case names, duplicate rows, missing phone numbers) and outputs a clean version. Normalize dates to ISO 8601, title-case all names, deduplicate by email, format phone numbers to E.164, and flag rows with missing required fields. Include a summary report of changes made.',
+      },
+      {
+        title: 'Create a rate limiter middleware for an Express.js API',
+        description: 'Build a configurable rate limiting middleware for Express.js. Support: per-IP and per-API-key limits, sliding window algorithm, custom limits per route (e.g. /auth routes = 5/min, /api routes = 100/min), Redis-backed storage for multi-instance deployments, and proper 429 responses with Retry-After headers. Include the middleware, a Redis adapter, and usage examples.',
+      },
+      {
+        title: 'Write a database migration script from MongoDB to PostgreSQL',
+        description: 'Create a Node.js migration script that reads data from a MongoDB collection (users, with nested addresses and preferences), flattens it into a normalized PostgreSQL schema (users, addresses, preferences tables with foreign keys), handles data type conversions (ObjectId to UUID, dates, arrays to join tables), and logs progress with error recovery. Include the SQL schema, the migration script, and a verification query to compare record counts.',
+      },
     ],
     tags: ['Python', 'Node.js', 'API', 'Automation', 'TypeScript', 'DevOps', 'Testing'],
   },
@@ -95,6 +115,14 @@ const CATEGORIES = [
         title: 'Compile remote work productivity statistics for 2025-2026',
         description: 'Gather 15+ data points on remote work from reputable sources (McKinsey, Gallup, Buffer State of Remote Work, etc). Cover: productivity metrics, employee satisfaction rates, employer adoption trends, hybrid vs fully remote breakdown, and industry-specific differences. Present as a structured report with inline citations and a summary table.',
       },
+      {
+        title: 'Research 6 headless CMS platforms and recommend one for a startup blog',
+        description: 'Evaluate Contentful, Strapi, Sanity, Payload CMS, Ghost, and Hygraph. Compare: pricing at different content volumes, developer experience (SDK quality, documentation), content modeling flexibility, self-hosted vs cloud options, and API performance. Deliver a comparison matrix and a 300-word recommendation for a 3-person startup shipping a developer blog.',
+      },
+      {
+        title: 'Investigate open-source alternatives to 5 popular SaaS tools',
+        description: 'For each of these tools: Intercom, Mixpanel, Notion, Calendly, and Mailchimp, identify the best open-source alternative. Compare: feature parity (what is missing vs the paid version), self-hosting requirements, community activity (GitHub stars, last commit date), and total cost of ownership for a 20-person team. Deliver a structured report with a go/no-go recommendation for each.',
+      },
     ],
     tags: ['Market Research', 'Competitive Analysis', 'Tools', 'Statistics', 'AI'],
   },
@@ -114,6 +142,14 @@ const CATEGORIES = [
       {
         title: 'Analyze app store reviews and generate a sentiment report',
         description: 'Take a dataset of 500 app store reviews (provided as CSV) and classify each as positive, negative, or neutral. Extract the top 10 recurring complaints and 5 most-praised features. Calculate overall sentiment score. Deliver: sentiment distribution breakdown, categorized issue list with frequency counts, and a 200-word executive summary.',
+      },
+      {
+        title: 'Analyze website traffic data and identify the top 5 conversion bottlenecks',
+        description: 'Given Google Analytics export data (CSV provided) for a SaaS marketing site, analyze the user funnel from landing page to signup. Identify the 5 pages with the highest drop-off rates, calculate conversion rates per step, compare mobile vs desktop performance, and flag any pages with unusually high bounce rates. Deliver a report with specific recommendations to improve each bottleneck.',
+      },
+      {
+        title: 'Build a churn prediction framework for a subscription product',
+        description: 'Design a churn prediction framework for a B2C subscription app. Define the 10 most predictive churn signals (login frequency, support tickets, feature usage, billing failures, etc), propose a scoring model with weights, and create a risk tier system (Low/Medium/High/Critical). For each tier, recommend 2-3 retention actions. Deliver as a structured document with example calculations.',
       },
     ],
     tags: ['Data Analysis', 'SEO', 'Financial Model', 'Audit', 'NLP'],
@@ -139,6 +175,14 @@ const CATEGORIES = [
         title: 'Write a technical blog post comparing WebSockets vs SSE',
         description: 'Write a 1000-word blog post comparing WebSockets and Server-Sent Events for real-time web features. Cover: protocol mechanics, browser compatibility, use cases (chat vs live feeds vs notifications), scaling considerations (connection limits, load balancing), and implementation examples in JavaScript for both. Include clear section headings, a comparison table, and a "when to use which" conclusion.',
       },
+      {
+        title: 'Write a developer changelog for 3 months of product updates',
+        description: 'Given a list of 25 shipped features and bug fixes (provided), write a polished developer-facing changelog grouped by month. For each entry: write a clear title, a 1-2 sentence description of what changed and why it matters, and tag it (Feature, Improvement, Bugfix, Breaking Change). Include migration notes for any breaking changes. Format in markdown, ready to publish.',
+      },
+      {
+        title: 'Create a knowledge base with 10 help articles for a SaaS product',
+        description: 'Write 10 help center articles for a project management SaaS tool. Topics: getting started, creating a project, inviting team members, setting permissions, using Kanban boards, tracking time, generating reports, integrations setup, billing FAQ, and account deletion. Each article: 200-400 words, step-by-step format with numbered instructions, and a "Related Articles" section at the bottom.',
+      },
     ],
     tags: ['Technical Writing', 'Documentation', 'SEO', 'Copywriting', 'Email'],
   },
@@ -154,6 +198,10 @@ const CATEGORIES = [
       {
         title: 'Write 10 Twitter/X thread hooks for a startup founder',
         description: 'Create 10 opening tweets for Twitter/X threads on business topics: scaling to 1K users, early hiring mistakes, choosing a tech stack, pricing strategy, and cold outreach tactics. Each hook must be under 280 characters and create strong curiosity to read more. For each hook, include a 3-5 bullet suggested thread outline.',
+      },
+      {
+        title: 'Write LinkedIn post series for a B2B SaaS product launch',
+        description: 'Create 5 LinkedIn posts for a B2B SaaS launch campaign. Post 1: founder story (problem discovery). Post 2: behind-the-scenes build process. Post 3: early customer testimonial format. Post 4: product demo walkthrough (text-based). Post 5: launch day announcement with CTA. Each post: 150-250 words, include emoji usage, hashtag suggestions, and optimal posting day/time.',
       },
     ],
     tags: ['Social Media', 'Content Calendar', 'Twitter', 'LinkedIn'],
@@ -171,6 +219,10 @@ const CATEGORIES = [
         title: 'Write UX copy for a complete 4-step e-commerce checkout flow',
         description: 'Write all microcopy for a checkout: Cart Review, Shipping Info, Payment, and Confirmation. Include: page headings, field labels, placeholder text, helper text, 15+ validation error messages (covering empty fields, invalid formats, expired cards), button labels for each step, progress indicator copy, success and failure page copy, and order confirmation email subject + body. Tone: clear, trustworthy, minimal.',
       },
+      {
+        title: 'Design an error state system for a web application',
+        description: 'Create a comprehensive error state guide for a SaaS dashboard. Cover: empty states (no data yet), loading failures (API timeout, network error), permission denied screens, 404 pages, form validation error patterns, toast notification copy for 10 common actions (save, delete, invite, export), and a maintenance mode page. For each state: write the heading, body copy, and primary action button text. Include illustration suggestions.',
+      },
     ],
     tags: ['Design System', 'UX Writing', 'UI', 'E-commerce'],
   },
@@ -187,6 +239,10 @@ const CATEGORIES = [
         title: 'Audit npm dependencies for known CVEs and recommend alternatives',
         description: 'Run a full dependency audit on a Node.js project (package.json provided). Identify all direct and transitive dependencies with known CVEs. For each vulnerability: list the CVE ID, severity score, affected package and version, and whether a patched version exists. Recommend a drop-in replacement for any package that is unmaintained or has unpatched critical issues. Deliver as a structured table.',
       },
+      {
+        title: 'Create a security checklist for deploying a Node.js app to production',
+        description: 'Write a comprehensive pre-deployment security checklist for a Node.js/Express application. Cover: environment variable management (no hardcoded secrets), HTTPS enforcement, CORS policy, rate limiting configuration, input sanitization, SQL/NoSQL injection prevention, authentication token best practices, dependency scanning, logging sensitive data (what NOT to log), and server hardening. Deliver as a markdown checklist with pass/fail criteria for each item.',
+      },
     ],
     tags: ['Security Audit', 'Node.js', 'Vulnerability'],
   },
@@ -202,6 +258,14 @@ const CATEGORIES = [
       {
         title: 'Write a technical RFC for adding real-time notifications',
         description: 'Draft an RFC for adding real-time notifications to a web application. Cover: problem statement with user impact data, proposed solution comparing WebSocket vs SSE vs polling (with pros/cons table), system architecture (text-based diagram), database schema changes, API contract for subscribe/unsubscribe, migration plan with rollback steps, performance estimates (connections per server, message latency), and security considerations for auth on persistent connections.',
+      },
+      {
+        title: 'Create a go-to-market plan for a developer tool',
+        description: 'Build a 90-day GTM plan for a developer-focused API product. Cover: target persona definition (who is buying and who is using), pricing strategy (freemium vs trial vs usage-based with pros/cons), launch channels ranked by expected ROI (Product Hunt, Hacker News, Dev.to, Twitter, etc), content marketing plan (4 blog post topics + 2 tutorial ideas), and success metrics with targets for each phase (Week 1, Month 1, Month 3).',
+      },
+      {
+        title: 'Write a post-mortem template and fill it out for a sample outage',
+        description: 'Create a reusable post-mortem template for engineering teams, then fill it out with a realistic example (e.g., a database connection pool exhaustion causing 30 minutes of downtime). Include: incident summary, timeline of events (minute by minute), root cause analysis (5 Whys), impact assessment (users affected, revenue lost), what went well, what went wrong, and 5 action items with owners and due dates.',
       },
     ],
     tags: ['Strategy', 'Architecture', 'RFC', 'Business Analysis'],

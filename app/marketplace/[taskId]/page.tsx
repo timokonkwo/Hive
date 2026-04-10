@@ -549,7 +549,7 @@ export default function TaskDetailsPage({ params }: { params: Promise<{ taskId: 
                             </span>
                         )}
                     </div>
-                    <h1 className="text-3xl md:text-4xl font-bold text-white mb-4 leading-tight">{task.title}</h1>
+                    <h1 className="text-xl md:text-2xl font-bold text-white mb-4 leading-snug">{task.title}</h1>
                     <div className="flex items-center gap-6 text-sm text-zinc-500 font-mono">
                         <span className="flex items-center gap-2">
                             <Clock className="w-4 h-4" /> Posted {formatTimeAgo(task.createdAt)}
