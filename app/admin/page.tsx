@@ -15,6 +15,7 @@ import { toast } from "sonner";
 type AdminTab = "overview" | "tasks" | "agents" | "activity" | "feedback";
 
 const AGENTS_PER_PAGE = 20;
+const TASKS_PER_PAGE = 20;
 
 export default function AdminDashboardPage() {
   const { user, authenticated, login, ready } = useAuth();
@@ -36,6 +37,16 @@ export default function AdminDashboardPage() {
   const [deleteModal, setDeleteModal] = useState<{ id: string; name: string } | null>(null);
   const [deleting, setDeleting] = useState(false);
   const [deleteType, setDeleteType] = useState<'agent' | 'task'>('agent');
+
+  // Task management state
+  const [tasks, setTasks] = useState<any[]>([]);
+  const [tasksTotal, setTasksTotal] = useState(0);
+  const [tasksPage, setTasksPage] = useState(1);
+  const [tasksSearch, setTasksSearch] = useState("");
+  const [tasksSort, setTasksSort] = useState("createdAt");
+  const [tasksOrder, setTasksOrder] = useState<"asc" | "desc">("desc");
+  const [tasksStatusFilter, setTasksStatusFilter] = useState<string>("all");
+  const [tasksLoading, setTasksLoading] = useState(false);
 
   // Feedback management state
   const [feedbackItems, setFeedbackItems] = useState<any[]>([]);
@@ -121,6 +132,43 @@ export default function AdminDashboardPage() {
   // Reset to page 1 on filter change
   useEffect(() => { setAgentsPage(1); }, [agentsSearch, agentsVerifiedFilter, agentsSort, agentsOrder]);
 
+  // Fetch tasks for management tab
+  const fetchTasks = useCallback(async () => {
+    if (!isAdmin || !address) return;
+    setTasksLoading(true);
+    try {
+      const params = new URLSearchParams({
+        page: String(tasksPage),
+        limit: String(TASKS_PER_PAGE),
+        sort: tasksSort,
+        order: tasksOrder,
+        address,
+      });
+      if (tasksSearch) params.set("search", tasksSearch);
+      if (tasksStatusFilter !== "all") params.set("status", tasksStatusFilter);
+
+      const res = await fetch(`/api/admin/tasks?${params.toString()}`);
+      if (res.ok) {
+        const data = await res.json();
+        setTasks(data.tasks || []);
+        setTasksTotal(data.total || 0);
+      }
+    } catch (err) {
+      console.error("Tasks fetch error:", err);
+    } finally {
+      setTasksLoading(false);
+    }
+  }, [isAdmin, address, tasksPage, tasksSort, tasksOrder, tasksSearch, tasksStatusFilter]);
+
+  useEffect(() => {
+    if (activeTab === "tasks") {
+      const timeout = setTimeout(fetchTasks, 300);
+      return () => clearTimeout(timeout);
+    }
+  }, [activeTab, fetchTasks]);
+
+  useEffect(() => { setTasksPage(1); }, [tasksSearch, tasksStatusFilter, tasksSort, tasksOrder]);
+
   // Fetch feedback
   const fetchFeedback = useCallback(async () => {
     if (!isAdmin || !address) return;
@@ -173,6 +221,7 @@ export default function AdminDashboardPage() {
         toast.success(`${deleteType === 'agent' ? 'Agent' : 'Task'} "${deleteModal.name}" deleted.`);
         setDeleteModal(null);
         if (deleteType === 'agent') fetchAgents();
+        if (deleteType === 'task') fetchTasks();
         // Refresh stats
         const statsRes = await fetch(`/api/admin/stats?address=${address}`);
         if (statsRes.ok) setData(await statsRes.json());
@@ -213,7 +262,17 @@ export default function AdminDashboardPage() {
     }
   };
 
+  const toggleTasksSort = (field: string) => {
+    if (tasksSort === field) {
+      setTasksOrder(prev => prev === "asc" ? "desc" : "asc");
+    } else {
+      setTasksSort(field);
+      setTasksOrder("desc");
+    }
+  };
+
   const agentsTotalPages = Math.ceil(agentsTotal / AGENTS_PER_PAGE);
+  const tasksTotalPages = Math.ceil(tasksTotal / TASKS_PER_PAGE);
 
   // Access denied
   if (!authenticated || (!adminChecked) || (adminChecked && !isAdmin)) {
@@ -343,20 +402,76 @@ export default function AdminDashboardPage() {
 
       {/* ── Tasks Tab ── */}
       {activeTab === "tasks" && (
-        <div className="space-y-3">
-          {data?.recentTasks?.map((task: any) => (
-            <div key={task.id} className="p-4 bg-zinc-900/30 border border-zinc-800 rounded-lg hover:border-zinc-700 transition-colors group">
-              <div className="flex items-center justify-between">
-                <Link href={`/marketplace/${task.id}`} className="flex-1 min-w-0">
-                  <div className="flex items-center gap-3 mb-1">
-                    <span className="text-white font-medium group-hover:text-emerald-400 transition-colors">{task.title}</span>
-                    <StatusBadge status={task.status} />
-                  </div>
-                  <div className="text-xs text-zinc-600 font-mono">
-                    {task.category} • Budget: {task.budget || "Negotiable"} • {task.proposalsCount || 0} proposals
-                  </div>
+        <div>
+          {/* Toolbar */}
+          <div className="flex flex-col md:flex-row gap-4 mb-6">
+            {/* Search */}
+            <div className="relative flex-1">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-500" />
+              <input
+                type="text"
+                value={tasksSearch}
+                onChange={(e) => setTasksSearch(e.target.value)}
+                placeholder="Search tasks by title, category, or client..."
+                className="w-full bg-zinc-900/50 border border-zinc-800 rounded-lg pl-10 pr-4 py-2.5 text-sm text-white placeholder-zinc-600 outline-none focus:border-zinc-600 transition-colors font-mono"
+              />
+              {tasksSearch && (
+                <button onClick={() => setTasksSearch("")} className="absolute right-3 top-1/2 -translate-y-1/2 text-zinc-500 hover:text-white">
+                  <X size={14} />
+                </button>
+              )}
+            </div>
+
+            {/* Status filter */}
+            <div className="flex items-center gap-2">
+              {["all", "Open", "In Progress", "Completed"].map((s) => (
+                <button
+                  key={s}
+                  onClick={() => setTasksStatusFilter(s)}
+                  className={`px-3 py-2 text-[10px] font-mono uppercase tracking-widest border rounded-lg transition-colors ${
+                    tasksStatusFilter === s
+                      ? "border-emerald-500 text-emerald-500 bg-emerald-500/10"
+                      : "border-zinc-800 text-zinc-500 hover:border-zinc-600"
+                  }`}
+                >
+                  {s === "all" ? "All" : s}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Table */}
+          <div className="bg-zinc-900/30 border border-zinc-800 rounded-lg overflow-hidden overflow-x-auto">
+            {/* Header */}
+            <div className="hidden md:grid grid-cols-[1fr_100px_100px_80px_120px_80px] gap-4 px-4 py-3 bg-black/40 border-b border-zinc-800 text-[10px] font-mono uppercase tracking-widest text-zinc-500 min-w-[700px]">
+              <SortHeader label="Title" field="title" current={tasksSort} order={tasksOrder} onToggle={toggleTasksSort} />
+              <span>Category</span>
+              <SortHeader label="Status" field="status" current={tasksSort} order={tasksOrder} onToggle={toggleTasksSort} />
+              <span>Bids</span>
+              <SortHeader label="Created" field="createdAt" current={tasksSort} order={tasksOrder} onToggle={toggleTasksSort} />
+              <span>Actions</span>
+            </div>
+
+            {/* Loading */}
+            {tasksLoading && (
+              <div className="py-12 flex items-center justify-center">
+                <Loader2 className="w-5 h-5 text-emerald-500 animate-spin" />
+              </div>
+            )}
+
+            {/* Rows */}
+            {!tasksLoading && tasks.map((task) => (
+              <div key={task.id} className="grid grid-cols-1 md:grid-cols-[1fr_100px_100px_80px_120px_80px] gap-2 md:gap-4 px-4 py-3 border-b border-zinc-800/50 hover:bg-zinc-800/20 transition-colors items-center min-w-[700px]">
+                <Link href={`/marketplace/${task.id}`} className="text-sm text-white hover:text-emerald-400 transition-colors truncate">
+                  {task.title}
                 </Link>
-                <div className="flex items-center gap-2 shrink-0 ml-4">
+                <span className="text-xs text-zinc-500 font-mono">{task.category}</span>
+                <StatusBadge status={task.status} />
+                <span className="text-xs text-zinc-400 font-mono">{task.proposalsCount || 0}</span>
+                <span className="text-[10px] text-zinc-600 font-mono">
+                  {task.createdAt ? new Date(task.createdAt).toLocaleDateString() : '—'}
+                </span>
+                <div className="flex items-center gap-1">
                   <Link
                     href={`/marketplace/${task.id}`}
                     className="px-2 py-1 text-[10px] font-mono uppercase border border-zinc-700 text-zinc-400 hover:text-white hover:border-zinc-500 rounded transition-colors"
@@ -371,10 +486,38 @@ export default function AdminDashboardPage() {
                   </button>
                 </div>
               </div>
+            ))}
+
+            {/* Empty */}
+            {!tasksLoading && tasks.length === 0 && (
+              <div className="py-12 text-center text-zinc-600 font-mono text-sm">No tasks found</div>
+            )}
+          </div>
+
+          {/* Pagination */}
+          {tasksTotalPages > 1 && (
+            <div className="mt-6 flex flex-col items-center gap-3">
+              <div className="flex items-center gap-1">
+                <PaginationBtn onClick={() => setTasksPage(1)} disabled={tasksPage === 1}>
+                  <ChevronsLeft size={14} />
+                </PaginationBtn>
+                <PaginationBtn onClick={() => setTasksPage(p => p - 1)} disabled={tasksPage === 1}>
+                  <ChevronLeft size={14} />
+                </PaginationBtn>
+                <span className="px-4 py-2 text-xs font-mono text-zinc-400">
+                  Page {tasksPage} of {tasksTotalPages}
+                </span>
+                <PaginationBtn onClick={() => setTasksPage(p => p + 1)} disabled={tasksPage === tasksTotalPages}>
+                  <ChevronRight size={14} />
+                </PaginationBtn>
+                <PaginationBtn onClick={() => setTasksPage(tasksTotalPages)} disabled={tasksPage === tasksTotalPages}>
+                  <ChevronsRight size={14} />
+                </PaginationBtn>
+              </div>
+              <p className="text-[10px] font-mono uppercase tracking-widest text-zinc-600">
+                Showing {(tasksPage - 1) * TASKS_PER_PAGE + 1}–{Math.min(tasksPage * TASKS_PER_PAGE, tasksTotal)} of {tasksTotal} tasks
+              </p>
             </div>
-          ))}
-          {(!data?.recentTasks || data.recentTasks.length === 0) && (
-            <div className="py-12 text-center text-zinc-600 border border-dashed border-zinc-800 rounded-lg font-mono text-sm">No tasks found</div>
           )}
         </div>
       )}
