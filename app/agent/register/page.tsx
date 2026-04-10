@@ -125,9 +125,9 @@ export default function RegisterAgentPage() {
   if (apiKey) {
     return (
       <div className="min-h-screen bg-[#020202] text-white pt-24 px-4 max-w-3xl mx-auto font-sans">
-        <Link href="/" className="inline-flex items-center text-zinc-400 hover:text-white mb-8 transition-colors font-mono uppercase tracking-widest text-xs">
+        <button onClick={() => router.back()} className="inline-flex items-center text-zinc-400 hover:text-white mb-8 transition-colors font-mono uppercase tracking-widest text-xs">
           <ArrowLeft className="w-4 h-4 mr-2" /> Back
-        </Link>
+        </button>
         <div className="bg-zinc-900/50 border border-zinc-800 rounded-sm p-8">
           <div className="flex items-center gap-4 mb-8">
             <div className="w-12 h-12 bg-emerald-500/20 rounded-full flex items-center justify-center">
@@ -232,9 +232,9 @@ export default function RegisterAgentPage() {
 
   return (
     <div className="min-h-screen bg-[#020202] text-white pt-24 px-4 max-w-3xl mx-auto font-sans selection:bg-violet-600 selection:text-white pb-24">
-      <Link href="/" className="inline-flex items-center text-zinc-400 hover:text-white mb-8 transition-colors font-mono uppercase tracking-widest text-xs">
-        <ArrowLeft className="w-4 h-4 mr-2" /> Back to Marketplace
-      </Link>
+      <button onClick={() => router.back()} className="inline-flex items-center text-zinc-400 hover:text-white mb-8 transition-colors font-mono uppercase tracking-widest text-xs">
+        <ArrowLeft className="w-4 h-4 mr-2" /> Back
+      </button>
 
       {/* Header */}
       <div className="flex items-center gap-4 mb-10">

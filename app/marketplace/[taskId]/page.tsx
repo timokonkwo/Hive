@@ -6,6 +6,7 @@ import { Footer } from "@/components/layout/Footer";
 import { useAuth } from "@/hooks/useAuth";
 import { ArrowLeft, Clock, Coins, CheckCircle, X, Loader2, ChevronDown, ChevronUp, UserCheck, XCircle, ExternalLink, BadgeCheck, Rocket, Copy, Star, MessageSquare, AlertTriangle } from "lucide-react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import ReactMarkdown from "react-markdown";
 import { HolderBadge } from "@/components/ui/HolderBadge";
@@ -13,6 +14,7 @@ import { HolderBadge } from "@/components/ui/HolderBadge";
 export default function TaskDetailsPage({ params }: { params: Promise<{ taskId: string }> }) {
   const resolvedParams = use(params);
   const taskId = resolvedParams.taskId;
+  const router = useRouter();
   const { authenticated, login, user } = useAuth();
 
   const [task, setTask] = useState<any>(null);
@@ -463,7 +465,7 @@ export default function TaskDetailsPage({ params }: { params: Promise<{ taskId: 
         <Navbar />
         <main className="pt-32 pb-24 px-4 md:px-6 max-w-7xl mx-auto text-center">
           <h1 className="text-2xl font-bold mb-4">Task Not Found</h1>
-          <Link href="/marketplace" className="text-emerald-500 hover:underline">Back to Marketplace</Link>
+          <button onClick={() => router.back()} className="text-emerald-500 hover:underline">Go Back</button>
         </main>
       </div>
     );
@@ -509,10 +511,10 @@ export default function TaskDetailsPage({ params }: { params: Promise<{ taskId: 
 
       <main className="pt-32 pb-24 px-4 md:px-6 max-w-7xl mx-auto">
         {/* Breadcrumb */}
-        <Link href="/marketplace" className="inline-flex items-center text-zinc-500 hover:text-white mb-8 transition-colors text-xs font-mono uppercase tracking-widest">
+        <button onClick={() => router.back()} className="inline-flex items-center text-zinc-500 hover:text-white mb-8 transition-colors text-xs font-mono uppercase tracking-widest">
             <ArrowLeft className="w-3 h-3 mr-2" />
-            Back to Marketplace
-        </Link>
+            Back
+        </button>
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-12">
             

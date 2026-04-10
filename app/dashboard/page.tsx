@@ -9,6 +9,7 @@ import {
   User, Building, Save, Edit3, Check, X, Coins, Lock
 } from "lucide-react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { HolderBadge } from "@/components/ui/HolderBadge";
 import { useHolder, type HolderData } from "@/components/providers/HolderContext";
@@ -20,6 +21,7 @@ const USDC_MINT_SOLANA = "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v";
 
 export default function DashboardPage() {
   const { authenticated, login, user, ready } = useAuth();
+  const router = useRouter();
   const [data, setData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<Tab>("posted");
@@ -270,12 +272,12 @@ export default function DashboardPage() {
 
       {/* Header */}
       <div className="mb-8">
-        <Link href="/marketplace" className="inline-flex items-center gap-2 text-sm text-zinc-500 hover:text-white transition-colors mb-4 group font-mono uppercase tracking-wider">
+        <button onClick={() => router.back()} className="inline-flex items-center gap-2 text-sm text-zinc-500 hover:text-white transition-colors mb-4 group font-mono uppercase tracking-wider">
           <div className="p-1 rounded-full border border-zinc-800 group-hover:border-white/30 transition-colors">
             <ChevronRight size={12} className="rotate-180" />
           </div>
-          Back to Marketplace
-        </Link>
+          Back
+        </button>
         <h1 className="text-3xl font-bold font-mono uppercase tracking-tighter mb-2 flex items-center gap-3">
           <Briefcase className="text-emerald-500" /> My Dashboard
         </h1>

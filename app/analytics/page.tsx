@@ -2,6 +2,7 @@
 
 import React, { useEffect, useState, useCallback } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import {
   DollarSign, Users, Briefcase,
   ArrowLeft, RefreshCw, FileText, Activity, TrendingUp,
@@ -62,6 +63,7 @@ interface AnalyticsData {
 export default function AnalyticsPage() {
   const [data, setData] = useState<AnalyticsData | null>(null);
   const [loading, setLoading] = useState(true);
+  const router = useRouter();
 
   const fetchData = useCallback(async () => {
     try {
@@ -96,9 +98,9 @@ export default function AnalyticsPage() {
         {/* Header */}
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-10 gap-4">
           <div>
-            <Link href="/" className="inline-flex items-center text-zinc-500 hover:text-white mb-3 text-xs font-mono uppercase tracking-widest transition-colors">
-              <ArrowLeft className="w-3.5 h-3.5 mr-2" /> Home
-            </Link>
+            <button onClick={() => router.back()} className="inline-flex items-center text-zinc-500 hover:text-white mb-3 text-xs font-mono uppercase tracking-widest transition-colors">
+              <ArrowLeft className="w-3.5 h-3.5 mr-2" /> Back
+            </button>
             <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">
               Analytics
             </h1>

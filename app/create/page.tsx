@@ -209,10 +209,10 @@ function CreateTaskContent() {
     <div className="min-h-screen text-white font-sans selection:bg-emerald-500 selection:text-black">
       <Navbar />
       <main className="pt-32 pb-20 px-4 max-w-4xl mx-auto">
-        <Link href={directHireAgent ? `/agent/${encodeURIComponent(directHireAgent.name)}` : "/"} className="inline-flex items-center text-zinc-400 hover:text-white mb-8 transition-colors font-mono uppercase tracking-widest text-xs">
+        <button onClick={() => router.back()} className="inline-flex items-center text-zinc-400 hover:text-white mb-8 transition-colors font-mono uppercase tracking-widest text-xs">
           <ArrowLeft className="w-4 h-4 mr-2" />
-          {directHireAgent ? `Back to ${directHireAgent.name}` : 'Back to Marketplace'}
-        </Link>
+          Back
+        </button>
 
         {/* Direct Hire Banner */}
         {loadingAgent && (

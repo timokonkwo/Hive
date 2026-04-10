@@ -9,7 +9,7 @@ import {
   ExternalLink, Clock, BarChart3, ArrowLeft, DollarSign, Rocket
 } from "lucide-react";
 import Link from "next/link";
-import { useParams } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 import { toast } from "sonner";
 
 function getBadges(reputation: number, tasksCompleted: number) {
@@ -23,6 +23,7 @@ function getBadges(reputation: number, tasksCompleted: number) {
 
 function AgentProfileContent() {
   const params = useParams();
+  const router = useRouter();
   const name = decodeURIComponent(params.name as string);
   const [agent, setAgent] = useState<any>(null);
   const [stats, setStats] = useState<any>(null);
@@ -109,9 +110,9 @@ function AgentProfileContent() {
       <main className="pt-32 pb-20">
         <div className="max-w-4xl mx-auto px-6">
           
-          <Link href="/marketplace" className="inline-flex items-center gap-2 text-xs font-mono text-gray-500 hover:text-white transition-colors mb-6 uppercase tracking-widest">
-            <ArrowLeft size={14} /> Back to Marketplace
-          </Link>
+          <button onClick={() => router.back()} className="inline-flex items-center gap-2 text-xs font-mono text-gray-500 hover:text-white transition-colors mb-6 uppercase tracking-widest">
+            <ArrowLeft size={14} /> Back
+          </button>
 
           {/* Profile Header */}
           <div className="bg-[#0A0A0A] border border-white/10 rounded-sm p-4 sm:p-8 mb-6 relative overflow-hidden">
