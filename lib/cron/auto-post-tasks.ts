@@ -53,7 +53,7 @@ const CATEGORIES = [
     examples: [
       {
         title: 'Write a Python script to scrape product prices from 3 competitor websites',
-        description: 'Build a Python script that scrapes product pricing from Amazon, eBay, and AliExpress for a given keyword. Output a CSV with columns: product name, price, seller, URL, and scraped_at timestamp. Handle rate limiting, rotating user agents, and basic error recovery. Include a requirements.txt and usage instructions.',
+        description: 'Build a Python script that scrapes product pricing from **Amazon, eBay, and AliExpress** for a given keyword.\n\n**Deliverables:**\n- CSV output with columns: product name, price, seller, URL, scraped_at timestamp\n- Rate limiting and rotating user agents\n- Basic error recovery and retry logic\n- `requirements.txt` and usage instructions',
       },
       {
         title: 'Build a REST API endpoint that validates and cleans CSV uploads',
@@ -61,7 +61,7 @@ const CATEGORIES = [
       },
       {
         title: 'Create a GitHub Actions CI/CD pipeline for a Node.js project',
-        description: 'Write a complete GitHub Actions workflow YAML for a Node.js monorepo. Stages: install dependencies (with caching), run ESLint, run Jest tests with coverage threshold (80%), build for production, and deploy to Vercel on push to main. Include environment variable handling, Slack notification on failure, and a manual deploy trigger for staging.',
+        description: 'Write a complete **GitHub Actions** workflow YAML for a Node.js monorepo.\n\n**Pipeline stages:**\n- Install dependencies (with caching)\n- Run ESLint\n- Run Jest tests with **80% coverage threshold**\n- Build for production\n- Deploy to Vercel on push to `main`\n\nInclude environment variable handling, Slack notification on failure, and a manual deploy trigger for staging.',
       },
       {
         title: 'Write a Bash script to automate daily PostgreSQL backups to S3',
@@ -133,7 +133,7 @@ const CATEGORIES = [
     examples: [
       {
         title: 'Build a unit economics model for a subscription SaaS product',
-        description: 'Create a detailed financial model for a B2B SaaS product at $49/month. Include: CAC calculation broken down by channel (paid ads, content, outbound), LTV with churn rate scenarios (2%, 5%, 10% monthly), payback period, gross margin, and break-even point. Use realistic industry benchmarks. Deliver the model with all formulas explained and key assumptions documented.',
+        description: 'Create a detailed financial model for a B2B SaaS product at **$49/month**.\n\n**Include:**\n- CAC calculation broken down by channel (paid ads, content, outbound)\n- LTV with churn rate scenarios (2%, 5%, 10% monthly)\n- Payback period and gross margin\n- Break-even point analysis\n\nUse realistic industry benchmarks. Deliver with all formulas explained and key assumptions documented.',
       },
       {
         title: 'Audit 10 web pages for SEO issues and provide ranked fix recommendations',
@@ -161,7 +161,7 @@ const CATEGORIES = [
     examples: [
       {
         title: 'Write API documentation for 5 REST endpoints',
-        description: 'Document 5 REST API endpoints (specs will be provided). For each endpoint: URL pattern, HTTP method, required headers, request body schema with TypeScript types, response schema, possible error codes with descriptions, example curl request, and example JSON response. Follow OpenAPI-style conventions. Deliver in clean markdown.',
+        description: 'Document 5 REST API endpoints (specs will be provided).\n\n**For each endpoint include:**\n- URL pattern and HTTP method\n- Required headers and auth\n- Request body schema with **TypeScript types**\n- Response schema with example JSON\n- Possible error codes with descriptions\n- Example `curl` request\n\nFollow OpenAPI-style conventions. Deliver in clean markdown.',
       },
       {
         title: 'Generate SEO meta descriptions for 20 product pages',
@@ -233,7 +233,7 @@ const CATEGORIES = [
     examples: [
       {
         title: 'Review a Node.js API for security vulnerabilities',
-        description: 'Audit the provided Node.js/Express API code for security issues. Check for: NoSQL injection, XSS in responses, CSRF vulnerabilities, insecure dependencies (via npm audit), hardcoded secrets, missing rate limiting, JWT misconfiguration (weak signing, no expiry), and CORS misconfiguration. Deliver a vulnerability report with: issue description, severity (Critical/High/Medium/Low), affected code location, and recommended fix for each.',
+        description: 'Audit the provided Node.js/Express API code for security issues.\n\n**Check for:**\n- NoSQL injection and XSS in responses\n- CSRF vulnerabilities\n- Insecure dependencies (via `npm audit`)\n- Hardcoded secrets and missing rate limiting\n- JWT misconfiguration (weak signing, no expiry)\n- CORS misconfiguration\n\nDeliver a **vulnerability report** with: issue description, severity (Critical/High/Medium/Low), affected code location, and recommended fix for each.',
       },
       {
         title: 'Audit npm dependencies for known CVEs and recommend alternatives',
@@ -311,7 +311,7 @@ RULES:
 - The task should be something a client would delegate to an AI agent (not something trivial enough for a quick ChatGPT prompt)
 - It should require multi-step work, structured output, or domain expertise
 - Title: concise, action-oriented, under 80 characters
-- Description: 2-4 sentences. Be SPECIFIC about what to deliver, the format, scope, and any technical requirements. A reader should know exactly what work is expected.
+- Description: Use markdown formatting. Start with 1-2 sentences of context, then a bullet list of specific deliverables. Use **bold** for key terms. A reader should know exactly what work is expected and what to deliver.
 - Tags: 2-4 relevant tags
 - Be specific and realistic — real clients posting real work
 - Do NOT mention AI, agents, or Hive in the task itself
