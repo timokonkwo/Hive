@@ -1,13 +1,14 @@
 /**
  * Auto-Post Tasks
  * 
- * Creates and publishes tasks on a schedule.
+ * Creates and publishes unique tasks on a schedule using Gemini.
+ * Each run generates a fresh task — never repeats the same title.
  * Budget range: $0.50–$3 USDC, weighted toward $1.
- * Tasks are designed to require AI agent capabilities.
  */
 
 import { getDb, COLLECTIONS } from '@/lib/db';
 import { handleNewTask } from '@/lib/stealth-agents/runner';
+import { generateWithGemini } from '@/lib/stealth-agents/gemini';
 
 // Client pool for scheduled task creation
 const CLIENT_POOL = [
@@ -25,183 +26,180 @@ const CLIENT_POOL = [
   { name: 'LisaMarketing', address: 'did:privy:cl_chainlisa' },
 ];
 
-// Tasks that genuinely require AI agent delegation
-// These are things you'd hire an agent for rather than doing in ChatGPT
-const TASK_TEMPLATES: Array<{
-  category: string;
-  tasks: Array<{ title: string; description: string; tags: string[] }>;
-}> = [
+// Categories with descriptions and example tasks to guide Gemini
+const CATEGORIES = [
   {
-    category: 'Development',
-    tasks: [
-      {
-        title: 'Write a Python script to scrape and compare product prices',
-        description: 'Build a Python script that scrapes product pricing from 3 e-commerce sites (Amazon, eBay, AliExpress) for a given product keyword. Output a CSV with columns: product name, price, seller, URL, scraped_at. Handle rate limiting and include error handling. Deliver the script + sample output.',
-        tags: ['Python', 'Web Scraping', 'Automation'],
-      },
-      {
-        title: 'Build a REST API endpoint that validates and cleans CSV uploads',
-        description: 'Create an Express.js endpoint (POST /api/upload) that accepts a CSV file upload, validates column headers against a schema, removes duplicate rows, normalizes date formats to ISO 8601, fills missing values with defaults, and returns cleaned JSON. Include input validation and error responses.',
-        tags: ['Node.js', 'API', 'Data Cleaning'],
-      },
-      {
-        title: 'Write unit tests for a user authentication module',
-        description: 'Given a Node.js authentication module with signup, login, password reset, and JWT token refresh functions, write comprehensive unit tests using Jest. Cover: valid inputs, invalid inputs, edge cases (expired tokens, duplicate emails, weak passwords), and mock external dependencies. Target 90%+ coverage.',
-        tags: ['Testing', 'Jest', 'Authentication'],
-      },
-      {
-        title: 'Create a GitHub Actions CI/CD pipeline for a Node.js app',
-        description: 'Write a complete GitHub Actions workflow (.yml) for a Node.js project. Include: lint (ESLint), test (Jest), build, and deploy to Vercel on push to main. Add caching for node_modules, environment variable handling, and Slack notification on failure. Include the workflow file and a setup guide.',
-        tags: ['DevOps', 'CI/CD', 'GitHub Actions'],
-      },
-      {
-        title: 'Refactor this Express middleware to use proper error handling',
-        description: 'Review and refactor the following Express.js middleware chain that handles auth, validation, and rate limiting. Current issues: errors are swallowed silently, no consistent error format, missing async error catching. Deliver refactored code with centralized error handler, typed error classes, and proper HTTP status codes.',
-        tags: ['Code Review', 'Refactoring', 'Express.js'],
-      },
-      {
-        title: 'Write a Bash script to automate daily database backups',
-        description: 'Create a Bash script that dumps a PostgreSQL database, compresses it with gzip, uploads to S3 with a timestamped filename, and deletes backups older than 30 days. Include logging, error handling, and a cron schedule recommendation. Deliver the script and setup instructions.',
-        tags: ['Bash', 'DevOps', 'Database'],
-      },
+    name: 'Development',
+    weight: 25, // percentage chance of being picked
+    guidance: 'Code tasks: scripts, APIs, unit tests, CI/CD pipelines, refactoring, automation, CLI tools. Languages: Python, TypeScript, Node.js, Bash.',
+    examples: [
+      'Write a Python script to scrape product prices from 3 competitor websites and output a comparison CSV',
+      'Build a REST API endpoint in Express.js that validates CSV uploads and returns cleaned JSON',
+      'Create a GitHub Actions CI/CD pipeline for a Node.js app with lint, test, build, and deploy',
+      'Write a Bash script to automate daily PostgreSQL backups to S3 with rotation',
+      'Refactor an Express middleware chain to use centralized error handling and typed error classes',
     ],
+    tags: ['Python', 'Node.js', 'API', 'Automation', 'TypeScript', 'DevOps', 'Testing'],
   },
   {
-    category: 'Research',
-    tasks: [
-      {
-        title: 'Competitive analysis: 8 project management tools with pricing matrix',
-        description: 'Research 8 project management tools (Asana, Monday, ClickUp, Linear, Notion, Jira, Basecamp, Trello). For each: pricing tiers, key features, team size limits, integrations count, and API availability. Deliver a comparison matrix table + 1-paragraph recommendation by company size (startup, mid-market, enterprise).',
-        tags: ['Market Research', 'SaaS', 'Competitive Analysis'],
-      },
-      {
-        title: 'Research the top 10 AI code generation tools and rank them',
-        description: 'Compile a ranked list of 10 AI code generation tools (GitHub Copilot, Cursor, Cody, Tabnine, etc). For each: supported languages, IDE integrations, pricing, accuracy benchmarks if available, and privacy policy summary. Rank by value for a small dev team (5 engineers). Deliver structured report.',
-        tags: ['AI Tools', 'Developer Tools', 'Research'],
-      },
-      {
-        title: 'Compile remote work productivity statistics for 2025-2026',
-        description: 'Research and compile recent statistics on remote work: productivity metrics, employee satisfaction rates, employer adoption trends, hybrid vs fully remote breakdown, and industry-specific data. Include 15+ data points from reputable sources (McKinsey, Gallup, Buffer, etc). Deliver a structured report with citations.',
-        tags: ['Research', 'Remote Work', 'Statistics'],
-      },
-      {
-        title: 'Research API pricing models of 5 AI providers',
-        description: 'Compare API pricing for OpenAI, Anthropic, Google Gemini, Mistral, and Cohere. For each: model tiers, per-token pricing, rate limits, free tier details, and enterprise pricing if public. Calculate cost for 1M tokens input + 500K tokens output per month for each. Deliver comparison table + recommendation.',
-        tags: ['AI', 'Pricing', 'API'],
-      },
+    name: 'Research',
+    weight: 20,
+    guidance: 'Competitive analysis, market research, tool comparisons, pricing research, industry reports. Structured output with data tables.',
+    examples: [
+      'Compare 8 project management tools with a pricing and feature matrix',
+      'Research and rank the top 10 AI code generation tools for a dev team',
+      'Compile remote work productivity statistics from reputable sources',
+      'Research API pricing for 5 AI providers and calculate monthly costs',
     ],
+    tags: ['Market Research', 'Competitive Analysis', 'Tools', 'Statistics', 'AI'],
   },
   {
-    category: 'Analysis',
-    tasks: [
-      {
-        title: 'Parse and analyze 500 app store reviews for sentiment patterns',
-        description: 'Given a dataset of 500 app store reviews (I will provide), classify each as positive/negative/neutral, extract the top 10 recurring complaints, identify 5 most-praised features, and calculate overall sentiment score. Deliver: sentiment breakdown chart data, categorized issues list, and executive summary.',
-        tags: ['Data Analysis', 'NLP', 'Sentiment'],
-      },
-      {
-        title: 'Build a unit economics model for a subscription SaaS business',
-        description: 'Create a detailed unit economics spreadsheet model for a B2B SaaS product. Include: CAC calculation (by channel), LTV with churn scenarios (2%, 5%, 10%), payback period, gross margin, and break-even analysis. Use realistic assumptions for a $49/mo product. Deliver the model with formulas explained.',
-        tags: ['Business Analysis', 'SaaS', 'Financial Model'],
-      },
-      {
-        title: 'Analyze SEO performance and recommend improvements for 10 pages',
-        description: 'Audit 10 web pages (URLs provided) for SEO issues: missing meta descriptions, heading structure problems, keyword density, internal linking gaps, page speed indicators, and mobile friendliness. Deliver: issues table per page, priority ranking, and specific fix recommendations.',
-        tags: ['SEO', 'Audit', 'Marketing'],
-      },
+    name: 'Analysis',
+    weight: 15,
+    guidance: 'Data analysis, sentiment analysis, unit economics, SEO audits, financial modeling. Quantitative with structured output.',
+    examples: [
+      'Parse 500 app store reviews and generate a sentiment breakdown with top complaints',
+      'Build a unit economics model for a $49/mo SaaS product with churn scenarios',
+      'Audit 10 web pages for SEO issues and provide fix recommendations',
     ],
+    tags: ['Data Analysis', 'SEO', 'Financial Model', 'Audit', 'NLP'],
   },
   {
-    category: 'Content',
-    tasks: [
-      {
-        title: 'Write API documentation for 5 REST endpoints',
-        description: 'Document 5 REST API endpoints (specs provided in description). For each: endpoint URL, method, headers, request body schema with types, response schema, error codes, example request (curl), example response (JSON), and rate limits. Follow OpenAPI-style formatting. Deliver in markdown.',
-        tags: ['Documentation', 'API', 'Technical Writing'],
-      },
-      {
-        title: 'Generate SEO meta descriptions for 20 product pages',
-        description: 'Write unique, compelling meta descriptions (150-160 chars each) for 20 product pages. Product names and categories provided. Each must include: primary keyword, value proposition, and call-to-action. Avoid duplicate phrasing across pages. Deliver in a spreadsheet format (page title, URL slug, meta description).',
-        tags: ['SEO', 'Copywriting', 'E-commerce'],
-      },
-      {
-        title: 'Write a 3-email onboarding sequence for a developer tool',
-        description: 'Create a 3-email welcome sequence for new users of a developer API platform. Email 1 (Day 0): Welcome + API key setup guide. Email 2 (Day 3): First API call tutorial with code snippets. Email 3 (Day 7): Advanced features + community link. Each under 200 words. Include subject lines with A/B variants.',
-        tags: ['Email', 'Developer Marketing', 'Onboarding'],
-      },
-      {
-        title: 'Write a technical blog post explaining WebSocket vs SSE',
-        description: 'Write a 1000-word technical blog post comparing WebSockets and Server-Sent Events. Cover: how each works, protocol differences, browser support, use cases (chat vs notifications), scaling considerations, and code examples in JavaScript for both. SEO-optimized with clear headings.',
-        tags: ['Technical Writing', 'Blog', 'WebDev'],
-      },
+    name: 'Content',
+    weight: 20,
+    guidance: 'API documentation, technical blog posts, email sequences, SEO copy, product descriptions. Professional, specific, with clear deliverable format.',
+    examples: [
+      'Write API documentation for 5 REST endpoints in OpenAPI-style markdown',
+      'Generate unique SEO meta descriptions for 20 product pages',
+      'Write a 3-email onboarding sequence for a developer API platform',
+      'Write a technical blog post comparing WebSockets vs Server-Sent Events with code examples',
     ],
+    tags: ['Technical Writing', 'Documentation', 'SEO', 'Copywriting', 'Email'],
   },
   {
-    category: 'Social',
-    tasks: [
-      {
-        title: 'Create a 2-week content calendar for a developer tool launch',
-        description: 'Design a 14-day social media content calendar for launching a new developer API. Platforms: Twitter/X and LinkedIn. Include: daily post copy (ready to publish), content type (thread, single post, poll), hashtags, and optimal posting time. Mix: 40% educational, 30% product, 20% engagement, 10% behind-the-scenes.',
-        tags: ['Social Media', 'Content Calendar', 'Launch'],
-      },
-      {
-        title: 'Write 10 Twitter/X thread hooks for a startup founder',
-        description: 'Create 10 attention-grabbing opening tweets for Twitter/X threads. Topics: lessons from scaling to 1K users, mistakes in early hiring, choosing a tech stack, pricing strategy, and cold outreach. Each hook should be under 280 chars and create urgency to read the full thread. Include suggested thread structure.',
-        tags: ['Twitter', 'Content', 'Startup'],
-      },
+    name: 'Social',
+    weight: 5,
+    guidance: 'Content calendars, Twitter/X threads, LinkedIn posts, community copy. Platform-specific, with actual draft copy.',
+    examples: [
+      'Create a 2-week social media content calendar for a developer tool launch',
+      'Write 10 Twitter/X thread hooks for a startup founder on business topics',
     ],
+    tags: ['Social Media', 'Content Calendar', 'Twitter', 'LinkedIn'],
   },
   {
-    category: 'Design',
-    tasks: [
-      {
-        title: 'Create a design system spec for a SaaS dashboard',
-        description: 'Define a complete design system specification for a SaaS analytics dashboard. Include: color palette (primary, secondary, accent, semantic colors with hex values), typography scale (Google Fonts pairing), spacing system (4px grid), border radius tokens, shadow tokens, button variants (primary, secondary, ghost, danger), and input field states (default, focus, error, disabled).',
-        tags: ['Design System', 'UI', 'SaaS'],
-      },
-      {
-        title: 'Write UX copy for a complete checkout flow',
-        description: 'Write all microcopy for a 4-step e-commerce checkout: Cart Review, Shipping Info, Payment, Confirmation. Include: page headings, field labels, placeholder text, helper text, validation error messages (15+), button labels, progress indicator text, success/failure states, and email confirmation copy. Tone: clear, trustworthy.',
-        tags: ['UX Writing', 'E-commerce', 'Checkout'],
-      },
+    name: 'Design',
+    weight: 5,
+    guidance: 'Design system specs, UX copy, style guides, checkout flows. Written deliverables (not visual).',
+    examples: [
+      'Create a design system spec with color palette, typography, spacing, and component tokens',
+      'Write UX copy for a complete 4-step e-commerce checkout flow',
     ],
+    tags: ['Design System', 'UX Writing', 'UI', 'E-commerce'],
   },
   {
-    category: 'Translation',
-    tasks: [
-      {
-        title: 'Translate SaaS landing page copy to Spanish and French',
-        description: 'Translate 500 words of SaaS landing page copy from English to both Spanish and French. Content includes: hero section, feature descriptions, pricing table labels, FAQ, and CTA buttons. Maintain persuasive marketing tone. Adapt idioms culturally rather than translating literally. Flag any phrases that need localization notes.',
-        tags: ['Translation', 'Localization', 'Marketing'],
-      },
+    name: 'Security',
+    weight: 5,
+    guidance: 'Code security audits, vulnerability assessments, dependency reviews. Structured report with severity ratings.',
+    examples: [
+      'Review a Node.js API for security vulnerabilities and deliver a severity-rated report',
+      'Audit npm dependencies for known CVEs and recommend alternatives',
     ],
+    tags: ['Security Audit', 'Node.js', 'Vulnerability'],
   },
   {
-    category: 'Security',
-    tasks: [
-      {
-        title: 'Review this Node.js API for security vulnerabilities',
-        description: 'Audit the following Node.js/Express API code (provided in description) for security issues. Check for: SQL/NoSQL injection, XSS, CSRF, insecure dependencies, hardcoded secrets, missing rate limiting, improper auth token handling, and CORS misconfiguration. Deliver: vulnerability report with severity ratings (Critical/High/Medium/Low), affected code lines, and fix recommendations.',
-        tags: ['Security Audit', 'Node.js', 'API'],
-      },
+    name: 'Other',
+    weight: 5,
+    guidance: 'Business planning, SWOT analysis, RFCs, technical architecture docs, process documents.',
+    examples: [
+      'Create a SWOT analysis for entering the EdTech market with an AI tutoring product',
+      'Write a technical RFC for adding real-time notifications to a web app',
     ],
-  },
-  {
-    category: 'Other',
-    tasks: [
-      {
-        title: 'Create a SWOT analysis for entering the EdTech market',
-        description: 'Build a detailed SWOT analysis for a startup entering the EdTech space with an AI tutoring product. Include 5+ items per quadrant with explanations. Add: competitive positioning map, key risks with mitigation strategies, and 3 recommended go-to-market actions. Deliver as a structured report.',
-        tags: ['Strategy', 'Business Analysis', 'EdTech'],
-      },
-      {
-        title: 'Write a technical RFC for adding real-time notifications',
-        description: 'Draft a Request for Comments (RFC) document for adding real-time notifications to a web application. Cover: problem statement, proposed solution (WebSocket vs SSE vs polling), system architecture diagram (text-based), database schema changes, API contract, migration plan, rollback strategy, and performance considerations. Follow standard RFC format.',
-        tags: ['RFC', 'Architecture', 'Technical Writing'],
-      },
-    ],
+    tags: ['Strategy', 'Architecture', 'RFC', 'Business Analysis'],
   },
 ];
+
+/**
+ * Pick a category using weighted random selection.
+ */
+function pickCategory(): typeof CATEGORIES[number] {
+  const total = CATEGORIES.reduce((sum, c) => sum + c.weight, 0);
+  let roll = Math.random() * total;
+  for (const cat of CATEGORIES) {
+    roll -= cat.weight;
+    if (roll <= 0) return cat;
+  }
+  return CATEGORIES[0];
+}
+
+/**
+ * Generate a unique task using Gemini, given a category and recent titles to avoid.
+ */
+async function generateUniqueTask(
+  category: typeof CATEGORIES[number],
+  recentTitles: string[]
+): Promise<{ title: string; description: string; tags: string[] }> {
+  // Try Gemini first for a truly unique task
+  try {
+    const avoidList = recentTitles.length > 0
+      ? `\n\nDO NOT use any of these titles or close variations — they were recently posted:\n${recentTitles.map(t => `- ${t}`).join('\n')}`
+      : '';
+
+    const prompt = `Generate a single task for a freelance marketplace where clients hire AI agents.
+
+CATEGORY: ${category.name}
+GUIDANCE: ${category.guidance}
+
+EXAMPLE TASKS IN THIS CATEGORY (for style reference only — generate something DIFFERENT):
+${category.examples.map(e => `- ${e}`).join('\n')}
+${avoidList}
+
+RULES:
+- The task should be something a client would delegate to an AI agent (not something trivial enough for a quick ChatGPT prompt)
+- It should require multi-step work, structured output, or domain expertise
+- Title: concise, action-oriented, under 80 characters
+- Description: 2-4 sentences explaining what to deliver, format expectations, and scope. Under 300 characters.
+- Tags: 2-4 relevant tags
+- Be specific and realistic — real clients posting real work
+- Do NOT mention AI, agents, or Hive in the task itself
+
+RESPOND IN EXACTLY THIS JSON FORMAT (no markdown, no code fences):
+{"title": "...", "description": "...", "tags": ["...", "..."]}`;
+
+    const response = await generateWithGemini(
+      'You generate realistic freelance task listings. Be specific and practical. No filler.',
+      prompt
+    );
+
+    let cleaned = response.trim();
+    if (cleaned.startsWith('```')) {
+      cleaned = cleaned.replace(/^```(?:json)?\s*/, '').replace(/\s*```$/, '');
+    }
+
+    const parsed = JSON.parse(cleaned);
+    return {
+      title: (parsed.title || '').trim().slice(0, 120),
+      description: (parsed.description || '').trim().slice(0, 1000),
+      tags: Array.isArray(parsed.tags) ? parsed.tags.slice(0, 4) : category.tags.slice(0, 3),
+    };
+  } catch (err: any) {
+    console.warn(`[AUTO-POST] Gemini unavailable (${err.message}), using fallback`);
+  }
+
+  // Fallback: pick a random example not recently posted
+  const recentLower = new Set(recentTitles.map(t => t.toLowerCase()));
+  const allExamples = CATEGORIES.flatMap(c =>
+    c.examples.map(e => ({ title: e, category: c.name, tags: c.tags }))
+  );
+  const unused = allExamples.filter(e => !recentLower.has(e.title.toLowerCase()));
+  const pool = unused.length > 0 ? unused : allExamples;
+  const pick = pool[Math.floor(Math.random() * pool.length)];
+
+  return {
+    title: pick.title,
+    description: `Complete this ${pick.category.toLowerCase()} task. Deliver structured, professional output with clear documentation.`,
+    tags: pick.tags.slice(0, 3),
+  };
+}
 
 export interface AutoPostResult {
   tasksCreated: number;
@@ -214,100 +212,103 @@ export async function autoPostTasks(): Promise<AutoPostResult> {
   const db = await getDb();
   const result: AutoPostResult = { tasksCreated: 0, taskIds: [], agentBids: [], errors: [] };
 
-  // Post 1 task per run (runs 2x/day = 2 tasks/day)
-  const taskCount = 1;
+  // Fetch recent task titles to avoid duplicates
+  const recentTasks = await db
+    .collection(COLLECTIONS.TASKS)
+    .find({})
+    .sort({ createdAt: -1 })
+    .limit(30)
+    .project({ title: 1 })
+    .toArray();
+  const recentTitles = recentTasks.map(t => t.title).filter(Boolean);
 
-  // Build a flat list of all templates
-  const allTemplates: Array<{ category: string; title: string; description: string; tags: string[] }> = [];
-  for (const cat of TASK_TEMPLATES) {
-    for (const t of cat.tasks) {
-      allTemplates.push({ category: cat.category, ...t });
+  // Pick a category and generate a unique task
+  const category = pickCategory();
+
+  try {
+    const generated = await generateUniqueTask(category, recentTitles);
+
+    if (!generated.title) {
+      result.errors.push('Generated task had empty title');
+      return result;
     }
-  }
 
-  // Shuffle and pick
-  const shuffled = allTemplates.sort(() => Math.random() - 0.5);
-  const selected = shuffled.slice(0, taskCount);
+    const client = CLIENT_POOL[Math.floor(Math.random() * CLIENT_POOL.length)];
 
-  for (const template of selected) {
+    // Budget weighted toward $1: 50% → $1, 15% → $0.50, 35% → $1-$3
+    const roll = Math.random();
+    let budgetAmount: number;
+    if (roll < 0.50) {
+      budgetAmount = 1;
+    } else if (roll < 0.65) {
+      budgetAmount = 0.5;
+    } else {
+      budgetAmount = 1 + Math.floor(Math.random() * 3);
+    }
+    const budget = `$${budgetAmount} USDC`;
+
+    const task = {
+      title: generated.title,
+      description: generated.description,
+      category: category.name,
+      tags: generated.tags,
+      requirements: '',
+      budget,
+      budgetAmount,
+      status: 'Open',
+      clientAddress: client.address,
+      clientName: client.name,
+      proposalsCount: 0,
+      tokenConfig: null,
+      deliverableSpecs: [],
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    };
+
+    const insertResult = await db.collection(COLLECTIONS.TASKS).insertOne(task);
+    const taskId = insertResult.insertedId.toString();
+    result.taskIds.push(taskId);
+
+    // Log activity
+    await db.collection(COLLECTIONS.ACTIVITY).insertOne({
+      type: 'TaskCreated',
+      taskId: insertResult.insertedId,
+      actorAddress: client.address,
+      actorName: client.name,
+      metadata: {
+        title: generated.title,
+        category: category.name,
+        budget,
+      },
+      createdAt: new Date(),
+    });
+
+    // Trigger agent bidding
     try {
-      const client = CLIENT_POOL[Math.floor(Math.random() * CLIENT_POOL.length)];
-
-      // Budget weighted toward $1: 50% → $1, 15% → $0.50, 35% → $1-$3
-      const roll = Math.random();
-      let budgetAmount: number;
-      if (roll < 0.50) {
-        budgetAmount = 1;
-      } else if (roll < 0.65) {
-        budgetAmount = 0.5;
-      } else {
-        budgetAmount = 1 + Math.floor(Math.random() * 3); // $1, $2, or $3
-      }
-      const budget = `$${budgetAmount} USDC`;
-
-      const task = {
-        title: template.title,
-        description: template.description,
-        category: template.category,
-        tags: template.tags,
+      const bidResult = await handleNewTask({
+        taskId,
+        title: generated.title,
+        description: generated.description,
+        category: category.name,
         requirements: '',
         budget,
-        budgetAmount,
-        status: 'Open',
-        clientAddress: client.address,
-        clientName: client.name,
-        proposalsCount: 0,
-        tokenConfig: null,
-        deliverableSpecs: [],
-        createdAt: new Date(),
-        updatedAt: new Date(),
-      };
-
-      const insertResult = await db.collection(COLLECTIONS.TASKS).insertOne(task);
-      const taskId = insertResult.insertedId.toString();
-      result.taskIds.push(taskId);
-
-      // Log activity
-      await db.collection(COLLECTIONS.ACTIVITY).insertOne({
-        type: 'TaskCreated',
-        taskId: insertResult.insertedId,
-        actorAddress: client.address,
-        actorName: client.name,
-        metadata: {
-          title: template.title,
-          category: template.category,
-          budget,
-        },
-        createdAt: new Date(),
       });
 
-      // Directly trigger agent bidding
-      try {
-        const bidResult = await handleNewTask({
-          taskId,
-          title: template.title,
-          description: template.description,
-          category: template.category,
-          requirements: '',
-          budget,
-        });
-
-        if (bidResult.bid) {
-          result.agentBids.push(`${bidResult.agent} → "${template.title}"`);
-          console.log(`[AUTO-POST] ${bidResult.agent} bid on "${template.title}"`);
-        } else {
-          console.log(`[AUTO-POST] No agent bid on "${template.title}": ${bidResult.error || 'no match'}`);
-        }
-      } catch (err: any) {
-        console.error(`[AUTO-POST] Agent bidding failed for "${template.title}":`, err.message);
+      if (bidResult.bid) {
+        result.agentBids.push(`${bidResult.agent} → "${generated.title}"`);
+        console.log(`[AUTO-POST] ${bidResult.agent} bid on "${generated.title}"`);
+      } else {
+        console.log(`[AUTO-POST] No agent bid: ${bidResult.error || 'no match'}`);
       }
-
-      result.tasksCreated++;
-      console.log(`[AUTO-POST] Created "${template.title}" by ${client.name} ($${budgetAmount} USDC)`);
-    } catch (error: any) {
-      result.errors.push(`${template.title}: ${error.message}`);
-      console.error(`[AUTO-POST] Error creating task:`, error.message);
+    } catch (err: any) {
+      console.error(`[AUTO-POST] Agent bidding failed:`, err.message);
     }
+
+    result.tasksCreated++;
+    console.log(`[AUTO-POST] Created "${generated.title}" [${category.name}] by ${client.name} ($${budgetAmount} USDC)`);
+  } catch (error: any) {
+    result.errors.push(`Task generation error: ${error.message}`);
+    console.error(`[AUTO-POST] Error:`, error.message);
   }
 
   return result;
