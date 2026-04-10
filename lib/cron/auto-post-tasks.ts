@@ -291,7 +291,7 @@ function pickCategory(): typeof CATEGORIES[number] {
 async function generateUniqueTask(
   category: typeof CATEGORIES[number],
   recentTitles: string[]
-): Promise<{ title: string; description: string; tags: string[] }> {
+): Promise<{ title: string; description: string; tags: string[]; resolvedCategory: string }> {
   // Try Gemini first for a truly unique task
   try {
     const avoidList = recentTitles.length > 0
@@ -308,6 +308,7 @@ ${category.examples.map(e => `- ${e.title}`).join('\n')}
 ${avoidList}
 
 RULES:
+- The task MUST be related to the ${category.name} category. Do NOT generate a task for a different category.
 - The task should be something a client would delegate to an AI agent (not something trivial enough for a quick ChatGPT prompt)
 - It should require multi-step work, structured output, or domain expertise
 - Title: concise, action-oriented, under 80 characters
@@ -334,13 +335,31 @@ RESPOND IN EXACTLY THIS JSON FORMAT (no markdown, no code fences):
       title: (parsed.title || '').trim().slice(0, 120),
       description: (parsed.description || '').trim().slice(0, 1000),
       tags: Array.isArray(parsed.tags) ? parsed.tags.slice(0, 4) : category.tags.slice(0, 3),
+      resolvedCategory: category.name,
     };
   } catch (err: any) {
     console.warn(`[AUTO-POST] Gemini unavailable (${err.message}), using fallback`);
   }
 
-  // Fallback: pick a random example not recently posted
+  // Fallback: pick a random example from the SAME category first
   const recentLower = new Set(recentTitles.map(t => t.toLowerCase()));
+
+  // Try same-category examples first
+  const sameCategory = category.examples
+    .filter(e => !recentLower.has(e.title.toLowerCase()))
+    .map(e => ({ title: e.title, description: e.description, tags: category.tags }));
+
+  if (sameCategory.length > 0) {
+    const pick = sameCategory[Math.floor(Math.random() * sameCategory.length)];
+    return {
+      title: pick.title,
+      description: pick.description,
+      tags: pick.tags.slice(0, 3),
+      resolvedCategory: category.name,
+    };
+  }
+
+  // All same-category examples were recently used — pick from any category, but use THAT example's category
   const allExamples = CATEGORIES.flatMap(c =>
     c.examples.map(e => ({ title: e.title, description: e.description, category: c.name, tags: c.tags }))
   );
@@ -352,6 +371,7 @@ RESPOND IN EXACTLY THIS JSON FORMAT (no markdown, no code fences):
     title: pick.title,
     description: pick.description,
     tags: pick.tags.slice(0, 3),
+    resolvedCategory: pick.category,
   };
 }
 
@@ -404,7 +424,7 @@ export async function autoPostTasks(): Promise<AutoPostResult> {
     const task = {
       title: generated.title,
       description: generated.description,
-      category: category.name,
+      category: generated.resolvedCategory,
       tags: generated.tags,
       requirements: '',
       budget,
@@ -431,7 +451,7 @@ export async function autoPostTasks(): Promise<AutoPostResult> {
       actorName: client.name,
       metadata: {
         title: generated.title,
-        category: category.name,
+        category: generated.resolvedCategory,
         budget,
       },
       createdAt: new Date(),
@@ -443,7 +463,7 @@ export async function autoPostTasks(): Promise<AutoPostResult> {
         taskId,
         title: generated.title,
         description: generated.description,
-        category: category.name,
+        category: generated.resolvedCategory,
         requirements: '',
         budget,
       });
@@ -459,7 +479,7 @@ export async function autoPostTasks(): Promise<AutoPostResult> {
     }
 
     result.tasksCreated++;
-    console.log(`[AUTO-POST] Created "${generated.title}" [${category.name}] by ${client.name} ($${budgetAmount} USDC)`);
+    console.log(`[AUTO-POST] Created "${generated.title}" [${generated.resolvedCategory}] by ${client.name} ($${budgetAmount} USDC)`);
   } catch (error: any) {
     result.errors.push(`Task generation error: ${error.message}`);
     console.error(`[AUTO-POST] Error:`, error.message);
