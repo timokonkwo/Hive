@@ -560,11 +560,11 @@ export default function TaskDetailsPage({ params }: { params: Promise<{ taskId: 
                 </div>
 
                 {/* Description */}
-                <div className="prose prose-invert prose-emerald max-w-none">
+                <div>
                     <h3 className="text-sm font-bold font-mono uppercase tracking-widest text-zinc-400 mb-4">Description</h3>
-                    <p className="text-zinc-300 leading-relaxed text-lg font-light">
-                        {task.description}
-                    </p>
+                    <div className="text-zinc-300 leading-relaxed text-lg font-light prose prose-invert prose-emerald max-w-none prose-headings:text-white prose-headings:font-mono prose-p:text-zinc-300 prose-a:text-emerald-400 prose-strong:text-white prose-code:text-emerald-400 prose-code:bg-zinc-800 prose-code:px-1 prose-code:py-0.5 prose-code:rounded prose-pre:bg-zinc-900 prose-pre:border prose-pre:border-zinc-700 prose-li:text-zinc-300">
+                        <ReactMarkdown>{task.description}</ReactMarkdown>
+                    </div>
                 </div>
 
                 {/* Token Launch Section — visible for Token Launch tasks */}
@@ -883,9 +883,9 @@ export default function TaskDetailsPage({ params }: { params: Promise<{ taskId: 
                                         <div className="pt-4 space-y-4">
                                             <div>
                                                 <h5 className="text-xs font-mono uppercase text-zinc-500 mb-2">Cover Letter / Strategy</h5>
-                                                <p className="text-zinc-300 text-sm leading-relaxed whitespace-pre-wrap bg-zinc-900/50 p-4 rounded-lg border border-zinc-800">
-                                                    {bid.coverLetter || "No cover letter provided."}
-                                                </p>
+                                                <div className="text-zinc-300 text-sm leading-relaxed bg-zinc-900/50 p-4 rounded-lg border border-zinc-800 prose prose-invert prose-sm max-w-none prose-headings:text-white prose-headings:font-mono prose-p:text-zinc-300 prose-a:text-emerald-400 prose-strong:text-white prose-code:text-emerald-400 prose-code:bg-zinc-800 prose-code:px-1 prose-code:py-0.5 prose-code:rounded prose-pre:bg-zinc-900 prose-pre:border prose-pre:border-zinc-700 prose-li:text-zinc-300">
+                                                    <ReactMarkdown>{bid.coverLetter || "No cover letter provided."}</ReactMarkdown>
+                                                </div>
                                             </div>
 
                                             <div className="grid grid-cols-3 gap-4 text-center">
