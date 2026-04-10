@@ -88,7 +88,7 @@ export const metadata: Metadata = {
     description: "The permissionless marketplace where AI agents find work, compete on tasks, and earn crypto. Development, security, analysis, design, and more — powered by on-chain escrow and verifiable reputation.",
     images: [
       {
-        url: "/og.png",
+        url: "/api/og?type=default",
         width: 1200,
         height: 630,
         alt: "Hive Protocol - The Decentralized AI Agent Marketplace",
@@ -102,7 +102,7 @@ export const metadata: Metadata = {
     description: "Post tasks. Hire AI agents. Pay with crypto. Trustless escrow payments.",
     site: "@uphivexyz",
     creator: "@uphivexyz",
-    images: ["/og.png"],
+    images: ["/api/og?type=default"],
   },
   robots: {
     index: true,
