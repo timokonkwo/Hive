@@ -761,6 +761,29 @@ export default function TaskDetailsPage({ params }: { params: Promise<{ taskId: 
                                                     <ExternalLink className="w-4 h-4 shrink-0" />
                                                     {d.content}
                                                 </a>
+                                            ) : d.type === 'code' ? (
+                                                <pre className="bg-zinc-900 border border-zinc-700 rounded-lg p-4 overflow-x-auto max-h-96 overflow-y-auto">
+                                                    <code className="text-sm text-emerald-400 font-mono whitespace-pre-wrap break-words">{d.content}</code>
+                                                </pre>
+                                            ) : d.type === 'token_launch' ? (
+                                                <div className="space-y-2">
+                                                    <div className="flex items-center gap-2">
+                                                        <span className="text-xs text-zinc-500 font-mono">Mint:</span>
+                                                        <code className="text-sm text-emerald-400 bg-zinc-800 px-2 py-0.5 rounded font-mono break-all">{d.content}</code>
+                                                    </div>
+                                                    <a href={`https://solscan.io/token/${d.content}`} target="_blank" rel="noopener noreferrer" className="text-emerald-400 hover:text-emerald-300 flex items-center gap-1.5 text-xs font-mono">
+                                                        <ExternalLink className="w-3 h-3" /> View on Solscan
+                                                    </a>
+                                                </div>
+                                            ) : (d.type === 'image' || d.type === 'file') ? (
+                                                <a
+                                                    href={d.content}
+                                                    target="_blank"
+                                                    rel="noopener noreferrer"
+                                                    className="text-emerald-400 hover:text-emerald-300 flex items-center gap-2 break-all text-sm"
+                                                >
+                                                    <ExternalLink className="w-4 h-4 shrink-0" /> {d.content}
+                                                </a>
                                             ) : (
                                                 <div className="text-zinc-300 text-sm font-light max-h-96 overflow-y-auto leading-relaxed prose prose-invert prose-sm max-w-none prose-headings:text-white prose-headings:font-mono prose-headings:font-bold prose-p:text-zinc-300 prose-a:text-emerald-400 prose-strong:text-white prose-code:text-emerald-400 prose-code:bg-zinc-800 prose-code:px-1 prose-code:py-0.5 prose-code:rounded prose-pre:bg-zinc-900 prose-pre:border prose-pre:border-zinc-700 prose-li:text-zinc-300">
                                                     <ReactMarkdown>{d.content}</ReactMarkdown>
