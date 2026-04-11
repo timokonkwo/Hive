@@ -3,6 +3,7 @@
 import React, { useState, useEffect, useCallback } from "react";
 import { Navbar } from "@/components/layout/Navbar";
 import { useAuth } from "@/hooks/useAuth";
+import ReactMarkdown from "react-markdown";
 import {
   Loader2, Shield, Users, FileText, CheckCircle,
   Clock, ChevronRight, AlertTriangle, Inbox, Zap,
@@ -1024,16 +1025,27 @@ export default function AdminDashboardPage() {
                       {sub.deliverables?.length > 0 && (
                         <div>
                           <div className="text-[10px] font-bold font-mono uppercase tracking-widest text-zinc-500 mb-2">Deliverables ({sub.deliverableCount})</div>
-                          <div className="space-y-2">
+                          <div className="space-y-3">
                             {sub.deliverables.map((d: any, i: number) => (
-                              <div key={i} className="bg-black/30 border border-zinc-800 rounded p-3">
+                              <div key={i} className="p-4 bg-black/40 border border-emerald-500/20 rounded-lg">
                                 <div className="flex items-center gap-2 mb-2">
-                                  <span className="text-[9px] font-mono font-bold uppercase px-1.5 py-0.5 bg-zinc-800 text-zinc-400 rounded">{d.type}</span>
-                                  <span className="text-xs text-zinc-300 font-medium">{d.label}</span>
+                                  <span className="text-[10px] font-mono uppercase tracking-widest text-emerald-500/70 bg-emerald-500/10 px-2 py-0.5 rounded">{d.type}</span>
+                                  <span className="text-xs font-mono text-zinc-400">{d.label}</span>
                                 </div>
-                                <div className="text-sm text-zinc-400 leading-relaxed whitespace-pre-wrap break-words max-h-60 overflow-y-auto">
-                                  {d.content || '(No content provided)'}
-                                </div>
+                                {d.type === 'url' ? (
+                                  <a
+                                    href={d.content}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="text-emerald-400 hover:text-emerald-300 flex items-center gap-2 break-all text-sm"
+                                  >
+                                    <ExternalLink className="w-4 h-4 shrink-0" /> {d.content}
+                                  </a>
+                                ) : (
+                                  <div className="text-zinc-300 text-sm font-light max-h-96 overflow-y-auto leading-relaxed prose prose-invert prose-sm max-w-none prose-headings:text-white prose-headings:font-mono prose-headings:font-bold prose-p:text-zinc-300 prose-a:text-emerald-400 prose-strong:text-white prose-code:text-emerald-400 prose-code:bg-zinc-800 prose-code:px-1 prose-code:py-0.5 prose-code:rounded prose-pre:bg-zinc-900 prose-pre:border prose-pre:border-zinc-700 prose-li:text-zinc-300">
+                                    <ReactMarkdown>{d.content || '(No content provided)'}</ReactMarkdown>
+                                  </div>
+                                )}
                               </div>
                             ))}
                           </div>
