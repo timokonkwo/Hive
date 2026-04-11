@@ -108,26 +108,25 @@ export async function GET(request: NextRequest) {
     ]);
 
     return NextResponse.json({
-      submissions: submissions.map(s => ({
-        id: s._id.toString(),
-        taskId: s.taskId,
-        taskTitle: taskMap[s.taskId] || 'Unknown Task',
-        agentId: s.agentId,
-        agentName: s.agentName,
-        summary: s.summary,
-        deliverableCount: Array.isArray(s.deliverables) ? s.deliverables.length : 0,
-        deliverables: (s.deliverables || []).map((d: any) => ({
-          type: d.type,
-          label: d.label,
-          content: typeof d.content === 'string' ? d.content.slice(0, 500) : String(d.content).slice(0, 500),
-        })),
-        reportUri: s.reportUri || null,
-        status: s.status,
-        rejectionCategory: s.rejectionCategory || null,
-        rejectionReason: s.rejectionReason || null,
-        createdAt: s.createdAt,
-        updatedAt: s.updatedAt,
-      })),
+      submissions: submissions.map(s => {
+        const deliverables = normalizeDeliverables(s.deliverables, s.summary);
+        return {
+          id: s._id.toString(),
+          taskId: s.taskId,
+          taskTitle: taskMap[s.taskId] || 'Unknown Task',
+          agentId: s.agentId,
+          agentName: s.agentName,
+          summary: s.summary || '',
+          deliverableCount: deliverables.length,
+          deliverables,
+          reportUri: s.reportUri || null,
+          status: s.status,
+          rejectionCategory: s.rejectionCategory || null,
+          rejectionReason: s.rejectionReason || null,
+          createdAt: s.createdAt,
+          updatedAt: s.updatedAt,
+        };
+      }),
       total,
       page,
       totalPages: Math.ceil(total / limit),
@@ -144,4 +143,104 @@ export async function GET(request: NextRequest) {
     console.error('GET /api/admin/submissions error:', error);
     return NextResponse.json({ error: 'Failed to fetch submissions' }, { status: 500 });
   }
+}
+
+/**
+ * Extract actual text content from a deliverable's content field.
+ * Agents sometimes send:
+ *  - A plain string (correct)
+ *  - A stringified JSON of the entire submission body
+ *  - An object with nested content/summary
+ *  - undefined/null
+ */
+function extractContent(raw: any): string {
+  if (raw == null) return '';
+
+  // Already a clean string — check if it's JSON wrapping real content
+  if (typeof raw === 'string') {
+    const trimmed = raw.trim();
+    if (trimmed.startsWith('{') || trimmed.startsWith('[')) {
+      try {
+        const parsed = JSON.parse(trimmed);
+        // Agent sent the whole submission as content: { summary, deliverables }
+        if (parsed.deliverables && Array.isArray(parsed.deliverables)) {
+          // Extract the nested actual content
+          const nested = parsed.deliverables
+            .map((d: any) => d.content)
+            .filter(Boolean)
+            .join('\n\n');
+          return (nested || parsed.summary || trimmed).slice(0, 2000);
+        }
+        // Object with a content field
+        if (parsed.content && typeof parsed.content === 'string') {
+          return parsed.content.slice(0, 2000);
+        }
+        // Object with a summary field
+        if (parsed.summary && typeof parsed.summary === 'string') {
+          return parsed.summary.slice(0, 2000);
+        }
+      } catch {
+        // Not valid JSON — just a string that starts with {
+      }
+    }
+    return trimmed.slice(0, 2000);
+  }
+
+  // Object (not stringified)
+  if (typeof raw === 'object') {
+    if (raw.content) return extractContent(raw.content);
+    if (raw.summary) return String(raw.summary).slice(0, 2000);
+    if (raw.text) return String(raw.text).slice(0, 2000);
+    return JSON.stringify(raw).slice(0, 500);
+  }
+
+  return String(raw).slice(0, 2000);
+}
+
+/**
+ * Normalize the deliverables array for admin display.
+ * Handles cases where agents crammed the entire submission into one deliverable,
+ * or where deliverables have no content.
+ */
+function normalizeDeliverables(raw: any, fallbackSummary?: string): Array<{ type: string; label: string; content: string }> {
+  if (!raw || !Array.isArray(raw) || raw.length === 0) {
+    // No deliverables — use the summary as a single deliverable
+    return fallbackSummary
+      ? [{ type: 'text', label: 'Work Summary', content: fallbackSummary }]
+      : [];
+  }
+
+  const results: Array<{ type: string; label: string; content: string }> = [];
+
+  for (const d of raw) {
+    const content = extractContent(d.content);
+
+    // Check if this deliverable's content contains nested deliverables (agent sent whole body)
+    if (typeof d.content === 'string' && d.content.trim().startsWith('{')) {
+      try {
+        const parsed = JSON.parse(d.content);
+        if (parsed.deliverables && Array.isArray(parsed.deliverables) && parsed.deliverables.length > 0) {
+          // Unpack the nested deliverables
+          for (const nested of parsed.deliverables) {
+            results.push({
+              type: nested.type || d.type || 'text',
+              label: nested.label || d.label || 'Deliverable',
+              content: extractContent(nested.content),
+            });
+          }
+          continue;
+        }
+      } catch {
+        // Not JSON, fall through
+      }
+    }
+
+    results.push({
+      type: d.type || 'text',
+      label: d.label || 'Deliverable',
+      content: content || '(No content provided)',
+    });
+  }
+
+  return results;
 }

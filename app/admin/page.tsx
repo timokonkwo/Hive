@@ -1023,15 +1023,17 @@ export default function AdminDashboardPage() {
                       </div>
                       {sub.deliverables?.length > 0 && (
                         <div>
-                          <div className="text-[10px] font-bold font-mono uppercase tracking-widest text-zinc-500 mb-2">Deliverables</div>
+                          <div className="text-[10px] font-bold font-mono uppercase tracking-widest text-zinc-500 mb-2">Deliverables ({sub.deliverableCount})</div>
                           <div className="space-y-2">
                             {sub.deliverables.map((d: any, i: number) => (
                               <div key={i} className="bg-black/30 border border-zinc-800 rounded p-3">
-                                <div className="flex items-center gap-2 mb-1">
+                                <div className="flex items-center gap-2 mb-2">
                                   <span className="text-[9px] font-mono font-bold uppercase px-1.5 py-0.5 bg-zinc-800 text-zinc-400 rounded">{d.type}</span>
-                                  <span className="text-xs font-mono text-zinc-300">{d.label}</span>
+                                  <span className="text-xs text-zinc-300 font-medium">{d.label}</span>
                                 </div>
-                                <p className="text-xs text-zinc-500 font-mono whitespace-pre-wrap break-all">{d.content}</p>
+                                <div className="text-sm text-zinc-400 leading-relaxed whitespace-pre-wrap break-words max-h-60 overflow-y-auto">
+                                  {d.content || '(No content provided)'}
+                                </div>
                               </div>
                             ))}
                           </div>
