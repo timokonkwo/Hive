@@ -3,12 +3,18 @@ import { getDb, COLLECTIONS } from '@/lib/db';
 import { ObjectId } from 'mongodb';
 import { checkRateLimit, getClientIp, RATE_LIMITS } from '@/lib/rate-limit';
 
+const REJECTION_CATEGORIES = [
+  'incomplete', 'poor_quality', 'off_topic', 'incorrect', 'formatting', 'other',
+] as const;
+
+type RejectionCategory = typeof REJECTION_CATEGORIES[number];
+
 /**
  * POST /api/tasks/[id]/reject
  * Client rejects submitted work and sends the task back for revision.
- * Task goes from "In Review" → "In Progress", bid goes back to "accepted".
+ * Task goes from "In Review" -> "In Progress", bid goes back to "accepted".
  *
- * Body: { clientAddress: string, reason: string }
+ * Body: { clientAddress: string, reason: string, rejectionCategory: string }
  */
 export async function POST(
   req: NextRequest,
@@ -32,7 +38,7 @@ export async function POST(
     }
 
     const body = await req.json();
-    const { clientAddress, reason } = body;
+    const { clientAddress, reason, rejectionCategory } = body;
 
     if (!clientAddress || typeof clientAddress !== 'string') {
       return NextResponse.json({ error: 'clientAddress is required.' }, { status: 400 });
@@ -42,6 +48,14 @@ export async function POST(
     }
     if (reason.length > 1000) {
       return NextResponse.json({ error: 'Reason must be under 1000 characters.' }, { status: 400 });
+    }
+
+    // Validate rejection category (required)
+    if (!rejectionCategory || !REJECTION_CATEGORIES.includes(rejectionCategory as RejectionCategory)) {
+      return NextResponse.json(
+        { error: `rejectionCategory is required. Must be one of: ${REJECTION_CATEGORIES.join(', ')}` },
+        { status: 400 }
+      );
     }
 
     const task = await db.collection(COLLECTIONS.TASKS).findOne({ _id: new ObjectId(taskId) });
@@ -70,6 +84,7 @@ export async function POST(
         },
         $push: {
           rejections: {
+            category: rejectionCategory,
             reason: reason.trim(),
             rejectedAt: now,
             rejectedBy: clientAddress,
@@ -82,10 +97,18 @@ export async function POST(
       return NextResponse.json({ error: 'Task status changed. Try again.' }, { status: 409 });
     }
 
-    // Reset submission status to Rejected
+    // Update submissions: set status + attach rejection details
     await db.collection(COLLECTIONS.SUBMISSIONS).updateMany(
       { taskId, status: { $in: ['Submitted', 'Approved'] } },
-      { $set: { status: 'Rejected', updatedAt: now } }
+      {
+        $set: {
+          status: 'Rejected',
+          rejectionCategory,
+          rejectionReason: reason.trim(),
+          rejectedAt: now,
+          updatedAt: now,
+        },
+      }
     );
 
     // Reset bid status back to accepted (so agent can resubmit)
@@ -101,6 +124,7 @@ export async function POST(
       actorAddress: clientAddress,
       metadata: {
         taskTitle: task.title,
+        rejectionCategory,
         reason: reason.trim(),
         assignedAgent: task.assignedAgentName || task.assignedAgent,
       },

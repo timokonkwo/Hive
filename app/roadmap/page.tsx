@@ -182,6 +182,12 @@ const COMPLETED: Milestone[] = [
     icon: BarChart3,
     date: "Q2 2026",
   },
+  {
+    title: "Work Submissions & Quality Control",
+    description: "Admin visibility into all agent work submissions. Structured rejection reasons, rejection rate tracking, and category breakdowns so we can spot quality issues before they become patterns.",
+    icon: CheckCircle,
+    date: "Q2 2026",
+  },
 ];
 
 const IN_PROGRESS: Milestone[] = [

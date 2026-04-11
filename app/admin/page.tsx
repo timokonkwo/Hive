@@ -7,15 +7,26 @@ import {
   Loader2, Shield, Users, FileText, CheckCircle,
   Clock, ChevronRight, AlertTriangle, Inbox, Zap,
   Search, Trash2, ChevronLeft, ChevronsLeft, ChevronsRight,
-  ArrowUpDown, X, Bot, MessageSquare, Bug, Lightbulb, CheckSquare, Square
+  ArrowUpDown, X, Bot, MessageSquare, Bug, Lightbulb, CheckSquare, Square,
+  Send, ChevronDown, ExternalLink
 } from "lucide-react";
 import Link from "next/link";
 import { toast } from "sonner";
 
-type AdminTab = "overview" | "tasks" | "agents" | "activity" | "feedback";
+type AdminTab = "overview" | "tasks" | "agents" | "submissions" | "activity" | "feedback";
 
 const AGENTS_PER_PAGE = 20;
 const TASKS_PER_PAGE = 20;
+const SUBMISSIONS_PER_PAGE = 15;
+
+const REJECTION_CATEGORY_LABELS: Record<string, string> = {
+  incomplete: 'Incomplete',
+  poor_quality: 'Poor Quality',
+  off_topic: 'Off Topic',
+  incorrect: 'Incorrect',
+  formatting: 'Formatting',
+  other: 'Other',
+};
 
 export default function AdminDashboardPage() {
   const { user, authenticated, login, ready } = useAuth();
@@ -57,6 +68,16 @@ export default function AdminDashboardPage() {
   const [feedbackTypeFilter, setFeedbackTypeFilter] = useState("all");
   const [feedbackStatusFilter, setFeedbackStatusFilter] = useState("all");
   const [feedbackLoading, setFeedbackLoading] = useState(false);
+
+  // Submissions management state
+  const [submissions, setSubmissions] = useState<any[]>([]);
+  const [submissionsTotal, setSubmissionsTotal] = useState(0);
+  const [submissionsPage, setSubmissionsPage] = useState(1);
+  const [submissionsSearch, setSubmissionsSearch] = useState("");
+  const [submissionsStatusFilter, setSubmissionsStatusFilter] = useState("all");
+  const [submissionsLoading, setSubmissionsLoading] = useState(false);
+  const [submissionsStats, setSubmissionsStats] = useState<any>(null);
+  const [expandedSubmission, setExpandedSubmission] = useState<string | null>(null);
 
   const address = user?.wallet?.address;
 
@@ -230,6 +251,42 @@ export default function AdminDashboardPage() {
 
   useEffect(() => { setFeedbackPage(1); }, [feedbackTypeFilter, feedbackStatusFilter]);
 
+  // Fetch submissions
+  const fetchSubmissions = useCallback(async () => {
+    if (!isAdmin || !address) return;
+    setSubmissionsLoading(true);
+    try {
+      const params = new URLSearchParams({
+        page: String(submissionsPage),
+        limit: String(SUBMISSIONS_PER_PAGE),
+        address,
+      });
+      if (submissionsSearch) params.set("search", submissionsSearch);
+      if (submissionsStatusFilter !== "all") params.set("status", submissionsStatusFilter);
+
+      const res = await fetch(`/api/admin/submissions?${params.toString()}`);
+      if (res.ok) {
+        const data = await res.json();
+        setSubmissions(data.submissions || []);
+        setSubmissionsTotal(data.total || 0);
+        setSubmissionsStats(data.stats || null);
+      }
+    } catch (err) {
+      console.error("Submissions fetch error:", err);
+    } finally {
+      setSubmissionsLoading(false);
+    }
+  }, [isAdmin, address, submissionsPage, submissionsSearch, submissionsStatusFilter]);
+
+  useEffect(() => {
+    if (activeTab === "submissions") {
+      const timeout = setTimeout(fetchSubmissions, 300);
+      return () => clearTimeout(timeout);
+    }
+  }, [activeTab, fetchSubmissions]);
+
+  useEffect(() => { setSubmissionsPage(1); }, [submissionsSearch, submissionsStatusFilter]);
+
   const updateFeedbackStatus = async (id: string, newStatus: string) => {
     if (!address) return;
     try {
@@ -382,7 +439,7 @@ export default function AdminDashboardPage() {
 
       {/* Tabs */}
       <div className="flex border-b border-zinc-800 mb-8 gap-1">
-        {(["overview", "tasks", "agents", "activity", "feedback"] as AdminTab[]).map((tab) => (
+        {(["overview", "tasks", "agents", "submissions", "activity", "feedback"] as AdminTab[]).map((tab) => (
           <button
             key={tab}
             onClick={() => setActiveTab(tab)}
@@ -833,6 +890,194 @@ export default function AdminDashboardPage() {
         </div>
       )}
 
+      {/* ── Submissions Tab ── */}
+      {activeTab === "submissions" && (
+        <div>
+          {/* Submission Stats */}
+          {submissionsStats && (
+            <div className="grid grid-cols-2 md:grid-cols-5 gap-3 mb-6">
+              <div className="bg-zinc-900/30 border border-zinc-800 p-3 rounded-lg text-center">
+                <div className="text-xl font-bold font-mono text-white">{submissionsStats.totalSubmissions}</div>
+                <div className="text-[9px] text-zinc-500 uppercase font-mono">Total</div>
+              </div>
+              <div className="bg-zinc-900/30 border border-zinc-800 p-3 rounded-lg text-center">
+                <div className="text-xl font-bold font-mono text-yellow-500">{submissionsStats.submittedCount}</div>
+                <div className="text-[9px] text-zinc-500 uppercase font-mono">Awaiting Review</div>
+              </div>
+              <div className="bg-zinc-900/30 border border-zinc-800 p-3 rounded-lg text-center">
+                <div className="text-xl font-bold font-mono text-green-500">{submissionsStats.approvedCount}</div>
+                <div className="text-[9px] text-zinc-500 uppercase font-mono">Approved</div>
+              </div>
+              <div className="bg-zinc-900/30 border border-zinc-800 p-3 rounded-lg text-center">
+                <div className="text-xl font-bold font-mono text-red-500">{submissionsStats.rejectedCount}</div>
+                <div className="text-[9px] text-zinc-500 uppercase font-mono">Rejected</div>
+              </div>
+              <div className="bg-zinc-900/30 border border-zinc-800 p-3 rounded-lg text-center">
+                <div className="text-xl font-bold font-mono text-orange-400">{submissionsStats.rejectionRate}%</div>
+                <div className="text-[9px] text-zinc-500 uppercase font-mono">Rejection Rate</div>
+              </div>
+            </div>
+          )}
+
+          {/* Rejection Insights */}
+          {submissionsStats?.rejectionsByCategory && Object.keys(submissionsStats.rejectionsByCategory).length > 0 && (
+            <div className="bg-zinc-900/30 border border-zinc-800 rounded-lg p-4 mb-6">
+              <h4 className="text-[10px] font-bold font-mono uppercase tracking-widest text-zinc-500 mb-3">Rejection Reasons Breakdown</h4>
+              <div className="space-y-2">
+                {(() => {
+                  const cats = submissionsStats.rejectionsByCategory;
+                  const total = Object.values(cats).reduce((s: number, c: any) => s + c, 0) as number;
+                  return Object.entries(cats)
+                    .sort(([, a]: any, [, b]: any) => b - a)
+                    .map(([cat, count]: [string, any]) => (
+                      <div key={cat} className="flex items-center gap-3">
+                        <span className="text-xs font-mono text-zinc-400 w-24 shrink-0">{REJECTION_CATEGORY_LABELS[cat] || cat}</span>
+                        <div className="flex-1 h-2 bg-zinc-800 rounded-full overflow-hidden">
+                          <div
+                            className="h-full bg-red-500/60 rounded-full transition-all"
+                            style={{ width: `${total > 0 ? (count / total) * 100 : 0}%` }}
+                          />
+                        </div>
+                        <span className="text-xs font-mono text-zinc-500 w-12 text-right">{count} ({total > 0 ? Math.round((count / total) * 100) : 0}%)</span>
+                      </div>
+                    ));
+                })()}
+              </div>
+            </div>
+          )}
+
+          {/* Search and Filter */}
+          <div className="flex flex-col sm:flex-row gap-3 mb-4">
+            <div className="relative flex-1">
+              <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-600" />
+              <input
+                type="text"
+                value={submissionsSearch}
+                onChange={(e) => setSubmissionsSearch(e.target.value)}
+                placeholder="Search by agent or summary..."
+                className="w-full bg-zinc-900/50 border border-zinc-800 rounded pl-9 pr-3 py-2 text-sm text-white font-mono outline-none focus:border-emerald-500/50 transition-colors"
+              />
+              {submissionsSearch && (
+                <button onClick={() => setSubmissionsSearch("")} className="absolute right-3 top-1/2 -translate-y-1/2 text-zinc-600 hover:text-white">
+                  <X size={12} />
+                </button>
+              )}
+            </div>
+            <div className="flex gap-2">
+              {["all", "Submitted", "Rejected", "Approved"].map((s) => (
+                <button
+                  key={s}
+                  onClick={() => setSubmissionsStatusFilter(s)}
+                  className={`px-3 py-2 text-[10px] font-mono uppercase tracking-widest border rounded transition-colors ${
+                    submissionsStatusFilter === s
+                      ? "border-emerald-500/50 text-emerald-500 bg-emerald-500/10"
+                      : "border-zinc-800 text-zinc-500 hover:text-zinc-300"
+                  }`}
+                >
+                  {s === "all" ? "All" : s}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Submissions Table */}
+          {submissionsLoading ? (
+            <div className="flex justify-center py-12"><Loader2 className="animate-spin text-zinc-500" /></div>
+          ) : submissions.length === 0 ? (
+            <div className="py-12 text-center text-zinc-600 border border-dashed border-zinc-800 rounded-lg font-mono text-sm">No submissions found</div>
+          ) : (
+            <div className="space-y-2">
+              {submissions.map((sub: any) => (
+                <div key={sub.id} className="bg-zinc-900/30 border border-zinc-800 rounded-lg overflow-hidden">
+                  <button
+                    onClick={() => setExpandedSubmission(expandedSubmission === sub.id ? null : sub.id)}
+                    className="w-full flex items-center gap-3 p-3 hover:bg-zinc-800/30 transition-colors text-left"
+                  >
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 mb-1">
+                        <Link href={`/agent/${encodeURIComponent(sub.agentName)}`} onClick={(e) => e.stopPropagation()} className="text-sm font-mono text-emerald-400 hover:underline">{sub.agentName}</Link>
+                        <span className="text-zinc-700">→</span>
+                        <Link href={`/marketplace/${sub.taskId}`} onClick={(e) => e.stopPropagation()} className="text-sm text-white hover:text-emerald-400 truncate transition-colors">{sub.taskTitle}</Link>
+                      </div>
+                      <div className="text-[10px] text-zinc-600 font-mono">
+                        {sub.deliverableCount} deliverable{sub.deliverableCount !== 1 ? 's' : ''} • {new Date(sub.createdAt).toLocaleDateString()}
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2 shrink-0">
+                      {sub.rejectionCategory && (
+                        <span className="px-2 py-0.5 rounded text-[9px] font-mono font-bold uppercase bg-red-500/10 text-red-400 border border-red-500/20">
+                          {REJECTION_CATEGORY_LABELS[sub.rejectionCategory] || sub.rejectionCategory}
+                        </span>
+                      )}
+                      <SubmissionStatusBadge status={sub.status} />
+                      <ChevronDown size={14} className={`text-zinc-600 transition-transform ${expandedSubmission === sub.id ? 'rotate-180' : ''}`} />
+                    </div>
+                  </button>
+
+                  {/* Expanded content */}
+                  {expandedSubmission === sub.id && (
+                    <div className="border-t border-zinc-800 p-4 space-y-3">
+                      <div>
+                        <div className="text-[10px] font-bold font-mono uppercase tracking-widest text-zinc-500 mb-1">Summary</div>
+                        <p className="text-sm text-zinc-300 leading-relaxed">{sub.summary}</p>
+                      </div>
+                      {sub.deliverables?.length > 0 && (
+                        <div>
+                          <div className="text-[10px] font-bold font-mono uppercase tracking-widest text-zinc-500 mb-2">Deliverables</div>
+                          <div className="space-y-2">
+                            {sub.deliverables.map((d: any, i: number) => (
+                              <div key={i} className="bg-black/30 border border-zinc-800 rounded p-3">
+                                <div className="flex items-center gap-2 mb-1">
+                                  <span className="text-[9px] font-mono font-bold uppercase px-1.5 py-0.5 bg-zinc-800 text-zinc-400 rounded">{d.type}</span>
+                                  <span className="text-xs font-mono text-zinc-300">{d.label}</span>
+                                </div>
+                                <p className="text-xs text-zinc-500 font-mono whitespace-pre-wrap break-all">{d.content}</p>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                      {sub.rejectionReason && (
+                        <div className="bg-red-500/5 border border-red-500/20 rounded p-3">
+                          <div className="text-[10px] font-bold font-mono uppercase tracking-widest text-red-400 mb-1">Rejection Details</div>
+                          <p className="text-sm text-red-300">{sub.rejectionReason}</p>
+                        </div>
+                      )}
+                      {sub.reportUri && (
+                        <div>
+                          <a href={sub.reportUri} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 text-xs text-emerald-500 hover:underline font-mono">
+                            <ExternalLink size={10} /> Report Link
+                          </a>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* Pagination */}
+          {submissionsTotal > SUBMISSIONS_PER_PAGE && (
+            <div className="flex items-center justify-center gap-2 mt-6">
+              <PaginationBtn onClick={() => setSubmissionsPage(1)} disabled={submissionsPage <= 1}>
+                <ChevronsLeft size={14} />
+              </PaginationBtn>
+              <PaginationBtn onClick={() => setSubmissionsPage(p => Math.max(1, p - 1))} disabled={submissionsPage <= 1}>
+                <ChevronLeft size={14} />
+              </PaginationBtn>
+              <span className="text-xs font-mono text-zinc-500">Page {submissionsPage} of {Math.ceil(submissionsTotal / SUBMISSIONS_PER_PAGE)}</span>
+              <PaginationBtn onClick={() => setSubmissionsPage(p => p + 1)} disabled={submissionsPage >= Math.ceil(submissionsTotal / SUBMISSIONS_PER_PAGE)}>
+                <ChevronRight size={14} />
+              </PaginationBtn>
+              <PaginationBtn onClick={() => setSubmissionsPage(Math.ceil(submissionsTotal / SUBMISSIONS_PER_PAGE))} disabled={submissionsPage >= Math.ceil(submissionsTotal / SUBMISSIONS_PER_PAGE)}>
+                <ChevronsRight size={14} />
+              </PaginationBtn>
+            </div>
+          )}
+        </div>
+      )}
+
       {/* Delete Confirmation Modal */}
       {deleteModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
@@ -904,6 +1149,19 @@ function SortHeader({ label, field, current, order, onToggle }: { label: string;
       {label}
       <ArrowUpDown size={10} className={isActive ? (order === "asc" ? "rotate-180" : "") : "opacity-40"} />
     </button>
+  );
+}
+
+function SubmissionStatusBadge({ status }: { status: string }) {
+  const styles: Record<string, string> = {
+    Submitted: "bg-yellow-500/10 text-yellow-500 border-yellow-500/20",
+    Rejected: "bg-red-500/10 text-red-500 border-red-500/20",
+    Approved: "bg-green-500/10 text-green-500 border-green-500/20",
+  };
+  return (
+    <span className={`inline-flex px-2 py-0.5 rounded-full border text-[10px] font-bold uppercase ${styles[status] || "bg-zinc-800 text-zinc-400 border-zinc-700"}`}>
+      {status}
+    </span>
   );
 }
 

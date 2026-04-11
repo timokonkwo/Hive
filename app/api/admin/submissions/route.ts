@@ -1,0 +1,147 @@
+import { NextRequest, NextResponse } from 'next/server';
+import { getDb, COLLECTIONS } from '@/lib/db';
+import { ObjectId } from 'mongodb';
+
+const SUBMISSIONS_PER_PAGE = 15;
+
+// Allowed rejection categories — used for server-side validation
+const REJECTION_CATEGORIES = [
+  'incomplete', 'poor_quality', 'off_topic', 'incorrect', 'formatting', 'other',
+] as const;
+
+/**
+ * GET /api/admin/submissions
+ * Paginated, searchable, filterable submissions list for admin dashboard.
+ *
+ * Query params:
+ *   ?page=1&limit=15&search=&status=all&address=<admin wallet>
+ *
+ * Status filter: all | Submitted | Rejected | Approved
+ */
+export async function GET(request: NextRequest) {
+  try {
+    const adminKey = request.headers.get('x-admin-key');
+    const expectedAdmin = process.env.ADMIN_API_KEY;
+    const { searchParams } = new URL(request.url);
+    const address = searchParams.get('address');
+    const adminAddress = process.env.ADMIN_ADDRESS;
+
+    const keyOk = expectedAdmin && adminKey === expectedAdmin;
+    const addressOk = address && adminAddress && address.toLowerCase() === adminAddress.toLowerCase();
+
+    if (!keyOk && !addressOk) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 403 });
+    }
+
+    const db = await getDb();
+
+    // Parse query params with bounds checking
+    const page = Math.max(1, parseInt(searchParams.get('page') || '1'));
+    const limit = Math.min(50, Math.max(1, parseInt(searchParams.get('limit') || String(SUBMISSIONS_PER_PAGE))));
+    const search = (searchParams.get('search') || '').trim();
+    const statusFilter = searchParams.get('status') || 'all';
+
+    // Build query — escape regex special chars to prevent ReDoS
+    const query: any = {};
+
+    if (statusFilter !== 'all') {
+      query.status = statusFilter;
+    }
+
+    if (search) {
+      const escaped = search.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      query.$or = [
+        { agentName: { $regex: escaped, $options: 'i' } },
+        { summary: { $regex: escaped, $options: 'i' } },
+      ];
+    }
+
+    const [submissions, total] = await Promise.all([
+      db.collection(COLLECTIONS.SUBMISSIONS)
+        .find(query)
+        .sort({ createdAt: -1 })
+        .skip((page - 1) * limit)
+        .limit(limit)
+        .toArray(),
+      db.collection(COLLECTIONS.SUBMISSIONS).countDocuments(query),
+    ]);
+
+    // Enrich with task titles in a single batch query
+    const taskIds = [...new Set(submissions.map(s => s.taskId).filter(Boolean))];
+    const taskMap: Record<string, string> = {};
+
+    if (taskIds.length > 0) {
+      const objectIds = taskIds
+        .filter(id => ObjectId.isValid(id))
+        .map(id => new ObjectId(id));
+      if (objectIds.length > 0) {
+        const tasks = await db.collection(COLLECTIONS.TASKS)
+          .find({ _id: { $in: objectIds } })
+          .project({ title: 1 })
+          .toArray();
+        for (const t of tasks) {
+          taskMap[t._id.toString()] = t.title;
+        }
+      }
+    }
+
+    // Rejection category breakdown (all-time, cached per request)
+    const rejectionBreakdown = await db.collection(COLLECTIONS.SUBMISSIONS).aggregate([
+      { $match: { status: 'Rejected', rejectionCategory: { $exists: true, $ne: null } } },
+      { $group: { _id: '$rejectionCategory', count: { $sum: 1 } } },
+      { $sort: { count: -1 } },
+    ]).toArray();
+
+    const rejectionsByCategory: Record<string, number> = {};
+    for (const r of rejectionBreakdown) {
+      if (r._id && REJECTION_CATEGORIES.includes(r._id)) {
+        rejectionsByCategory[r._id] = r.count;
+      }
+    }
+
+    // Submission stats
+    const [totalSubmissions, submittedCount, rejectedCount, approvedCount] = await Promise.all([
+      db.collection(COLLECTIONS.SUBMISSIONS).countDocuments(),
+      db.collection(COLLECTIONS.SUBMISSIONS).countDocuments({ status: 'Submitted' }),
+      db.collection(COLLECTIONS.SUBMISSIONS).countDocuments({ status: 'Rejected' }),
+      db.collection(COLLECTIONS.SUBMISSIONS).countDocuments({ status: 'Approved' }),
+    ]);
+
+    return NextResponse.json({
+      submissions: submissions.map(s => ({
+        id: s._id.toString(),
+        taskId: s.taskId,
+        taskTitle: taskMap[s.taskId] || 'Unknown Task',
+        agentId: s.agentId,
+        agentName: s.agentName,
+        summary: s.summary,
+        deliverableCount: Array.isArray(s.deliverables) ? s.deliverables.length : 0,
+        deliverables: (s.deliverables || []).map((d: any) => ({
+          type: d.type,
+          label: d.label,
+          content: typeof d.content === 'string' ? d.content.slice(0, 500) : String(d.content).slice(0, 500),
+        })),
+        reportUri: s.reportUri || null,
+        status: s.status,
+        rejectionCategory: s.rejectionCategory || null,
+        rejectionReason: s.rejectionReason || null,
+        createdAt: s.createdAt,
+        updatedAt: s.updatedAt,
+      })),
+      total,
+      page,
+      totalPages: Math.ceil(total / limit),
+      stats: {
+        totalSubmissions,
+        submittedCount,
+        rejectedCount,
+        approvedCount,
+        rejectionRate: totalSubmissions > 0 ? Math.round((rejectedCount / totalSubmissions) * 100) : 0,
+        rejectionsByCategory,
+      },
+    });
+  } catch (error) {
+    console.error('GET /api/admin/submissions error:', error);
+    return NextResponse.json({ error: 'Failed to fetch submissions' }, { status: 500 });
+  }
+}

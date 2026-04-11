@@ -41,7 +41,17 @@ export default function TaskDetailsPage({ params }: { params: Promise<{ taskId: 
   // Rejection state
   const [showRejectModal, setShowRejectModal] = useState(false);
   const [rejectReason, setRejectReason] = useState('');
+  const [rejectCategory, setRejectCategory] = useState('');
   const [rejecting, setRejecting] = useState(false);
+
+  const REJECTION_CATEGORIES = [
+    { id: 'incomplete', label: 'Incomplete', desc: 'Missing deliverables' },
+    { id: 'poor_quality', label: 'Poor Quality', desc: 'Low effort or sloppy' },
+    { id: 'off_topic', label: 'Off Topic', desc: 'Doesn\'t match the task' },
+    { id: 'incorrect', label: 'Incorrect', desc: 'Contains errors' },
+    { id: 'formatting', label: 'Formatting', desc: 'Bad structure' },
+    { id: 'other', label: 'Other', desc: 'Something else' },
+  ];
 
   const userAddress = user?.wallet?.address?.toLowerCase();
   const isTaskPoster = task?.clientAddress?.toLowerCase() === userAddress;
@@ -418,8 +428,12 @@ export default function TaskDetailsPage({ params }: { params: Promise<{ taskId: 
 
   // === REJECTION FLOW ===
   const handleRejectWork = async () => {
+    if (!rejectCategory) {
+      toast.error('Please select a rejection reason category.');
+      return;
+    }
     if (rejectReason.trim().length < 10) {
-      toast.error('Please provide a reason (at least 10 characters).');
+      toast.error('Please provide details (at least 10 characters).');
       return;
     }
     setRejecting(true);
@@ -430,6 +444,7 @@ export default function TaskDetailsPage({ params }: { params: Promise<{ taskId: 
         body: JSON.stringify({
           clientAddress: user?.wallet?.address,
           reason: rejectReason.trim(),
+          rejectionCategory: rejectCategory,
         }),
       });
       if (!res.ok) {
@@ -440,6 +455,7 @@ export default function TaskDetailsPage({ params }: { params: Promise<{ taskId: 
       setSubmission(null);
       setShowRejectModal(false);
       setRejectReason('');
+      setRejectCategory('');
       toast.success('Work rejected. Agent can revise and resubmit.');
     } catch (error: any) {
       toast.error(error.message || 'Failed to reject work.');
@@ -1193,31 +1209,52 @@ export default function TaskDetailsPage({ params }: { params: Promise<{ taskId: 
       {/* Reject Modal */}
       {showRejectModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm">
-          <div className="bg-zinc-900 border border-zinc-700 rounded-xl p-8 max-w-md w-full mx-4 shadow-2xl">
+          <div className="bg-zinc-900 border border-zinc-700 rounded-xl p-8 max-w-lg w-full mx-4 shadow-2xl">
             <h3 className="text-lg font-bold font-mono uppercase tracking-widest text-white mb-2 flex items-center gap-2">
               <AlertTriangle className="text-red-500" size={20} /> Reject Work
             </h3>
-            <p className="text-zinc-400 text-xs mb-6">The agent will be able to revise and resubmit.</p>
+            <p className="text-zinc-400 text-xs mb-5">The agent will be able to revise and resubmit.</p>
 
+            {/* Rejection category picker */}
+            <label className="block text-[10px] font-bold font-mono uppercase tracking-widest text-zinc-500 mb-2">Reason *</label>
+            <div className="grid grid-cols-3 gap-2 mb-5">
+              {REJECTION_CATEGORIES.map(cat => (
+                <button
+                  key={cat.id}
+                  type="button"
+                  onClick={() => setRejectCategory(cat.id)}
+                  className={`px-3 py-2.5 text-left rounded-lg border text-xs font-mono transition-all ${
+                    rejectCategory === cat.id
+                      ? 'bg-red-500/15 border-red-500/40 text-red-400'
+                      : 'bg-black border-zinc-800 text-zinc-500 hover:border-zinc-600 hover:text-zinc-300'
+                  }`}
+                >
+                  <div className="font-bold">{cat.label}</div>
+                  <div className="text-[9px] opacity-60 mt-0.5">{cat.desc}</div>
+                </button>
+              ))}
+            </div>
+
+            <label className="block text-[10px] font-bold font-mono uppercase tracking-widest text-zinc-500 mb-2">Details *</label>
             <textarea
               value={rejectReason}
               onChange={(e) => setRejectReason(e.target.value.slice(0, 1000))}
-              placeholder="Why are you rejecting this work? (min 10 characters)"
-              rows={4}
+              placeholder="Explain what needs to be fixed (min 10 characters)"
+              rows={3}
               className="w-full bg-black border border-zinc-700 rounded-lg px-3 py-2 text-white text-sm font-mono outline-none focus:border-red-500 transition-colors mb-1 resize-none"
             />
-            <p className="text-[10px] text-zinc-600 font-mono mb-6">{rejectReason.length}/1000</p>
+            <p className="text-[10px] text-zinc-600 font-mono mb-5">{rejectReason.length}/1000</p>
 
             <div className="flex gap-3">
               <button
-                onClick={() => { setShowRejectModal(false); setRejectReason(''); }}
+                onClick={() => { setShowRejectModal(false); setRejectReason(''); setRejectCategory(''); }}
                 className="flex-1 px-4 py-3 border border-zinc-700 text-zinc-400 hover:text-white rounded-lg font-mono text-xs uppercase tracking-widest transition-colors"
               >
                 Cancel
               </button>
               <button
                 onClick={handleRejectWork}
-                disabled={rejecting || rejectReason.trim().length < 10}
+                disabled={rejecting || !rejectCategory || rejectReason.trim().length < 10}
                 className="flex-1 px-4 py-3 bg-red-600 hover:bg-red-500 text-white rounded-lg font-bold font-mono text-xs uppercase tracking-widest transition-colors disabled:opacity-40 flex items-center justify-center gap-2"
               >
                 {rejecting ? <Loader2 size={14} className="animate-spin" /> : <XCircle size={14} />}

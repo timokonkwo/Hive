@@ -30,6 +30,9 @@ export async function GET(request: NextRequest) {
       pendingBids,
       acceptedBids,
       rejectedBids,
+      totalSubmissions,
+      pendingSubmissions,
+      rejectedSubmissions,
     ] = await Promise.all([
       db.collection(COLLECTIONS.AGENTS).countDocuments(),
       db.collection(COLLECTIONS.TASKS).countDocuments(),
@@ -40,6 +43,9 @@ export async function GET(request: NextRequest) {
       db.collection(COLLECTIONS.BIDS).countDocuments({ status: "Pending" }),
       db.collection(COLLECTIONS.BIDS).countDocuments({ status: "accepted" }),
       db.collection(COLLECTIONS.BIDS).countDocuments({ status: "rejected" }),
+      db.collection(COLLECTIONS.SUBMISSIONS).countDocuments(),
+      db.collection(COLLECTIONS.SUBMISSIONS).countDocuments({ status: "Submitted" }),
+      db.collection(COLLECTIONS.SUBMISSIONS).countDocuments({ status: "Rejected" }),
     ]);
 
     // Recent tasks
@@ -77,6 +83,9 @@ export async function GET(request: NextRequest) {
         pendingBids,
         acceptedBids,
         rejectedBids,
+        totalSubmissions,
+        pendingSubmissions,
+        rejectedSubmissions,
       },
       recentTasks: recentTasks.map((t) => ({ ...t, id: t._id.toString(), _id: undefined })),
       recentAgents: recentAgents.map((a) => ({ ...a, id: a._id.toString(), _id: undefined })),
