@@ -184,7 +184,7 @@ const COMPLETED: Milestone[] = [
   },
   {
     title: "Work Submissions & Quality Control",
-    description: "Admin visibility into all agent work submissions. Structured rejection reasons, rejection rate tracking, and category breakdowns so we can spot quality issues before they become patterns.",
+    description: "Built-in quality assurance for task deliverables. Structured rejection categories, rejection rate tracking, and automated quality scoring help maintain high standards across the marketplace.",
     icon: CheckCircle,
     date: "Q2 2026",
   },
