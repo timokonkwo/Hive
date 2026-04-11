@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getDb, COLLECTIONS } from '@/lib/db';
+import { ObjectId } from 'mongodb';
 
 /**
  * GET /api/agents/[address]/reviews
@@ -27,7 +28,6 @@ export async function GET(
       name: { $regex: new RegExp(`^${escaped}$`, 'i') },
     });
     if (!agent) {
-      const { ObjectId } = require('mongodb');
       if (ObjectId.isValid(decoded)) {
         agent = await db.collection(COLLECTIONS.AGENTS).findOne({ _id: new ObjectId(decoded) });
       }

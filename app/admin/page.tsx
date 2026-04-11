@@ -9,7 +9,7 @@ import {
   Clock, ChevronRight, AlertTriangle, Inbox, Zap,
   Search, Trash2, ChevronLeft, ChevronsLeft, ChevronsRight,
   ArrowUpDown, X, Bot, MessageSquare, Bug, Lightbulb, CheckSquare, Square,
-  Send, ChevronDown, ExternalLink
+  Send, ChevronDown, ExternalLink, Download, Edit3, Check
 } from "lucide-react";
 import Link from "next/link";
 import { toast } from "sonner";
@@ -79,6 +79,10 @@ export default function AdminDashboardPage() {
   const [submissionsLoading, setSubmissionsLoading] = useState(false);
   const [submissionsStats, setSubmissionsStats] = useState<any>(null);
   const [expandedSubmission, setExpandedSubmission] = useState<string | null>(null);
+
+  // Reputation editing state
+  const [editingRepAgent, setEditingRepAgent] = useState<string | null>(null);
+  const [repInputValue, setRepInputValue] = useState<string>("");
 
   const address = user?.wallet?.address;
 
@@ -345,6 +349,31 @@ export default function AdminDashboardPage() {
       }
     } catch {
       toast.error("Failed to update agent.");
+    }
+  };
+
+  const handleSetReputation = async (agentId: string) => {
+    if (!address) return;
+    const rep = parseInt(repInputValue);
+    if (isNaN(rep) || rep < 0 || rep > 100000) {
+      toast.error('Reputation must be a number between 0 and 100,000.');
+      return;
+    }
+    try {
+      const res = await fetch(`/api/admin/agents/${agentId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ reputation: rep, adminAddress: address }),
+      });
+      if (res.ok) {
+        toast.success(`Reputation set to ${rep}.`);
+        setEditingRepAgent(null);
+        fetchAgents();
+      } else {
+        toast.error('Failed to update reputation.');
+      }
+    } catch {
+      toast.error('Failed to update reputation.');
     }
   };
 
@@ -713,7 +742,39 @@ export default function AdminDashboardPage() {
                   <div className="text-zinc-500 text-xs font-mono truncate">
                     {agent.walletAddress ? `${agent.walletAddress.slice(0, 6)}...${agent.walletAddress.slice(-4)}` : "—"}
                   </div>
-                  <div className="text-white font-mono font-bold">{agent.reputation}</div>
+                  <div className="flex items-center gap-1.5">
+                    {editingRepAgent === agent.id ? (
+                      <div className="flex items-center gap-1">
+                        <input
+                          type="number"
+                          value={repInputValue}
+                          onChange={(e) => setRepInputValue(e.target.value)}
+                          onKeyDown={(e) => { if (e.key === 'Enter') handleSetReputation(agent.id); if (e.key === 'Escape') setEditingRepAgent(null); }}
+                          className="w-20 bg-zinc-800 border border-emerald-500/30 rounded px-1.5 py-0.5 text-white font-mono text-sm focus:outline-none focus:border-emerald-500"
+                          autoFocus
+                          min={0}
+                          max={100000}
+                        />
+                        <button onClick={() => handleSetReputation(agent.id)} className="p-0.5 text-emerald-500 hover:text-emerald-400 transition-colors">
+                          <Check size={14} />
+                        </button>
+                        <button onClick={() => setEditingRepAgent(null)} className="p-0.5 text-zinc-500 hover:text-zinc-300 transition-colors">
+                          <X size={14} />
+                        </button>
+                      </div>
+                    ) : (
+                      <>
+                        <span className="text-white font-mono font-bold">{agent.reputation}</span>
+                        <button
+                          onClick={() => { setEditingRepAgent(agent.id); setRepInputValue(String(agent.reputation || 0)); }}
+                          className="p-0.5 text-zinc-600 hover:text-emerald-500 transition-colors"
+                          title="Edit reputation"
+                        >
+                          <Edit3 size={12} />
+                        </button>
+                      </>
+                    )}
+                  </div>
                   <div>
                     <button
                       onClick={() => handleToggleVerified(agent.id, agent.isVerified)}
@@ -1028,9 +1089,32 @@ export default function AdminDashboardPage() {
                           <div className="space-y-3">
                             {sub.deliverables.map((d: any, i: number) => (
                               <div key={i} className="p-4 bg-black/40 border border-emerald-500/20 rounded-lg">
-                                <div className="flex items-center gap-2 mb-2">
-                                  <span className="text-[10px] font-mono uppercase tracking-widest text-emerald-500/70 bg-emerald-500/10 px-2 py-0.5 rounded">{d.type}</span>
-                                  <span className="text-xs font-mono text-zinc-400">{d.label}</span>
+                                <div className="flex items-center justify-between gap-2 mb-2">
+                                  <div className="flex items-center gap-2">
+                                    <span className="text-[10px] font-mono uppercase tracking-widest text-emerald-500/70 bg-emerald-500/10 px-2 py-0.5 rounded">{d.type}</span>
+                                    <span className="text-xs font-mono text-zinc-400">{d.label}</span>
+                                  </div>
+                                  {(d.type === 'text' || d.type === 'code') && d.content && d.content !== '(No content provided)' && (
+                                    <button
+                                      onClick={() => {
+                                        const ext = d.type === 'code' ? '.txt' : '.md';
+                                        const mimeType = d.type === 'code' ? 'text/plain' : 'text/markdown';
+                                        const cleaned = (d.content || '').replace(/\\n/g, '\n').replace(/\\t/g, '\t');
+                                        const blob = new Blob([cleaned], { type: mimeType });
+                                        const url = URL.createObjectURL(blob);
+                                        const a = document.createElement('a');
+                                        a.href = url;
+                                        a.download = `${(d.label || 'deliverable').replace(/[^a-zA-Z0-9_-]/g, '_')}${ext}`;
+                                        document.body.appendChild(a);
+                                        a.click();
+                                        document.body.removeChild(a);
+                                        URL.revokeObjectURL(url);
+                                      }}
+                                      className="flex items-center gap-1 text-[10px] font-mono text-zinc-500 hover:text-emerald-400 transition-colors px-2 py-1 border border-zinc-700 hover:border-emerald-500/30 rounded"
+                                    >
+                                      <Download size={10} /> Download
+                                    </button>
+                                  )}
                                 </div>
                                 <DeliverableContent type={d.type} content={d.content} />
                               </div>
@@ -1148,23 +1232,26 @@ function DeliverableContent({ type, content }: { type: string; content: string }
     return <p className="text-sm text-zinc-600 italic">No content provided</p>;
   }
 
+  // Clean escaped newlines that might come through even after server-side cleaning
+  const cleaned = content.replace(/\\n/g, '\n').replace(/\\t/g, '\t');
+
   switch (type) {
     case 'url':
       return (
         <a
-          href={content}
+          href={cleaned}
           target="_blank"
           rel="noopener noreferrer"
           className="text-emerald-400 hover:text-emerald-300 flex items-center gap-2 break-all text-sm"
         >
-          <ExternalLink className="w-4 h-4 shrink-0" /> {content}
+          <ExternalLink className="w-4 h-4 shrink-0" /> {cleaned}
         </a>
       );
 
     case 'code':
       return (
         <pre className="bg-zinc-900 border border-zinc-700 rounded-lg p-4 overflow-x-auto max-h-96 overflow-y-auto">
-          <code className="text-sm text-emerald-400 font-mono whitespace-pre-wrap break-words">{content}</code>
+          <code className="text-sm text-emerald-400 font-mono whitespace-pre-wrap break-words">{cleaned}</code>
         </pre>
       );
 
@@ -1173,10 +1260,10 @@ function DeliverableContent({ type, content }: { type: string; content: string }
         <div className="space-y-2">
           <div className="flex items-center gap-2">
             <span className="text-xs text-zinc-500 font-mono">Mint:</span>
-            <code className="text-sm text-emerald-400 bg-zinc-800 px-2 py-0.5 rounded font-mono break-all">{content}</code>
+            <code className="text-sm text-emerald-400 bg-zinc-800 px-2 py-0.5 rounded font-mono break-all">{cleaned}</code>
           </div>
           <a
-            href={`https://solscan.io/token/${content}`}
+            href={`https://solscan.io/token/${cleaned}`}
             target="_blank"
             rel="noopener noreferrer"
             className="text-emerald-400 hover:text-emerald-300 flex items-center gap-1.5 text-xs font-mono"
@@ -1190,12 +1277,12 @@ function DeliverableContent({ type, content }: { type: string; content: string }
     case 'file':
       return (
         <a
-          href={content}
+          href={cleaned}
           target="_blank"
           rel="noopener noreferrer"
           className="text-emerald-400 hover:text-emerald-300 flex items-center gap-2 break-all text-sm"
         >
-          <ExternalLink className="w-4 h-4 shrink-0" /> {content}
+          <ExternalLink className="w-4 h-4 shrink-0" /> {cleaned}
         </a>
       );
 
@@ -1203,7 +1290,7 @@ function DeliverableContent({ type, content }: { type: string; content: string }
     default:
       return (
         <div className="text-zinc-300 text-sm font-light max-h-96 overflow-y-auto leading-relaxed prose prose-invert prose-sm max-w-none prose-headings:text-white prose-headings:font-mono prose-headings:font-bold prose-p:text-zinc-300 prose-a:text-emerald-400 prose-strong:text-white prose-code:text-emerald-400 prose-code:bg-zinc-800 prose-code:px-1 prose-code:py-0.5 prose-code:rounded prose-pre:bg-zinc-900 prose-pre:border prose-pre:border-zinc-700 prose-li:text-zinc-300">
-          <ReactMarkdown>{content}</ReactMarkdown>
+          <ReactMarkdown>{cleaned}</ReactMarkdown>
         </div>
       );
   }

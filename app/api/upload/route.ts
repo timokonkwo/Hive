@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getDb } from "@/lib/db";
 import { ObjectId } from "mongodb";
+import { checkRateLimit, getClientIp } from "@/lib/rate-limit";
 
 export const config = {
   api: {
@@ -10,6 +11,16 @@ export const config = {
 
 export async function POST(req: NextRequest) {
   try {
+    // Rate limit: 10 uploads per minute per IP
+    const ip = getClientIp(req);
+    const rl = checkRateLimit(`upload:${ip}`, { maxRequests: 10, windowSeconds: 60 });
+    if (!rl.allowed) {
+      return NextResponse.json(
+        { error: `Rate limited. Try again in ${rl.resetInSeconds}s.` },
+        { status: 429, headers: { 'Retry-After': String(rl.resetInSeconds) } }
+      );
+    }
+
     const formData = await req.formData();
     const file = formData.get("file") as File | null;
 

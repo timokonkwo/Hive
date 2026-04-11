@@ -146,95 +146,127 @@ export async function GET(request: NextRequest) {
 }
 
 /**
+ * Try to parse a string as JSON. Returns null on failure.
+ */
+function safeParse(str: string): any | null {
+  try {
+    return JSON.parse(str);
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Clean up content: fix escaped newlines, trim whitespace.
+ */
+function cleanContent(str: string): string {
+  if (!str) return '';
+  // Replace literal \n (two-char sequences) with real newlines
+  return str.replace(/\\n/g, '\n').trim();
+}
+
+/**
  * Extract actual text content from a deliverable's content field.
- * Agents sometimes send:
+ * Agents send content in many broken formats:
  *  - A plain string (correct)
- *  - A stringified JSON of the entire submission body
+ *  - A stringified JSON of the entire submission body { summary, deliverables: [] }
  *  - An object with nested content/summary
  *  - undefined/null
  */
 function extractContent(raw: any): string {
   if (raw == null) return '';
 
-  // Already a clean string — check if it's JSON wrapping real content
   if (typeof raw === 'string') {
     const trimmed = raw.trim();
+
+    // Try JSON parse if it looks like an object or array
     if (trimmed.startsWith('{') || trimmed.startsWith('[')) {
-      try {
-        const parsed = JSON.parse(trimmed);
-        // Agent sent the whole submission as content: { summary, deliverables }
+      const parsed = safeParse(trimmed);
+      if (parsed) {
+        // Case: agent sent entire submission body as content
+        // { summary: "...", deliverables: [{ content: "actual work" }] }
         if (parsed.deliverables && Array.isArray(parsed.deliverables)) {
-          // Extract the nested actual content
           const nested = parsed.deliverables
-            .map((d: any) => d.content)
-            .filter(Boolean)
+            .map((d: any) => extractContent(d.content))
+            .filter((c: string) => c.length > 0)
             .join('\n\n');
-          return (nested || parsed.summary || trimmed).slice(0, 2000);
+          return cleanContent(nested || parsed.summary || trimmed);
         }
-        // Object with a content field
-        if (parsed.content && typeof parsed.content === 'string') {
-          return parsed.content.slice(0, 2000);
+        // Case: nested object with a content field
+        if (typeof parsed.content === 'string') {
+          return cleanContent(parsed.content);
         }
-        // Object with a summary field
-        if (parsed.summary && typeof parsed.summary === 'string') {
-          return parsed.summary.slice(0, 2000);
+        // Case: nested object with summary only
+        if (typeof parsed.summary === 'string') {
+          return cleanContent(parsed.summary);
         }
-      } catch {
-        // Not valid JSON — just a string that starts with {
+        // Case: it parsed into something but doesn't match known patterns
+        // Return cleaned original string rather than the JSON structure
+        if (parsed.type && parsed.label) {
+          // This looks like a single deliverable object - extract content
+          if (typeof parsed.content === 'string') {
+            return cleanContent(parsed.content);
+          }
+        }
       }
     }
-    return trimmed.slice(0, 2000);
+
+    return cleanContent(trimmed);
   }
 
   // Object (not stringified)
   if (typeof raw === 'object') {
+    if (typeof raw.content === 'string') return cleanContent(raw.content);
     if (raw.content) return extractContent(raw.content);
-    if (raw.summary) return String(raw.summary).slice(0, 2000);
-    if (raw.text) return String(raw.text).slice(0, 2000);
-    return JSON.stringify(raw).slice(0, 500);
+    if (raw.summary) return cleanContent(String(raw.summary));
+    if (raw.text) return cleanContent(String(raw.text));
+    // Last resort: stringify, but clean it
+    return cleanContent(JSON.stringify(raw));
   }
 
-  return String(raw).slice(0, 2000);
+  return cleanContent(String(raw));
 }
 
 /**
- * Normalize the deliverables array for admin display.
+ * Normalize the deliverables array for display.
  * Handles cases where agents crammed the entire submission into one deliverable,
- * or where deliverables have no content.
+ * or where deliverables have malformed or missing content.
  */
 function normalizeDeliverables(raw: any, fallbackSummary?: string): Array<{ type: string; label: string; content: string }> {
   if (!raw || !Array.isArray(raw) || raw.length === 0) {
-    // No deliverables — use the summary as a single deliverable
     return fallbackSummary
-      ? [{ type: 'text', label: 'Work Summary', content: fallbackSummary }]
+      ? [{ type: 'text', label: 'Work Summary', content: cleanContent(fallbackSummary) }]
       : [];
   }
 
   const results: Array<{ type: string; label: string; content: string }> = [];
 
   for (const d of raw) {
-    const content = extractContent(d.content);
-
-    // Check if this deliverable's content contains nested deliverables (agent sent whole body)
-    if (typeof d.content === 'string' && d.content.trim().startsWith('{')) {
-      try {
-        const parsed = JSON.parse(d.content);
-        if (parsed.deliverables && Array.isArray(parsed.deliverables) && parsed.deliverables.length > 0) {
-          // Unpack the nested deliverables
+    // Check if the content field contains nested deliverables (agent sent whole body as content)
+    if (d.content && typeof d.content === 'string') {
+      const trimmedContent = d.content.trim();
+      if (trimmedContent.startsWith('{') || trimmedContent.startsWith('[')) {
+        const parsed = safeParse(trimmedContent);
+        if (parsed?.deliverables && Array.isArray(parsed.deliverables) && parsed.deliverables.length > 0) {
+          // Unpack nested deliverables - preserve their individual types
           for (const nested of parsed.deliverables) {
-            results.push({
-              type: nested.type || d.type || 'text',
-              label: nested.label || d.label || 'Deliverable',
-              content: extractContent(nested.content),
-            });
+            const nestedContent = extractContent(nested.content);
+            if (nestedContent) {
+              results.push({
+                type: nested.type || d.type || 'text',
+                label: nested.label || d.label || 'Deliverable',
+                content: nestedContent,
+              });
+            }
           }
-          continue;
+          // If we successfully unpacked nested deliverables, skip the outer one
+          if (results.length > 0) continue;
         }
-      } catch {
-        // Not JSON, fall through
       }
     }
 
+    // Normal deliverable - extract and clean content
+    const content = extractContent(d.content);
     results.push({
       type: d.type || 'text',
       label: d.label || 'Deliverable',
@@ -244,3 +276,4 @@ function normalizeDeliverables(raw: any, fallbackSummary?: string): Array<{ type
 
   return results;
 }
+

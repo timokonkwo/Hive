@@ -4,7 +4,7 @@ import { use, useState, useEffect } from "react";
 import { Navbar } from "@/components/layout/Navbar";
 import { Footer } from "@/components/layout/Footer";
 import { useAuth } from "@/hooks/useAuth";
-import { ArrowLeft, Clock, Coins, CheckCircle, X, Loader2, ChevronDown, ChevronUp, UserCheck, XCircle, ExternalLink, BadgeCheck, Rocket, Copy, Star, MessageSquare, AlertTriangle } from "lucide-react";
+import { ArrowLeft, Clock, Coins, CheckCircle, X, Loader2, ChevronDown, ChevronUp, UserCheck, XCircle, ExternalLink, BadgeCheck, Rocket, Copy, Star, MessageSquare, AlertTriangle, Download } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
@@ -745,52 +745,77 @@ export default function TaskDetailsPage({ params }: { params: Promise<{ taskId: 
                             <div>
                                 <h4 className="text-xs font-mono uppercase tracking-widest text-emerald-500/70 mb-2">Deliverables</h4>
                                 <div className="space-y-3">
-                                    {Array.isArray(submission.deliverables) ? submission.deliverables.map((d: any, i: number) => (
+                                    {Array.isArray(submission.deliverables) ? submission.deliverables.map((d: any, i: number) => {
+                                        const cleanedContent = (d.content || '').replace(/\\n/g, '\n').replace(/\\t/g, '\t');
+                                        return (
                                         <div key={i} className="p-4 bg-black/40 border border-emerald-500/20 rounded-lg">
-                                            <div className="flex items-center gap-2 mb-2">
-                                                <span className="text-[10px] font-mono uppercase tracking-widest text-emerald-500/70 bg-emerald-500/10 px-2 py-0.5 rounded">{d.type}</span>
-                                                <span className="text-xs font-mono text-zinc-400">{d.label}</span>
+                                            <div className="flex items-center justify-between gap-2 mb-2">
+                                                <div className="flex items-center gap-2">
+                                                    <span className="text-[10px] font-mono uppercase tracking-widest text-emerald-500/70 bg-emerald-500/10 px-2 py-0.5 rounded">{d.type}</span>
+                                                    <span className="text-xs font-mono text-zinc-400">{d.label}</span>
+                                                </div>
+                                                {(d.type === 'text' || d.type === 'code') && cleanedContent && (
+                                                    <button
+                                                        onClick={() => {
+                                                            const ext = d.type === 'code' ? '.txt' : '.md';
+                                                            const mimeType = d.type === 'code' ? 'text/plain' : 'text/markdown';
+                                                            const blob = new Blob([cleanedContent], { type: mimeType });
+                                                            const url = URL.createObjectURL(blob);
+                                                            const a = document.createElement('a');
+                                                            a.href = url;
+                                                            a.download = `${(d.label || 'deliverable').replace(/[^a-zA-Z0-9_-]/g, '_')}${ext}`;
+                                                            document.body.appendChild(a);
+                                                            a.click();
+                                                            document.body.removeChild(a);
+                                                            URL.revokeObjectURL(url);
+                                                        }}
+                                                        className="flex items-center gap-1 text-[10px] font-mono text-zinc-500 hover:text-emerald-400 transition-colors px-2 py-1 border border-zinc-700 hover:border-emerald-500/30 rounded"
+                                                    >
+                                                        <Download size={10} /> Download
+                                                    </button>
+                                                )}
                                             </div>
                                             {d.type === 'url' ? (
                                                 <a
-                                                    href={d.content}
+                                                    href={cleanedContent}
                                                     target="_blank"
                                                     rel="noopener noreferrer"
                                                     className="text-emerald-400 hover:text-emerald-300 flex items-center gap-2 break-all text-sm"
                                                 >
                                                     <ExternalLink className="w-4 h-4 shrink-0" />
-                                                    {d.content}
+                                                    {cleanedContent}
                                                 </a>
                                             ) : d.type === 'code' ? (
                                                 <pre className="bg-zinc-900 border border-zinc-700 rounded-lg p-4 overflow-x-auto max-h-96 overflow-y-auto">
-                                                    <code className="text-sm text-emerald-400 font-mono whitespace-pre-wrap break-words">{d.content}</code>
+                                                    <code className="text-sm text-emerald-400 font-mono whitespace-pre-wrap break-words">{cleanedContent}</code>
                                                 </pre>
                                             ) : d.type === 'token_launch' ? (
                                                 <div className="space-y-2">
                                                     <div className="flex items-center gap-2">
                                                         <span className="text-xs text-zinc-500 font-mono">Mint:</span>
-                                                        <code className="text-sm text-emerald-400 bg-zinc-800 px-2 py-0.5 rounded font-mono break-all">{d.content}</code>
+                                                        <code className="text-sm text-emerald-400 bg-zinc-800 px-2 py-0.5 rounded font-mono break-all">{cleanedContent}</code>
                                                     </div>
-                                                    <a href={`https://solscan.io/token/${d.content}`} target="_blank" rel="noopener noreferrer" className="text-emerald-400 hover:text-emerald-300 flex items-center gap-1.5 text-xs font-mono">
+                                                    <a href={`https://solscan.io/token/${cleanedContent}`} target="_blank" rel="noopener noreferrer" className="text-emerald-400 hover:text-emerald-300 flex items-center gap-1.5 text-xs font-mono">
                                                         <ExternalLink className="w-3 h-3" /> View on Solscan
                                                     </a>
                                                 </div>
                                             ) : (d.type === 'image' || d.type === 'file') ? (
                                                 <a
-                                                    href={d.content}
+                                                    href={cleanedContent}
                                                     target="_blank"
                                                     rel="noopener noreferrer"
                                                     className="text-emerald-400 hover:text-emerald-300 flex items-center gap-2 break-all text-sm"
                                                 >
-                                                    <ExternalLink className="w-4 h-4 shrink-0" /> {d.content}
+                                                    <ExternalLink className="w-4 h-4 shrink-0" /> {cleanedContent}
                                                 </a>
                                             ) : (
                                                 <div className="text-zinc-300 text-sm font-light max-h-96 overflow-y-auto leading-relaxed prose prose-invert prose-sm max-w-none prose-headings:text-white prose-headings:font-mono prose-headings:font-bold prose-p:text-zinc-300 prose-a:text-emerald-400 prose-strong:text-white prose-code:text-emerald-400 prose-code:bg-zinc-800 prose-code:px-1 prose-code:py-0.5 prose-code:rounded prose-pre:bg-zinc-900 prose-pre:border prose-pre:border-zinc-700 prose-li:text-zinc-300">
-                                                    <ReactMarkdown>{d.content}</ReactMarkdown>
+                                                    <ReactMarkdown>{cleanedContent}</ReactMarkdown>
                                                 </div>
                                             )}
                                         </div>
-                                    )) : (
+                                        );
+                                    }) : (
                                         <div className="p-4 bg-black/40 border border-emerald-500/20 rounded-lg">
                                             <p className="text-zinc-300 text-sm">{String(submission.deliverables)}</p>
                                         </div>

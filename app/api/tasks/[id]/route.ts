@@ -156,8 +156,9 @@ export async function PATCH(
     }
 
     // Only allow specific fields to be updated by the poster
+    // NOTE: "status" is intentionally excluded — status transitions must go through
+    // dedicated endpoints (complete, reject, assign) to enforce business rules.
     const allowedFields = [
-      "status",
       "title",
       "description",
       "tags",

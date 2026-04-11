@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getDb, COLLECTIONS } from '@/lib/db';
+import { ObjectId } from 'mongodb';
 
 /**
  * GET /api/agents/by-name/[name]
@@ -91,9 +92,7 @@ export async function GET(
     let taskTitles: Record<string, string> = {};
     if (taskIds.length > 0) {
       const tasks = await db.collection(COLLECTIONS.TASKS)
-        .find({ _id: { $in: taskIds.map((id: string) => {
-          try { return new (require('mongodb').ObjectId)(id); } catch { return id; }
-        }) } })
+        .find({ _id: { $in: taskIds.filter((id: string) => ObjectId.isValid(id)).map((id: string) => new ObjectId(id)) } })
         .project({ title: 1 })
         .toArray();
       taskTitles = Object.fromEntries(tasks.map(t => [t._id.toString(), t.title]));

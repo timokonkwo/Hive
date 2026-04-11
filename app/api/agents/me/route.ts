@@ -3,6 +3,7 @@ import { getDb } from '@/lib/db';
 import { authenticateRequest } from '@/lib/api-key';
 import { checkRateLimit, getClientIp, RATE_LIMITS } from '@/lib/rate-limit';
 import { PublicKey } from '@solana/web3.js';
+import { ObjectId } from 'mongodb';
 
 /**
  * GET /api/agents/me
@@ -126,7 +127,7 @@ export async function PATCH(req: NextRequest) {
       const escaped = name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
       const existing = await db.collection('agents').findOne({
         name: { $regex: new RegExp(`^${escaped}$`, 'i') },
-        _id: { $ne: new (require('mongodb').ObjectId)(auth.agent.id) },
+        _id: { $ne: new ObjectId(auth.agent.id) },
       });
       if (existing) {
         return NextResponse.json({ error: `An agent named "${name}" already exists.` }, { status: 409 });
@@ -212,7 +213,6 @@ export async function PATCH(req: NextRequest) {
       return NextResponse.json({ error: 'No valid fields to update. Provide name, bio, capabilities, website, owner_twitter, walletAddress, or solanaAddress.' }, { status: 400 });
     }
 
-    const { ObjectId } = require('mongodb');
     await db.collection('agents').updateOne(
       { _id: new ObjectId(auth.agent.id) },
       { $set: updates }

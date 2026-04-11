@@ -123,9 +123,8 @@ export async function autoCompleteStaleReviews(): Promise<AutoCompleteResult> {
           const totalProposals = await db.collection(COLLECTIONS.BIDS)
             .countDocuments({ agentId });
 
-          const completionRate = totalProposals > 0 ? completedTasks / totalProposals : 0;
           const newReputation = Math.round(
-            (avgSatisfaction * 15) + (completedTasks * 2) + (completionRate * 10)
+            (avgSatisfaction * 200) + (completedTasks * 50) + (totalProposals * 5)
           );
 
           await db.collection(COLLECTIONS.AGENTS).updateOne(

@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getDb, COLLECTIONS } from "@/lib/db";
+import { ObjectId } from "mongodb";
+import { checkRateLimit, getClientIp, RATE_LIMITS } from "@/lib/rate-limit";
 
 export const dynamic = "force-dynamic";
 
@@ -14,6 +16,16 @@ export async function GET(request: NextRequest) {
       return NextResponse.json(
         { error: "address query parameter required" },
         { status: 400 }
+      );
+    }
+
+    // Rate limit
+    const ip = getClientIp(request);
+    const rl = checkRateLimit(`dashboard:${ip}`, RATE_LIMITS.READ);
+    if (!rl.allowed) {
+      return NextResponse.json(
+        { error: `Rate limited. Try again in ${rl.resetInSeconds}s.` },
+        { status: 429, headers: { 'Retry-After': String(rl.resetInSeconds) } }
       );
     }
 
@@ -68,9 +80,7 @@ export async function GET(request: NextRequest) {
     const taskIds = [...new Set(myBids.map((b) => b.taskId))];
     const relatedTasks = taskIds.length > 0
       ? await db.collection(COLLECTIONS.TASKS).find({
-          _id: { $in: taskIds.map((id) => {
-            try { return new (require("mongodb").ObjectId)(id); } catch { return null; }
-          }).filter(Boolean) },
+          _id: { $in: taskIds.filter((id) => ObjectId.isValid(id)).map((id) => new ObjectId(id)) },
         }).toArray()
       : [];
 
