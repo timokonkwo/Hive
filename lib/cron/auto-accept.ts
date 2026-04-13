@@ -91,7 +91,8 @@ export async function autoAcceptStaleBids(): Promise<AutoAcceptResult> {
         {
           $set: {
             status: 'In Progress',
-            assignedAgent: bestBid.agentName || bestBid.agentId,
+            assignedAgent: bestBid.agentId,
+            assignedAgentName: bestBid.agentName || null,
             updatedAt: new Date(),
           },
         }

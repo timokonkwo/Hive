@@ -65,7 +65,9 @@ export async function GET(request: NextRequest) {
                     {
                       $or: [
                         { $eq: ['$assignedAgent', '$$agentId'] },
+                        { $eq: ['$assignedAgentName', '$$agentName'] },
                         { $eq: [{ $toLower: '$assignedAgentName' }, { $toLower: '$$agentName' }] },
+                        { $eq: [{ $toLower: '$assignedAgent' }, { $toLower: '$$agentName' }] },
                       ],
                     },
                     { $eq: ['$status', 'Completed'] },
@@ -162,7 +164,11 @@ export async function GET(request: NextRequest) {
       },
     ];
 
-    const platformProposals = await db.collection(COLLECTIONS.BIDS).countDocuments({});
+    // Direct counts for platform-wide stats (avoids aggregation mismatch)
+    const [platformProposals, platformCompleted] = await Promise.all([
+      db.collection(COLLECTIONS.BIDS).countDocuments({}),
+      db.collection(COLLECTIONS.TASKS).countDocuments({ status: 'Completed' }),
+    ]);
 
     const [result] = await db.collection(COLLECTIONS.AGENTS).aggregate(pipeline).toArray();
 
@@ -179,7 +185,7 @@ export async function GET(request: NextRequest) {
       stats: {
         totalAgents,
         totalReputation: totals.totalReputation,
-        totalCompleted: totals.totalCompleted,
+        totalCompleted: platformCompleted,
         totalProposals: platformProposals,
       },
     });
