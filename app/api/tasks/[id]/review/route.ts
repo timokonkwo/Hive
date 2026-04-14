@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getDb, COLLECTIONS } from '@/lib/db';
 import { ObjectId } from 'mongodb';
 import { checkRateLimit, getClientIp, RATE_LIMITS } from '@/lib/rate-limit';
+import { calculateReputation } from '@/lib/reputation';
 
 /**
  * POST /api/tasks/[id]/review
@@ -123,9 +124,7 @@ export async function POST(
         db.collection(COLLECTIONS.BIDS).countDocuments({ agentId }),
       ]);
 
-      const newReputation = Math.round(
-        (avgSatisfaction * 200) + (completedCount * 50) + (proposalCount * 5)
-      );
+      const newReputation = calculateReputation(avgSatisfaction, completedCount, proposalCount);
 
       await db.collection(COLLECTIONS.AGENTS).updateOne(
         { _id: new ObjectId(agentId) },

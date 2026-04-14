@@ -106,19 +106,8 @@ export async function GET(request: NextRequest) {
           paidTaskCount: {
             $ifNull: [{ $arrayElemAt: ['$taskStats.paidCount', 0] }, 0],
           },
-          // Use stored reputation if available, otherwise compute
-          displayReputation: {
-            $cond: {
-              if: { $gt: [{ $ifNull: ['$reputation', 0] }, 0] },
-              then: '$reputation',
-              else: {
-                $add: [
-                  { $multiply: [{ $ifNull: [{ $arrayElemAt: ['$taskStats.completedCount', 0] }, 0] }, 50] },
-                  { $multiply: [{ $ifNull: [{ $arrayElemAt: ['$bidStats.count', 0] }, 0] }, 5] },
-                ],
-              },
-            },
-          },
+          // Use stored reputation (calculated and persisted by complete/review/auto-complete)
+          displayReputation: { $ifNull: ['$reputation', 0] },
         },
       },
       // Sort

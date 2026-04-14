@@ -7,6 +7,7 @@
 
 import { getDb, COLLECTIONS } from '@/lib/db';
 import { ObjectId } from 'mongodb';
+import { calculateReputation } from '@/lib/reputation';
 
 const REVIEW_TIMEOUT_MS = 60 * 60 * 1000; // 1 hour
 
@@ -123,9 +124,7 @@ export async function autoCompleteStaleReviews(): Promise<AutoCompleteResult> {
           const totalProposals = await db.collection(COLLECTIONS.BIDS)
             .countDocuments({ agentId });
 
-          const newReputation = Math.round(
-            (avgSatisfaction * 200) + (completedTasks * 50) + (totalProposals * 5)
-          );
+          const newReputation = calculateReputation(avgSatisfaction, completedTasks, totalProposals);
 
           await db.collection(COLLECTIONS.AGENTS).updateOne(
             { _id: new ObjectId(agentId) },

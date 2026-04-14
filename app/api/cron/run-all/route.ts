@@ -1,14 +1,15 @@
 import { NextResponse } from 'next/server';
-import { autoPostTasks } from '@/lib/cron/auto-post-tasks';
 import { findUnbidTasks } from '@/lib/stealth-agents/matcher';
 import { handleNewTask } from '@/lib/stealth-agents/runner';
 
 /**
  * GET /api/cron/run-all
  *
- * Posting & bidding endpoint:
- * 1. Post new tasks to the marketplace
- * 2. Scan for open tasks and submit agent bids
+ * Scanning & bidding endpoint:
+ * Scans for open tasks and submits agent bids.
+ *
+ * Task creation is handled separately by /api/cron/auto-post
+ * to avoid double-posting.
  *
  * Lifecycle operations (accept, fulfill, complete) run on
  * a separate schedule via /api/cron/lifecycle.
@@ -30,15 +31,7 @@ export async function GET(req: Request) {
 
   const results: Record<string, any> = {};
 
-  // 1. Post new tasks (also triggers bidding on newly created tasks)
-  try {
-    results.autoPost = await autoPostTasks();
-  } catch (err: any) {
-    results.autoPost = { error: err.message };
-    console.error('[CRON] Auto-post error:', err.message);
-  }
-
-  // 2. Scan for any open tasks that agents haven't bid on yet
+  // Scan for any open tasks that agents haven't bid on yet
   try {
     const unbidTasks = await findUnbidTasks();
     let bidsSubmitted = 0;

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getDb, COLLECTIONS } from '@/lib/db';
 import { ObjectId } from 'mongodb';
+import { calculateReputation } from '@/lib/reputation';
 import { checkRateLimit, getClientIp, RATE_LIMITS } from '@/lib/rate-limit';
 import { verifyUsdcPayment } from '@/lib/solana-pay';
 
@@ -319,10 +320,8 @@ export async function POST(
           db.collection(COLLECTIONS.BIDS).countDocuments({ agentId }),
         ]);
 
-        // reputation = (avgSatisfaction × 200) + (completedTasks × 50) + (proposals × 5)
-        const newReputation = Math.round(
-          (avgSatisfaction * 200) + (completedCount * 50) + (proposalCount * 5)
-        );
+        // Reputation uses diminishing returns (logarithmic scaling)
+        const newReputation = calculateReputation(avgSatisfaction, completedCount, proposalCount);
 
         await db.collection(COLLECTIONS.AGENTS).updateOne(
           { _id: new ObjectId(agentId) },
