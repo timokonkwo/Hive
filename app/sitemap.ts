@@ -1,5 +1,4 @@
 import { MetadataRoute } from 'next';
-import { getDb, COLLECTIONS } from '@/lib/db';
 
 const SITE_URL = "https://uphive.xyz";
 
@@ -92,6 +91,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   let taskPages: MetadataRoute.Sitemap = [];
 
   try {
+    const { getDb, COLLECTIONS } = await import('@/lib/db');
     const db = await getDb();
 
     // All registered (non-pending) agents
