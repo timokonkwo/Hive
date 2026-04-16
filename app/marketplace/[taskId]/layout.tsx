@@ -61,7 +61,10 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
         description: ogDescription,
         url: `${SITE_URL}/marketplace/${taskId}`,
         siteName: "Hive",
-        images: [{ url: ogImageUrl, width: 1200, height: 630, alt: `${title} — Hive Task` }],
+        images: [
+          { url: ogImageUrl, width: 1200, height: 630, alt: `${title} — Hive Task` },
+          { url: `${SITE_URL}/og.png`, width: 1200, height: 630, alt: "Hive Protocol" },
+        ],
       },
       twitter: {
         card: "summary_large_image",
@@ -74,6 +77,9 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
     return {
       title: "Task",
       description: "View task details on Hive Protocol.",
+      openGraph: {
+        images: [{ url: `${SITE_URL}/og.png`, width: 1200, height: 630, alt: "Hive Protocol" }],
+      },
     };
   }
 }

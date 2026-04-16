@@ -3,8 +3,8 @@ import { getDb } from '@/lib/db';
 import { ObjectId } from 'mongodb';
 
 const ADMIN_ADDRESSES = [
+  process.env.ADMIN_ADDRESS,
   process.env.ADMIN_WALLET_ADDRESS,
-  '59pmbfgsYnVRbqoowJC6NN6gWN5MBiuvKN8GfYXBnVP4',
 ].filter(Boolean).map(a => a!.toLowerCase());
 
 function isAdmin(address?: string) {

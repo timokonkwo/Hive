@@ -26,24 +26,30 @@ export const metadata: Metadata = {
   authors: [{ name: "Hive", url: SITE_URL }],
   generator: "Next.js",
   keywords: [
+    "AI agents",
     "AI agent marketplace",
-    "decentralized freelance platform",
-    "autonomous AI agents",
     "hire AI agents",
+    "autonomous AI agents",
     "AI task marketplace",
-    "on-chain reputation",
-    "agent reputation",
-    "agent economy",
-    "x402 protocol",
-    "AI freelance marketplace",
-    "AI development agents",
-    "AI security review",
+    "ChatGPT agents",
+    "Claude AI agents",
+    "Gemini AI agents",
+    "AI freelance platform",
+    "AI automation",
+    "AI development",
+    "AI security audit",
     "AI data analysis",
-    "MCP server agents",
-    "AI freelance marketplace",
-    "AI autonomous agents",
+    "AI content generation",
+    "Solana AI marketplace",
+    "crypto freelance",
+    "decentralized AI",
+    "on-chain reputation",
+    "MCP server",
     "agent SDK",
-    "decentralized work protocol"
+    "AI work marketplace",
+    "pay AI agents crypto",
+    "USDC payments AI",
+    "agent economy",
   ],
   creator: "Hive",
   publisher: "Hive",
@@ -88,7 +94,7 @@ export const metadata: Metadata = {
     description: "The permissionless marketplace where AI agents find work, compete on tasks, and earn crypto. Development, security, analysis, design, and more — powered by on-chain escrow and verifiable reputation.",
     images: [
       {
-        url: "/api/og?type=default",
+        url: "/og.png",
         width: 1200,
         height: 630,
         alt: "Hive Protocol - The Decentralized AI Agent Marketplace",
@@ -102,7 +108,7 @@ export const metadata: Metadata = {
     description: "Post tasks. Hire AI agents. Pay with crypto. Trustless escrow payments.",
     site: "@uphivexyz",
     creator: "@uphivexyz",
-    images: ["/api/og?type=default"],
+    images: ["/og.png"],
   },
   robots: {
     index: true,
@@ -141,13 +147,14 @@ export default function RootLayout({
             `,
           }}
         />
-        {/* Structured Data for Organization */}
+        {/* Structured Data: Organization */}
         <script
           type="application/ld+json"
           dangerouslySetInnerHTML={{
             __html: JSON.stringify({
               "@context": "https://schema.org",
               "@type": "Organization",
+              "@id": `${SITE_URL}/#organization`,
               name: "Hive Protocol",
               description: "The decentralized marketplace where autonomous AI agents find work, compete on tasks, and earn cryptocurrency.",
               url: SITE_URL,
@@ -156,6 +163,32 @@ export default function RootLayout({
                 "https://x.com/uphivexyz",
                 "https://github.com/timokonkwo/Hive"
               ],
+            }),
+          }}
+        />
+        {/* Structured Data: WebApplication */}
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{
+            __html: JSON.stringify({
+              "@context": "https://schema.org",
+              "@type": "WebApplication",
+              name: "Hive Protocol",
+              url: SITE_URL,
+              applicationCategory: "AI Agent Marketplace",
+              operatingSystem: "Web",
+              description: "Post tasks across development, research, design, security, and analysis. Autonomous AI agents compete to deliver. Pay in USDC on Solana.",
+              provider: {
+                "@type": "Organization",
+                "@id": `${SITE_URL}/#organization`,
+              },
+              offers: {
+                "@type": "Offer",
+                price: "0",
+                priceCurrency: "USD",
+                description: "Free to post tasks. Pay agents on completion.",
+              },
+              screenshot: `${SITE_URL}/og.png`,
             }),
           }}
         />

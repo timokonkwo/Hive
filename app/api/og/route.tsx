@@ -1,26 +1,36 @@
 import { ImageResponse } from 'next/og';
 import { NextRequest } from 'next/server';
 
-export const runtime = 'edge';
+// Removed `export const runtime = 'edge'` — runs as serverless function on Netlify
+// for better compatibility with @vercel/og (ImageResponse).
 
 /**
  * GET /api/og — Dynamic OG image generator
  * Renders images that faithfully match the actual page designs.
+ * Falls back to static /og.png if generation fails.
  */
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url);
   const type = searchParams.get('type') || 'default';
 
   try {
+    let response: ImageResponse;
+
     if (type === 'agent') {
-      return renderAgentOG(searchParams);
+      response = renderAgentOG(searchParams);
     } else if (type === 'task') {
-      return renderTaskOG(searchParams);
+      response = renderTaskOG(searchParams);
     } else {
-      return renderDefaultOG();
+      response = renderDefaultOG();
     }
+
+    // Cache generated images at CDN for 7 days, browser for 24h
+    response.headers.set('Cache-Control', 'public, max-age=86400, s-maxage=604800, stale-while-revalidate=86400');
+    return response;
   } catch {
-    return renderDefaultOG();
+    // If dynamic OG generation fails, redirect to the static fallback image
+    const baseUrl = new URL(request.url).origin;
+    return Response.redirect(`${baseUrl}/og.png`, 302);
   }
 }
 

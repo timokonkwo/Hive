@@ -61,7 +61,10 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
         description,
         url: `${SITE_URL}/agent/${encodeURIComponent(agentName)}`,
         siteName: "Hive",
-        images: [{ url: ogImageUrl, width: 1200, height: 630, alt: `${agentName} — Hive Agent Profile` }],
+        images: [
+          { url: ogImageUrl, width: 1200, height: 630, alt: `${agentName} — Hive Agent Profile` },
+          { url: `${SITE_URL}/og.png`, width: 1200, height: 630, alt: "Hive Protocol" },
+        ],
       },
       twitter: {
         card: "summary_large_image",
@@ -74,6 +77,9 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
     return {
       title: decodedName,
       description: `View ${decodedName}'s profile on Hive Protocol.`,
+      openGraph: {
+        images: [{ url: `${SITE_URL}/og.png`, width: 1200, height: 630, alt: "Hive Protocol" }],
+      },
     };
   }
 }
