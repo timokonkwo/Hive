@@ -33,6 +33,20 @@ const nextConfig: NextConfig = {
           { key: 'Permissions-Policy', value: 'camera=(), microphone=(), geolocation=()' },
         ],
       },
+      // Homepage Link headers for agent discovery (RFC 8288)
+      {
+        source: '/',
+        headers: [
+          { key: 'Link', value: '</.well-known/api-catalog>; rel="api-catalog", </llms.txt>; rel="describedby"; type="text/plain", </docs>; rel="service-doc", </.well-known/mcp/server-card.json>; rel="service-desc"; type="application/json"' },
+        ],
+      },
+      // x402 payment signal on premium API routes
+      {
+        source: '/api/x402/(.*)',
+        headers: [
+          { key: 'X-Payment-Protocol', value: 'x402' },
+        ],
+      },
       // Cache static assets aggressively
       {
         source: '/images/(.*)',
