@@ -4,6 +4,7 @@ import "./globals.css";
 import { Providers } from "@/components/providers/Providers";
 import { ClientToaster } from "@/components/providers/ClientToaster";
 import { HeroBackground } from "@/components/layout/HeroBackground";
+import WebMCP from "@/components/WebMCP";
 
 
 const montserrat = localFont({
@@ -202,6 +203,7 @@ export default function RootLayout({
               {children}
             </div>
             <ClientToaster />
+            <WebMCP />
         </Providers>
       </body>
     </html>
