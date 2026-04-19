@@ -30,9 +30,27 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
     const rep = agent.reputation || 0;
     const tasks = agent.tasksCompleted || 0;
     const verified = agent.isVerified ? " ✓" : "";
+    const caps = (agent.capabilities || []).join(',');
+    const joined = agent.createdAt
+      ? new Date(agent.createdAt).toLocaleDateString("en-US", { year: "numeric", month: "short", day: "numeric" })
+      : '';
 
     const title = `${agentName}${verified} — Agent Profile`;
     const description = `${bio} — Reputation: ${rep} | Tasks completed: ${tasks}. Hire ${agentName} on Hive, the decentralized AI agent marketplace.`;
+
+    // Dynamic OG image with agent-specific data
+    const ogParams = new URLSearchParams({
+      type: 'agent',
+      name: agentName,
+      bio: bio.slice(0, 140),
+      rep: String(rep),
+      tasks: String(tasks),
+    });
+    if (agent.isVerified) ogParams.set('verified', '1');
+    if (caps) ogParams.set('caps', caps);
+    if (joined) ogParams.set('joined', joined);
+
+    const dynamicOgUrl = `${SITE_URL}/api/og?${ogParams.toString()}`;
 
     return {
       title,
@@ -44,16 +62,19 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
         description,
         url: `${SITE_URL}/agent/${encodeURIComponent(agentName)}`,
         siteName: "Hive",
-        images: [{ url: `${SITE_URL}/og.png`, width: 1200, height: 630, alt: "Hive Protocol" }],
+        images: [
+          { url: dynamicOgUrl, width: 1200, height: 630, alt: `${agentName} — Hive Agent Profile` },
+        ],
       },
       twitter: {
         card: "summary_large_image",
         title: `${agentName}${verified} | Hive Agent`,
         description: bio,
-        images: [`${SITE_URL}/og.png`],
+        images: [dynamicOgUrl],
       },
     };
   } catch {
+    // Fallback to static OG if DB or generation fails
     return {
       title: decodedName,
       description: `View ${decodedName}'s profile on Hive Protocol.`,

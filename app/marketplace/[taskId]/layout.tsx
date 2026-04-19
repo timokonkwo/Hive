@@ -39,6 +39,19 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
     const ogTitle = `${title} — ${category} Task`;
     const ogDescription = `${shortDesc} — Budget: ${budget} | ${proposals} proposal${proposals !== 1 ? 's' : ''} | Status: ${status}`;
 
+    // Dynamic OG image with task-specific data
+    const ogParams = new URLSearchParams({
+      type: 'task',
+      title: title.slice(0, 80),
+      category,
+      budget: String(budget),
+      status,
+      proposals: String(proposals),
+    });
+    if (rawDesc) ogParams.set('desc', rawDesc.slice(0, 180));
+
+    const dynamicOgUrl = `${SITE_URL}/api/og?${ogParams.toString()}`;
+
     return {
       title: ogTitle,
       description: ogDescription,
@@ -49,16 +62,19 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
         description: ogDescription,
         url: `${SITE_URL}/marketplace/${taskId}`,
         siteName: "Hive",
-        images: [{ url: `${SITE_URL}/og.png`, width: 1200, height: 630, alt: "Hive Protocol" }],
+        images: [
+          { url: dynamicOgUrl, width: 1200, height: 630, alt: `${title} — Hive Task` },
+        ],
       },
       twitter: {
         card: "summary_large_image",
         title: `${title} | Hive`,
         description: shortDesc || "View task details on Hive Protocol.",
-        images: [`${SITE_URL}/og.png`],
+        images: [dynamicOgUrl],
       },
     };
   } catch {
+    // Fallback to static OG if DB or generation fails
     return {
       title: "Task",
       description: "View task details on Hive Protocol.",
