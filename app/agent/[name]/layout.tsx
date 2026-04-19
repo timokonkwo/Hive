@@ -25,30 +25,59 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
       };
     }
 
+    const agentId = agent._id.toString();
     const agentName = agent.name || decodedName;
     const bio = agent.bio || "AI agent on the Hive marketplace.";
-    const rep = agent.reputation || 0;
-    const tasks = agent.tasksCompleted || 0;
     const verified = agent.isVerified ? " ✓" : "";
     const caps = (agent.capabilities || []).join(',');
     const joined = agent.createdAt
       ? new Date(agent.createdAt).toLocaleDateString("en-US", { year: "numeric", month: "short", day: "numeric" })
       : '';
 
-    const title = `${agentName}${verified} — Agent Profile`;
-    const description = `${bio} — Reputation: ${rep} | Tasks completed: ${tasks}. Hire ${agentName} on Hive, the decentralized AI agent marketplace.`;
+    // Build the same assignedAgent query used by the by-name API
+    const assignedQuery: any = { $or: [{ assignedAgent: agentId }] };
+    if (agent.walletAddress) {
+      const walletEscaped = agent.walletAddress.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      assignedQuery.$or.push({ assignedAgent: { $regex: new RegExp(`^${walletEscaped}$`, 'i') } });
+    }
+    assignedQuery.$or.push({ assignedAgentName: { $regex: new RegExp(`^${escaped}$`, 'i') } });
 
-    // Dynamic OG image with agent-specific data
+    // Fetch real stats from tasks/bids collections
+    const [tasksCompleted, totalProposals, totalEarnings] = await Promise.all([
+      db.collection(COLLECTIONS.TASKS).countDocuments({
+        ...assignedQuery,
+        status: 'Completed',
+      }),
+      db.collection(COLLECTIONS.BIDS).countDocuments({ agentId }),
+      db.collection(COLLECTIONS.TASKS)
+        .find({ ...assignedQuery, status: 'Completed' })
+        .toArray()
+        .then(tasks => tasks.reduce((sum: number, t: any) => sum + (t.budgetAmount || 0), 0)),
+    ]);
+
+    const rep = agent.reputation || 0;
+    const earnings = totalEarnings > 0 ? `${totalEarnings.toFixed(1)}` : '0';
+    const satisfaction = agent.avgSatisfaction ? agent.avgSatisfaction.toFixed(1) : '';
+    const reviews = agent.reviewCount || 0;
+
+    const title = `${agentName}${verified} — Agent Profile`;
+    const description = `${bio} — Reputation: ${rep} | Tasks completed: ${tasksCompleted}. Hire ${agentName} on Hive, the decentralized AI agent marketplace.`;
+
+    // Dynamic OG image with full agent stats
     const ogParams = new URLSearchParams({
       type: 'agent',
       name: agentName,
       bio: bio.slice(0, 140),
       rep: String(rep),
-      tasks: String(tasks),
+      tasks: String(tasksCompleted),
+      proposals: String(totalProposals),
+      earnings: earnings,
     });
     if (agent.isVerified) ogParams.set('verified', '1');
     if (caps) ogParams.set('caps', caps);
     if (joined) ogParams.set('joined', joined);
+    if (satisfaction) ogParams.set('rating', satisfaction);
+    if (reviews) ogParams.set('reviews', String(reviews));
 
     const dynamicOgUrl = `${SITE_URL}/api/og?${ogParams.toString()}`;
 
@@ -74,7 +103,6 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
       },
     };
   } catch {
-    // Fallback to static OG if DB or generation fails
     return {
       title: decodedName,
       description: `View ${decodedName}'s profile on Hive Protocol.`,

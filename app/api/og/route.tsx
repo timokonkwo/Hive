@@ -48,10 +48,22 @@ function renderAgentOG(params: URLSearchParams) {
   const bio = params.get('bio') || '';
   const rep = params.get('rep') || '0';
   const tasks = params.get('tasks') || '0';
+  const proposals = params.get('proposals') || '0';
+  const earnings = params.get('earnings') || '0';
   const verified = params.get('verified') === '1';
   const caps = params.get('caps') || '';
   const joined = params.get('joined') || '';
-  const capabilities = caps ? caps.split(',').slice(0, 6) : [];
+  const rating = params.get('rating') || '';
+  const reviews = params.get('reviews') || '0';
+  const capabilities = caps ? caps.split(',').slice(0, 5) : [];
+
+  // Build stats array dynamically
+  const stats = [
+    { value: rep, label: 'Reputation', color: '#10b981' },
+    { value: tasks, label: 'Completed', color: '#3b82f6' },
+    { value: proposals, label: 'Proposals', color: '#a855f7' },
+    { value: `$${earnings}`, label: 'Earned (USDC)', color: '#eab308' },
+  ];
 
   return new ImageResponse(
     (
@@ -63,45 +75,67 @@ function renderAgentOG(params: URLSearchParams) {
           flexDirection: 'column',
           backgroundColor: '#09090b',
           fontFamily: 'system-ui, -apple-system, sans-serif',
-          padding: '0',
         }}
       >
-        {/* Navbar mimic */}
+        {/* Top accent line */}
+        <div style={{
+          height: '3px',
+          background: 'linear-gradient(90deg, #10b981, #3b82f6, #a855f7)',
+          display: 'flex',
+        }} />
+
+        {/* Header */}
         <div style={{
           display: 'flex',
           alignItems: 'center',
-          padding: '20px 60px',
-          borderBottom: '1px solid rgba(255,255,255,0.06)',
+          justifyContent: 'space-between',
+          padding: '24px 56px',
         }}>
-          <span style={{ color: '#10b981', fontSize: '28px', fontWeight: 800, letterSpacing: '-1px' }}>HIVE</span>
-          <span style={{ color: '#10b981', fontSize: '10px', marginLeft: '12px', padding: '2px 8px', border: '1px solid rgba(16,185,129,0.3)', borderRadius: '9999px' }}>LIVE</span>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+            <span style={{ color: '#10b981', fontSize: '26px', fontWeight: 800, letterSpacing: '-1px' }}>HIVE</span>
+            <span style={{
+              color: '#52525b',
+              fontSize: '12px',
+              fontWeight: 600,
+              textTransform: 'uppercase',
+              letterSpacing: '3px',
+            }}>Agent Profile</span>
+          </div>
+          {rating && Number(rating) > 0 && (
+            <div style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px',
+              padding: '6px 16px',
+              backgroundColor: 'rgba(234,179,8,0.08)',
+              border: '1px solid rgba(234,179,8,0.2)',
+              borderRadius: '9999px',
+            }}>
+              <span style={{ fontSize: '14px' }}>★</span>
+              <span style={{ color: '#eab308', fontSize: '14px', fontWeight: 700 }}>{rating}</span>
+              <span style={{ color: '#71717a', fontSize: '12px' }}>({reviews})</span>
+            </div>
+          )}
         </div>
 
-        {/* Main content area */}
-        <div style={{ display: 'flex', flexDirection: 'column', padding: '32px 60px', flex: 1 }}>
+        {/* Main content */}
+        <div style={{ display: 'flex', flex: 1, padding: '0 56px 24px', gap: '40px' }}>
 
-          {/* Profile Card — matches the actual page card */}
-          <div style={{
-            display: 'flex',
-            flexDirection: 'column',
-            backgroundColor: '#0A0A0A',
-            border: '1px solid rgba(255,255,255,0.1)',
-            borderRadius: '2px',
-            padding: '32px 40px',
-            marginBottom: '20px',
-          }}>
-            <div style={{ display: 'flex', alignItems: 'flex-start', gap: '24px' }}>
-              {/* Avatar */}
+          {/* Left: Profile info */}
+          <div style={{ display: 'flex', flexDirection: 'column', flex: 1, justifyContent: 'center' }}>
+
+            {/* Avatar + Name */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '24px', marginBottom: '20px' }}>
               <div style={{
-                width: '80px',
-                height: '80px',
+                width: '88px',
+                height: '88px',
                 backgroundColor: 'rgba(16,185,129,0.1)',
-                border: '1px solid rgba(16,185,129,0.2)',
-                borderRadius: '2px',
+                border: '2px solid rgba(16,185,129,0.3)',
+                borderRadius: '16px',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                fontSize: '32px',
+                fontSize: '36px',
                 fontWeight: 800,
                 color: '#10b981',
                 flexShrink: 0,
@@ -109,166 +143,127 @@ function renderAgentOG(params: URLSearchParams) {
                 {name.substring(0, 2).toUpperCase()}
               </div>
 
-              <div style={{ display: 'flex', flexDirection: 'column', flex: 1, minWidth: 0 }}>
-                {/* Name row */}
-                <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '8px' }}>
+              <div style={{ display: 'flex', flexDirection: 'column' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '6px' }}>
                   <span style={{
                     color: '#fff',
-                    fontSize: '36px',
-                    fontWeight: 900,
-                    textTransform: 'uppercase',
+                    fontSize: '38px',
+                    fontWeight: 800,
                     letterSpacing: '-1px',
+                    lineHeight: 1,
                   }}>
-                    {name}
+                    {name.length > 20 ? name.slice(0, 20) + '...' : name}
                   </span>
                   {verified && (
                     <span style={{
+                      padding: '4px 12px',
+                      backgroundColor: 'rgba(16,185,129,0.1)',
+                      border: '1px solid rgba(16,185,129,0.3)',
+                      borderRadius: '9999px',
+                      color: '#10b981',
+                      fontSize: '11px',
+                      fontWeight: 700,
+                      textTransform: 'uppercase',
+                      letterSpacing: '1px',
                       display: 'flex',
                       alignItems: 'center',
                       gap: '4px',
-                      color: '#10b981',
-                      fontSize: '12px',
-                      fontWeight: 700,
-                      textTransform: 'uppercase',
-                      letterSpacing: '2px',
                     }}>
                       ✓ Verified
                     </span>
                   )}
                 </div>
-
-                {/* Bio */}
-                {bio && (
-                  <div style={{
-                    color: '#a1a1aa',
-                    fontSize: '16px',
-                    lineHeight: '1.5',
-                    marginBottom: '12px',
-                    maxWidth: '800px',
-                  }}>
-                    {bio.length > 120 ? bio.slice(0, 120) + '...' : bio}
-                  </div>
-                )}
-
-                {/* Joined date */}
                 {joined && (
-                  <div style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '6px',
-                    color: '#71717a',
-                    fontSize: '12px',
-                    letterSpacing: '1px',
-                    marginBottom: '12px',
+                  <span style={{ color: '#52525b', fontSize: '13px' }}>
+                    Joined {joined}
+                  </span>
+                )}
+              </div>
+            </div>
+
+            {/* Bio */}
+            {bio && (
+              <div style={{
+                color: '#a1a1aa',
+                fontSize: '16px',
+                lineHeight: 1.6,
+                marginBottom: '20px',
+                maxWidth: '600px',
+              }}>
+                {bio.length > 130 ? bio.slice(0, 130) + '...' : bio}
+              </div>
+            )}
+
+            {/* Capability pills */}
+            {capabilities.length > 0 && (
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
+                {capabilities.map((cap, i) => (
+                  <span key={i} style={{
+                    padding: '5px 14px',
+                    backgroundColor: 'rgba(255,255,255,0.04)',
+                    border: '1px solid rgba(255,255,255,0.08)',
+                    color: '#a1a1aa',
+                    fontSize: '11px',
+                    fontWeight: 600,
+                    textTransform: 'uppercase',
+                    letterSpacing: '1.5px',
+                    borderRadius: '4px',
                   }}>
-                    📅 Joined {joined}
-                  </div>
-                )}
-
-                {/* Capability pills */}
-                {capabilities.length > 0 && (
-                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
-                    {capabilities.map((cap, i) => (
-                      <span key={i} style={{
-                        padding: '4px 10px',
-                        backgroundColor: 'rgba(255,255,255,0.05)',
-                        border: '1px solid rgba(255,255,255,0.1)',
-                        color: '#d4d4d8',
-                        fontSize: '10px',
-                        fontWeight: 600,
-                        textTransform: 'uppercase',
-                        letterSpacing: '1px',
-                        borderRadius: '2px',
-                      }}>
-                        {cap.trim()}
-                      </span>
-                    ))}
-                  </div>
-                )}
+                    {cap.trim()}
+                  </span>
+                ))}
               </div>
-            </div>
-          </div>
-
-          {/* Stats row — matches the 2-column grid on actual page */}
-          <div style={{ display: 'flex', gap: '16px' }}>
-            {/* Reputation card */}
-            <div style={{
-              flex: 1,
-              backgroundColor: '#0A0A0A',
-              border: '1px solid rgba(255,255,255,0.1)',
-              padding: '20px',
-              borderRadius: '2px',
-              display: 'flex',
-              flexDirection: 'column',
-              alignItems: 'center',
-            }}>
-              <div style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '8px',
-                color: '#10b981',
-                fontSize: '32px',
-                fontWeight: 700,
-              }}>
-                ⭐ {rep}
-              </div>
-              <div style={{
-                color: '#71717a',
-                fontSize: '10px',
-                textTransform: 'uppercase',
-                letterSpacing: '2px',
-                fontWeight: 600,
-                marginTop: '4px',
-              }}>
-                Reputation
-              </div>
-            </div>
-
-            {/* Tasks completed card */}
-            <div style={{
-              flex: 1,
-              backgroundColor: '#0A0A0A',
-              border: '1px solid rgba(255,255,255,0.1)',
-              padding: '20px',
-              borderRadius: '2px',
-              display: 'flex',
-              flexDirection: 'column',
-              alignItems: 'center',
-            }}>
-              <div style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '8px',
-                color: '#eab308',
-                fontSize: '32px',
-                fontWeight: 700,
-              }}>
-                📊 {tasks}
-              </div>
-              <div style={{
-                color: '#71717a',
-                fontSize: '10px',
-                textTransform: 'uppercase',
-                letterSpacing: '2px',
-                fontWeight: 600,
-                marginTop: '4px',
-              }}>
-                Tasks Completed
-              </div>
-            </div>
+            )}
           </div>
         </div>
 
-        {/* Bottom bar */}
+        {/* Stats bar */}
+        <div style={{
+          display: 'flex',
+          borderTop: '1px solid rgba(255,255,255,0.06)',
+          backgroundColor: 'rgba(255,255,255,0.02)',
+        }}>
+          {stats.map((stat, i) => (
+            <div key={i} style={{
+              flex: 1,
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              padding: '24px 0',
+              borderRight: i < stats.length - 1 ? '1px solid rgba(255,255,255,0.06)' : 'none',
+            }}>
+              <span style={{
+                color: stat.color,
+                fontSize: '30px',
+                fontWeight: 800,
+                lineHeight: 1,
+                marginBottom: '6px',
+              }}>
+                {stat.value}
+              </span>
+              <span style={{
+                color: '#52525b',
+                fontSize: '10px',
+                fontWeight: 700,
+                textTransform: 'uppercase',
+                letterSpacing: '2px',
+              }}>
+                {stat.label}
+              </span>
+            </div>
+          ))}
+        </div>
+
+        {/* Footer */}
         <div style={{
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'space-between',
-          padding: '16px 60px',
-          borderTop: '1px solid rgba(255,255,255,0.06)',
+          padding: '14px 56px',
+          borderTop: '1px solid rgba(255,255,255,0.04)',
         }}>
-          <span style={{ color: '#52525b', fontSize: '14px' }}>uphive.xyz/agent/{name}</span>
-          <span style={{ color: '#10b981', fontSize: '14px', fontWeight: 700 }}>HIVE PROTOCOL</span>
+          <span style={{ color: '#3f3f46', fontSize: '13px' }}>uphive.xyz/agent/{name}</span>
+          <span style={{ color: '#10b981', fontSize: '12px', fontWeight: 700, letterSpacing: '3px', textTransform: 'uppercase' }}>Hive Protocol</span>
         </div>
       </div>
     ),
