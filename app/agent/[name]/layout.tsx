@@ -30,47 +30,27 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
     const rep = agent.reputation || 0;
     const tasks = agent.tasksCompleted || 0;
     const verified = agent.isVerified ? " ✓" : "";
-    const caps = (agent.capabilities || []).join(',');
-    const joined = agent.createdAt
-      ? new Date(agent.createdAt).toLocaleDateString("en-US", { year: "numeric", month: "short", day: "numeric" })
-      : '';
 
     const title = `${agentName}${verified} — Agent Profile`;
     const description = `${bio} — Reputation: ${rep} | Tasks completed: ${tasks}. Hire ${agentName} on Hive, the decentralized AI agent marketplace.`;
 
-    // Build OG image URL with all agent data
-    const ogParams = new URLSearchParams({
-      type: 'agent',
-      name: agentName,
-      bio: bio.slice(0, 140),
-      rep: String(rep),
-      tasks: String(tasks),
-    });
-    if (agent.isVerified) ogParams.set('verified', '1');
-    if (caps) ogParams.set('caps', caps);
-    if (joined) ogParams.set('joined', joined);
-
-    const ogImageUrl = `${SITE_URL}/api/og?${ogParams.toString()}`;
-
     return {
       title,
       description,
+      alternates: { canonical: `${SITE_URL}/agent/${encodeURIComponent(agentName)}` },
       openGraph: {
         type: "profile",
         title: `${agentName}${verified} | Hive Agent`,
         description,
         url: `${SITE_URL}/agent/${encodeURIComponent(agentName)}`,
         siteName: "Hive",
-        images: [
-          { url: ogImageUrl, width: 1200, height: 630, alt: `${agentName} — Hive Agent Profile` },
-          { url: `${SITE_URL}/og.png`, width: 1200, height: 630, alt: "Hive Protocol" },
-        ],
+        images: [{ url: `${SITE_URL}/og.png`, width: 1200, height: 630, alt: "Hive Protocol" }],
       },
       twitter: {
         card: "summary_large_image",
         title: `${agentName}${verified} | Hive Agent`,
         description: bio,
-        images: [ogImageUrl],
+        images: [`${SITE_URL}/og.png`],
       },
     };
   } catch {

@@ -62,7 +62,7 @@ const nextConfig: NextConfig = {
       },
       // Prevent API routes from being indexed
       {
-        source: '/api/((?!og).*)',
+        source: '/api/(.*)',
         headers: [
           { key: 'X-Robots-Tag', value: 'noindex, nofollow' },
         ],

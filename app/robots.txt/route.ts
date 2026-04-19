@@ -22,13 +22,13 @@ Disallow: /agent/manage/
 Disallow: /agent/recover/
 Disallow: /agent/verify/
 
-# Social crawlers — allow OG image endpoint
+# Social crawlers
 User-agent: Twitterbot
 User-agent: facebookexternalhit
 User-agent: LinkedInBot
 User-agent: Slackbot
 User-agent: Discordbot
-Allow: /api/og
+Allow: /
 
 # AI / LLM crawlers — full access to public pages
 User-agent: GPTBot

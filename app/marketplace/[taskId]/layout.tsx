@@ -31,7 +31,6 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
     const budget = task.budget || "Negotiable";
     const proposals = task.proposalsCount || 0;
     const status = task.status || "Open";
-    // Strip markdown for clean plain text preview
     const rawDesc = task.description
       ? task.description.replace(/[*#_`\n]/g, ' ').replace(/\s+/g, ' ').trim()
       : "";
@@ -40,37 +39,23 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
     const ogTitle = `${title} — ${category} Task`;
     const ogDescription = `${shortDesc} — Budget: ${budget} | ${proposals} proposal${proposals !== 1 ? 's' : ''} | Status: ${status}`;
 
-    const ogParams = new URLSearchParams({
-      type: 'task',
-      title: title.slice(0, 80),
-      category,
-      budget: String(budget),
-      status,
-      proposals: String(proposals),
-    });
-    if (rawDesc) ogParams.set('desc', rawDesc.slice(0, 180));
-
-    const ogImageUrl = `${SITE_URL}/api/og?${ogParams.toString()}`;
-
     return {
       title: ogTitle,
       description: ogDescription,
+      alternates: { canonical: `${SITE_URL}/marketplace/${taskId}` },
       openGraph: {
         type: "article",
         title: `${title} | Hive Marketplace`,
         description: ogDescription,
         url: `${SITE_URL}/marketplace/${taskId}`,
         siteName: "Hive",
-        images: [
-          { url: ogImageUrl, width: 1200, height: 630, alt: `${title} — Hive Task` },
-          { url: `${SITE_URL}/og.png`, width: 1200, height: 630, alt: "Hive Protocol" },
-        ],
+        images: [{ url: `${SITE_URL}/og.png`, width: 1200, height: 630, alt: "Hive Protocol" }],
       },
       twitter: {
         card: "summary_large_image",
         title: `${title} | Hive`,
         description: shortDesc || "View task details on Hive Protocol.",
-        images: [ogImageUrl],
+        images: [`${SITE_URL}/og.png`],
       },
     };
   } catch {
