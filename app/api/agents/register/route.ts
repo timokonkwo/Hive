@@ -4,6 +4,7 @@ import { generateApiKey, hashApiKey, isValidApiKeyFormat } from '@/lib/api-key';
 import { checkRateLimit, getClientIp, RATE_LIMITS } from '@/lib/rate-limit';
 import { PublicKey } from '@solana/web3.js';
 import { randomBytes, createHash } from 'crypto';
+import { validateTokenSymbol, generateTokenSymbol, createAgentBagsClient } from '@/lib/bags-agent';
 
 /**
  * POST /api/agents/register
@@ -40,7 +41,7 @@ export async function POST(req: NextRequest) {
     const db = await getDb();
     const body = await req.json();
 
-    const { name: rawName, bio: rawBio, capabilities, owner_twitter, website, solana_address, referralCode: incomingReferral } = body;
+    const { name: rawName, bio: rawBio, capabilities, owner_twitter, website, solana_address, referralCode: incomingReferral, launchToken, tokenSymbol: rawTokenSymbol } = body;
 
     // Sanitize inputs
     const name = typeof rawName === 'string' ? rawName.trim() : '';
@@ -85,6 +86,129 @@ export async function POST(req: NextRequest) {
         return NextResponse.json(
           { error: 'Each capability must be a non-empty string of 50 characters or less.' },
           { status: 400 }
+        );
+      }
+    }
+
+    // ── Token launch validation (only when launchToken is true) ──
+    let finalTokenSymbol: string | null = null;
+    const wantsToken = launchToken === true;
+
+    if (wantsToken) {
+      // Stricter bio requirement for tokenized agents
+      if (bio.length < 50) {
+        return NextResponse.json(
+          { error: 'Tokenized agents require a bio of at least 50 characters.' },
+          { status: 400 }
+        );
+      }
+
+      // Require at least 2 capabilities for tokenized agents
+      if (!capabilities || capabilities.length < 2) {
+        return NextResponse.json(
+          { error: 'Tokenized agents require at least 2 capabilities.' },
+          { status: 400 }
+        );
+      }
+
+      // Rate limits for token launches (separate from registration rate limits)
+      const tokenHourlyRl = checkRateLimit(`agent-token-hour:${ip}`, { maxRequests: 2, windowSeconds: 3600 });
+      if (!tokenHourlyRl.allowed) {
+        return NextResponse.json(
+          { error: `Token launch rate limited. Max 2 per hour. Try again in ${tokenHourlyRl.resetInSeconds}s.` },
+          { status: 429 }
+        );
+      }
+
+      const tokenDailyRl = checkRateLimit(`agent-token-day:${ip}`, { maxRequests: 3, windowSeconds: 86400 });
+      if (!tokenDailyRl.allowed) {
+        return NextResponse.json(
+          { error: `Token launch daily limit reached. Max 3 per day. Try again in ${tokenDailyRl.resetInSeconds}s.` },
+          { status: 429 }
+        );
+      }
+
+      // Global daily cap
+      const todayStart = new Date();
+      todayStart.setHours(0, 0, 0, 0);
+      const todayLaunches = await db.collection(COLLECTIONS.ACTIVITY).countDocuments({
+        type: 'AgentTokenLaunched',
+        createdAt: { $gte: todayStart },
+      });
+      const dailyCap = 10;
+      if (todayLaunches >= dailyCap) {
+        return NextResponse.json(
+          { error: `Global daily limit of ${dailyCap} agent token launches reached. Try again tomorrow.` },
+          { status: 429 }
+        );
+      }
+
+      // Monthly cap
+      const monthStart = new Date();
+      monthStart.setDate(1);
+      monthStart.setHours(0, 0, 0, 0);
+      const monthLaunches = await db.collection(COLLECTIONS.ACTIVITY).countDocuments({
+        type: 'AgentTokenLaunched',
+        createdAt: { $gte: monthStart },
+      });
+      const monthlyCap = parseInt(process.env.AGENT_LAUNCH_MONTHLY_CAP || '50', 10);
+      if (monthLaunches >= monthlyCap) {
+        return NextResponse.json(
+          { error: `Monthly agent token launch cap (${monthlyCap}) reached. Try next month.` },
+          { status: 429 }
+        );
+      }
+
+      // Validate or generate token symbol
+      if (rawTokenSymbol) {
+        const symbolCheck = validateTokenSymbol(rawTokenSymbol);
+        if (!symbolCheck.valid) {
+          return NextResponse.json({ error: symbolCheck.error }, { status: 400 });
+        }
+        finalTokenSymbol = symbolCheck.normalized!;
+      } else {
+        finalTokenSymbol = generateTokenSymbol(name);
+      }
+
+      // Check symbol uniqueness among existing tokenized agents
+      const existingSymbol = await db.collection(COLLECTIONS.AGENTS).findOne({
+        tokenSymbol: finalTokenSymbol,
+        isTokenized: true,
+      });
+      if (existingSymbol) {
+        return NextResponse.json(
+          { error: `Token symbol "${finalTokenSymbol}" is already taken by another agent. Choose a different symbol.` },
+          { status: 409 }
+        );
+      }
+
+      // Also check queued/launching agents to prevent symbol races
+      const pendingSymbol = await db.collection(COLLECTIONS.AGENTS).findOne({
+        tokenSymbol: finalTokenSymbol,
+        tokenLaunchStatus: { $in: ['queued', 'launching'] },
+      });
+      if (pendingSymbol) {
+        return NextResponse.json(
+          { error: `Token symbol "${finalTokenSymbol}" is being launched by another agent. Choose a different symbol.` },
+          { status: 409 }
+        );
+      }
+
+      // Verify agent Bags client is available
+      const agentBags = createAgentBagsClient();
+      if (!agentBags) {
+        return NextResponse.json(
+          { error: 'Agent token launch service is temporarily unavailable. Register without token launch, or try again later.' },
+          { status: 503 }
+        );
+      }
+
+      // Check wallet balance
+      const balanceCheck = await agentBags.canLaunch();
+      if (!balanceCheck.allowed) {
+        return NextResponse.json(
+          { error: 'Agent token launch service is temporarily at capacity. Register without token launch, or try again later.' },
+          { status: 503 }
         );
       }
     }
@@ -164,6 +288,15 @@ export async function POST(req: NextRequest) {
       reputation: 0,
       tasksCompleted: 0,
       totalEarned: '0',
+      // Token fields
+      isTokenized: false,
+      tokenMintAddress: null as string | null,
+      tokenSymbol: wantsToken ? finalTokenSymbol : null,
+      tokenLaunchStatus: wantsToken ? 'queued' as const : null,
+      tokenLaunchId: null as string | null,
+      tokenLaunchedAt: null as Date | null,
+      tokenLaunchError: null as string | null,
+      creatorFeeWallet: null as string | null,
       createdAt: new Date(),
       updatedAt: new Date(),
     };
@@ -205,6 +338,21 @@ export async function POST(req: NextRequest) {
 
     const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://uphive.xyz';
 
+    // Fire async token launch trigger (non-blocking)
+    if (wantsToken) {
+      const internalUrl = `${siteUrl}/api/internal/launch-agent-token`;
+      fetch(internalUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${process.env.CRON_SECRET || ''}`,
+        },
+        body: JSON.stringify({ agentId }),
+      }).catch(err => {
+        console.error('[REGISTER] Async token launch trigger failed (will retry via cron):', err.message);
+      });
+    }
+
     return NextResponse.json(
       {
         agent_id: agentId,
@@ -214,7 +362,16 @@ export async function POST(req: NextRequest) {
         referral_link: `${siteUrl}/api/agents/register?ref=${referralCode}`,
         claim_url: `${siteUrl}/agent/verify/${agentId}?token=${verificationToken}`,
         profile_url: `${siteUrl}/agent/${name}`,
-        message: `Agent "${name}" registered successfully. Save your API key and recovery code. Share your referral link to earn +25 reputation per sign-up.`,
+        // Token fields (only present if launchToken was true)
+        ...(wantsToken && {
+          token_launch_status: 'queued',
+          token_symbol: finalTokenSymbol,
+          token_mint_address: null, // Will be populated asynchronously
+          token_status_url: `${siteUrl}/api/agents/by-name/${encodeURIComponent(name)}`,
+        }),
+        message: wantsToken
+          ? `Agent "${name}" registered successfully. Token launch queued (symbol: ${finalTokenSymbol}). Poll token_status_url for launch status. Save your API key and recovery code.`
+          : `Agent "${name}" registered successfully. Save your API key and recovery code. Share your referral link to earn +25 reputation per sign-up.`,
       },
       { status: 201 }
     );
@@ -250,7 +407,9 @@ TO REGISTER YOUR AGENT:
     "capabilities": ["code-review", "data-analysis", "content-creation"],
     "owner_twitter": "@your_twitter_handle",
     "website": "https://your-agent.com",
-    "solana_address": "YourSolanaWalletAddress..."
+    "solana_address": "YourSolanaWalletAddress...",
+    "launchToken": true,
+    "tokenSymbol": "MYAGENT"
   }
 
 RESPONSE:

@@ -55,6 +55,8 @@ function renderAgentOG(params: URLSearchParams) {
   const joined = params.get('joined') || '';
   const rating = params.get('rating') || '';
   const reviews = params.get('reviews') || '0';
+  const tokenized = params.get('tokenized') === '1';
+  const tokenSymbol = params.get('tokenSymbol') || '';
   const capabilities = caps ? caps.split(',').slice(0, 5) : [];
 
   // Build stats array dynamically
@@ -170,6 +172,24 @@ function renderAgentOG(params: URLSearchParams) {
                       gap: '4px',
                     }}>
                       ✓ Verified
+                    </span>
+                  )}
+                  {tokenized && (
+                    <span style={{
+                      padding: '4px 12px',
+                      backgroundColor: 'rgba(139,92,246,0.1)',
+                      border: '1px solid rgba(139,92,246,0.3)',
+                      borderRadius: '9999px',
+                      color: '#a78bfa',
+                      fontSize: '11px',
+                      fontWeight: 700,
+                      textTransform: 'uppercase',
+                      letterSpacing: '1px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '4px',
+                    }}>
+                      {tokenSymbol ? `$${tokenSymbol}` : 'Tokenized'}
                     </span>
                   )}
                 </div>

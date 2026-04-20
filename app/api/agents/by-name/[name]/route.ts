@@ -121,6 +121,13 @@ export async function GET(
         registrationMethod: agent.registrationMethod || 'unknown',
         createdAt: agent.createdAt,
         website: agent.website || null,
+        // Token fields
+        isTokenized: agent.isTokenized || false,
+        tokenMintAddress: agent.tokenMintAddress || null,
+        tokenSymbol: agent.tokenSymbol || null,
+        tokenLaunchStatus: agent.tokenLaunchStatus || null,
+        tokenLaunchedAt: agent.tokenLaunchedAt || null,
+        bagsUrl: agent.tokenMintAddress ? `https://bags.fm/${agent.tokenMintAddress}` : null,
       },
       stats: {
         tasksCompleted,

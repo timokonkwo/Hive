@@ -14,7 +14,7 @@ import {
 import Link from "next/link";
 import { toast } from "sonner";
 
-type AdminTab = "overview" | "tasks" | "agents" | "submissions" | "activity" | "feedback";
+type AdminTab = "overview" | "tasks" | "agents" | "submissions" | "activity" | "feedback" | "tokens";
 
 const AGENTS_PER_PAGE = 20;
 const TASKS_PER_PAGE = 20;
@@ -80,9 +80,14 @@ export default function AdminDashboardPage() {
   const [submissionsStats, setSubmissionsStats] = useState<any>(null);
   const [expandedSubmission, setExpandedSubmission] = useState<string | null>(null);
 
-  // Reputation editing state
   const [editingRepAgent, setEditingRepAgent] = useState<string | null>(null);
   const [repInputValue, setRepInputValue] = useState<string>("");
+
+  // Token management state
+  const [tokenStats, setTokenStats] = useState<any>(null);
+  const [tokenStatsLoading, setTokenStatsLoading] = useState(false);
+  const [launchingTokenFor, setLaunchingTokenFor] = useState<string | null>(null);
+  const [claimingFees, setClaimingFees] = useState(false);
 
   const address = user?.wallet?.address;
 
@@ -252,6 +257,14 @@ export default function AdminDashboardPage() {
 
   useEffect(() => {
     if (activeTab === "feedback") fetchFeedback();
+    if (activeTab === "tokens") {
+      setTokenStatsLoading(true);
+      fetch(`/api/admin/token-stats?address=${user?.wallet?.address}`)
+        .then(res => res.ok ? res.json() : null)
+        .then(data => { if (data) setTokenStats(data); })
+        .catch(() => {})
+        .finally(() => setTokenStatsLoading(false));
+    }
   }, [activeTab, fetchFeedback]);
 
   useEffect(() => { setFeedbackPage(1); }, [feedbackTypeFilter, feedbackStatusFilter]);
@@ -469,7 +482,7 @@ export default function AdminDashboardPage() {
 
       {/* Tabs */}
       <div className="flex border-b border-zinc-800 mb-8 gap-1">
-        {(["overview", "tasks", "agents", "submissions", "activity", "feedback"] as AdminTab[]).map((tab) => (
+        {(["overview", "tasks", "agents", "submissions", "activity", "feedback", "tokens"] as AdminTab[]).map((tab) => (
           <button
             key={tab}
             onClick={() => setActiveTab(tab)}
@@ -791,6 +804,41 @@ export default function AdminDashboardPage() {
                     {new Date(agent.createdAt).toLocaleDateString("en-US", { month: "short", day: "numeric" })}
                   </div>
                   <div className="flex items-center justify-end gap-2">
+                    {/* Launch Token button — only for non-tokenized agents */}
+                    {(!agent.isTokenized || agent.tokenLaunchStatus === 'failed') && (
+                      <button
+                        onClick={async () => {
+                          if (!confirm(`Launch token for ${agent.name}?`)) return;
+                          setLaunchingTokenFor(agent.id);
+                          try {
+                            const res = await fetch('/api/admin/token-stats', {
+                              method: 'POST',
+                              headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${process.env.NEXT_PUBLIC_ADMIN_SECRET || ''}` },
+                              body: JSON.stringify({ action: 'launch', agentId: agent.id }),
+                            });
+                            const data = await res.json();
+                            if (res.ok) {
+                              toast.success(`Token launch queued for ${agent.name}`);
+                            } else {
+                              toast.error(data.error || 'Launch failed');
+                            }
+                          } catch (err: any) {
+                            toast.error(err.message);
+                          } finally {
+                            setLaunchingTokenFor(null);
+                          }
+                        }}
+                        disabled={launchingTokenFor === agent.id}
+                        className="px-2 py-1 text-[10px] font-mono uppercase border border-violet-500/30 text-violet-400 hover:text-violet-300 hover:border-violet-500/50 rounded transition-colors disabled:opacity-50"
+                      >
+                        {launchingTokenFor === agent.id ? <Loader2 size={12} className="animate-spin" /> : agent.tokenLaunchStatus === 'failed' ? 'Retry' : 'Token'}
+                      </button>
+                    )}
+                    {agent.isTokenized && agent.tokenLaunchStatus === 'launched' && (
+                      <span className="px-2 py-0.5 text-[10px] font-mono text-violet-400 bg-violet-500/10 border border-violet-500/20 rounded">
+                        ${agent.tokenSymbol}
+                      </span>
+                    )}
                     <Link
                       href={`/agent/${encodeURIComponent(agent.name)}`}
                       className="px-2 py-1 text-[10px] font-mono uppercase border border-zinc-700 text-zinc-400 hover:text-white hover:border-zinc-500 rounded transition-colors"
@@ -1197,6 +1245,138 @@ export default function AdminDashboardPage() {
               </button>
             </div>
           </div>
+        </div>
+      )}
+
+      {/* ── Tokens Tab ── */}
+      {activeTab === "tokens" && (
+        <div>
+          {tokenStatsLoading ? (
+            <div className="py-20 text-center"><Loader2 className="w-6 h-6 text-emerald-500 animate-spin mx-auto" /></div>
+          ) : tokenStats ? (
+            <div className="space-y-8">
+              {/* Stats Cards */}
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                <div className="bg-zinc-900/30 border border-zinc-800 p-4 rounded-lg text-center">
+                  <div className="text-2xl font-bold font-mono text-violet-400">{tokenStats.stats.totalLaunched}</div>
+                  <div className="text-[9px] text-zinc-500 uppercase font-mono mt-1">Tokens Launched</div>
+                </div>
+                <div className="bg-zinc-900/30 border border-zinc-800 p-4 rounded-lg text-center">
+                  <div className="text-2xl font-bold font-mono text-amber-400">{tokenStats.stats.totalQueued}</div>
+                  <div className="text-[9px] text-zinc-500 uppercase font-mono mt-1">Queued</div>
+                </div>
+                <div className="bg-zinc-900/30 border border-zinc-800 p-4 rounded-lg text-center">
+                  <div className="text-2xl font-bold font-mono text-red-400">{tokenStats.stats.totalFailed}</div>
+                  <div className="text-[9px] text-zinc-500 uppercase font-mono mt-1">Failed</div>
+                </div>
+                <div className="bg-zinc-900/30 border border-zinc-800 p-4 rounded-lg text-center">
+                  <div className="text-2xl font-bold font-mono text-emerald-400">
+                    {tokenStats.stats.walletBalance !== null ? `${tokenStats.stats.walletBalance} SOL` : 'N/A'}
+                  </div>
+                  <div className="text-[9px] text-zinc-500 uppercase font-mono mt-1">Wallet Balance</div>
+                </div>
+              </div>
+
+              {/* Monthly Usage */}
+              <div className="bg-zinc-900/30 border border-zinc-800 p-4 rounded-lg">
+                <div className="flex items-center justify-between mb-3">
+                  <h3 className="text-xs font-mono uppercase tracking-widest text-zinc-400 font-bold">Monthly Usage</h3>
+                  <span className="text-xs font-mono text-zinc-500">
+                    {tokenStats.stats.launchesThisMonth} / {tokenStats.stats.monthlyCap} ({tokenStats.stats.monthlyRemaining} remaining)
+                  </span>
+                </div>
+                <div className="h-2 bg-zinc-800 rounded-full overflow-hidden">
+                  <div
+                    className="h-full bg-violet-500 rounded-full transition-all"
+                    style={{ width: `${Math.min(100, (tokenStats.stats.launchesThisMonth / tokenStats.stats.monthlyCap) * 100)}%` }}
+                  />
+                </div>
+                <div className="flex items-center justify-between mt-2 text-[10px] font-mono text-zinc-600">
+                  <span>Today: {tokenStats.stats.launchesToday} / 10</span>
+                  <span>Monthly cap: {tokenStats.stats.monthlyCap}</span>
+                </div>
+              </div>
+
+              {/* Claim Fees */}
+              <div className="bg-violet-500/5 border border-violet-500/20 p-4 rounded-lg flex items-center justify-between">
+                <div>
+                  <h3 className="text-sm font-mono font-bold text-violet-400 uppercase tracking-widest">Partner Revenue</h3>
+                  <p className="text-[10px] text-zinc-500 font-mono mt-1">Claim accumulated trading fees from agent token volume.</p>
+                </div>
+                <button
+                  onClick={async () => {
+                    setClaimingFees(true);
+                    try {
+                      const res = await fetch('/api/admin/token-stats', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${process.env.NEXT_PUBLIC_ADMIN_SECRET || ''}` },
+                        body: JSON.stringify({ action: 'claim-fees' }),
+                      });
+                      const data = await res.json();
+                      if (res.ok) {
+                        toast.success(data.message || 'Fee claim initiated');
+                      } else {
+                        toast.error(data.error || 'Claim failed');
+                      }
+                    } catch (err: any) {
+                      toast.error(err.message);
+                    } finally {
+                      setClaimingFees(false);
+                    }
+                  }}
+                  disabled={claimingFees}
+                  className="px-4 py-2 bg-violet-600 hover:bg-violet-500 text-white text-xs font-bold font-mono uppercase tracking-widest rounded transition-colors disabled:opacity-50 flex items-center gap-2"
+                >
+                  {claimingFees ? <Loader2 size={14} className="animate-spin" /> : null}
+                  Claim Fees
+                </button>
+              </div>
+
+              {/* Recent Launches */}
+              <div>
+                <h3 className="text-xs font-mono uppercase tracking-widest text-zinc-400 font-bold mb-4">Recent Launches</h3>
+                {tokenStats.recentLaunches.length === 0 ? (
+                  <div className="py-8 text-center text-zinc-600 text-sm font-mono">No agent tokens launched yet</div>
+                ) : (
+                  <div className="space-y-2">
+                    {tokenStats.recentLaunches.map((launch: any) => (
+                      <div key={launch.id} className="bg-black/30 border border-zinc-800 rounded p-3 flex items-center justify-between gap-4">
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2">
+                            <span className="text-white text-sm font-medium">{launch.agentName}</span>
+                            <span className="text-violet-400 text-xs font-mono">${launch.tokenSymbol}</span>
+                            <span className={`px-1.5 py-0.5 text-[9px] font-bold uppercase rounded border ${
+                              launch.status === 'launched' ? 'bg-emerald-500/10 text-emerald-500 border-emerald-500/20'
+                              : launch.status === 'failed' ? 'bg-red-500/10 text-red-500 border-red-500/20'
+                              : 'bg-amber-500/10 text-amber-500 border-amber-500/20'
+                            }`}>{launch.status}</span>
+                          </div>
+                          {launch.mintAddress && (
+                            <code className="text-[10px] text-zinc-600 font-mono">{launch.mintAddress.slice(0, 12)}...{launch.mintAddress.slice(-8)}</code>
+                          )}
+                          {launch.error && (
+                            <p className="text-[10px] text-red-400 font-mono mt-1">{launch.error}</p>
+                          )}
+                        </div>
+                        <div className="flex items-center gap-2 shrink-0">
+                          <span className="text-[10px] text-zinc-600 font-mono">
+                            {new Date(launch.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                          </span>
+                          {launch.bagsUrl && (
+                            <a href={launch.bagsUrl} target="_blank" rel="noopener noreferrer" className="text-violet-400 hover:text-violet-300 transition-colors">
+                              <ExternalLink size={14} />
+                            </a>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+          ) : (
+            <div className="py-12 text-center text-zinc-600 text-sm font-mono">Failed to load token stats</div>
+          )}
         </div>
       )}
     </div>

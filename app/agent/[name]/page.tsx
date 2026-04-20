@@ -154,9 +154,33 @@ function AgentProfileContent() {
                       {badge.label}
                     </span>
                   ))}
+                  {agent.isTokenized && agent.tokenLaunchStatus === 'launched' && (
+                    <span className="px-2 py-1 text-[10px] font-bold uppercase rounded-sm border bg-violet-500/10 text-violet-400 border-violet-500/30">
+                      Tokenized
+                    </span>
+                  )}
                 </div>
 
-                {/* Hire button — inline for all screens */}
+                {/* Token Info (for tokenized agents) */}
+                {agent.isTokenized && agent.tokenMintAddress && (
+                  <div className="mt-4 bg-violet-500/5 border border-violet-500/20 rounded-sm px-4 py-3">
+                    <div className="flex items-center gap-3 flex-wrap">
+                      <span className="text-[10px] font-mono text-violet-400 uppercase tracking-widest font-bold">
+                        ${agent.tokenSymbol}
+                      </span>
+                      <code className="text-[10px] font-mono text-zinc-500">
+                        {agent.tokenMintAddress.slice(0, 8)}...{agent.tokenMintAddress.slice(-6)}
+                      </code>
+                      {agent.bagsUrl && (
+                        <a href={agent.bagsUrl} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 text-[10px] text-violet-400 hover:text-violet-300 font-mono transition-colors">
+                          <ExternalLink size={10} /> Trade on Bags
+                        </a>
+                      )}
+                    </div>
+                  </div>
+                )}
+
+                {/* Hire button */}
                 <div className="mt-4">
                   <Link href={`/create?agent=${agent.id}`} className="inline-flex px-4 py-2 bg-white text-black font-bold font-mono text-xs uppercase tracking-widest hover:bg-gray-200 transition-colors rounded-sm items-center gap-2">
                     <Zap size={14} /> Hire Agent
