@@ -1297,39 +1297,102 @@ export default function AdminDashboardPage() {
                 </div>
               </div>
 
-              {/* Claim Fees */}
-              <div className="bg-violet-500/5 border border-violet-500/20 p-4 rounded-lg flex items-center justify-between">
-                <div>
-                  <h3 className="text-sm font-mono font-bold text-violet-400 uppercase tracking-widest">Partner Revenue</h3>
-                  <p className="text-[10px] text-zinc-500 font-mono mt-1">Claim accumulated trading fees from agent token volume.</p>
-                </div>
-                <button
-                  onClick={async () => {
-                    setClaimingFees(true);
-                    try {
-                      const res = await fetch('/api/admin/token-stats', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ action: 'claim-fees', adminAddress: user?.wallet?.address }),
-                      });
-                      const data = await res.json();
-                      if (res.ok) {
-                        toast.success(data.message || 'Fee claim initiated');
-                      } else {
-                        toast.error(data.error || 'Claim failed');
+              {/* Revenue Breakdown */}
+              <div className="bg-zinc-900/30 border border-zinc-800 rounded-lg overflow-hidden">
+                <div className="p-4 border-b border-zinc-800 flex items-center justify-between">
+                  <div>
+                    <h3 className="text-xs font-mono uppercase tracking-widest text-violet-400 font-bold">Partner Revenue</h3>
+                    <p className="text-[10px] text-zinc-600 font-mono mt-1">
+                      10% fee on all bonding curve trading volume
+                      {tokenStats.stats.walletAddress && (
+                        <span className="ml-2 text-zinc-700">Wallet: {tokenStats.stats.walletAddress.slice(0, 6)}...{tokenStats.stats.walletAddress.slice(-4)}</span>
+                      )}
+                    </p>
+                  </div>
+                  <button
+                    onClick={async () => {
+                      setClaimingFees(true);
+                      try {
+                        const res = await fetch('/api/admin/token-stats', {
+                          method: 'POST',
+                          headers: { 'Content-Type': 'application/json' },
+                          body: JSON.stringify({ action: 'claim-fees', adminAddress: user?.wallet?.address }),
+                        });
+                        const data = await res.json();
+                        if (res.ok) {
+                          toast.success(data.message || 'Fee claim initiated');
+                        } else {
+                          toast.error(data.error || 'Claim failed');
+                        }
+                      } catch (err: any) {
+                        toast.error(err.message);
+                      } finally {
+                        setClaimingFees(false);
                       }
-                    } catch (err: any) {
-                      toast.error(err.message);
-                    } finally {
-                      setClaimingFees(false);
-                    }
-                  }}
-                  disabled={claimingFees}
-                  className="px-4 py-2 bg-violet-600 hover:bg-violet-500 text-white text-xs font-bold font-mono uppercase tracking-widest rounded transition-colors disabled:opacity-50 flex items-center gap-2"
-                >
-                  {claimingFees ? <Loader2 size={14} className="animate-spin" /> : null}
-                  Claim Fees
-                </button>
+                    }}
+                    disabled={claimingFees}
+                    className="px-4 py-2 bg-violet-600 hover:bg-violet-500 text-white text-xs font-bold font-mono uppercase tracking-widest rounded transition-colors disabled:opacity-50 flex items-center gap-2 shrink-0"
+                  >
+                    {claimingFees ? <Loader2 size={14} className="animate-spin" /> : null}
+                    Claim Fees
+                  </button>
+                </div>
+
+                {/* Revenue Summary Cards */}
+                <div className="grid grid-cols-3 divide-x divide-zinc-800 border-b border-zinc-800">
+                  <div className="p-4 text-center">
+                    <div className="text-xl font-bold font-mono text-emerald-400">
+                      {tokenStats.revenue?.totalLifetimeFees?.toFixed(4) || '0'} SOL
+                    </div>
+                    <div className="text-[9px] text-zinc-500 uppercase font-mono mt-1">Total Lifetime Fees</div>
+                  </div>
+                  <div className="p-4 text-center">
+                    <div className="text-xl font-bold font-mono text-amber-400">
+                      {tokenStats.revenue?.totalClaimable?.toFixed(4) || '0'} SOL
+                    </div>
+                    <div className="text-[9px] text-zinc-500 uppercase font-mono mt-1">Claimable Now</div>
+                  </div>
+                  <div className="p-4 text-center">
+                    <div className="text-xl font-bold font-mono text-violet-400">
+                      {tokenStats.revenue?.claimablePositions || 0}
+                    </div>
+                    <div className="text-[9px] text-zinc-500 uppercase font-mono mt-1">Fee Positions</div>
+                  </div>
+                </div>
+
+                {/* Per-Token Fee Breakdown */}
+                {tokenStats.revenue?.perTokenFees?.length > 0 && (
+                  <div className="p-4">
+                    <h4 className="text-[10px] font-mono uppercase tracking-widest text-zinc-500 font-bold mb-3">Per-Token Breakdown</h4>
+                    <div className="space-y-1.5">
+                      {tokenStats.revenue.perTokenFees.map((token: any) => (
+                        <div key={token.mintAddress} className="flex items-center justify-between p-2 bg-black/20 rounded hover:bg-black/40 transition-colors group">
+                          <div className="flex items-center gap-3 min-w-0">
+                            <span className="text-violet-400 text-xs font-mono font-bold w-16 shrink-0">${token.symbol}</span>
+                            <span className="text-zinc-400 text-sm truncate">{token.name}</span>
+                          </div>
+                          <div className="flex items-center gap-3 shrink-0">
+                            <span className={`text-sm font-mono font-bold ${token.lifetimeFees > 0 ? 'text-emerald-400' : 'text-zinc-600'}`}>
+                              {token.lifetimeFees.toFixed(4)} SOL
+                            </span>
+                            <a
+                              href={token.bagsUrl}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="text-zinc-600 hover:text-violet-400 transition-colors opacity-0 group-hover:opacity-100"
+                            >
+                              <ExternalLink size={12} />
+                            </a>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {(!tokenStats.revenue?.perTokenFees || tokenStats.revenue.perTokenFees.length === 0) && (
+                  <div className="p-6 text-center text-zinc-600 text-sm font-mono">No token fee data available yet</div>
+                )}
               </div>
 
               {/* Recent Launches */}

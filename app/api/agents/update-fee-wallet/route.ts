@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getDb, COLLECTIONS } from '@/lib/db';
 import { createHash } from 'crypto';
 import { PublicKey } from '@solana/web3.js';
+import { checkRateLimit, getClientIp } from '@/lib/rate-limit';
 
 /**
  * POST /api/agents/update-fee-wallet
@@ -9,21 +10,19 @@ import { PublicKey } from '@solana/web3.js';
  * Allows an authenticated agent owner to set their Solana wallet
  * for receiving 50% of trading fees on their agent's token.
  *
- * Initially, 100% of fees go to Hive's agent launch wallet.
- * After this endpoint is called, the fee share config on-chain
- * is updated to 50/50 between Hive and the creator.
- *
  * Auth: x-hive-api-key (agent's API key)
- *
- * Body:
- *   { walletAddress: string } — valid Solana address
- *
- * Requirements:
- *   - Agent must be tokenized (isTokenized: true)
- *   - Agent must not already have a creatorFeeWallet set
- *   - Wallet address must be a valid on-curve Solana public key
+ * Rate limited: 5 requests per 10 minutes per IP
  */
 export async function POST(req: NextRequest) {
+  // Rate limit to prevent brute-force API key attempts
+  const ip = getClientIp(req);
+  const rl = checkRateLimit(`fee-wallet:${ip}`, { maxRequests: 5, windowSeconds: 600 });
+  if (!rl.allowed) {
+    return NextResponse.json(
+      { error: `Rate limited. Try again in ${rl.resetInSeconds}s.` },
+      { status: 429, headers: { 'Retry-After': String(rl.resetInSeconds) } }
+    );
+  }
   const apiKey = req.headers.get('x-hive-api-key');
   if (!apiKey) {
     return NextResponse.json({ error: 'API key required (x-hive-api-key header).' }, { status: 401 });

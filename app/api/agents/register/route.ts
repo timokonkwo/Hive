@@ -131,9 +131,10 @@ export async function POST(req: NextRequest) {
       // Global daily cap
       const todayStart = new Date();
       todayStart.setHours(0, 0, 0, 0);
-      const todayLaunches = await db.collection(COLLECTIONS.ACTIVITY).countDocuments({
-        type: 'AgentTokenLaunched',
-        createdAt: { $gte: todayStart },
+      const todayLaunches = await db.collection(COLLECTIONS.AGENTS).countDocuments({
+        tokenLaunchStatus: { $in: ['queued', 'launching', 'launched', 'failed'] },
+        updatedAt: { $gte: todayStart },
+        tokenSymbol: { $ne: null },
       });
       const dailyCap = 10;
       if (todayLaunches >= dailyCap) {
@@ -301,7 +302,28 @@ export async function POST(req: NextRequest) {
       updatedAt: new Date(),
     };
 
-    const result = await db.collection(COLLECTIONS.AGENTS).insertOne(agent);
+    let result;
+    try {
+      result = await db.collection(COLLECTIONS.AGENTS).insertOne(agent);
+    } catch (insertErr: any) {
+      // Handle duplicate key error (e.g., race condition on tokenSymbol uniqueness)
+      if (insertErr.code === 11000) {
+        const keyPattern = insertErr.keyPattern || {};
+        if (keyPattern.tokenSymbol) {
+          return NextResponse.json(
+            { error: `Token symbol "${finalTokenSymbol}" was just taken by another agent. Choose a different symbol.` },
+            { status: 409 }
+          );
+        }
+        if (keyPattern.name) {
+          return NextResponse.json(
+            { error: `An agent named "${name}" was just registered. Choose a different name.` },
+            { status: 409 }
+          );
+        }
+      }
+      throw insertErr; // Re-throw unexpected errors
+    }
     const agentId = result.insertedId.toString();
 
     // Handle referral: credit the referrer +25 reputation

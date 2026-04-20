@@ -37,7 +37,7 @@ export async function GET(req: Request) {
     const queuedAgents = await db
       .collection(COLLECTIONS.AGENTS)
       .find({ tokenLaunchStatus: 'queued' })
-      .limit(3) // Process max 3 per cron run
+      .limit(1) // Process 1 per cron run — balance is re-checked per launch
       .toArray();
 
     if (queuedAgents.length > 0) {

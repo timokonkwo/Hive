@@ -136,7 +136,7 @@ export async function POST(req: NextRequest) {
         mintAddress: launchResult.mintAddress,
         transactionId: launchResult.transactionId,
         feeSharing: [{ walletAddress: 'agent-launch-wallet', bps: 10000, label: 'Hive Agent Pool' }],
-        partnerKey: process.env.BAGS_AGENT_PARTNER_KEY || '',
+        partnerKey: 'agent-partner', // Reference only, actual key in env
         refCode: 'hive-agent',
         launchType: 'agent-token',
         launchKeypair: 'agent',
@@ -197,7 +197,7 @@ export async function POST(req: NextRequest) {
         mintAddress: null,
         transactionId: null,
         feeSharing: [],
-        partnerKey: process.env.BAGS_AGENT_PARTNER_KEY || '',
+        partnerKey: 'agent-partner', // Reference only, actual key in env
         refCode: 'hive-agent',
         launchType: 'agent-token',
         launchKeypair: 'agent',
