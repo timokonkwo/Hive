@@ -813,8 +813,8 @@ export default function AdminDashboardPage() {
                           try {
                             const res = await fetch('/api/admin/token-stats', {
                               method: 'POST',
-                              headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${process.env.NEXT_PUBLIC_ADMIN_SECRET || ''}` },
-                              body: JSON.stringify({ action: 'launch', agentId: agent.id }),
+                              headers: { 'Content-Type': 'application/json' },
+                              body: JSON.stringify({ action: 'launch', agentId: agent.id, adminAddress: user?.wallet?.address }),
                             });
                             const data = await res.json();
                             if (res.ok) {
@@ -1309,8 +1309,8 @@ export default function AdminDashboardPage() {
                     try {
                       const res = await fetch('/api/admin/token-stats', {
                         method: 'POST',
-                        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${process.env.NEXT_PUBLIC_ADMIN_SECRET || ''}` },
-                        body: JSON.stringify({ action: 'claim-fees' }),
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ action: 'claim-fees', adminAddress: user?.wallet?.address }),
                       });
                       const data = await res.json();
                       if (res.ok) {

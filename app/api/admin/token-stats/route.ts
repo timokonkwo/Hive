@@ -135,15 +135,17 @@ export async function GET(req: NextRequest) {
  * Admin actions: launch token for agent, or claim partner fees.
  */
 export async function POST(req: NextRequest) {
-  const authHeader = req.headers.get('authorization');
-  const adminSecret = process.env.ADMIN_SECRET;
+  const body = await req.json();
+  const { action, adminAddress } = body;
 
-  if (!adminSecret || authHeader !== `Bearer ${adminSecret}`) {
+  // Wallet-based admin verification (same as GET)
+  if (!adminAddress) {
+    return NextResponse.json({ error: 'Unauthorized — adminAddress required' }, { status: 401 });
+  }
+  const adminAddresses = (process.env.ADMIN_WALLETS || '').split(',').map(a => a.trim().toLowerCase());
+  if (!adminAddresses.includes(adminAddress.toLowerCase())) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
-
-  const body = await req.json();
-  const { action } = body;
 
   if (action === 'launch') {
     // Launch token for a specific agent
