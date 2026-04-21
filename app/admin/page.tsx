@@ -1228,7 +1228,7 @@ export default function AdminDashboardPage() {
                     });
                     const data = await res.json();
                     if (res.ok) {
-                      toast.success(`Token launch queued for ${name}`);
+                      toast.success(`Token launched for ${name}! ${data.mintAddress ? `Mint: ${data.mintAddress.slice(0, 8)}...` : ''}`);
                       setTokenLaunchModal(null);
                     } else {
                       toast.error(data.error || 'Launch failed');

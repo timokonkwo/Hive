@@ -218,37 +218,98 @@ export async function POST(req: NextRequest) {
 
     const symbolToUse = agent.tokenSymbol || agent.name.replace(/[^a-zA-Z0-9]/g, '').slice(0, 5).toUpperCase() || 'AGENT';
 
-    await db.collection(COLLECTIONS.AGENTS).updateOne(
-      { _id: new ObjectId(agentId) },
+    // Set to launching atomically
+    const lockResult = await db.collection(COLLECTIONS.AGENTS).findOneAndUpdate(
+      { _id: new ObjectId(agentId), tokenLaunchStatus: { $nin: ['launched', 'launching'] } },
       {
         $set: {
           tokenSymbol: symbolToUse,
-          tokenLaunchStatus: 'queued',
+          tokenLaunchStatus: 'launching',
           tokenLaunchError: null,
           updatedAt: new Date(),
         },
-      }
+      },
+      { returnDocument: 'after' }
     );
 
-    // Trigger the internal launch endpoint
-    const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://uphive.xyz';
-    const cronSecret = process.env.CRON_SECRET;
+    if (!lockResult) {
+      return NextResponse.json({ error: 'Agent is already launching or launched' }, { status: 409 });
+    }
 
-    fetch(`${siteUrl}/api/internal/launch-agent-token`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${cronSecret}`,
-      },
-      body: JSON.stringify({ agentId }),
-    }).catch(err => {
-      console.error('[ADMIN] Token launch trigger failed:', err.message);
-    });
+    // Execute launch inline (fire-and-forget dies on serverless)
+    const bags = createAgentBagsClient();
+    if (!bags) {
+      await db.collection(COLLECTIONS.AGENTS).updateOne(
+        { _id: new ObjectId(agentId) },
+        { $set: { tokenLaunchStatus: 'failed', tokenLaunchError: 'Bags client not configured', updatedAt: new Date() } }
+      );
+      return NextResponse.json({ error: 'Agent Bags client not configured' }, { status: 503 });
+    }
 
-    return NextResponse.json({
-      message: `Token launch queued for ${agent.name} ($${symbolToUse})`,
+    const launchResult = await bags.launchAgentToken({
+      agentName: agent.name,
       tokenSymbol: symbolToUse,
+      bio: agent.bio || `${agent.name} - AI agent on Hive Protocol`,
+      website: agent.website || undefined,
     });
+
+    if (launchResult.success && launchResult.mintAddress) {
+      await db.collection(COLLECTIONS.AGENTS).updateOne(
+        { _id: new ObjectId(agentId) },
+        {
+          $set: {
+            isTokenized: true,
+            tokenMintAddress: launchResult.mintAddress,
+            tokenLaunchStatus: 'launched',
+            tokenLaunchedAt: new Date(),
+            tokenLaunchError: null,
+            updatedAt: new Date(),
+          },
+        }
+      );
+
+      // Record launch
+      await db.collection(COLLECTIONS.TOKEN_LAUNCHES).insertOne({
+        taskId: null,
+        agentId,
+        agentName: agent.name,
+        tokenName: agent.name,
+        tokenSymbol: symbolToUse,
+        mintAddress: launchResult.mintAddress,
+        transactionId: launchResult.transactionId,
+        feeSharing: [{ walletAddress: 'agent-launch-wallet', bps: 10000, label: 'Hive Agent Pool' }],
+        partnerKey: 'agent-partner',
+        refCode: 'hive-agent',
+        launchType: 'agent-token',
+        launchKeypair: 'agent',
+        bagsConfigType: '48e26d2f-0a9d-4625-a3cc-c3987d874b9e',
+        status: 'launched',
+        createdAt: new Date(),
+      });
+
+      // Log activity
+      await db.collection(COLLECTIONS.ACTIVITY).insertOne({
+        type: 'AgentTokenLaunched',
+        agentId,
+        actorName: agent.name,
+        metadata: { tokenSymbol: symbolToUse, mintAddress: launchResult.mintAddress, transactionId: launchResult.transactionId },
+        createdAt: new Date(),
+      });
+
+      return NextResponse.json({
+        message: `Token launched for ${agent.name} ($${symbolToUse})`,
+        tokenSymbol: symbolToUse,
+        mintAddress: launchResult.mintAddress,
+        transactionId: launchResult.transactionId,
+        bagsUrl: `https://bags.fm/${launchResult.mintAddress}`,
+      });
+    } else {
+      await db.collection(COLLECTIONS.AGENTS).updateOne(
+        { _id: new ObjectId(agentId) },
+        { $set: { tokenLaunchStatus: 'failed', tokenLaunchError: launchResult.error || 'Unknown error', updatedAt: new Date() } }
+      );
+      return NextResponse.json({ error: launchResult.error || 'Token launch failed' }, { status: 500 });
+    }
   }
 
   if (action === 'claim-fees') {
