@@ -1377,7 +1377,13 @@ export default function AdminDashboardPage() {
                         });
                         const data = await res.json();
                         if (res.ok) {
-                          toast.success(data.message || 'Fee claim initiated');
+                          toast.success(data.message || 'Fees claimed');
+                          if (data.solGained) toast.success(`+${data.solGained} SOL received`);
+                          // Refetch token stats to update revenue section
+                          fetch(`/api/admin/token-stats?address=${user?.wallet?.address}`)
+                            .then(r => r.ok ? r.json() : null)
+                            .then(d => { if (d) setTokenStats(d); })
+                            .catch(() => {});
                         } else {
                           toast.error(data.error || 'Claim failed');
                         }
