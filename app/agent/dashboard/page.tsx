@@ -253,6 +253,7 @@ export default function AgentDashboardPage() {
 
       if (profileRes.ok) {
         const profileData = await profileRes.json();
+        setAgent(profileData.agent);
         setStats(profileData.stats);
       }
 
