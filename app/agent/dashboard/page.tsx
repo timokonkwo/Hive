@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useCallback } from "react";
+import React, { useState, useCallback, useEffect } from "react";
 import { Navbar } from "@/components/layout/Navbar";
 import { Footer } from "@/components/layout/Footer";
 import {
@@ -72,6 +72,56 @@ export default function AgentDashboardPage() {
   const [launchingToken, setLaunchingToken] = useState(false);
   const [tokenSymbolInput, setTokenSymbolInput] = useState("");
   const [showTokenLaunch, setShowTokenLaunch] = useState(false);
+
+  // Restore session on mount
+  useEffect(() => {
+    const savedKey = sessionStorage.getItem('hive_agent_key');
+    if (savedKey) {
+      setApiKey(savedKey);
+      // Auto-restore session
+      (async () => {
+        setLoading(true);
+        try {
+          const profileRes = await fetch('/api/agents/me', { headers: { 'x-hive-api-key': savedKey } });
+          if (profileRes.ok) {
+            const profileData = await profileRes.json();
+            setAgent(profileData.agent);
+            setStats(profileData.stats);
+            // Fetch payments
+            const paymentsRes = await fetch('/api/agents/payments', { headers: { 'x-hive-api-key': savedKey } });
+            if (paymentsRes.ok) {
+              const pd = await paymentsRes.json();
+              setPayments(pd.payments || []);
+              setPaymentSummary(pd.summary || null);
+            }
+            if (profileData.agent?.solanaAddress) {
+              fetchBalances(profileData.agent.solanaAddress);
+            }
+          } else {
+            // Key expired or invalid — clear it
+            sessionStorage.removeItem('hive_agent_key');
+          }
+        } catch {
+          sessionStorage.removeItem('hive_agent_key');
+        } finally {
+          setLoading(false);
+        }
+      })();
+    }
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const logout = () => {
+    sessionStorage.removeItem('hive_agent_key');
+    setApiKey('');
+    setOwnerPin('');
+    setAgent(null);
+    setStats(null);
+    setPayments([]);
+    setPaymentSummary(null);
+    setError('');
+    setSolBalance(null);
+    setUsdcBalance(null);
+  };
 
   const copyToClipboard = (text: string) => {
     navigator.clipboard.writeText(text);
@@ -183,6 +233,8 @@ export default function AgentDashboardPage() {
       }
 
       setAgent(pinData.agent);
+      // Persist session
+      sessionStorage.setItem('hive_agent_key', apiKey);
       await loadFullDashboard();
     } catch (err: any) {
       setError(err.message);
@@ -285,6 +337,14 @@ export default function AgentDashboardPage() {
             <p className="text-zinc-400 font-mono text-sm leading-relaxed">
               Manage your agent, wallet, and earnings.
             </p>
+            {agent && (
+              <button
+                onClick={logout}
+                className="mt-3 text-[10px] font-mono uppercase tracking-widest text-zinc-600 hover:text-red-400 transition-colors"
+              >
+                Logout
+              </button>
+            )}
           </div>
 
           {/* Login / PIN Setup / Dashboard */}
