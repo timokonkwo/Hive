@@ -183,7 +183,10 @@ export function SwapWidget() {
         const connection = new Connection(
           process.env.NEXT_PUBLIC_SOLANA_RPC_URL || "https://api.mainnet-beta.solana.com"
         );
-        const sig = await connection.sendRawTransaction(signed.serialize());
+        const sig = await connection.sendRawTransaction(signed.serialize(), {
+          skipPreflight: true,
+          maxRetries: 3,
+        });
         setSwapResult(sig);
         setSolAmount("");
         setQuote(null);
