@@ -170,19 +170,16 @@ export function SwapWidget() {
         return;
       }
 
-      if (swapData.response?.transaction) {
-        const { Transaction } = await import("@solana/web3.js");
+      // Bags returns swapTransaction at response level or top level
+      const swapTx = swapData.response?.swapTransaction || swapData.swapTransaction;
 
-        // Browser-safe base64 decode (no Node.js Buffer needed)
-        const binaryString = atob(swapData.response.transaction);
-        const bytes = new Uint8Array(binaryString.length);
-        for (let i = 0; i < binaryString.length; i++) {
-          bytes[i] = binaryString.charCodeAt(i);
-        }
+      if (swapTx) {
+        const { VersionedTransaction, Connection } = await import("@solana/web3.js");
+        const bs58 = await import("bs58");
 
-        const tx = Transaction.from(bytes);
+        const decodedTransaction = bs58.default.decode(swapTx);
+        const tx = VersionedTransaction.deserialize(decodedTransaction);
         const signed = await solana.signTransaction(tx);
-        const { Connection } = await import("@solana/web3.js");
         const connection = new Connection(
           process.env.NEXT_PUBLIC_SOLANA_RPC_URL || "https://api.mainnet-beta.solana.com"
         );
@@ -191,6 +188,7 @@ export function SwapWidget() {
         setSolAmount("");
         setQuote(null);
       } else {
+        console.error("[SWAP] Response shape:", JSON.stringify(Object.keys(swapData)), swapData.response ? JSON.stringify(Object.keys(swapData.response)) : 'no response key');
         setError("No transaction returned from swap API");
       }
     } catch (err: any) {
