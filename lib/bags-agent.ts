@@ -57,6 +57,8 @@ export interface AgentTokenLaunchResult {
   success: boolean;
   mintAddress?: string;
   transactionId?: string;
+  metadataUrl?: string;
+  description?: string;
   error?: string;
 }
 
@@ -129,8 +131,8 @@ function getAgentSDK(): BagsSDK | null {
  * and partner config so agent tokens aren't attributed to Hive's profile.
  */
 export class AgentBagsClient {
-  private sdk: BagsSDK;
-  private keypair: Keypair;
+  public sdk: BagsSDK;
+  public keypair: Keypair;
   private connection: Connection;
   private partnerKey: string;
   private apiKey: string;
@@ -205,9 +207,10 @@ export class AgentBagsClient {
       const agentUrl = `${siteUrl}/agent/${encodeURIComponent(agentName)}`;
       const tokenDescription = `${bio.trim()} | ${agentName} is an AI agent on Hive Protocol. ${agentUrl}`;
 
-      // Step 1: Create token metadata on Bags
       console.log(`[AGENT-BAGS] Creating token info: ${agentName} (${tokenSymbol})`);
-      console.log(`[AGENT-BAGS] Description: ${tokenDescription.slice(0, 100)}...`);
+      console.log(`[AGENT-BAGS] Description (${tokenDescription.length} chars): ${tokenDescription}`);
+      console.log(`[AGENT-BAGS] Image: ${getAgentTokenImageUrl()}`);
+      console.log(`[AGENT-BAGS] Website: ${agentUrl}`);
 
       const tokenInfo = await this.sdk.tokenLaunch.createTokenInfoAndMetadata({
         name: agentName,
@@ -312,6 +315,8 @@ export class AgentBagsClient {
         success: true,
         mintAddress: tokenInfo.tokenMint,
         transactionId: txSignature,
+        metadataUrl: tokenInfo.tokenMetadata,
+        description: tokenDescription,
       };
     } catch (error: any) {
       console.error('[AGENT-BAGS] Agent token launch failed:', error);

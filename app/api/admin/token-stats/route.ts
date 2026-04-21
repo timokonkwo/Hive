@@ -102,12 +102,12 @@ export async function GET(req: NextRequest) {
       const tokensToCheck = topTokens.slice(0, 20);
       const feeResults = await Promise.allSettled(
         tokensToCheck.map(async (a) => {
-          const fees = await bags.getTokenLifetimeFees(a.tokenMintAddress);
+          const feesLamports = await bags.getTokenLifetimeFees(a.tokenMintAddress);
           return {
             name: a.name,
             symbol: a.tokenSymbol,
             mintAddress: a.tokenMintAddress,
-            lifetimeFees: fees,
+            lifetimeFees: feesLamports / 1e9, // lamports -> SOL
           };
         })
       );
@@ -121,8 +121,13 @@ export async function GET(req: NextRequest) {
   }
 
   const totalLifetimeFees = perTokenFees.reduce((sum, t) => sum + t.lifetimeFees, 0);
+  // Sum claimable from positions — SDK returns lamports in various fields
   const totalClaimable = claimablePositions.reduce((sum: number, p: any) => {
-    try { return sum + (p.claimable || 0); } catch { return sum; }
+    try {
+      const vp = Number(p.virtualPoolClaimableLamportsUserShare || p.virtualPoolClaimableAmount || 0);
+      const dp = Number(p.dammPoolClaimableLamportsUserShare || p.dammPoolClaimableAmount || 0);
+      return sum + (vp + dp) / 1e9; // lamports -> SOL
+    } catch { return sum; }
   }, 0);
   const monthlyCap = parseInt(process.env.AGENT_LAUNCH_MONTHLY_CAP || '50', 10);
 
@@ -318,10 +323,59 @@ export async function POST(req: NextRequest) {
       if (!bags) {
         return NextResponse.json({ error: 'Agent Bags client not configured' }, { status: 503 });
       }
-      const balance = await bags.getBalance();
+
+      // Get claimable positions
+      const positions = await bags.getClaimablePositions();
+      if (!positions || positions.length === 0) {
+        return NextResponse.json({ message: 'No claimable positions found', claimed: 0 });
+      }
+
+      // Get balance before claiming
+      const balanceBefore = await bags.getBalance();
+
+      // Claim each position
+      let claimed = 0;
+      let failed = 0;
+      const errors: string[] = [];
+
+      for (const position of positions) {
+        try {
+          // Check if position has anything to claim
+          const vp = Number(position.virtualPoolClaimableLamportsUserShare || position.virtualPoolClaimableAmount || 0);
+          const dp = Number(position.dammPoolClaimableLamportsUserShare || position.dammPoolClaimableAmount || 0);
+          if (vp + dp <= 0) continue;
+
+          const claimTxs = await bags.sdk.fee.getClaimTransaction(bags.keypair.publicKey, position);
+
+          for (const tx of claimTxs) {
+            tx.partialSign(bags.keypair);
+            const sig = await bags.sdk.state.getConnection().sendRawTransaction(tx.serialize(), {
+              skipPreflight: true,
+              maxRetries: 3,
+            });
+            await bags.sdk.state.getConnection().confirmTransaction(sig, 'confirmed');
+            console.log(`[ADMIN-CLAIM] Claimed position ${position.baseMint}: ${sig}`);
+          }
+          claimed++;
+        } catch (err: any) {
+          failed++;
+          errors.push(`${position.baseMint}: ${err.message}`);
+          console.error(`[ADMIN-CLAIM] Failed to claim ${position.baseMint}:`, err.message);
+        }
+      }
+
+      // Get balance after claiming
+      const balanceAfter = await bags.getBalance();
+      const gained = balanceAfter - balanceBefore;
+
       return NextResponse.json({
-        message: 'Fee claiming initiated',
-        walletBalance: parseFloat(balance.toFixed(4)),
+        message: `Claimed ${claimed} position(s)${failed > 0 ? `, ${failed} failed` : ''}`,
+        claimed,
+        failed,
+        solGained: parseFloat(gained.toFixed(6)),
+        balanceBefore: parseFloat(balanceBefore.toFixed(4)),
+        balanceAfter: parseFloat(balanceAfter.toFixed(4)),
+        errors: errors.length > 0 ? errors : undefined,
       });
     } catch (err: any) {
       return NextResponse.json({ error: err.message }, { status: 500 });
