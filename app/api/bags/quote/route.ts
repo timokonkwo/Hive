@@ -67,6 +67,7 @@ export async function GET(req: NextRequest) {
     }
 
     const data = await res.json();
+    console.log('[BAGS] Quote response keys:', JSON.stringify(Object.keys(data)), 'response keys:', data.response ? JSON.stringify(Object.keys(data.response)) : 'null');
     return NextResponse.json(data);
   } catch (error: any) {
     console.error('[BAGS] Quote request failed:', error.message);

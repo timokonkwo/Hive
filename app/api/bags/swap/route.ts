@@ -81,7 +81,7 @@ export async function POST(req: NextRequest) {
         amount: String(amount),
         slippageMode: 'auto',
         userPublicKey: wallet,
-        quoteRequestId,
+        requestId: quoteRequestId,
       }),
     });
 
