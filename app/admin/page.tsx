@@ -482,12 +482,12 @@ export default function AdminDashboardPage() {
       </div>
 
       {/* Tabs */}
-      <div className="flex border-b border-zinc-800 mb-8 gap-1">
+      <div className="flex border-b border-zinc-800 mb-8 gap-1 overflow-x-auto scrollbar-hide -mx-4 px-4 sm:mx-0 sm:px-0">
         {(["overview", "tasks", "agents", "submissions", "activity", "feedback", "tokens"] as AdminTab[]).map((tab) => (
           <button
             key={tab}
             onClick={() => setActiveTab(tab)}
-            className={`px-4 py-3 text-xs font-mono uppercase tracking-widest transition-colors border-b-2 ${
+            className={`px-3 sm:px-4 py-3 text-[10px] sm:text-xs font-mono uppercase tracking-widest transition-colors border-b-2 shrink-0 ${
               activeTab === tab ? "border-emerald-500 text-white" : "border-transparent text-zinc-500 hover:text-zinc-300"
             }`}
           >
