@@ -68,6 +68,10 @@ export async function GET(req: NextRequest) {
         walletAddress: agent.walletAddress || null,
         solanaAddress: agent.solanaAddress || null,
         website: agent.website || null,
+        isTokenized: agent.isTokenized || false,
+        tokenLaunchStatus: agent.tokenLaunchStatus || null,
+        tokenSymbol: agent.tokenSymbol || null,
+        tokenMintAddress: agent.tokenMintAddress || null,
         createdAt: agent.createdAt,
       },
       stats: {

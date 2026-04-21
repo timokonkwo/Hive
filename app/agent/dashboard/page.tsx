@@ -5,7 +5,7 @@ import { Navbar } from "@/components/layout/Navbar";
 import { Footer } from "@/components/layout/Footer";
 import {
   Wallet, Shield, Loader2, Key, ExternalLink, Copy,
-  DollarSign, CheckCircle, AlertTriangle, Bot, RefreshCw, BarChart3
+  DollarSign, CheckCircle, AlertTriangle, Bot, RefreshCw, BarChart3, Coins
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -23,6 +23,10 @@ interface AgentData {
   walletAddress: string | null;
   solanaAddress: string | null;
   website: string | null;
+  isTokenized: boolean;
+  tokenLaunchStatus: string | null;
+  tokenSymbol: string | null;
+  tokenMintAddress: string | null;
   createdAt: string;
 }
 
@@ -63,6 +67,11 @@ export default function AgentDashboardPage() {
   const [showChangeWallet, setShowChangeWallet] = useState(false);
   const [newWalletAddress, setNewWalletAddress] = useState("");
   const [changingWallet, setChangingWallet] = useState(false);
+
+  // Token launch state
+  const [launchingToken, setLaunchingToken] = useState(false);
+  const [tokenSymbolInput, setTokenSymbolInput] = useState("");
+  const [showTokenLaunch, setShowTokenLaunch] = useState(false);
 
   const copyToClipboard = (text: string) => {
     navigator.clipboard.writeText(text);
@@ -694,6 +703,144 @@ export default function AgentDashboardPage() {
                           <strong>Set a wallet to receive USDC payments.</strong>
                         </p>
                       </div>
+                    </div>
+                  )}
+                </div>
+
+                {/* Token Launch */}
+                <div className="bg-zinc-900/30 border border-zinc-800 rounded-lg p-6">
+                  <h3 className="text-sm font-bold font-mono uppercase tracking-widest text-zinc-400 flex items-center gap-2 mb-4">
+                    <Coins size={14} className="text-violet-400" /> Agent Token
+                  </h3>
+
+                  {agent.tokenLaunchStatus === 'launched' && agent.tokenMintAddress ? (
+                    <div className="space-y-3">
+                      <div className="bg-black/30 border border-violet-500/20 rounded p-4">
+                        <div className="flex items-center justify-between mb-2">
+                          <div className="flex items-center gap-2">
+                            <div className="w-2 h-2 bg-violet-500 rounded-full" />
+                            <span className="text-[10px] font-mono uppercase tracking-widest text-violet-400 font-bold">Tokenized</span>
+                          </div>
+                          <span className="text-xs font-mono font-bold text-violet-400">${agent.tokenSymbol}</span>
+                        </div>
+                        <div className="text-xs text-zinc-500 font-mono mb-3 truncate">{agent.tokenMintAddress}</div>
+                        <div className="flex gap-2">
+                          <a
+                            href={`https://bags.fm/${agent.tokenMintAddress}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="flex-1 py-2 bg-violet-600 hover:bg-violet-500 text-white font-bold font-mono text-[10px] uppercase tracking-widest rounded-sm transition-colors flex items-center justify-center gap-2"
+                          >
+                            <ExternalLink size={12} /> Trade on Bags
+                          </a>
+                          <button
+                            onClick={() => copyToClipboard(agent.tokenMintAddress!)}
+                            className="px-3 py-2 bg-zinc-800 hover:bg-zinc-700 text-zinc-400 rounded-sm transition-colors"
+                          >
+                            <Copy size={12} />
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  ) : agent.tokenLaunchStatus === 'queued' || agent.tokenLaunchStatus === 'launching' || launchingToken ? (
+                    <div className="bg-black/30 border border-amber-500/20 rounded p-6 text-center">
+                      <Loader2 className="w-8 h-8 text-amber-400 mx-auto mb-3 animate-spin" />
+                      <p className="text-amber-400 text-xs font-mono font-bold mb-1">Launching Token...</p>
+                      <p className="text-zinc-600 text-[10px] font-mono">This takes 30-60 seconds. Don&apos;t close this page.</p>
+                    </div>
+                  ) : (
+                    <div className="space-y-3">
+                      {agent.tokenLaunchStatus === 'failed' && (
+                        <div className="bg-red-500/5 border border-red-500/20 p-3 rounded">
+                          <p className="text-red-400 text-[11px] font-mono">Previous launch failed. You can try again.</p>
+                        </div>
+                      )}
+
+                      {!showTokenLaunch ? (
+                        <div className="bg-black/30 border border-dashed border-zinc-700 rounded p-6 text-center">
+                          <Coins className="w-8 h-8 text-violet-500 mx-auto mb-3 opacity-50" />
+                          <p className="text-zinc-500 text-xs font-mono mb-1">No token deployed yet</p>
+                          <p className="text-zinc-600 text-[10px] font-mono mb-4">Launch a token for your agent on Solana. Free.</p>
+                          <button
+                            onClick={() => setShowTokenLaunch(true)}
+                            className="w-full px-6 py-2.5 bg-violet-600 hover:bg-violet-500 text-white font-bold font-mono text-xs uppercase tracking-widest rounded-sm transition-all flex items-center justify-center gap-2"
+                          >
+                            <Coins size={14} /> Tokenize Agent
+                          </button>
+                        </div>
+                      ) : (
+                        <div className="bg-black/30 border border-violet-500/20 rounded p-5 space-y-4">
+                          <div>
+                            <label className="block text-[10px] font-bold font-mono text-zinc-500 mb-2 uppercase tracking-widest">Token Symbol</label>
+                            <input
+                              type="text"
+                              value={tokenSymbolInput}
+                              onChange={(e) => setTokenSymbolInput(e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 10))}
+                              placeholder={agent.name.replace(/[^a-zA-Z0-9]/g, '').slice(0, 6).toUpperCase() || 'AGENT'}
+                              className="w-full bg-black border border-zinc-700 rounded-sm px-3 py-2.5 text-white text-sm font-mono outline-none focus:border-violet-500 transition-colors text-center tracking-widest"
+                            />
+                            <p className="text-zinc-600 text-[10px] font-mono mt-1">2-10 characters. Leave blank for auto-generated.</p>
+                          </div>
+
+                          {agent.bio && agent.bio.length >= 10 ? (
+                            <div className="bg-violet-500/5 border border-violet-500/20 p-3 rounded">
+                              <p className="text-violet-400 text-[11px] font-mono"><strong>Description preview:</strong></p>
+                              <p className="text-zinc-400 text-[10px] font-mono mt-1">{agent.bio.slice(0, 80)}...</p>
+                            </div>
+                          ) : (
+                            <div className="bg-amber-500/5 border border-amber-500/20 p-3 rounded">
+                              <p className="text-amber-400 text-[11px] font-mono">Your agent needs a bio of at least 10 characters.</p>
+                            </div>
+                          )}
+
+                          <div className="flex gap-2">
+                            <button
+                              onClick={async () => {
+                                setLaunchingToken(true);
+                                try {
+                                  const res = await fetch('/api/agents/launch-token', {
+                                    method: 'POST',
+                                    headers: {
+                                      'Content-Type': 'application/json',
+                                      'x-hive-api-key': apiKey,
+                                    },
+                                    body: JSON.stringify({ tokenSymbol: tokenSymbolInput || undefined }),
+                                  });
+                                  const data = await res.json();
+                                  if (res.ok && data.success) {
+                                    toast.success(`Token $${data.tokenSymbol} launched!`);
+                                    setAgent(prev => prev ? {
+                                      ...prev,
+                                      isTokenized: true,
+                                      tokenLaunchStatus: 'launched',
+                                      tokenSymbol: data.tokenSymbol,
+                                      tokenMintAddress: data.mintAddress,
+                                    } : prev);
+                                    setShowTokenLaunch(false);
+                                  } else {
+                                    toast.error(data.error || 'Launch failed');
+                                  }
+                                } catch (err: any) {
+                                  toast.error(err.message || 'Launch failed');
+                                } finally {
+                                  setLaunchingToken(false);
+                                }
+                              }}
+                              disabled={launchingToken || (agent.bio?.length || 0) < 10}
+                              className="flex-1 px-6 py-2.5 bg-violet-600 hover:bg-violet-500 text-white font-bold font-mono text-[10px] uppercase tracking-widest rounded-sm transition-colors disabled:opacity-40 flex items-center justify-center gap-2"
+                            >
+                              {launchingToken ? <Loader2 size={12} className="animate-spin" /> : <Coins size={12} />}
+                              {launchingToken ? 'Launching...' : 'Launch Token'}
+                            </button>
+                            <button
+                              onClick={() => { setShowTokenLaunch(false); setTokenSymbolInput(''); }}
+                              className="px-4 py-2.5 bg-zinc-800 hover:bg-zinc-700 text-zinc-400 font-mono text-[10px] uppercase rounded-sm transition-colors"
+                            >
+                              Cancel
+                            </button>
+                          </div>
+                        </div>
+                      )}
                     </div>
                   )}
                 </div>
