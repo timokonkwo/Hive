@@ -805,20 +805,38 @@ export default function AdminDashboardPage() {
                     {new Date(agent.createdAt).toLocaleDateString("en-US", { month: "short", day: "numeric" })}
                   </div>
                   <div className="flex items-center justify-end gap-2">
-                    {/* Launch Token button — only for non-tokenized agents */}
-                    {(!agent.isTokenized || agent.tokenLaunchStatus === 'failed') && (
+                    {/* Token status indicator */}
+                    {agent.tokenLaunchStatus === 'launched' && agent.tokenMintAddress ? (
+                      <a
+                        href={`https://bags.fm/${agent.tokenMintAddress}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="px-2 py-0.5 text-[10px] font-mono text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 rounded hover:bg-emerald-500/20 transition-colors"
+                        title={`Mint: ${agent.tokenMintAddress}`}
+                      >
+                        ${agent.tokenSymbol} ✓
+                      </a>
+                    ) : agent.tokenLaunchStatus === 'queued' || agent.tokenLaunchStatus === 'launching' ? (
+                      <span className="px-2 py-0.5 text-[10px] font-mono text-amber-400 bg-amber-500/10 border border-amber-500/20 rounded flex items-center gap-1">
+                        <Loader2 size={10} className="animate-spin" />
+                        {agent.tokenLaunchStatus === 'queued' ? 'Queued' : 'Launching'}
+                      </span>
+                    ) : agent.tokenLaunchStatus === 'failed' ? (
                       <button
                         onClick={() => setTokenLaunchModal({ id: agent.id, name: agent.name })}
                         disabled={launchingTokenFor === agent.id}
-                        className="px-2 py-1 text-[10px] font-mono uppercase border border-violet-500/30 text-violet-400 hover:text-violet-300 hover:border-violet-500/50 rounded transition-colors disabled:opacity-50"
+                        className="px-2 py-0.5 text-[10px] font-mono text-red-400 bg-red-500/10 border border-red-500/20 rounded hover:bg-red-500/20 transition-colors disabled:opacity-50"
                       >
-                        {launchingTokenFor === agent.id ? <Loader2 size={12} className="animate-spin" /> : agent.tokenLaunchStatus === 'failed' ? 'Retry' : 'Token'}
+                        {launchingTokenFor === agent.id ? <Loader2 size={10} className="animate-spin" /> : 'Retry'}
                       </button>
-                    )}
-                    {agent.isTokenized && agent.tokenLaunchStatus === 'launched' && (
-                      <span className="px-2 py-0.5 text-[10px] font-mono text-violet-400 bg-violet-500/10 border border-violet-500/20 rounded">
-                        ${agent.tokenSymbol}
-                      </span>
+                    ) : (
+                      <button
+                        onClick={() => setTokenLaunchModal({ id: agent.id, name: agent.name })}
+                        disabled={launchingTokenFor === agent.id}
+                        className="px-2 py-0.5 text-[10px] font-mono text-violet-400 border border-violet-500/20 rounded hover:bg-violet-500/10 transition-colors disabled:opacity-50"
+                      >
+                        {launchingTokenFor === agent.id ? <Loader2 size={10} className="animate-spin" /> : 'Launch'}
+                      </button>
                     )}
                     <Link
                       href={`/agent/${encodeURIComponent(agent.name)}`}
