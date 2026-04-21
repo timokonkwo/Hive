@@ -42,7 +42,7 @@ export default function AdminDashboardPage() {
   const [agentsTotal, setAgentsTotal] = useState(0);
   const [agentsPage, setAgentsPage] = useState(1);
   const [agentsSearch, setAgentsSearch] = useState("");
-  const [agentsSort, setAgentsSort] = useState("createdAt");
+  const [agentsSort, setAgentsSort] = useState("reputation");
   const [agentsOrder, setAgentsOrder] = useState<"asc" | "desc">("desc");
   const [agentsVerifiedFilter, setAgentsVerifiedFilter] = useState<string>("all");
   const [agentsLoading, setAgentsLoading] = useState(false);
@@ -88,6 +88,7 @@ export default function AdminDashboardPage() {
   const [tokenStatsLoading, setTokenStatsLoading] = useState(false);
   const [launchingTokenFor, setLaunchingTokenFor] = useState<string | null>(null);
   const [claimingFees, setClaimingFees] = useState(false);
+  const [tokenLaunchModal, setTokenLaunchModal] = useState<{ id: string; name: string } | null>(null);
 
   const address = user?.wallet?.address;
 
@@ -807,27 +808,7 @@ export default function AdminDashboardPage() {
                     {/* Launch Token button — only for non-tokenized agents */}
                     {(!agent.isTokenized || agent.tokenLaunchStatus === 'failed') && (
                       <button
-                        onClick={async () => {
-                          if (!confirm(`Launch token for ${agent.name}?`)) return;
-                          setLaunchingTokenFor(agent.id);
-                          try {
-                            const res = await fetch('/api/admin/token-stats', {
-                              method: 'POST',
-                              headers: { 'Content-Type': 'application/json' },
-                              body: JSON.stringify({ action: 'launch', agentId: agent.id, adminAddress: user?.wallet?.address }),
-                            });
-                            const data = await res.json();
-                            if (res.ok) {
-                              toast.success(`Token launch queued for ${agent.name}`);
-                            } else {
-                              toast.error(data.error || 'Launch failed');
-                            }
-                          } catch (err: any) {
-                            toast.error(err.message);
-                          } finally {
-                            setLaunchingTokenFor(null);
-                          }
-                        }}
+                        onClick={() => setTokenLaunchModal({ id: agent.id, name: agent.name })}
                         disabled={launchingTokenFor === agent.id}
                         className="px-2 py-1 text-[10px] font-mono uppercase border border-violet-500/30 text-violet-400 hover:text-violet-300 hover:border-violet-500/50 rounded transition-colors disabled:opacity-50"
                       >
@@ -1208,6 +1189,64 @@ export default function AdminDashboardPage() {
               </PaginationBtn>
             </div>
           )}
+        </div>
+      )}
+
+      {/* Token Launch Confirmation Modal */}
+      {tokenLaunchModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
+          <div className="bg-[#0A0A0A] border border-zinc-800 rounded-lg p-8 max-w-md w-full mx-4">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="w-10 h-10 rounded-full bg-violet-500/10 flex items-center justify-center">
+                <svg className="text-violet-400" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><path d="M16 8h-6a2 2 0 1 0 0 4h4a2 2 0 1 1 0 4H8"/><path d="M12 18V6"/></svg>
+              </div>
+              <h3 className="text-lg font-bold font-mono uppercase">Launch Token</h3>
+            </div>
+            <p className="text-zinc-400 text-sm mb-2">
+              Launch a token for <span className="text-white font-bold">{tokenLaunchModal.name}</span>?
+            </p>
+            <p className="text-zinc-600 text-xs mb-6 font-mono">
+              This will create a new token on Solana via Bags with a 10% fee config. The launch uses SOL from the agent wallet and cannot be reversed.
+            </p>
+            <div className="flex items-center gap-3 justify-end">
+              <button
+                onClick={() => setTokenLaunchModal(null)}
+                disabled={launchingTokenFor === tokenLaunchModal.id}
+                className="px-4 py-2 border border-zinc-700 text-zinc-400 hover:text-white hover:border-zinc-500 text-xs font-mono uppercase tracking-widest rounded transition-colors disabled:opacity-50"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={async () => {
+                  const { id, name } = tokenLaunchModal;
+                  setLaunchingTokenFor(id);
+                  try {
+                    const res = await fetch('/api/admin/token-stats', {
+                      method: 'POST',
+                      headers: { 'Content-Type': 'application/json' },
+                      body: JSON.stringify({ action: 'launch', agentId: id, adminAddress: user?.wallet?.address }),
+                    });
+                    const data = await res.json();
+                    if (res.ok) {
+                      toast.success(`Token launch queued for ${name}`);
+                      setTokenLaunchModal(null);
+                    } else {
+                      toast.error(data.error || 'Launch failed');
+                    }
+                  } catch (err: any) {
+                    toast.error(err.message);
+                  } finally {
+                    setLaunchingTokenFor(null);
+                  }
+                }}
+                disabled={launchingTokenFor === tokenLaunchModal.id}
+                className="px-4 py-2 bg-violet-600 hover:bg-violet-500 text-white text-xs font-bold font-mono uppercase tracking-widest rounded transition-colors disabled:opacity-50 flex items-center gap-2"
+              >
+                {launchingTokenFor === tokenLaunchModal.id ? <Loader2 size={12} className="animate-spin" /> : null}
+                Launch
+              </button>
+            </div>
+          </div>
         </div>
       )}
 
