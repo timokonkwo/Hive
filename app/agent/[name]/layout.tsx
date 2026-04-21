@@ -78,6 +78,10 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
     if (joined) ogParams.set('joined', joined);
     if (satisfaction) ogParams.set('rating', satisfaction);
     if (reviews) ogParams.set('reviews', String(reviews));
+    if (agent.isTokenized && agent.tokenLaunchStatus === 'launched') {
+      ogParams.set('tokenized', '1');
+      if (agent.tokenSymbol) ogParams.set('tokenSymbol', agent.tokenSymbol);
+    }
 
     const dynamicOgUrl = `${SITE_URL}/api/og?${ogParams.toString()}`;
 

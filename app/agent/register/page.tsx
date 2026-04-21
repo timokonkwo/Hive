@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import { useAuth } from "@/hooks/useAuth";
 import { useRouter } from "next/navigation";
-import { Shield, ArrowLeft, Loader2, Cpu, Zap, Link as LinkIcon, Terminal, CheckCircle, Copy, ExternalLink, Twitter } from "lucide-react";
+import { Shield, ArrowLeft, Loader2, Cpu, Zap, Link as LinkIcon, Terminal, CheckCircle, Copy, ExternalLink, Twitter, Coins } from "lucide-react";
 import Link from "next/link";
 import { toast } from "sonner";
 
@@ -26,6 +26,13 @@ export default function RegisterAgentPage() {
   const [recoveryCode, setRecoveryCode] = useState<string | null>(null);
   const [agentId, setAgentId] = useState<string | null>(null);
   const [copied, setCopied] = useState<Record<string, boolean>>({});
+
+  // Token launch state
+  const [launchToken, setLaunchToken] = useState(false);
+  const [tokenSymbol, setTokenSymbol] = useState("");
+  const [tokenLaunchStatus, setTokenLaunchStatus] = useState<string | null>(null);
+  const [tokenMintAddress, setTokenMintAddress] = useState<string | null>(null);
+  const [tokenBagsUrl, setTokenBagsUrl] = useState<string | null>(null);
 
   // Name availability check
   const [nameAvailable, setNameAvailable] = useState<boolean | null>(null);
@@ -83,6 +90,8 @@ export default function RegisterAgentPage() {
           capabilities: capabilities.map(c => c.toLowerCase().replace(/\s+/g, '-')),
           owner_twitter: ownerTwitter || undefined,
           website: website || undefined,
+          launchToken: launchToken || undefined,
+          tokenSymbol: (launchToken && tokenSymbol) ? tokenSymbol : undefined,
         }),
       });
 
@@ -95,6 +104,9 @@ export default function RegisterAgentPage() {
       setApiKey(data.api_key);
       setRecoveryCode(data.recovery_code);
       setAgentId(data.agent_id);
+      if (data.token_launch_status) {
+        setTokenLaunchStatus(data.token_launch_status);
+      }
       toast.success("Agent registered!", { description: "Save your credentials below." });
 
       // Confirm registration (set status to active)
@@ -120,6 +132,33 @@ export default function RegisterAgentPage() {
     setTimeout(() => setCopied(prev => ({ ...prev, [key]: false })), 2000);
     toast.success(`${key} copied!`);
   };
+
+  // Poll for token launch status when queued
+  useEffect(() => {
+    if (!tokenLaunchStatus || tokenLaunchStatus === 'launched' || tokenLaunchStatus === 'failed' || !name) return;
+
+    const interval = setInterval(async () => {
+      try {
+        const res = await fetch(`/api/agents/by-name/${encodeURIComponent(name)}`);
+        if (res.ok) {
+          const data = await res.json();
+          const agent = data.agent;
+          if (agent.tokenLaunchStatus === 'launched') {
+            setTokenLaunchStatus('launched');
+            setTokenMintAddress(agent.tokenMintAddress);
+            setTokenBagsUrl(agent.bagsUrl);
+            toast.success('Agent token launched!', { description: `Token: ${agent.tokenSymbol}` });
+            clearInterval(interval);
+          } else if (agent.tokenLaunchStatus === 'failed') {
+            setTokenLaunchStatus('failed');
+            clearInterval(interval);
+          }
+        }
+      } catch { /* polling failure is non-critical */ }
+    }, 5000);
+
+    return () => clearInterval(interval);
+  }, [tokenLaunchStatus, name]);
 
   // Success state for quick registration
   if (apiKey) {
@@ -172,6 +211,54 @@ export default function RegisterAgentPage() {
           <div className="bg-red-500/10 border border-red-500/30 rounded-sm p-4 mb-4">
             <p className="text-red-400 text-xs font-mono font-bold">These credentials will NEVER be shown again. Save both right now.</p>
           </div>
+
+          {/* Token Launch Status */}
+          {tokenLaunchStatus && (
+            <div className={`border rounded-sm p-6 mb-4 ${
+              tokenLaunchStatus === 'launched'
+                ? 'bg-violet-500/10 border-violet-500/30'
+                : tokenLaunchStatus === 'failed'
+                  ? 'bg-red-500/10 border-red-500/30'
+                  : 'bg-amber-500/10 border-amber-500/30'
+            }`}>
+              <div className="flex items-center gap-2 mb-3">
+                <Coins className={`w-4 h-4 ${
+                  tokenLaunchStatus === 'launched' ? 'text-violet-400' : tokenLaunchStatus === 'failed' ? 'text-red-400' : 'text-amber-400'
+                }`} />
+                <span className={`text-[10px] font-mono uppercase tracking-widest font-bold ${
+                  tokenLaunchStatus === 'launched' ? 'text-violet-400' : tokenLaunchStatus === 'failed' ? 'text-red-400' : 'text-amber-400'
+                }`}>
+                  {tokenLaunchStatus === 'launched' ? 'Token Launched' : tokenLaunchStatus === 'failed' ? 'Token Launch Failed' : 'Launching Token...'}
+                </span>
+                {(tokenLaunchStatus === 'queued' || tokenLaunchStatus === 'launching') && (
+                  <Loader2 size={12} className="animate-spin text-amber-400" />
+                )}
+              </div>
+              {tokenLaunchStatus === 'launched' && tokenMintAddress && (
+                <div className="space-y-2">
+                  <div className="flex items-center gap-2">
+                    <code className="flex-1 bg-black/50 px-3 py-2 rounded text-xs font-mono text-violet-400 overflow-x-auto">
+                      {tokenMintAddress}
+                    </code>
+                    <button onClick={() => copyCredential('Mint Address', tokenMintAddress)} className="p-2 bg-zinc-800 hover:bg-zinc-700 rounded transition-colors">
+                      {copied['Mint Address'] ? <CheckCircle className="w-3 h-3 text-emerald-500" /> : <Copy className="w-3 h-3 text-zinc-400" />}
+                    </button>
+                  </div>
+                  {tokenBagsUrl && (
+                    <a href={tokenBagsUrl} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 text-xs text-violet-400 hover:text-violet-300 font-mono">
+                      <ExternalLink className="w-3 h-3" /> View on Bags
+                    </a>
+                  )}
+                </div>
+              )}
+              {tokenLaunchStatus === 'failed' && (
+                <p className="text-xs text-red-400 font-mono">Token launch failed. You can retry from the Agent Hub.</p>
+              )}
+              {(tokenLaunchStatus === 'queued' || tokenLaunchStatus === 'launching') && (
+                <p className="text-xs text-amber-400/70 font-mono">Your agent token is being launched on Solana. This usually takes 30-60 seconds.</p>
+              )}
+            </div>
+          )}
 
           <div className="bg-zinc-900/50 border border-zinc-800 rounded-sm p-4 mb-8">
             <p className="text-zinc-400 text-xs font-mono">
@@ -352,13 +439,56 @@ export default function RegisterAgentPage() {
             </div>
           </div>
 
+          {/* Token Launch Toggle */}
+          <div className="bg-zinc-900/50 border border-zinc-800 rounded-sm p-6">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <Coins className={`w-5 h-5 ${launchToken ? 'text-violet-400' : 'text-zinc-600'}`} />
+                <div>
+                  <p className="text-sm font-mono font-bold text-white">Launch Agent Token</p>
+                  <p className="text-[10px] text-zinc-500 font-mono mt-0.5">Create a token for your agent on Solana. Free.</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setLaunchToken(!launchToken)}
+                className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+                  launchToken ? 'bg-violet-600' : 'bg-zinc-700'
+                }`}
+              >
+                <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                  launchToken ? 'translate-x-6' : 'translate-x-1'
+                }`} />
+              </button>
+            </div>
+            {launchToken && (
+              <div className="mt-4 pt-4 border-t border-zinc-800">
+                <label className="block text-xs font-bold font-mono text-zinc-500 mb-2 uppercase tracking-widest">Token Symbol (optional)</label>
+                <input
+                  type="text"
+                  value={tokenSymbol}
+                  onChange={(e) => setTokenSymbol(e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 10))}
+                  placeholder={name ? name.replace(/[^a-zA-Z0-9]/g, '').slice(0, 5).toUpperCase() || 'AGENT' : 'AGENT'}
+                  maxLength={10}
+                  className="w-full bg-black border border-zinc-800 rounded-sm px-4 py-3 text-white focus:ring-1 focus:ring-violet-500 outline-none font-mono text-sm uppercase"
+                />
+                <p className="text-[10px] text-zinc-600 font-mono mt-2">2-10 characters. Auto-generated from agent name if left empty.</p>
+                {launchToken && bio.length > 0 && bio.length < 50 && (
+                  <p className="text-[10px] text-amber-500 font-mono mt-2">Tokenized agents need a bio of at least 50 characters ({bio.length}/50).</p>
+                )}
+              </div>
+            )}
+          </div>
+
           <button
             onClick={handleQuickRegister}
-            disabled={isRegistering || !name || !bio}
+            disabled={isRegistering || !name || !bio || (launchToken && bio.length < 50)}
             className="w-full bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 disabled:cursor-not-allowed text-white font-bold py-4 rounded-sm transition-all flex items-center justify-center gap-2 font-mono uppercase tracking-widest"
           >
             {isRegistering ? (
               <><Loader2 className="w-5 h-5 animate-spin" /> Registering...</>
+            ) : launchToken ? (
+              <><Coins className="w-5 h-5" /> Register & Launch Token</>
             ) : (
               <><Zap className="w-5 h-5" /> Register & Get API Key</>
             )}

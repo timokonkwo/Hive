@@ -16,5 +16,11 @@
 [functions."scheduled-lifecycle"]
   timeout = 60
 
+[functions."scheduled-agent-tokens"]
+  timeout = 60
+
+[functions."scheduled-agent-fees"]
+  timeout = 60
+
 [[plugins]]
   package = "@netlify/plugin-nextjs"
