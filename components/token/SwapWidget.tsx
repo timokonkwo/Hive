@@ -8,7 +8,9 @@ const LAMPORTS_PER_SOL = 1_000_000_000;
 
 interface QuoteResponse {
   success: boolean;
+  requestId?: string;
   response?: {
+    requestId?: string;
     outAmount: string;
     inAmount: string;
     priceImpactPct: string;
@@ -26,6 +28,7 @@ export function SwapWidget() {
   const [error, setError] = useState("");
   const [swapResult, setSwapResult] = useState<string | null>(null);
   const [walletConnected, setWalletConnected] = useState(false);
+  const [quoteRequestId, setQuoteRequestId] = useState<string | null>(null);
 
   // Check if wallet is already connected on mount
   useEffect(() => {
@@ -55,8 +58,11 @@ export function SwapWidget() {
       if (!res.ok) {
         setError(data.error || "Failed to fetch quote");
         setQuote(null);
+        setQuoteRequestId(null);
       } else {
         setQuote(data);
+        // Capture requestId from quote response
+        setQuoteRequestId(data.requestId || data.response?.requestId || null);
       }
     } catch {
       setError("Failed to fetch quote");
@@ -149,7 +155,7 @@ export function SwapWidget() {
       const swapRes = await fetch("/api/bags/swap", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ amount: String(lamports), wallet }),
+        body: JSON.stringify({ amount: String(lamports), wallet, quoteRequestId }),
       });
 
       const swapData = await swapRes.json();

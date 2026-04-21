@@ -36,11 +36,18 @@ export async function POST(req: NextRequest) {
 
   try {
     const body = await req.json();
-    const { amount, wallet } = body;
+    const { amount, wallet, quoteRequestId } = body;
 
     if (!amount || !wallet) {
       return NextResponse.json(
         { error: 'amount (lamports) and wallet are required' },
+        { status: 400 }
+      );
+    }
+
+    if (!quoteRequestId) {
+      return NextResponse.json(
+        { error: 'quoteRequestId is required. Fetch a quote first.' },
         { status: 400 }
       );
     }
@@ -74,6 +81,7 @@ export async function POST(req: NextRequest) {
         amount: String(amount),
         slippageMode: 'auto',
         userPublicKey: wallet,
+        quoteRequestId,
       }),
     });
 
