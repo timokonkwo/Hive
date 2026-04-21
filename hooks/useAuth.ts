@@ -6,20 +6,22 @@ import { toast } from "sonner";
 /**
  * Extended auth hook that provides a stable identity for ALL login methods.
  *
- * - Wallet login → uses the connected wallet address
- * - Email/Google login → uses Privy user ID (no embedded wallet needed)
+ * Priority order for wallet address:
+ *  1. Solana wallet (if connected via Solana wallet like Phantom)
+ *  2. Ethereum wallet (if connected via MetaMask, etc.)
+ *  3. Privy user ID (for email/Google users without a wallet)
  *
  * All consuming code should use `user.wallet.address` which this hook
- * now guarantees to exist by synthesizing a wallet object for email users.
+ * guarantees to exist.
  */
 export function useAuth() {
   const privy = usePrivy();
   const { address: wagmiAddress, isConnected: wagmiConnected } = useAccount();
-  
+
   const [prevAddress, setPrevAddress] = useState<string | null>(null);
   const [authStabilized, setAuthStabilized] = useState(false);
 
-  // Stabilization delay: after Privy authenticates, wait for wagmi to sync
+  // Stabilization delay: after Privy authenticates, wait for wallet to sync
   useEffect(() => {
     if (!privy.authenticated) {
       setAuthStabilized(false);
@@ -33,15 +35,14 @@ export function useAuth() {
     return () => clearTimeout(timer);
   }, [privy.authenticated]);
 
-  // Detect MetaMask wallet switches via wagmi
-  // Only runs for external wallet users
+  // Detect MetaMask wallet switches via wagmi (EVM users only)
   useEffect(() => {
     if (!privy.authenticated || !wagmiAddress || !authStabilized) return;
 
-    const hasExternalWallet = privy.user?.linkedAccounts?.some(
-      (account: any) => account.type === 'wallet' && account.walletClientType !== 'privy'
+    const hasExternalEthWallet = privy.user?.linkedAccounts?.some(
+      (account: any) => account.type === 'wallet' && account.chainType === 'ethereum' && account.walletClientType !== 'privy'
     );
-    if (!hasExternalWallet) return;
+    if (!hasExternalEthWallet) return;
 
     const currentPrivyAddress = privy.user?.wallet?.address?.toLowerCase();
     const currentWagmiAddress = wagmiAddress?.toLowerCase();
@@ -61,13 +62,13 @@ export function useAuth() {
     }
   }, [wagmiAddress, privy.authenticated, privy.user?.wallet?.address, authStabilized, prevAddress, privy]);
 
-  // Handle disconnect from wagmi side
+  // Handle disconnect from wagmi side (EVM users only)
   useEffect(() => {
     if (!authStabilized) return;
-    const hasExternalWallet = privy.user?.linkedAccounts?.some(
-      (account: any) => account.type === 'wallet' && account.walletClientType !== 'privy'
+    const hasExternalEthWallet = privy.user?.linkedAccounts?.some(
+      (account: any) => account.type === 'wallet' && account.chainType === 'ethereum' && account.walletClientType !== 'privy'
     );
-    if (!hasExternalWallet) return;
+    if (!hasExternalEthWallet) return;
     if (privy.authenticated && prevAddress && !wagmiConnected) {
       privy.logout().then(() => {
         setPrevAddress(null);
@@ -76,17 +77,31 @@ export function useAuth() {
   }, [wagmiConnected, privy.authenticated, prevAddress, authStabilized, privy]);
 
   // Build a stable user object that ALWAYS has an address
-  // Wallet users → wallet address | Email/Google users → Privy user ID
   const userWithAddress = useMemo(() => {
     if (!privy.user) return privy.user;
 
-    const walletAddress = privy.user.wallet?.address;
+    // 1. Check for Solana wallet (prioritized for Hive)
+    const solanaWallet = privy.user.linkedAccounts?.find(
+      (account: any) => account.type === 'wallet' && account.chainType === 'solana'
+    ) as any;
 
-    // If user already has a wallet address, return as-is
-    if (walletAddress) return privy.user;
+    if (solanaWallet?.address) {
+      return {
+        ...privy.user,
+        wallet: {
+          address: solanaWallet.address,
+          chainType: 'solana' as const,
+          chainId: 'mainnet',
+          walletClientType: solanaWallet.walletClientType || 'unknown',
+        },
+      };
+    }
 
-    // For email/Google users without a wallet, synthesize a wallet object
-    // using the Privy user ID as the address
+    // 2. Check for Ethereum wallet (backward compat)
+    const ethWalletAddress = privy.user.wallet?.address;
+    if (ethWalletAddress) return privy.user;
+
+    // 3. For email/Google users without a wallet, use Privy user ID
     const userId = privy.user.id;
     return {
       ...privy.user,
@@ -99,7 +114,6 @@ export function useAuth() {
     };
   }, [privy.user]);
 
-  // Return the same shape as privy but with our enhanced user
   return {
     ...privy,
     user: userWithAddress,
