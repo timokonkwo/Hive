@@ -69,20 +69,23 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    const bagsBody = {
+      inputMint: SOL_MINT,
+      outputMint: HIVE_MINT,
+      amount: String(amount),
+      slippageMode: 'auto',
+      userPublicKey: wallet,
+      requestId: quoteRequestId,
+    };
+    console.log('[BAGS] Swap request body:', JSON.stringify(bagsBody));
+
     const res = await fetch(`${BAGS_API_BASE}/trade/swap`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
         'x-api-key': apiKey,
       },
-      body: JSON.stringify({
-        inputMint: SOL_MINT,
-        outputMint: HIVE_MINT,
-        amount: String(amount),
-        slippageMode: 'auto',
-        userPublicKey: wallet,
-        requestId: quoteRequestId,
-      }),
+      body: JSON.stringify(bagsBody),
     });
 
     if (!res.ok) {
