@@ -2,8 +2,6 @@ import { NextRequest, NextResponse } from 'next/server';
 import { checkRateLimit, getClientIp, RATE_LIMITS } from '@/lib/rate-limit';
 
 const BAGS_API_BASE = 'https://public-api-v2.bags.fm/api/v1';
-const HIVE_MINT = '6JfonM6a24xngXh5yJ1imZzbMhpfvEsiafkb4syHBAGS';
-const SOL_MINT = 'So11111111111111111111111111111111111111112';
 
 // Solana base58 address: 32-44 characters, no 0/O/I/l
 const SOLANA_ADDRESS_REGEX = /^[1-9A-HJ-NP-Za-km-z]{32,44}$/;
@@ -11,11 +9,11 @@ const SOLANA_ADDRESS_REGEX = /^[1-9A-HJ-NP-Za-km-z]{32,44}$/;
 /**
  * POST /api/bags/swap
  * 
- * Creates a swap transaction (SOL → $HIVE) via the Bags API.
+ * Creates a swap transaction (SOL -> $HIVE) via the Bags API.
  * Returns a serialized Solana transaction for the client to sign.
  * 
- * Body: { amount: string, wallet: string }
- *   - amount: lamports (e.g., "1000000000" = 1 SOL)
+ * Body: { quoteResponse: object, wallet: string }
+ *   - quoteResponse: the full quote response from /api/bags/quote
  *   - wallet: buyer's Solana wallet address
  */
 export async function POST(req: NextRequest) {
@@ -36,18 +34,11 @@ export async function POST(req: NextRequest) {
 
   try {
     const body = await req.json();
-    const { amount, wallet, quoteRequestId } = body;
+    const { quoteResponse, wallet } = body;
 
-    if (!amount || !wallet) {
+    if (!quoteResponse || !wallet) {
       return NextResponse.json(
-        { error: 'amount (lamports) and wallet are required' },
-        { status: 400 }
-      );
-    }
-
-    if (!quoteRequestId) {
-      return NextResponse.json(
-        { error: 'quoteRequestId is required. Fetch a quote first.' },
+        { error: 'quoteResponse and wallet are required' },
         { status: 400 }
       );
     }
@@ -60,24 +51,10 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // Validate and cap amount
-    const numAmount = Number(amount);
-    if (isNaN(numAmount) || numAmount <= 0 || numAmount > 100_000_000_000) {
-      return NextResponse.json(
-        { error: 'Amount must be between 1 lamport and 100 SOL' },
-        { status: 400 }
-      );
-    }
-
     const bagsBody = {
-      inputMint: SOL_MINT,
-      outputMint: HIVE_MINT,
-      amount: String(amount),
-      slippageMode: 'auto',
+      quoteResponse,
       userPublicKey: wallet,
-      requestId: quoteRequestId,
     };
-    console.log('[BAGS] Swap request body:', JSON.stringify(bagsBody));
 
     const res = await fetch(`${BAGS_API_BASE}/trade/swap`, {
       method: 'POST',

@@ -28,7 +28,7 @@ export function SwapWidget() {
   const [error, setError] = useState("");
   const [swapResult, setSwapResult] = useState<string | null>(null);
   const [walletConnected, setWalletConnected] = useState(false);
-  const [quoteRequestId, setQuoteRequestId] = useState<string | null>(null);
+  const [lastQuoteResponse, setLastQuoteResponse] = useState<any>(null);
 
   // Check if wallet is already connected on mount
   useEffect(() => {
@@ -58,11 +58,11 @@ export function SwapWidget() {
       if (!res.ok) {
         setError(data.error || "Failed to fetch quote");
         setQuote(null);
-        setQuoteRequestId(null);
+        setLastQuoteResponse(null);
       } else {
         setQuote(data);
-        // Capture requestId from quote response
-        setQuoteRequestId(data.requestId || data.response?.requestId || null);
+        // Store the full quote response for the swap call
+        setLastQuoteResponse(data.response || null);
       }
     } catch {
       setError("Failed to fetch quote");
@@ -150,12 +150,16 @@ export function SwapWidget() {
         return;
       }
 
-      const lamports = Math.floor(parseFloat(solAmount) * LAMPORTS_PER_SOL);
+      if (!lastQuoteResponse) {
+        setError("Please wait for a quote before swapping.");
+        setSwapping(false);
+        return;
+      }
 
       const swapRes = await fetch("/api/bags/swap", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ amount: String(lamports), wallet, quoteRequestId }),
+        body: JSON.stringify({ quoteResponse: lastQuoteResponse, wallet }),
       });
 
       const swapData = await swapRes.json();
