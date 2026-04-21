@@ -214,7 +214,8 @@ export class AgentBagsClient {
         symbol: tokenSymbol,
         description: tokenDescription,
         imageUrl: getAgentTokenImageUrl(),
-        website: website || agentUrl,
+        website: agentUrl,
+        twitter: 'https://x.com/uphivexyz',
       });
 
       console.log(`[AGENT-BAGS] Token info created: mint=${tokenInfo.tokenMint}, metadata=${tokenInfo.tokenMetadata}`);
