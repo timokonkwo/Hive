@@ -27,8 +27,10 @@ const BAGS_API_BASE = 'https://public-api-v2.bags.fm/api/v1';
  */
 const AGENT_CONFIG_TYPE = '48e26d2f-0a9d-4625-a3cc-c3987d874b9e';
 
-/** Hardcoded image for all agent token launches */
-const AGENT_TOKEN_IMAGE_URL = `${process.env.NEXT_PUBLIC_SITE_URL || 'https://uphive.xyz'}/agent.png`;
+/** Get the image URL at runtime (not module init) so env vars are resolved */
+function getAgentTokenImageUrl(): string {
+  return `${process.env.NEXT_PUBLIC_SITE_URL || 'https://uphive.xyz'}/agent.png`;
+}
 
 const DEFAULT_RPC = 'https://api.mainnet-beta.solana.com';
 
@@ -199,18 +201,20 @@ export class AgentBagsClient {
       const wallet = this.keypair.publicKey.toBase58();
       const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://uphive.xyz';
 
-      // Build token description with auto-appended agent note
-      const tokenDescription = `${bio.trim()}\n\nThis token represents ${agentName}, an AI agent on Hive Protocol - ${siteUrl}/agent/${encodeURIComponent(agentName)}`;
+      // Build token description — single line, no special chars that Bags might strip
+      const agentUrl = `${siteUrl}/agent/${encodeURIComponent(agentName)}`;
+      const tokenDescription = `${bio.trim()} | ${agentName} is an AI agent on Hive Protocol. ${agentUrl}`;
 
       // Step 1: Create token metadata on Bags
       console.log(`[AGENT-BAGS] Creating token info: ${agentName} (${tokenSymbol})`);
+      console.log(`[AGENT-BAGS] Description: ${tokenDescription.slice(0, 100)}...`);
 
       const tokenInfo = await this.sdk.tokenLaunch.createTokenInfoAndMetadata({
         name: agentName,
         symbol: tokenSymbol,
         description: tokenDescription,
-        imageUrl: AGENT_TOKEN_IMAGE_URL,
-        website: website || `${siteUrl}/agent/${encodeURIComponent(agentName)}`,
+        imageUrl: getAgentTokenImageUrl(),
+        website: website || agentUrl,
       });
 
       console.log(`[AGENT-BAGS] Token info created: mint=${tokenInfo.tokenMint}, metadata=${tokenInfo.tokenMetadata}`);
