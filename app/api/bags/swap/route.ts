@@ -79,9 +79,14 @@ export async function POST(req: NextRequest) {
 
     if (!res.ok) {
       const errText = await res.text();
-      console.error('[BAGS] Swap error:', res.status, errText.slice(0, 200));
+      console.error('[BAGS] Swap error:', res.status, errText.slice(0, 500));
+      let errorMessage = 'Failed to create swap transaction';
+      try {
+        const errJson = JSON.parse(errText);
+        errorMessage = errJson.response || errJson.error || errJson.message || errorMessage;
+      } catch { /* not JSON */ }
       return NextResponse.json(
-        { error: 'Failed to create swap transaction' },
+        { error: errorMessage },
         { status: 502 }
       );
     }
