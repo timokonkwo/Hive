@@ -5,7 +5,7 @@ import { Navbar } from "@/components/layout/Navbar";
 import { Footer } from "@/components/layout/Footer";
 import {
   Wallet, Shield, Loader2, Key, ExternalLink, Copy,
-  DollarSign, CheckCircle, AlertTriangle, Bot, RefreshCw, BarChart3, Coins
+  DollarSign, CheckCircle, AlertTriangle, Bot, RefreshCw, BarChart3, Coins, RotateCw
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -72,6 +72,11 @@ export default function AgentDashboardPage() {
   const [launchingToken, setLaunchingToken] = useState(false);
   const [tokenSymbolInput, setTokenSymbolInput] = useState("");
   const [showTokenLaunch, setShowTokenLaunch] = useState(false);
+
+  // API key regeneration state
+  const [showRegenConfirm, setShowRegenConfirm] = useState(false);
+  const [regenerating, setRegenerating] = useState(false);
+  const [newGeneratedKey, setNewGeneratedKey] = useState<string | null>(null);
 
   // Restore session on mount
   useEffect(() => {
@@ -902,6 +907,94 @@ export default function AgentDashboardPage() {
                           </div>
                         </div>
                       )}
+                    </div>
+                  )}
+                </div>
+
+                {/* API Key Management */}
+                <div className="bg-zinc-900/30 border border-zinc-800 rounded-lg p-6">
+                  <h3 className="text-sm font-bold font-mono uppercase tracking-widest text-zinc-400 flex items-center gap-2 mb-4">
+                    <Key size={14} className="text-amber-400" /> API Key
+                  </h3>
+
+                  {newGeneratedKey ? (
+                    <div className="space-y-3">
+                      <div className="bg-emerald-500/5 border border-emerald-500/20 p-3 rounded">
+                        <p className="text-emerald-400 text-[11px] font-mono font-bold mb-2">New API key generated!</p>
+                        <p className="text-amber-400 text-[10px] font-mono mb-2">Save this key now. It will not be shown again.</p>
+                      </div>
+                      <div className="bg-black border border-zinc-700 rounded p-3 flex items-center gap-2">
+                        <code className="flex-1 text-[10px] font-mono text-emerald-400 break-all">{newGeneratedKey}</code>
+                        <button
+                          onClick={() => copyToClipboard(newGeneratedKey)}
+                          className="shrink-0 p-1.5 bg-zinc-800 hover:bg-zinc-700 text-zinc-400 rounded transition-colors"
+                        >
+                          <Copy size={12} />
+                        </button>
+                      </div>
+                      <button
+                        onClick={() => setNewGeneratedKey(null)}
+                        className="w-full py-2 bg-zinc-800 hover:bg-zinc-700 text-zinc-400 font-mono text-[10px] uppercase tracking-widest rounded-sm transition-colors"
+                      >
+                        Done
+                      </button>
+                    </div>
+                  ) : showRegenConfirm ? (
+                    <div className="space-y-3">
+                      <div className="bg-red-500/5 border border-red-500/20 p-3 rounded">
+                        <p className="text-red-400 text-[11px] font-mono font-bold">Are you sure?</p>
+                        <p className="text-zinc-500 text-[10px] font-mono mt-1">Your current API key will be permanently invalidated. Any agents or scripts using it will stop working.</p>
+                      </div>
+                      <div className="flex gap-2">
+                        <button
+                          onClick={async () => {
+                            setRegenerating(true);
+                            try {
+                              const res = await fetch('/api/agents/regenerate-key', {
+                                method: 'POST',
+                                headers: { 'x-hive-api-key': apiKey },
+                              });
+                              const data = await res.json();
+                              if (res.ok && data.success) {
+                                setNewGeneratedKey(data.apiKey);
+                                setApiKey(data.apiKey);
+                                sessionStorage.setItem('hive_agent_key', data.apiKey);
+                                setShowRegenConfirm(false);
+                                toast.success('API key regenerated');
+                              } else {
+                                toast.error(data.error || 'Failed to regenerate key');
+                              }
+                            } catch {
+                              toast.error('Failed to regenerate key');
+                            } finally {
+                              setRegenerating(false);
+                            }
+                          }}
+                          disabled={regenerating}
+                          className="flex-1 py-2.5 bg-red-600 hover:bg-red-500 text-white font-bold font-mono text-[10px] uppercase tracking-widest rounded-sm transition-colors disabled:opacity-40 flex items-center justify-center gap-2"
+                        >
+                          {regenerating ? <Loader2 size={12} className="animate-spin" /> : <RotateCw size={12} />}
+                          {regenerating ? 'Regenerating...' : 'Confirm Regenerate'}
+                        </button>
+                        <button
+                          onClick={() => setShowRegenConfirm(false)}
+                          className="px-4 py-2.5 bg-zinc-800 hover:bg-zinc-700 text-zinc-400 font-mono text-[10px] uppercase rounded-sm transition-colors"
+                        >
+                          Cancel
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="space-y-3">
+                      <div className="bg-black/30 border border-zinc-700 rounded p-3">
+                        <p className="text-zinc-500 text-[10px] font-mono">Current key: <span className="text-zinc-400">{apiKey.slice(0, 12)}...{apiKey.slice(-4)}</span></p>
+                      </div>
+                      <button
+                        onClick={() => setShowRegenConfirm(true)}
+                        className="w-full py-2.5 bg-zinc-800 hover:bg-zinc-700 text-zinc-400 font-bold font-mono text-[10px] uppercase tracking-widest rounded-sm transition-colors flex items-center justify-center gap-2"
+                      >
+                        <RotateCw size={12} /> Regenerate API Key
+                      </button>
                     </div>
                   )}
                 </div>
