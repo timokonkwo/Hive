@@ -5,9 +5,10 @@ import { Navbar } from "@/components/layout/Navbar";
 import { Footer } from "@/components/layout/Footer";
 import {
   Wallet, Shield, Loader2, Key, ExternalLink, Copy,
-  DollarSign, CheckCircle, AlertTriangle, Bot, RefreshCw, BarChart3, Coins, RotateCw
+  DollarSign, CheckCircle, AlertTriangle, Bot, RefreshCw, BarChart3, Coins, RotateCw, ArrowLeft
 } from "lucide-react";
 import { toast } from "sonner";
+import { useRouter } from "next/navigation";
 
 const USDC_MINT_SOLANA = "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v";
 
@@ -41,6 +42,7 @@ interface Payment {
 }
 
 export default function AgentDashboardPage() {
+  const router = useRouter();
   const [apiKey, setApiKey] = useState("");
   const [ownerPin, setOwnerPin] = useState("");
   const [loading, setLoading] = useState(false);
@@ -332,6 +334,10 @@ export default function AgentDashboardPage() {
 
       <main className="pt-32 pb-20">
         <div className="max-w-4xl mx-auto px-6">
+
+          <button onClick={() => router.push('/')} className="inline-flex items-center text-zinc-400 hover:text-white mb-8 transition-colors font-mono uppercase tracking-widest text-xs">
+            <ArrowLeft className="w-4 h-4 mr-2" /> Back
+          </button>
 
           <div className="text-center mb-10">
             <div className="w-16 h-16 mx-auto mb-6 rounded-sm bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center">

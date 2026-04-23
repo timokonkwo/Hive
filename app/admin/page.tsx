@@ -9,12 +9,12 @@ import {
   Clock, ChevronRight, AlertTriangle, Inbox, Zap,
   Search, Trash2, ChevronLeft, ChevronsLeft, ChevronsRight,
   ArrowUpDown, X, Bot, MessageSquare, Bug, Lightbulb, CheckSquare, Square,
-  Send, ChevronDown, ExternalLink, Download, Edit3, Check
+  Send, ChevronDown, ExternalLink, Download, Edit3, Check, Map, Plus, ArrowRight
 } from "lucide-react";
 import Link from "next/link";
 import { toast } from "sonner";
 
-type AdminTab = "overview" | "tasks" | "agents" | "submissions" | "activity" | "feedback" | "tokens";
+type AdminTab = "overview" | "tasks" | "agents" | "submissions" | "activity" | "feedback" | "tokens" | "roadmap";
 
 const AGENTS_PER_PAGE = 20;
 const TASKS_PER_PAGE = 20;
@@ -89,6 +89,14 @@ export default function AdminDashboardPage() {
   const [launchingTokenFor, setLaunchingTokenFor] = useState<string | null>(null);
   const [claimingFees, setClaimingFees] = useState(false);
   const [tokenLaunchModal, setTokenLaunchModal] = useState<{ id: string; name: string } | null>(null);
+
+  // Roadmap management state
+  const [roadmapItems, setRoadmapItems] = useState<any[]>([]);
+  const [roadmapLoading, setRoadmapLoading] = useState(false);
+  const [roadmapEditItem, setRoadmapEditItem] = useState<any>(null);
+  const [roadmapForm, setRoadmapForm] = useState({ title: '', description: '', status: 'planned', date: '', tag: '', icon: '' });
+  const [roadmapSaving, setRoadmapSaving] = useState(false);
+  const [showRoadmapForm, setShowRoadmapForm] = useState(false);
 
   const address = user?.wallet?.address;
 
@@ -265,6 +273,14 @@ export default function AdminDashboardPage() {
         .then(data => { if (data) setTokenStats(data); })
         .catch(() => {})
         .finally(() => setTokenStatsLoading(false));
+    }
+    if (activeTab === "roadmap") {
+      setRoadmapLoading(true);
+      fetch('/api/roadmap')
+        .then(res => res.json())
+        .then(data => { if (data.success) setRoadmapItems(data.items); })
+        .catch(() => {})
+        .finally(() => setRoadmapLoading(false));
     }
   }, [activeTab, fetchFeedback]);
 
@@ -483,7 +499,7 @@ export default function AdminDashboardPage() {
 
       {/* Tabs */}
       <div className="flex border-b border-zinc-800 mb-8 gap-1 overflow-x-auto scrollbar-hide -mx-4 px-4 sm:mx-0 sm:px-0">
-        {(["overview", "tasks", "agents", "submissions", "activity", "feedback", "tokens"] as AdminTab[]).map((tab) => (
+        {(["overview", "tasks", "agents", "submissions", "activity", "feedback", "tokens", "roadmap"] as AdminTab[]).map((tab) => (
           <button
             key={tab}
             onClick={() => setActiveTab(tab)}
@@ -1502,6 +1518,251 @@ export default function AdminDashboardPage() {
             </div>
           ) : (
             <div className="py-12 text-center text-zinc-600 text-sm font-mono">Failed to load token stats</div>
+          )}
+        </div>
+      )}
+
+      {/* ── Roadmap Tab ── */}
+      {activeTab === "roadmap" && (
+        <div>
+          <div className="flex items-center justify-between mb-6">
+            <h3 className="text-sm font-bold font-mono uppercase tracking-widest text-zinc-400 flex items-center gap-2">
+              <Map size={14} /> Roadmap Management
+            </h3>
+            <button
+              onClick={() => {
+                setRoadmapEditItem(null);
+                setRoadmapForm({ title: '', description: '', status: 'planned', date: '', tag: '', icon: '' });
+                setShowRoadmapForm(true);
+              }}
+              className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white font-bold font-mono text-[10px] uppercase tracking-widest rounded-sm transition-colors flex items-center gap-2"
+            >
+              <Plus size={12} /> Add Item
+            </button>
+          </div>
+
+          {/* Add/Edit Form */}
+          {showRoadmapForm && (
+            <div className="bg-zinc-900/50 border border-zinc-800 rounded-lg p-6 mb-6">
+              <h4 className="text-xs font-mono uppercase tracking-widest text-zinc-400 font-bold mb-4">
+                {roadmapEditItem ? 'Edit Item' : 'New Roadmap Item'}
+              </h4>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                <input
+                  value={roadmapForm.title}
+                  onChange={e => setRoadmapForm(f => ({ ...f, title: e.target.value }))}
+                  placeholder="Title"
+                  className="bg-black border border-zinc-700 rounded px-3 py-2 text-sm text-white font-mono outline-none focus:border-emerald-500"
+                />
+                <select
+                  value={roadmapForm.status}
+                  onChange={e => setRoadmapForm(f => ({ ...f, status: e.target.value }))}
+                  className="bg-black border border-zinc-700 rounded px-3 py-2 text-sm text-white font-mono outline-none focus:border-emerald-500"
+                >
+                  <option value="completed">Completed</option>
+                  <option value="in-progress">In Progress</option>
+                  <option value="planned">Planned</option>
+                </select>
+                <input
+                  value={roadmapForm.date}
+                  onChange={e => setRoadmapForm(f => ({ ...f, date: e.target.value }))}
+                  placeholder="Date (e.g. Q2 2026)"
+                  className="bg-black border border-zinc-700 rounded px-3 py-2 text-sm text-white font-mono outline-none focus:border-emerald-500"
+                />
+                <input
+                  value={roadmapForm.tag}
+                  onChange={e => setRoadmapForm(f => ({ ...f, tag: e.target.value }))}
+                  placeholder="Tag (optional, e.g. npm)"
+                  className="bg-black border border-zinc-700 rounded px-3 py-2 text-sm text-white font-mono outline-none focus:border-emerald-500"
+                />
+                <input
+                  value={roadmapForm.icon}
+                  onChange={e => setRoadmapForm(f => ({ ...f, icon: e.target.value }))}
+                  placeholder="Icon name (e.g. Bot, Shield, Zap)"
+                  className="bg-black border border-zinc-700 rounded px-3 py-2 text-sm text-white font-mono outline-none focus:border-emerald-500"
+                />
+              </div>
+              <textarea
+                value={roadmapForm.description}
+                onChange={e => setRoadmapForm(f => ({ ...f, description: e.target.value }))}
+                placeholder="Description"
+                rows={3}
+                className="w-full bg-black border border-zinc-700 rounded px-3 py-2 text-sm text-white font-mono outline-none focus:border-emerald-500 mb-4 resize-none"
+              />
+              <div className="flex gap-2">
+                <button
+                  onClick={async () => {
+                    if (!roadmapForm.title || !roadmapForm.description) {
+                      toast.error('Title and description are required');
+                      return;
+                    }
+                    setRoadmapSaving(true);
+                    try {
+                      const method = roadmapEditItem ? 'PUT' : 'POST';
+                      const body = roadmapEditItem
+                        ? { id: roadmapEditItem.id, ...roadmapForm }
+                        : roadmapForm;
+                      const res = await fetch('/api/roadmap', {
+                        method,
+                        headers: { 'Content-Type': 'application/json', 'x-wallet-address': address || '' },
+                        body: JSON.stringify(body),
+                      });
+                      const data = await res.json();
+                      if (res.ok && data.success) {
+                        toast.success(roadmapEditItem ? 'Item updated' : 'Item added');
+                        setShowRoadmapForm(false);
+                        setRoadmapEditItem(null);
+                        // Refresh
+                        const refreshRes = await fetch('/api/roadmap');
+                        const refreshData = await refreshRes.json();
+                        if (refreshData.success) setRoadmapItems(refreshData.items);
+                      } else {
+                        toast.error(data.error || 'Failed to save');
+                      }
+                    } catch { toast.error('Failed to save'); }
+                    finally { setRoadmapSaving(false); }
+                  }}
+                  disabled={roadmapSaving}
+                  className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white font-bold font-mono text-[10px] uppercase tracking-widest rounded-sm transition-colors disabled:opacity-40 flex items-center gap-2"
+                >
+                  {roadmapSaving ? <Loader2 size={12} className="animate-spin" /> : <Check size={12} />}
+                  {roadmapEditItem ? 'Update' : 'Create'}
+                </button>
+                <button
+                  onClick={() => { setShowRoadmapForm(false); setRoadmapEditItem(null); }}
+                  className="px-4 py-2 bg-zinc-800 hover:bg-zinc-700 text-zinc-400 font-mono text-[10px] uppercase rounded-sm transition-colors"
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          )}
+
+          {roadmapLoading ? (
+            <div className="flex justify-center py-12"><Loader2 className="animate-spin text-zinc-600" size={20} /></div>
+          ) : (
+            <>
+              {(['completed', 'in-progress', 'planned'] as const).map(status => {
+                const statusItems = roadmapItems.filter(i => i.status === status);
+                const statusConfig = {
+                  completed: { label: 'Completed', color: 'text-emerald-500', border: 'border-emerald-500/20', bg: 'bg-emerald-500/10' },
+                  'in-progress': { label: 'In Progress', color: 'text-blue-500', border: 'border-blue-500/20', bg: 'bg-blue-500/10' },
+                  planned: { label: 'Planned', color: 'text-violet-400', border: 'border-violet-500/20', bg: 'bg-violet-500/10' },
+                }[status];
+                return (
+                  <div key={status} className="mb-8">
+                    <div className="flex items-center gap-3 mb-3">
+                      <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-sm text-[10px] font-mono uppercase tracking-widest font-bold ${statusConfig.bg} ${statusConfig.border} ${statusConfig.color} border`}>
+                        {statusConfig.label}
+                      </span>
+                      <span className="text-[10px] font-mono text-zinc-600">{statusItems.length} items</span>
+                    </div>
+                    {statusItems.length === 0 ? (
+                      <div className="py-4 text-center text-zinc-700 text-xs font-mono">No items</div>
+                    ) : (
+                      <div className="space-y-2">
+                        {statusItems.map(item => (
+                          <div key={item.id} className="bg-black/30 border border-zinc-800 rounded p-3 flex items-center justify-between gap-3 group hover:border-zinc-700 transition-colors">
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center gap-2 flex-wrap">
+                                <span className="text-white text-sm font-medium">{item.title}</span>
+                                {item.tag && <span className="text-[9px] font-mono text-violet-400/60 bg-violet-500/10 px-1.5 py-0.5 rounded uppercase">{item.tag}</span>}
+                                {item.icon && <span className="text-[9px] font-mono text-zinc-600">{item.icon}</span>}
+                              </div>
+                              <p className="text-zinc-600 text-[10px] font-mono mt-0.5 line-clamp-1">{item.description}</p>
+                              {item.date && <span className="text-[9px] font-mono text-zinc-700">{item.date}</span>}
+                            </div>
+                            <div className="flex items-center gap-1 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">
+                              {/* Edit */}
+                              <button
+                                onClick={() => {
+                                  setRoadmapEditItem(item);
+                                  setRoadmapForm({
+                                    title: item.title,
+                                    description: item.description,
+                                    status: item.status,
+                                    date: item.date || '',
+                                    tag: item.tag || '',
+                                    icon: item.icon || '',
+                                  });
+                                  setShowRoadmapForm(true);
+                                }}
+                                className="p-1.5 text-zinc-500 hover:text-white transition-colors" title="Edit"
+                              >
+                                <Edit3 size={12} />
+                              </button>
+                              {/* Move to next status */}
+                              {status !== 'completed' && (
+                                <button
+                                  onClick={async () => {
+                                    const nextStatus = status === 'planned' ? 'in-progress' : 'completed';
+                                    const res = await fetch('/api/roadmap', {
+                                      method: 'PUT',
+                                      headers: { 'Content-Type': 'application/json', 'x-wallet-address': address || '' },
+                                      body: JSON.stringify({ id: item.id, status: nextStatus }),
+                                    });
+                                    if (res.ok) {
+                                      toast.success(`Moved to ${nextStatus}`);
+                                      const r = await fetch('/api/roadmap');
+                                      const d = await r.json();
+                                      if (d.success) setRoadmapItems(d.items);
+                                    } else toast.error('Failed to move');
+                                  }}
+                                  className="p-1.5 text-zinc-500 hover:text-emerald-400 transition-colors"
+                                  title={status === 'planned' ? 'Move to In Progress' : 'Mark Complete'}
+                                >
+                                  {status === 'planned' ? <ArrowRight size={12} /> : <CheckCircle size={12} />}
+                                </button>
+                              )}
+                              {/* Move back */}
+                              {status !== 'planned' && (
+                                <button
+                                  onClick={async () => {
+                                    const prevStatus = status === 'completed' ? 'in-progress' : 'planned';
+                                    const res = await fetch('/api/roadmap', {
+                                      method: 'PUT',
+                                      headers: { 'Content-Type': 'application/json', 'x-wallet-address': address || '' },
+                                      body: JSON.stringify({ id: item.id, status: prevStatus }),
+                                    });
+                                    if (res.ok) {
+                                      toast.success(`Moved to ${prevStatus}`);
+                                      const r = await fetch('/api/roadmap');
+                                      const d = await r.json();
+                                      if (d.success) setRoadmapItems(d.items);
+                                    } else toast.error('Failed to move');
+                                  }}
+                                  className="p-1.5 text-zinc-500 hover:text-amber-400 transition-colors"
+                                  title={status === 'completed' ? 'Move to In Progress' : 'Move to Planned'}
+                                >
+                                  <ChevronLeft size={12} />
+                                </button>
+                              )}
+                              {/* Delete */}
+                              <button
+                                onClick={async () => {
+                                  if (!confirm(`Delete "${item.title}"?`)) return;
+                                  const res = await fetch(`/api/roadmap?id=${item.id}`, {
+                                    method: 'DELETE',
+                                    headers: { 'x-wallet-address': address || '' },
+                                  });
+                                  if (res.ok) {
+                                    toast.success('Deleted');
+                                    setRoadmapItems(prev => prev.filter(i => i.id !== item.id));
+                                  } else toast.error('Failed to delete');
+                                }}
+                                className="p-1.5 text-zinc-500 hover:text-red-400 transition-colors" title="Delete"
+                              >
+                                <Trash2 size={12} />
+                              </button>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </>
           )}
         </div>
       )}

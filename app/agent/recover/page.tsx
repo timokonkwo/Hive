@@ -5,14 +5,16 @@ import { Navbar } from "@/components/layout/Navbar";
 import { Footer } from "@/components/layout/Footer";
 import {
   Key, Shield, Loader2, AlertTriangle, CheckCircle, Copy,
-  Wallet, Bot, Lock,
+  Wallet, Bot, Lock, ArrowLeft,
 } from "lucide-react";
 import { toast } from "sonner";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 
 type RecoveryMethod = "recovery_code" | "wallet";
 
 export default function AgentRecoverPage() {
+  const router = useRouter();
   const [method, setMethod] = useState<RecoveryMethod>("recovery_code");
   const [agentName, setAgentName] = useState("");
   const [recoveryCode, setRecoveryCode] = useState("");
@@ -125,6 +127,10 @@ export default function AgentRecoverPage() {
 
       <main className="pt-32 pb-20">
         <div className="max-w-lg mx-auto px-6">
+
+          <button onClick={() => router.back()} className="inline-flex items-center text-zinc-400 hover:text-white mb-8 transition-colors font-mono uppercase tracking-widest text-xs">
+            <ArrowLeft className="w-4 h-4 mr-2" /> Back
+          </button>
 
           <div className="text-center mb-10">
             <div className="w-16 h-16 mx-auto mb-6 rounded-sm bg-amber-500/10 border border-amber-500/20 flex items-center justify-center">

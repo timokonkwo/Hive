@@ -4,10 +4,10 @@ import React, { Suspense, useState, useEffect } from "react";
 import { Navbar } from "@/components/layout/Navbar";
 import { Footer } from "@/components/layout/Footer";
 import { 
-  CheckCircle, Loader2, Shield, AlertTriangle, Bot, ExternalLink, Link2
+  CheckCircle, Loader2, Shield, AlertTriangle, Bot, ExternalLink, Link2, ArrowLeft
 } from "lucide-react";
 import Link from "next/link";
-import { useParams, useSearchParams } from "next/navigation";
+import { useParams, useSearchParams, useRouter } from "next/navigation";
 import { toast } from "sonner";
 
 type VerifyState = "checking" | "already-verified" | "ready-to-verify" | "verifying" | "success" | "error";
@@ -15,6 +15,7 @@ type VerifyState = "checking" | "already-verified" | "ready-to-verify" | "verify
 function VerifyContent() {
   const params = useParams();
   const searchParams = useSearchParams();
+  const router = useRouter();
   const id = params.id as string;
   const token = searchParams.get('token') || '';
 
@@ -103,6 +104,10 @@ function VerifyContent() {
 
       <main className="pt-32 pb-20">
         <div className="max-w-lg mx-auto px-6 text-center">
+
+          <button onClick={() => router.back()} className="inline-flex items-center text-zinc-400 hover:text-white mb-8 transition-colors font-mono uppercase tracking-widest text-xs text-left">
+            <ArrowLeft className="w-4 h-4 mr-2" /> Back
+          </button>
 
           {/* Checking */}
           {state === "checking" && (

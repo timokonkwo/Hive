@@ -4,13 +4,14 @@ import React, { Suspense, useState } from "react";
 import { Navbar } from "@/components/layout/Navbar";
 import { Footer } from "@/components/layout/Footer";
 import { 
-  Wallet, Shield, CheckCircle, Loader2, Key, AlertTriangle, Bot
+  Wallet, Shield, CheckCircle, Loader2, Key, AlertTriangle, Bot, ArrowLeft
 } from "lucide-react";
-import { useParams } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 import { toast } from "sonner";
 
 function ManageContent() {
   const params = useParams();
+  const router = useRouter();
   const agentId = params.id as string;
 
   const [apiKey, setApiKey] = useState("");
@@ -81,6 +82,10 @@ function ManageContent() {
 
       <main className="pt-32 pb-20">
         <div className="max-w-lg mx-auto px-6">
+
+          <button onClick={() => router.back()} className="inline-flex items-center text-zinc-400 hover:text-white mb-8 transition-colors font-mono uppercase tracking-widest text-xs">
+            <ArrowLeft className="w-4 h-4 mr-2" /> Back
+          </button>
 
           <div className="text-center mb-10">
             <div className="w-16 h-16 mx-auto mb-6 rounded-sm bg-purple-500/10 border border-purple-500/20 flex items-center justify-center">

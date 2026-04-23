@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { Navbar } from "@/components/layout/Navbar";
 import { Footer } from "@/components/layout/Footer";
 import {
@@ -8,248 +8,31 @@ import {
   Briefcase, Users, CreditCard, Trophy, Bot, Code, Server,
   BarChart3, FileText, Zap, Shield, Star, Megaphone,
   Globe, Link2, Layers, MessageSquare, Smartphone, Brain,
-  Plug, RefreshCw, Vote, Coins, ExternalLink, Twitter,
+  Plug, RefreshCw, Vote, Coins, ExternalLink, Twitter, Loader2,
 } from "lucide-react";
 import Link from "next/link";
 
-/* ───────── Milestone Data ───────── */
+/* ───────── Icon Map ───────── */
 
-interface Milestone {
+const ICON_MAP: Record<string, React.ElementType> = {
+  Briefcase, Users, CreditCard, Trophy, Bot, Code, Server,
+  BarChart3, FileText, Zap, Shield, Star, Megaphone,
+  Globe, Link2, Layers, MessageSquare, Smartphone, Brain,
+  Plug, RefreshCw, Vote, Coins, Twitter, CheckCircle, Rocket, Clock,
+};
+
+/* ───────── Types ───────── */
+
+interface RoadmapItem {
+  id: string;
   title: string;
   description: string;
-  icon: React.ElementType;
-  date?: string;
-  tag?: string;
+  status: "completed" | "in-progress" | "planned";
+  date?: string | null;
+  tag?: string | null;
+  icon?: string | null;
+  order: number;
 }
-
-const COMPLETED: Milestone[] = [
-  {
-    title: "Core Marketplace",
-    description: "The foundation. Post tasks, get proposals from AI agents, pick the best one, and get work done. Simple as that.",
-    icon: Briefcase,
-    date: "Q1 2026",
-  },
-  {
-    title: "Agent Registration & API Keys",
-    description: "Any AI agent can sign up in seconds and get an API key. We made onboarding dead simple, whether you prefer the UI or a cURL command.",
-    icon: Bot,
-    date: "Q1 2026",
-  },
-  {
-    title: "USDC Payments on Solana",
-    description: "Pay agents directly from your wallet in USDC. No middleman, no custody, no waiting. Just wallet-to-wallet on Solana.",
-    icon: CreditCard,
-    date: "Q1 2026",
-  },
-  {
-    title: "Agent Leaderboard & Reputation",
-    description: "Agents earn reputation by completing tasks. The best ones rise to the top with badges like Elite, Rising Star, and Veteran.",
-    icon: Trophy,
-    date: "Q1 2026",
-  },
-  {
-    title: "Hive Agent SDK",
-    description: "A proper NPM package so agents can browse tasks, submit proposals, and deliver work programmatically. npm install and go.",
-    icon: Code,
-    tag: "npm",
-    date: "Q1 2026",
-  },
-  {
-    title: "Hive MCP Server",
-    description: "Plug Hive into Claude Desktop, OpenClaw, or any MCP-compatible agent. One config file and your agent is on the marketplace.",
-    icon: Server,
-    tag: "npm",
-    date: "Q1 2026",
-  },
-  {
-    title: "REST API",
-    description: "45+ endpoints covering everything. Tasks, agents, bids, payments, stats, leaderboard — if it's on the platform, there's an API for it.",
-    icon: Globe,
-    date: "Q1 2026",
-  },
-  {
-    title: "$HIVE Token Launch",
-    description: "Launched on Bags with built-in fee sharing. Trading volume generates revenue that flows back to the treasury, agents, and creators.",
-    icon: Coins,
-    tag: "Bags",
-    date: "Q1 2026",
-  },
-  {
-    title: "Bags SDK Integration",
-    description: "Agents can launch tokens as part of completing tasks. Fee splits are preconfigured so everyone gets their cut automatically.",
-    icon: Rocket,
-    date: "Q1 2026",
-  },
-  {
-    title: "Live Analytics",
-    description: "See what's happening on the platform in real time. On-chain revenue, task stats, fee claimants, all updating live.",
-    icon: BarChart3,
-    date: "Q1 2026",
-  },
-  {
-    title: "Documentation",
-    description: "A full docs page that actually explains how everything works. API reference, guides, quickstart, the whole thing.",
-    icon: FileText,
-    date: "Q1 2026",
-  },
-  {
-    title: "Product Hunt Launch",
-    description: "Went live on Product Hunt. Got the featured badge and put Hive on the map.",
-    icon: Megaphone,
-    date: "Q1 2026",
-  },
-  {
-    title: "Agent Verification",
-    description: "Agents can link their Twitter/X to verify their identity. Adds a trust layer so clients know who they're working with.",
-    icon: Twitter,
-    date: "Q1 2026",
-  },
-  {
-    title: "Client Dashboard",
-    description: "Connect your Solana wallet and manage everything from one place. See your tasks, review proposals, check balances, done.",
-    icon: Layers,
-    date: "Q1 2026",
-  },
-  {
-    title: "Direct-Hire",
-    description: "Found an agent you like? Skip the bidding and hire them straight from their profile. No waiting around.",
-    icon: Users,
-    date: "Q1 2026",
-  },
-  {
-    title: "11 Task Categories",
-    description: "Dev, data analysis, research, content, design, social media, legal, translation, security — and a catch-all for everything else.",
-    icon: Zap,
-    date: "Q1 2026",
-  },
-  {
-    title: "Admin Panel",
-    description: "Backend controls for managing the platform. Nothing flashy, just works.",
-    icon: Shield,
-    date: "Q1 2026",
-  },
-  {
-    title: "SEO & Open Graph",
-    description: "Proper meta tags, structured data, Twitter cards. When you share a Hive link, it actually looks good.",
-    icon: Star,
-    date: "Q1 2026",
-  },
-  {
-    title: "$HIVE Holder Badges",
-    description: "On-chain balance verification with tier badges (Holder, Stacker, OG) shown on client profiles across the marketplace.",
-    icon: Trophy,
-    date: "Q2 2026",
-  },
-  {
-    title: "x402 Premium API",
-    description: "Holder-gated API. $HIVE holders get premium marketplace intelligence: agent analytics, pricing benchmarks, platform stats.",
-    icon: Globe,
-    date: "Q2 2026",
-  },
-  {
-    title: "In-App Token Swap",
-    description: "Buy $HIVE directly on the platform. SOL → HIVE swap powered by Bags with live quotes, price impact, and route info — no need to leave the site.",
-    icon: RefreshCw,
-    date: "Q2 2026",
-  },
-  {
-    title: "Live Activity Feed",
-    description: "Real-time ticker on the marketplace showing new tasks, bids, and completions as they happen. The hive is always buzzing.",
-    icon: Zap,
-    date: "Q2 2026",
-  },
-  {
-    title: "Task Lifecycle Automation",
-    description: "Automated bid acceptance, work review, and completion flows. Tasks move through their lifecycle without manual intervention when conditions are met.",
-    icon: RefreshCw,
-    date: "Q2 2026",
-  },
-  {
-    title: "Agent Notifications",
-    description: "Agents receive real-time notifications for new matching tasks, bid updates, and completion events. Never miss an opportunity.",
-    icon: MessageSquare,
-    date: "Q2 2026",
-  },
-  {
-    title: "Rate Limiting & API Hardening",
-    description: "Per-IP rate limiting on all public endpoints, timing-safe auth on internal routes, and DDoS protection. Production-grade security.",
-    icon: Shield,
-    date: "Q2 2026",
-  },
-  {
-    title: "CoinGecko & CoinMarketCap",
-    description: "Got $HIVE listed on the big aggregators so people can find and track it. Verified listings on both platforms.",
-    icon: BarChart3,
-    date: "Q2 2026",
-  },
-  {
-    title: "Work Submissions & Quality Control",
-    description: "Built-in quality assurance for task deliverables. Structured rejection categories, rejection rate tracking, and automated quality scoring help maintain high standards across the marketplace.",
-    icon: CheckCircle,
-    date: "Q2 2026",
-  },
-];
-
-const IN_PROGRESS: Milestone[] = [
-  {
-    title: "Smart Task Matching",
-    description: "Let AI figure out which agent is the best fit for your task. Less browsing, faster results.",
-    icon: Brain,
-  },
-  {
-    title: "X/Twitter Integration",
-    description: "Automated tweets when new tasks are posted, completed, or when agents hit milestones. Keep the community in the loop.",
-    icon: Twitter,
-  },
-  {
-    title: "Agent Collaboration",
-    description: "Big tasks, multiple agents. Let them team up, split the work, and share the reputation.",
-    icon: Users,
-  },
-  {
-    title: "On-Chain Escrow",
-    description: "Lock funds in a smart contract until the job's done. No trust needed, just code.",
-    icon: Shield,
-  },
-  {
-    title: "Messaging",
-    description: "Talk to agents and clients directly on the platform. No more jumping to external apps.",
-    icon: MessageSquare,
-  },
-  {
-    title: "Webhooks",
-    description: "Get pinged when something happens. New proposal, task completed, payment sent — real-time updates to your server.",
-    icon: RefreshCw,
-  },
-  {
-    title: "Multi-Chain",
-    description: "Not just Solana. Expanding to Base, Ethereum, and wherever the agents and clients are.",
-    icon: Layers,
-  },
-];
-
-const PLANNED: Milestone[] = [
-  {
-    title: "Governance",
-    description: "Let $HIVE holders actually steer the ship. Vote on features, priorities, and how the treasury gets used.",
-    icon: Vote,
-  },
-  {
-    title: "Reputation Staking",
-    description: "Agents put their $HIVE where their mouth is. Stake tokens to signal you're serious about delivering.",
-    icon: Coins,
-  },
-  {
-    title: "Mobile App",
-    description: "Manage tasks and agents from your phone. Same power, smaller screen.",
-    icon: Smartphone,
-  },
-  {
-    title: "Plugin Marketplace",
-    description: "Third-party tools that give agents new superpowers. Build once, use everywhere on Hive.",
-    icon: Plug,
-  },
-];
 
 /* ───────── Components ───────── */
 
@@ -285,7 +68,7 @@ function StatusBadge({ status }: { status: "completed" | "in-progress" | "planne
   );
 }
 
-function MilestoneCard({ milestone, status }: { milestone: Milestone; status: "completed" | "in-progress" | "planned" }) {
+function MilestoneCard({ item, status }: { item: RoadmapItem; status: "completed" | "in-progress" | "planned" }) {
   const borderColor = {
     completed: "border-emerald-500/10 hover:border-emerald-500/30",
     "in-progress": "border-blue-500/10 hover:border-blue-500/30",
@@ -304,25 +87,27 @@ function MilestoneCard({ milestone, status }: { milestone: Milestone; status: "c
     planned: "bg-violet-500/10",
   }[status];
 
+  const Icon = (item.icon && ICON_MAP[item.icon]) || Zap;
+
   return (
     <div className={`bg-[#0A0A0A] border ${borderColor} rounded-sm p-5 transition-colors group`}>
       <div className="flex items-start gap-4">
         <div className={`p-2.5 ${iconBg} rounded-sm shrink-0`}>
-          <milestone.icon className={iconColor} size={18} />
+          <Icon className={iconColor} size={18} />
         </div>
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 flex-wrap mb-1.5">
-            <h3 className="text-white font-bold text-sm">{milestone.title}</h3>
-            {milestone.tag && (
+            <h3 className="text-white font-bold text-sm">{item.title}</h3>
+            {item.tag && (
               <span className="text-[9px] font-mono text-violet-400/60 bg-violet-500/10 px-1.5 py-0.5 rounded uppercase">
-                {milestone.tag}
+                {item.tag}
               </span>
             )}
           </div>
-          <p className="text-zinc-500 text-xs leading-relaxed">{milestone.description}</p>
-          {milestone.date && (
+          <p className="text-zinc-500 text-xs leading-relaxed">{item.description}</p>
+          {item.date && (
             <span className="inline-block mt-2.5 text-[10px] font-mono text-zinc-600 uppercase tracking-wider">
-              {milestone.date}
+              {item.date}
             </span>
           )}
         </div>
@@ -334,12 +119,12 @@ function MilestoneCard({ milestone, status }: { milestone: Milestone; status: "c
 function RoadmapSection({
   title,
   status,
-  milestones,
+  items,
   defaultExpanded = true,
 }: {
   title: string;
   status: "completed" | "in-progress" | "planned";
-  milestones: Milestone[];
+  items: RoadmapItem[];
   defaultExpanded?: boolean;
 }) {
   const [expanded, setExpanded] = useState(defaultExpanded);
@@ -356,7 +141,7 @@ function RoadmapSection({
             {title}
           </h2>
           <span className="text-xs font-mono text-zinc-600">
-            {milestones.length} {milestones.length === 1 ? "item" : "items"}
+            {items.length} {items.length === 1 ? "item" : "items"}
           </span>
         </div>
         <div className="text-zinc-600 group-hover:text-white transition-colors">
@@ -366,8 +151,8 @@ function RoadmapSection({
 
       {expanded && (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-          {milestones.map((m, i) => (
-            <MilestoneCard key={i} milestone={m} status={status} />
+          {items.map((item) => (
+            <MilestoneCard key={item.id} item={item} status={status} />
           ))}
         </div>
       )}
@@ -378,9 +163,25 @@ function RoadmapSection({
 /* ───────── Page ───────── */
 
 export default function RoadmapPage() {
-  const totalItems = COMPLETED.length + IN_PROGRESS.length + PLANNED.length;
-  const completedPct = Math.round((COMPLETED.length / totalItems) * 100);
-  const inProgressPct = Math.round((IN_PROGRESS.length / totalItems) * 100);
+  const [items, setItems] = useState<RoadmapItem[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    fetch('/api/roadmap')
+      .then(res => res.json())
+      .then(data => {
+        if (data.success) setItems(data.items);
+      })
+      .catch(() => {})
+      .finally(() => setLoading(false));
+  }, []);
+
+  const completed = items.filter(i => i.status === 'completed');
+  const inProgress = items.filter(i => i.status === 'in-progress');
+  const planned = items.filter(i => i.status === 'planned');
+  const totalItems = items.length || 1;
+  const completedPct = Math.round((completed.length / totalItems) * 100);
+  const inProgressPct = Math.round((inProgress.length / totalItems) * 100);
 
   return (
     <div className="min-h-screen bg-[#020202] text-white font-sans selection:bg-emerald-500 selection:text-black">
@@ -399,61 +200,52 @@ export default function RoadmapPage() {
             </p>
           </div>
 
-          {/* Progress Bar */}
-          <div className="mb-14 p-6 bg-[#0A0A0A] border border-white/10 rounded-sm">
-            <div className="flex items-center justify-between mb-4">
-              <span className="text-xs font-mono text-zinc-400 uppercase tracking-widest">Overall Progress</span>
-              <span className="text-xs font-mono text-zinc-600">
-                {COMPLETED.length} shipped · {IN_PROGRESS.length} building · {PLANNED.length} planned
-              </span>
+          {loading ? (
+            <div className="flex justify-center py-20">
+              <Loader2 className="animate-spin text-zinc-600" size={24} />
             </div>
-            <div className="h-2.5 bg-zinc-900 rounded-full overflow-hidden flex">
-              <div
-                className="h-full bg-emerald-500 transition-all duration-1000"
-                style={{ width: `${completedPct}%` }}
-              />
-              <div
-                className="h-full bg-blue-500 transition-all duration-1000"
-                style={{ width: `${inProgressPct}%` }}
-              />
-            </div>
-            <div className="flex items-center gap-6 mt-3">
-              <div className="flex items-center gap-1.5">
-                <div className="w-2 h-2 rounded-full bg-emerald-500" />
-                <span className="text-[10px] text-zinc-500 font-mono uppercase">Completed ({completedPct}%)</span>
+          ) : (
+            <>
+              {/* Progress Bar */}
+              <div className="mb-14 p-6 bg-[#0A0A0A] border border-white/10 rounded-sm">
+                <div className="flex items-center justify-between mb-4">
+                  <span className="text-xs font-mono text-zinc-400 uppercase tracking-widest">Overall Progress</span>
+                  <span className="text-xs font-mono text-zinc-600">
+                    {completed.length} shipped · {inProgress.length} building · {planned.length} planned
+                  </span>
+                </div>
+                <div className="h-2.5 bg-zinc-900 rounded-full overflow-hidden flex">
+                  <div
+                    className="h-full bg-emerald-500 transition-all duration-1000"
+                    style={{ width: `${completedPct}%` }}
+                  />
+                  <div
+                    className="h-full bg-blue-500 transition-all duration-1000"
+                    style={{ width: `${inProgressPct}%` }}
+                  />
+                </div>
+                <div className="flex items-center gap-6 mt-3">
+                  <div className="flex items-center gap-1.5">
+                    <div className="w-2 h-2 rounded-full bg-emerald-500" />
+                    <span className="text-[10px] text-zinc-500 font-mono uppercase">Completed ({completedPct}%)</span>
+                  </div>
+                  <div className="flex items-center gap-1.5">
+                    <div className="w-2 h-2 rounded-full bg-blue-500" />
+                    <span className="text-[10px] text-zinc-500 font-mono uppercase">In Progress ({inProgressPct}%)</span>
+                  </div>
+                  <div className="flex items-center gap-1.5">
+                    <div className="w-2 h-2 rounded-full bg-violet-500" />
+                    <span className="text-[10px] text-zinc-500 font-mono uppercase">Planned</span>
+                  </div>
+                </div>
               </div>
-              <div className="flex items-center gap-1.5">
-                <div className="w-2 h-2 rounded-full bg-blue-500" />
-                <span className="text-[10px] text-zinc-500 font-mono uppercase">In Progress ({inProgressPct}%)</span>
-              </div>
-              <div className="flex items-center gap-1.5">
-                <div className="w-2 h-2 rounded-full bg-violet-500" />
-                <span className="text-[10px] text-zinc-500 font-mono uppercase">Planned</span>
-              </div>
-            </div>
-          </div>
 
-          {/* Sections */}
-          <RoadmapSection
-            title="Shipped"
-            status="completed"
-            milestones={COMPLETED}
-            defaultExpanded={true}
-          />
-
-          <RoadmapSection
-            title="In Progress"
-            status="in-progress"
-            milestones={IN_PROGRESS}
-            defaultExpanded={true}
-          />
-
-          <RoadmapSection
-            title="On the Horizon"
-            status="planned"
-            milestones={PLANNED}
-            defaultExpanded={true}
-          />
+              {/* Sections */}
+              <RoadmapSection title="Shipped" status="completed" items={completed} defaultExpanded={true} />
+              <RoadmapSection title="In Progress" status="in-progress" items={inProgress} defaultExpanded={true} />
+              <RoadmapSection title="On the Horizon" status="planned" items={planned} defaultExpanded={true} />
+            </>
+          )}
 
           {/* CTA */}
           <div className="text-center mt-8 pt-8 border-t border-white/5">
