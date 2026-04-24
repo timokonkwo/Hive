@@ -9,7 +9,7 @@ import {
   Clock, ChevronRight, AlertTriangle, Inbox, Zap,
   Search, Trash2, ChevronLeft, ChevronsLeft, ChevronsRight,
   ArrowUpDown, X, Bot, MessageSquare, Bug, Lightbulb, CheckSquare, Square,
-  Send, ChevronDown, ExternalLink, Download, Edit3, Check, Map, Plus, ArrowRight, Database
+  Send, ChevronDown, ExternalLink, Download, Edit3, Check, Map, Plus, ArrowRight
 } from "lucide-react";
 import Link from "next/link";
 import { toast } from "sonner";
@@ -105,6 +105,7 @@ export default function AdminDashboardPage() {
   const [roadmapForm, setRoadmapForm] = useState({ title: '', description: '', status: 'planned', date: '', tag: '', icon: '' });
   const [roadmapSaving, setRoadmapSaving] = useState(false);
   const [showRoadmapForm, setShowRoadmapForm] = useState(false);
+  const [roadmapCollapsed, setRoadmapCollapsed] = useState<Record<string, boolean>>({ completed: true });
 
   const address = user?.wallet?.address;
 
@@ -1655,31 +1656,7 @@ export default function AdminDashboardPage() {
           ) : roadmapItems.length === 0 ? (
             <div className="text-center py-16">
               <Map size={32} className="mx-auto text-zinc-600 mb-4" />
-              <p className="text-zinc-500 font-mono text-sm mb-4">No roadmap items yet.</p>
-              <button
-                onClick={async () => {
-                  setRoadmapLoading(true);
-                  try {
-                    const res = await fetch('/api/roadmap/seed', {
-                      method: 'POST',
-                      headers: { 'x-wallet-address': address || '' },
-                    });
-                    const data = await res.json();
-                    if (res.ok && data.success) {
-                      toast.success(`Seeded ${data.seeded} items`);
-                      const r = await fetch('/api/roadmap');
-                      const rd = await r.json();
-                      if (rd.success) setRoadmapItems(rd.items);
-                    } else {
-                      toast.error(data.error || 'Seed failed');
-                    }
-                  } catch { toast.error('Seed failed'); }
-                  finally { setRoadmapLoading(false); }
-                }}
-                className="px-6 py-3 bg-emerald-600 hover:bg-emerald-500 text-white font-bold font-mono text-xs uppercase tracking-widest rounded-sm transition-colors inline-flex items-center gap-2"
-              >
-                <Database size={14} /> Seed Default Items
-              </button>
+              <p className="text-zinc-500 font-mono text-sm">No roadmap items yet. Use the Add Item button above.</p>
             </div>
           ) : (
             <>
@@ -1692,13 +1669,17 @@ export default function AdminDashboardPage() {
                 }[status];
                 return (
                   <div key={status} className="mb-8">
-                    <div className="flex items-center gap-3 mb-3">
+                    <button
+                      onClick={() => setRoadmapCollapsed(prev => ({ ...prev, [status]: !prev[status] }))}
+                      className="flex items-center gap-3 mb-3 w-full text-left group"
+                    >
+                      <ChevronRight size={14} className={`text-zinc-600 transition-transform ${roadmapCollapsed[status] ? '' : 'rotate-90'}`} />
                       <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-sm text-[10px] font-mono uppercase tracking-widest font-bold ${statusConfig.bg} ${statusConfig.border} ${statusConfig.color} border`}>
                         {statusConfig.label}
                       </span>
                       <span className="text-[10px] font-mono text-zinc-600">{statusItems.length} items</span>
-                    </div>
-                    {statusItems.length === 0 ? (
+                    </button>
+                    {roadmapCollapsed[status] ? null : statusItems.length === 0 ? (
                       <div className="py-4 text-center text-zinc-700 text-xs font-mono">No items</div>
                     ) : (
                       <div className="space-y-2">
