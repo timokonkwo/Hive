@@ -59,7 +59,7 @@ async function seed() {
 
   const client = new MongoClient(uri);
   await client.connect();
-  const db = client.db();
+  const db = client.db('hive');
 
   // Check if already seeded
   const count = await db.collection('roadmap').countDocuments();

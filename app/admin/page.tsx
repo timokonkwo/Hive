@@ -9,7 +9,7 @@ import {
   Clock, ChevronRight, AlertTriangle, Inbox, Zap,
   Search, Trash2, ChevronLeft, ChevronsLeft, ChevronsRight,
   ArrowUpDown, X, Bot, MessageSquare, Bug, Lightbulb, CheckSquare, Square,
-  Send, ChevronDown, ExternalLink, Download, Edit3, Check, Map, Plus, ArrowRight
+  Send, ChevronDown, ExternalLink, Download, Edit3, Check, Map, Plus, ArrowRight, Database
 } from "lucide-react";
 import Link from "next/link";
 import { toast } from "sonner";
@@ -18,6 +18,14 @@ type AdminTab = "overview" | "tasks" | "agents" | "submissions" | "activity" | "
 
 const AGENTS_PER_PAGE = 20;
 const TASKS_PER_PAGE = 20;
+
+const ROADMAP_ICONS = [
+  'Briefcase', 'Bot', 'CreditCard', 'Trophy', 'Code', 'Server',
+  'Globe', 'Coins', 'Rocket', 'BarChart3', 'FileText', 'Megaphone',
+  'Twitter', 'Layers', 'Users', 'Zap', 'Shield', 'Star',
+  'RefreshCw', 'MessageSquare', 'Brain', 'Smartphone', 'Plug',
+  'Vote', 'CheckCircle', 'Clock', 'Link2',
+];
 const SUBMISSIONS_PER_PAGE = 15;
 
 const REJECTION_CATEGORY_LABELS: Record<string, string> = {
@@ -1575,12 +1583,16 @@ export default function AdminDashboardPage() {
                   placeholder="Tag (optional, e.g. npm)"
                   className="bg-black border border-zinc-700 rounded px-3 py-2 text-sm text-white font-mono outline-none focus:border-emerald-500"
                 />
-                <input
+                <select
                   value={roadmapForm.icon}
                   onChange={e => setRoadmapForm(f => ({ ...f, icon: e.target.value }))}
-                  placeholder="Icon name (e.g. Bot, Shield, Zap)"
                   className="bg-black border border-zinc-700 rounded px-3 py-2 text-sm text-white font-mono outline-none focus:border-emerald-500"
-                />
+                >
+                  <option value="">Select icon...</option>
+                  {ROADMAP_ICONS.map(name => (
+                    <option key={name} value={name}>{name}</option>
+                  ))}
+                </select>
               </div>
               <textarea
                 value={roadmapForm.description}
@@ -1640,6 +1652,35 @@ export default function AdminDashboardPage() {
 
           {roadmapLoading ? (
             <div className="flex justify-center py-12"><Loader2 className="animate-spin text-zinc-600" size={20} /></div>
+          ) : roadmapItems.length === 0 ? (
+            <div className="text-center py-16">
+              <Map size={32} className="mx-auto text-zinc-600 mb-4" />
+              <p className="text-zinc-500 font-mono text-sm mb-4">No roadmap items yet.</p>
+              <button
+                onClick={async () => {
+                  setRoadmapLoading(true);
+                  try {
+                    const res = await fetch('/api/roadmap/seed', {
+                      method: 'POST',
+                      headers: { 'x-wallet-address': address || '' },
+                    });
+                    const data = await res.json();
+                    if (res.ok && data.success) {
+                      toast.success(`Seeded ${data.seeded} items`);
+                      const r = await fetch('/api/roadmap');
+                      const rd = await r.json();
+                      if (rd.success) setRoadmapItems(rd.items);
+                    } else {
+                      toast.error(data.error || 'Seed failed');
+                    }
+                  } catch { toast.error('Seed failed'); }
+                  finally { setRoadmapLoading(false); }
+                }}
+                className="px-6 py-3 bg-emerald-600 hover:bg-emerald-500 text-white font-bold font-mono text-xs uppercase tracking-widest rounded-sm transition-colors inline-flex items-center gap-2"
+              >
+                <Database size={14} /> Seed Default Items
+              </button>
+            </div>
           ) : (
             <>
               {(['completed', 'in-progress', 'planned'] as const).map(status => {
