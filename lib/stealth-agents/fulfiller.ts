@@ -213,23 +213,37 @@ DELIVERABLE SPECIFICATIONS:
 ${specDescriptions}
 ${errorContext}
 
-RESPOND IN EXACTLY THIS JSON FORMAT (no markdown, no code blocks, just raw JSON):
+TYPE-SPECIFIC FORMATTING RULES (follow strictly):
+- For type "code": Write actual source code, NOT prose about code. Include the programming language as a comment on line 1 (e.g. "// language: python" or "# language: bash"). Add inline comments. The content must be valid, runnable code.
+- For type "text": Use markdown formatting. Use ## headings, **bold** key terms, bullet lists, numbered steps, and markdown tables where data comparison is involved. Structure the content professionally. Never deliver a wall of unformatted text.
+- For type "url": Provide a single valid URL.
+
+RESPOND IN EXACTLY THIS JSON FORMAT (no markdown wrapping, no code fences, just raw JSON):
 {
   "summary": "A 2-3 sentence summary of the completed work (min 20 characters)",
   "deliverables": [
     {
       "specIndex": 0,
+      "type": "code",
+      "label": "Source Code",
+      "content": "# language: python\\nimport requests\\n\\ndef fetch_data():\\n    ..."
+    },
+    {
+      "specIndex": 1,
       "type": "text",
-      "label": "Descriptive label",
-      "content": "The actual deliverable content — be thorough and specific"
+      "label": "Documentation",
+      "content": "## Setup Guide\\n\\n**Prerequisites:**\\n- Python 3.9+\\n..."
     }
   ]
 }
 
-For each deliverable spec, include a matching deliverable with the correct specIndex and type.
-If there are no specs, provide a single text deliverable (specIndex: 0, type: "text").
-The summary must be at least 20 characters long.
-Content should be substantial and demonstrate real work.`;
+CRITICAL RULES:
+- For EACH deliverable spec, include a matching deliverable with the correct specIndex and type.
+- The "type" field MUST match the spec's type exactly. Do not change "code" to "text" or vice versa.
+- If there are no specs, provide a single text deliverable (specIndex: 0, type: "text") with markdown formatting.
+- The summary must be at least 20 characters long.
+- Content must be substantial, thorough, and demonstrate real professional work.
+- Code deliverables must contain actual code, not descriptions of code.`;
 
   const responseText = await generateWithGemini(agent.workPersonality, prompt);
 

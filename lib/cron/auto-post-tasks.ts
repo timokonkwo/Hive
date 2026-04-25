@@ -374,6 +374,51 @@ RESPOND IN EXACTLY THIS JSON FORMAT (no markdown, no code fences):
   };
 }
 
+/**
+ * Generate appropriate deliverable specs based on task category.
+ * This tells agents what format to deliver in (code, structured text, etc.)
+ */
+function getDeliverableSpecs(category: string): Array<{ type: string; label: string; description: string; required: boolean }> {
+  switch (category) {
+    case 'Development':
+      return [
+        { type: 'code', label: 'Source Code', description: 'Complete, runnable source code with inline comments', required: true },
+        { type: 'text', label: 'Documentation', description: 'Setup instructions, dependencies, and usage guide', required: true },
+      ];
+    case 'Research':
+      return [
+        { type: 'text', label: 'Research Report', description: 'Structured report with findings, comparison tables, data, and citations', required: true },
+      ];
+    case 'Analysis':
+      return [
+        { type: 'text', label: 'Analysis Report', description: 'Data-driven analysis with methodology, findings, tables, and recommendations', required: true },
+        { type: 'code', label: 'Data / Formulas', description: 'Supporting calculations, scripts, or raw data', required: false },
+      ];
+    case 'Content':
+      return [
+        { type: 'text', label: 'Content Deliverable', description: 'Final polished copy with proper formatting, ready to publish', required: true },
+      ];
+    case 'Social':
+      return [
+        { type: 'text', label: 'Content Calendar / Posts', description: 'Ready-to-publish posts with platform-specific formatting and schedule', required: true },
+      ];
+    case 'Design':
+      return [
+        { type: 'text', label: 'Design Specification', description: 'Complete spec with tokens, color values, typography, and component definitions', required: true },
+        { type: 'code', label: 'Design Tokens', description: 'Design tokens as CSS custom properties or JSON', required: false },
+      ];
+    case 'Security':
+      return [
+        { type: 'text', label: 'Security Report', description: 'Vulnerability report with severity ratings (Critical/High/Medium/Low) and remediation steps', required: true },
+        { type: 'code', label: 'Fix Patches', description: 'Code patches or configuration fixes for identified vulnerabilities', required: false },
+      ];
+    default:
+      return [
+        { type: 'text', label: 'Deliverable', description: 'Complete work product with structured formatting', required: true },
+      ];
+  }
+}
+
 export interface AutoPostResult {
   tasksCreated: number;
   taskIds: string[];
@@ -448,7 +493,7 @@ export async function autoPostTasks(): Promise<AutoPostResult> {
       clientName: client.name,
       proposalsCount: 0,
       tokenConfig: null,
-      deliverableSpecs: [],
+      deliverableSpecs: getDeliverableSpecs(generated.resolvedCategory),
       createdAt: new Date(),
       updatedAt: new Date(),
     };
