@@ -1,10 +1,13 @@
 import type { Config } from '@netlify/functions';
 
 /**
- * Scheduled Function: Task Posting & Agent Bidding
- * Runs at 8 AM and 8 PM UTC daily.
- * 1. Posts new tasks via /api/cron/auto-post
- * 2. Triggers agent scanning & bidding via /api/cron/run-all
+ * Scheduled Function: Task Posting
+ * Runs at 8 AM and 8 PM UTC daily (1 task per run = 2 tasks/day).
+ *
+ * Only posts a task. Scanning, bidding, lifecycle, and fulfillment
+ * are handled by their own schedulers:
+ *   - scheduled-scan.mts    → agent scanning (every 2h)
+ *   - scheduled-lifecycle.mts → accept/fulfill/complete (2AM+2PM)
  */
 export default async () => {
   const siteUrl = process.env.URL || process.env.NEXT_PUBLIC_SITE_URL || 'https://uphive.xyz';
@@ -15,37 +18,21 @@ export default async () => {
     return new Response(JSON.stringify({ error: 'Missing secret' }), { status: 500 });
   }
 
-  const headers = { 'Authorization': `Bearer ${secret}` };
-  const results: Record<string, any> = {};
-
-  // Step 1: Auto-post new tasks
   try {
-    console.log(`[SCHEDULED] Posting tasks via ${siteUrl}/api/cron/auto-post`);
-    const postRes = await fetch(`${siteUrl}/api/cron/auto-post`, { headers });
-    const postData = await postRes.json();
-    results.autoPost = postData;
-    console.log('[SCHEDULED] Auto-post result:', JSON.stringify(postData));
+    console.log(`[SCHEDULED] Posting task via ${siteUrl}/api/cron/auto-post`);
+    const res = await fetch(`${siteUrl}/api/cron/auto-post`, {
+      headers: { 'Authorization': `Bearer ${secret}` },
+    });
+    const data = await res.json();
+    console.log('[SCHEDULED] Auto-post result:', JSON.stringify(data));
+    return new Response(JSON.stringify(data), {
+      status: res.status,
+      headers: { 'Content-Type': 'application/json' },
+    });
   } catch (err: any) {
-    results.autoPost = { error: err.message };
     console.error('[SCHEDULED] Auto-post failed:', err.message);
+    return new Response(JSON.stringify({ error: err.message }), { status: 500 });
   }
-
-  // Step 2: Scan for open tasks and submit agent bids
-  try {
-    console.log(`[SCHEDULED] Scanning via ${siteUrl}/api/cron/run-all`);
-    const scanRes = await fetch(`${siteUrl}/api/cron/run-all`, { headers });
-    const scanData = await scanRes.json();
-    results.scan = scanData;
-    console.log('[SCHEDULED] Scan result:', JSON.stringify(scanData));
-  } catch (err: any) {
-    results.scan = { error: err.message };
-    console.error('[SCHEDULED] Scan failed:', err.message);
-  }
-
-  return new Response(JSON.stringify({ success: true, ...results }), {
-    status: 200,
-    headers: { 'Content-Type': 'application/json' },
-  });
 };
 
 export const config: Config = {

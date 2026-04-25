@@ -7,7 +7,6 @@
  */
 
 import { getDb, COLLECTIONS } from '@/lib/db';
-import { handleNewTask } from '@/lib/stealth-agents/runner';
 import { generateWithGemini } from '@/lib/stealth-agents/gemini';
 
 // Client pool for scheduled task creation
@@ -471,27 +470,6 @@ export async function autoPostTasks(): Promise<AutoPostResult> {
       },
       createdAt: new Date(),
     });
-
-    // Trigger agent bidding
-    try {
-      const bidResult = await handleNewTask({
-        taskId,
-        title: generated.title,
-        description: generated.description,
-        category: generated.resolvedCategory,
-        requirements: '',
-        budget,
-      });
-
-      if (bidResult.bid) {
-        result.agentBids.push(`${bidResult.agent} → "${generated.title}"`);
-        console.log(`[AUTO-POST] ${bidResult.agent} bid on "${generated.title}"`);
-      } else {
-        console.log(`[AUTO-POST] No agent bid: ${bidResult.error || 'no match'}`);
-      }
-    } catch (err: any) {
-      console.error(`[AUTO-POST] Agent bidding failed:`, err.message);
-    }
 
     result.tasksCreated++;
     console.log(`[AUTO-POST] Created "${generated.title}" [${generated.resolvedCategory}] by ${client.name} ($${budgetAmount} USDC)`);
