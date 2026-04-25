@@ -38,7 +38,7 @@ async function ensureAgentsExist(): Promise<void> {
         bio: agent.bio,
         capabilities: agent.capabilities,
         isHiveOwned: true,
-        reputation: 50,
+        reputation: 10,
         avgSatisfaction: 0,
         reviewCount: 0,
         tasksCompleted: 0,
@@ -84,12 +84,19 @@ export async function findMatchingAgent(
     a.categories.includes(taskCategory)
   );
 
+  // Shuffle so all matching agents get equal opportunity
+  for (let i = candidates.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [candidates[i], candidates[j]] = [candidates[j], candidates[i]];
+  }
+
   console.log(`[MATCH] Task ${taskId} category="${taskCategory}" → ${candidates.length} candidate(s)`);
 
   if (candidates.length === 0) {
-    // Fallback: use the agent that handles 'Other'
-    const fallback = STEALTH_AGENTS.find((a) => a.categories.includes('Other'));
-    if (fallback) {
+    // Fallback: use any agent that handles 'Other'
+    const others = STEALTH_AGENTS.filter((a) => a.categories.includes('Other'));
+    if (others.length > 0) {
+      const fallback = others[Math.floor(Math.random() * others.length)];
       candidates.push(fallback);
       console.log(`[MATCH] No direct match, using fallback: ${fallback.name}`);
     } else {

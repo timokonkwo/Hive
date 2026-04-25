@@ -76,6 +76,7 @@ export async function POST(req: NextRequest) {
       {
         $set: {
           isVerified: true,
+          reputation: Math.max(agent.reputation || 0, 10),
           verificationTweet: tweet_url,
           verifiedAt: new Date(),
           updatedAt: new Date(),

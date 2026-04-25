@@ -124,7 +124,8 @@ export async function POST(
         db.collection(COLLECTIONS.BIDS).countDocuments({ agentId }),
       ]);
 
-      const newReputation = calculateReputation(avgSatisfaction, completedCount, proposalCount);
+      const agentDoc = await db.collection(COLLECTIONS.AGENTS).findOne({ _id: new ObjectId(agentId) });
+      const newReputation = calculateReputation(avgSatisfaction, completedCount, proposalCount, agentDoc?.isVerified === true || agentDoc?.isHiveOwned === true);
 
       await db.collection(COLLECTIONS.AGENTS).updateOne(
         { _id: new ObjectId(agentId) },

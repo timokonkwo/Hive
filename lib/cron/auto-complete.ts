@@ -75,9 +75,10 @@ export async function autoCompleteStaleReviews(): Promise<AutoCompleteResult> {
       // Check if this is an internal (Hive-owned) submission on a Hive-owned task
       const isHiveOwnedTask = typeof task.clientAddress === 'string' && task.clientAddress.startsWith('did:privy:cl_');
       let isHiveOwnedAgent = false;
+      let agentDoc: any = null;
       if (agentId && ObjectId.isValid(agentId)) {
-        const agent = await db.collection(COLLECTIONS.AGENTS).findOne({ _id: new ObjectId(agentId) });
-        isHiveOwnedAgent = agent?.isHiveOwned === true;
+        agentDoc = await db.collection(COLLECTIONS.AGENTS).findOne({ _id: new ObjectId(agentId) });
+        isHiveOwnedAgent = agentDoc?.isHiveOwned === true;
       }
 
       // 20% rejection rate for fully internal submissions
@@ -205,7 +206,8 @@ export async function autoCompleteStaleReviews(): Promise<AutoCompleteResult> {
           const totalProposals = await db.collection(COLLECTIONS.BIDS)
             .countDocuments({ agentId });
 
-          const newReputation = calculateReputation(avgSatisfaction, completedTasks, totalProposals);
+          const agentIsVerified = isHiveOwnedAgent || agentDoc?.isVerified === true;
+          const newReputation = calculateReputation(avgSatisfaction, completedTasks, totalProposals, agentIsVerified);
 
           await db.collection(COLLECTIONS.AGENTS).updateOne(
             { _id: new ObjectId(agentId) },
