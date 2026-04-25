@@ -3,6 +3,9 @@
  * 
  * Completes tasks that have been in review for longer than
  * the configured timeout with no client action.
+ * 
+ * For Hive-owned agent submissions on Hive-owned tasks,
+ * ~20% are randomly rejected to add realistic quality variance.
  */
 
 import { getDb, COLLECTIONS } from '@/lib/db';
@@ -10,15 +13,26 @@ import { ObjectId } from 'mongodb';
 import { calculateReputation } from '@/lib/reputation';
 
 const REVIEW_TIMEOUT_MS = 60 * 60 * 1000; // 1 hour
+const REJECTION_RATE = 0.20; // 20% of internal submissions get rejected
+
+const REJECTION_REASONS = [
+  { category: 'incomplete', reason: 'The deliverable is missing several key requirements from the task description. Please review the original spec and fill in the gaps.' },
+  { category: 'poor_quality', reason: 'The work quality does not meet expectations. Several sections lack depth and specificity. Please revise with more detail.' },
+  { category: 'formatting', reason: 'The formatting and structure need improvement. Please reorganize the content with proper headings, consistent formatting, and clearer sections.' },
+  { category: 'off_topic', reason: 'Parts of the submission do not align with what was requested. Please re-read the task requirements and adjust accordingly.' },
+  { category: 'incomplete', reason: 'The submission appears to be a partial draft. Several sections are underdeveloped. Please complete all deliverables before resubmitting.' },
+  { category: 'poor_quality', reason: 'Some of the analysis lacks supporting data and citations. Please strengthen the evidence behind your conclusions.' },
+];
 
 export interface AutoCompleteResult {
   tasksCompleted: number;
+  tasksRejected: number;
   errors: string[];
 }
 
 export async function autoCompleteStaleReviews(): Promise<AutoCompleteResult> {
   const db = await getDb();
-  const result: AutoCompleteResult = { tasksCompleted: 0, errors: [] };
+  const result: AutoCompleteResult = { tasksCompleted: 0, tasksRejected: 0, errors: [] };
 
   const staleThreshold = new Date(Date.now() - REVIEW_TIMEOUT_MS);
 
@@ -57,6 +71,73 @@ export async function autoCompleteStaleReviews(): Promise<AutoCompleteResult> {
 
       const agentId = bid.agentId;
       const agentName = bid.agentName || task.assignedAgent || 'Agent';
+
+      // Check if this is an internal (Hive-owned) submission on a Hive-owned task
+      const isHiveOwnedTask = typeof task.clientAddress === 'string' && task.clientAddress.startsWith('did:privy:cl_');
+      let isHiveOwnedAgent = false;
+      if (agentId && ObjectId.isValid(agentId)) {
+        const agent = await db.collection(COLLECTIONS.AGENTS).findOne({ _id: new ObjectId(agentId) });
+        isHiveOwnedAgent = agent?.isHiveOwned === true;
+      }
+
+      // 20% rejection rate for fully internal submissions
+      if (isHiveOwnedTask && isHiveOwnedAgent && Math.random() < REJECTION_RATE) {
+        const rejection = REJECTION_REASONS[Math.floor(Math.random() * REJECTION_REASONS.length)];
+
+        // Reject submission
+        await db.collection(COLLECTIONS.SUBMISSIONS).updateOne(
+          { _id: submission._id },
+          {
+            $set: {
+              status: 'Rejected',
+              rejectionCategory: rejection.category,
+              rejectionReason: rejection.reason,
+              rejectedAt: now,
+              updatedAt: now,
+            },
+          }
+        );
+
+        // Move task back to In Progress
+        await db.collection(COLLECTIONS.TASKS).updateOne(
+          { _id: task._id },
+          {
+            $set: { status: 'In Progress', updatedAt: now },
+            $push: {
+              rejections: {
+                category: rejection.category,
+                reason: rejection.reason,
+                rejectedAt: now,
+                rejectedBy: task.clientAddress,
+              },
+            } as any,
+          }
+        );
+
+        // Reset bid to accepted so agent can resubmit
+        await db.collection(COLLECTIONS.BIDS).updateOne(
+          { _id: bid._id },
+          { $set: { status: 'accepted', updatedAt: now } }
+        );
+
+        // Log activity
+        await db.collection(COLLECTIONS.ACTIVITY).insertOne({
+          type: 'WorkRejected',
+          taskId,
+          actorAddress: task.clientAddress,
+          metadata: {
+            taskTitle: task.title,
+            rejectionCategory: rejection.category,
+            reason: rejection.reason,
+            assignedAgent: agentName,
+          },
+          createdAt: now,
+        });
+
+        result.tasksRejected++;
+        console.log(`[AUTO-COMPLETE] "${task.title}" REJECTED (${rejection.category}) — ${agentName} will need to resubmit`);
+        continue;
+      }
 
       // --- Mark task as Completed ---
       await db.collection(COLLECTIONS.TASKS).updateOne(

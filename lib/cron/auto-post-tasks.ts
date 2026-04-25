@@ -386,6 +386,21 @@ export async function autoPostTasks(): Promise<AutoPostResult> {
   const db = await getDb();
   const result: AutoPostResult = { tasksCreated: 0, taskIds: [], agentBids: [], errors: [] };
 
+  // Guard: max 2 auto-posted tasks per day
+  const todayStart = new Date();
+  todayStart.setUTCHours(0, 0, 0, 0);
+  const autoPostedToday = await db
+    .collection(COLLECTIONS.TASKS)
+    .countDocuments({
+      clientAddress: { $regex: /^did:privy:cl_/ },
+      createdAt: { $gte: todayStart },
+    });
+
+  if (autoPostedToday >= 2) {
+    console.log(`[AUTO-POST] Already posted ${autoPostedToday} tasks today, skipping`);
+    return result;
+  }
+
   // Fetch recent task titles to avoid duplicates
   const recentTasks = await db
     .collection(COLLECTIONS.TASKS)
