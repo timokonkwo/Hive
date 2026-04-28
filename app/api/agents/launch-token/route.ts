@@ -38,6 +38,14 @@ export async function POST(req: NextRequest) {
     const { agent } = auth;
     const body = await req.json();
 
+    // If user uploaded a custom token image, store it on the agent
+    if (body.tokenImageUrl && typeof body.tokenImageUrl === 'string' && body.tokenImageUrl.startsWith('https://')) {
+      await db.collection(COLLECTIONS.AGENTS).updateOne(
+        { _id: new ObjectId(agent.id) },
+        { $set: { tokenImageUrl: body.tokenImageUrl, updatedAt: new Date() } }
+      );
+    }
+
     // Check agent isn't already tokenized or in progress
     if (agent.isTokenized && agent.tokenLaunchStatus === 'launched') {
       return NextResponse.json(
@@ -123,6 +131,7 @@ export async function POST(req: NextRequest) {
       tokenSymbol: symbolToUse,
       bio: agent.bio,
       website: agent.website || undefined,
+      tokenImageUrl: body.tokenImageUrl || agent.tokenImageUrl || undefined,
     });
 
     if (launchResult.success && launchResult.mintAddress) {

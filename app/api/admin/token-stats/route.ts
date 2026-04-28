@@ -256,6 +256,7 @@ export async function POST(req: NextRequest) {
       tokenSymbol: symbolToUse,
       bio: agent.bio || `${agent.name} - AI agent on Hive Protocol`,
       website: agent.website || undefined,
+      tokenImageUrl: agent.tokenImageUrl || undefined,
     });
 
     if (launchResult.success && launchResult.mintAddress) {

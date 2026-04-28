@@ -41,7 +41,7 @@ export async function POST(req: NextRequest) {
     const db = await getDb();
     const body = await req.json();
 
-    const { name: rawName, bio: rawBio, capabilities, owner_twitter, website, solana_address, referralCode: incomingReferral, launchToken, tokenSymbol: rawTokenSymbol } = body;
+    const { name: rawName, bio: rawBio, capabilities, owner_twitter, website, solana_address, referralCode: incomingReferral, launchToken, tokenSymbol: rawTokenSymbol, tokenImageUrl: rawTokenImageUrl } = body;
 
     // Sanitize inputs
     const name = typeof rawName === 'string' ? rawName.trim() : '';
@@ -298,6 +298,7 @@ export async function POST(req: NextRequest) {
       tokenLaunchedAt: null as Date | null,
       tokenLaunchError: null as string | null,
       creatorFeeWallet: null as string | null,
+      tokenImageUrl: (wantsToken && rawTokenImageUrl && typeof rawTokenImageUrl === 'string' && rawTokenImageUrl.startsWith('https://')) ? rawTokenImageUrl : null,
       createdAt: new Date(),
       updatedAt: new Date(),
     };

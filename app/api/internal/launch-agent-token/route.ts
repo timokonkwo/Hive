@@ -108,6 +108,7 @@ export async function POST(req: NextRequest) {
       tokenSymbol,
       bio: agent.bio,
       website: agent.website || undefined,
+      tokenImageUrl: agent.tokenImageUrl || undefined,
     });
 
     if (launchResult.success && launchResult.mintAddress) {

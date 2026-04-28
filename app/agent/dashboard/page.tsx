@@ -5,7 +5,7 @@ import { Navbar } from "@/components/layout/Navbar";
 import { Footer } from "@/components/layout/Footer";
 import {
   Wallet, Shield, Loader2, Key, ExternalLink, Copy,
-  DollarSign, CheckCircle, AlertTriangle, Bot, RefreshCw, BarChart3, Coins, RotateCw, ArrowLeft
+  DollarSign, CheckCircle, AlertTriangle, Bot, RefreshCw, BarChart3, Coins, RotateCw, ArrowLeft, ImagePlus, X
 } from "lucide-react";
 import { toast } from "sonner";
 import { useRouter } from "next/navigation";
@@ -74,6 +74,9 @@ export default function AgentDashboardPage() {
   const [launchingToken, setLaunchingToken] = useState(false);
   const [tokenSymbolInput, setTokenSymbolInput] = useState("");
   const [showTokenLaunch, setShowTokenLaunch] = useState(false);
+  const [tokenImageUrl, setTokenImageUrl] = useState<string | null>(null);
+  const [tokenImageUploading, setTokenImageUploading] = useState(false);
+  const [tokenImagePreview, setTokenImagePreview] = useState<string | null>(null);
 
   // API key regeneration state
   const [showRegenConfirm, setShowRegenConfirm] = useState(false);
@@ -865,6 +868,78 @@ export default function AgentDashboardPage() {
                             </div>
                           )}
 
+                          {/* Token Image Upload */}
+                          <div className="pt-3 border-t border-zinc-800">
+                            <label className="block text-[10px] font-bold font-mono text-zinc-500 mb-2 uppercase tracking-widest">Token Image</label>
+                            {tokenImagePreview ? (
+                              <div className="flex items-center gap-3">
+                                <div className="w-16 h-16 rounded-full overflow-hidden border-2 border-violet-500/50 shrink-0">
+                                  <img src={tokenImagePreview} alt="Token" className="w-full h-full object-cover" />
+                                </div>
+                                <div>
+                                  <p className="text-[10px] text-zinc-400 font-mono mb-1">Uploaded</p>
+                                  <button
+                                    type="button"
+                                    onClick={() => { setTokenImageUrl(null); setTokenImagePreview(null); }}
+                                    className="inline-flex items-center gap-1 text-[9px] font-mono text-red-400 hover:text-red-300 transition-colors"
+                                  >
+                                    <X size={8} /> Remove
+                                  </button>
+                                </div>
+                              </div>
+                            ) : (
+                              <label className="flex flex-col items-center justify-center w-full h-20 border-2 border-dashed border-zinc-700 hover:border-violet-500/50 rounded-lg cursor-pointer transition-colors bg-black/30 hover:bg-violet-500/5">
+                                <input
+                                  type="file"
+                                  accept="image/png,image/jpeg,image/webp"
+                                  className="hidden"
+                                  disabled={tokenImageUploading}
+                                  onChange={async (e) => {
+                                    const file = e.target.files?.[0];
+                                    if (!file) return;
+                                    if (file.size > 2 * 1024 * 1024) {
+                                      toast.error('Image too large. Max 2MB.');
+                                      return;
+                                    }
+                                    const reader = new FileReader();
+                                    reader.onload = (ev) => setTokenImagePreview(ev.target?.result as string);
+                                    reader.readAsDataURL(file);
+
+                                    setTokenImageUploading(true);
+                                    try {
+                                      const formData = new FormData();
+                                      formData.append('image', file);
+                                      const res = await fetch('/api/upload/token-image', { method: 'POST', body: formData });
+                                      const data = await res.json();
+                                      if (res.ok && data.url) {
+                                        setTokenImageUrl(data.url);
+                                        toast.success('Image uploaded');
+                                      } else {
+                                        toast.error(data.error || 'Upload failed');
+                                        setTokenImagePreview(null);
+                                      }
+                                    } catch {
+                                      toast.error('Upload failed');
+                                      setTokenImagePreview(null);
+                                    } finally {
+                                      setTokenImageUploading(false);
+                                    }
+                                  }}
+                                />
+                                {tokenImageUploading ? (
+                                  <Loader2 className="w-5 h-5 text-violet-400 animate-spin mb-0.5" />
+                                ) : (
+                                  <ImagePlus className="w-5 h-5 text-zinc-600 mb-0.5" />
+                                )}
+                                <span className="text-[9px] text-zinc-500 font-mono">
+                                  {tokenImageUploading ? 'Uploading...' : 'Upload token image'}
+                                </span>
+                                <span className="text-[8px] text-zinc-700 font-mono">PNG, JPG, WebP. Max 2MB.</span>
+                              </label>
+                            )}
+                            <p className="text-[8px] text-zinc-600 font-mono mt-1">Permanent once launched. Default Hive logo if not set.</p>
+                          </div>
+
                           <div className="flex gap-2">
                             <button
                               onClick={async () => {
@@ -876,7 +951,7 @@ export default function AgentDashboardPage() {
                                       'Content-Type': 'application/json',
                                       'x-hive-api-key': apiKey,
                                     },
-                                    body: JSON.stringify({ tokenSymbol: tokenSymbolInput || undefined }),
+                                    body: JSON.stringify({ tokenSymbol: tokenSymbolInput || undefined, tokenImageUrl: tokenImageUrl || undefined }),
                                   });
                                   const data = await res.json();
                                   if (res.ok && data.success) {
@@ -905,7 +980,7 @@ export default function AgentDashboardPage() {
                               {launchingToken ? 'Launching...' : 'Launch Token'}
                             </button>
                             <button
-                              onClick={() => { setShowTokenLaunch(false); setTokenSymbolInput(''); }}
+                              onClick={() => { setShowTokenLaunch(false); setTokenSymbolInput(''); setTokenImageUrl(null); setTokenImagePreview(null); }}
                               className="px-4 py-2.5 bg-zinc-800 hover:bg-zinc-700 text-zinc-400 font-mono text-[10px] uppercase rounded-sm transition-colors"
                             >
                               Cancel

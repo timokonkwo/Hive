@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import { useAuth } from "@/hooks/useAuth";
 import { useRouter } from "next/navigation";
-import { Shield, ArrowLeft, Loader2, Cpu, Zap, Link as LinkIcon, Terminal, CheckCircle, Copy, ExternalLink, Twitter, Coins } from "lucide-react";
+import { Shield, ArrowLeft, Loader2, Cpu, Zap, Link as LinkIcon, Terminal, CheckCircle, Copy, ExternalLink, Twitter, Coins, ImagePlus, X } from "lucide-react";
 import Link from "next/link";
 import { toast } from "sonner";
 
@@ -33,6 +33,9 @@ export default function RegisterAgentPage() {
   const [tokenLaunchStatus, setTokenLaunchStatus] = useState<string | null>(null);
   const [tokenMintAddress, setTokenMintAddress] = useState<string | null>(null);
   const [tokenBagsUrl, setTokenBagsUrl] = useState<string | null>(null);
+  const [tokenImageUrl, setTokenImageUrl] = useState<string | null>(null);
+  const [tokenImageUploading, setTokenImageUploading] = useState(false);
+  const [tokenImagePreview, setTokenImagePreview] = useState<string | null>(null);
 
   // Name availability check
   const [nameAvailable, setNameAvailable] = useState<boolean | null>(null);
@@ -92,6 +95,7 @@ export default function RegisterAgentPage() {
           website: website || undefined,
           launchToken: launchToken || undefined,
           tokenSymbol: (launchToken && tokenSymbol) ? tokenSymbol : undefined,
+          tokenImageUrl: (launchToken && tokenImageUrl) ? tokenImageUrl : undefined,
         }),
       });
 
@@ -476,6 +480,80 @@ export default function RegisterAgentPage() {
                 {launchToken && bio.length > 0 && bio.length < 50 && (
                   <p className="text-[10px] text-amber-500 font-mono mt-2">Tokenized agents need a bio of at least 50 characters ({bio.length}/50).</p>
                 )}
+
+                {/* Token Image Upload */}
+                <div className="mt-4 pt-4 border-t border-zinc-800">
+                  <label className="block text-xs font-bold font-mono text-zinc-500 mb-2 uppercase tracking-widest">Token Image</label>
+                  {tokenImagePreview ? (
+                    <div className="flex items-center gap-4">
+                      <div className="relative w-20 h-20 rounded-full overflow-hidden border-2 border-violet-500/50 shrink-0">
+                        <img src={tokenImagePreview} alt="Token" className="w-full h-full object-cover" />
+                      </div>
+                      <div className="flex-1">
+                        <p className="text-xs text-zinc-400 font-mono mb-2">Image uploaded</p>
+                        <button
+                          type="button"
+                          onClick={() => { setTokenImageUrl(null); setTokenImagePreview(null); }}
+                          className="inline-flex items-center gap-1 text-[10px] font-mono text-red-400 hover:text-red-300 transition-colors"
+                        >
+                          <X size={10} /> Remove
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    <label className="flex flex-col items-center justify-center w-full h-28 border-2 border-dashed border-zinc-700 hover:border-violet-500/50 rounded-lg cursor-pointer transition-colors bg-black/30 hover:bg-violet-500/5">
+                      <input
+                        type="file"
+                        accept="image/png,image/jpeg,image/webp"
+                        className="hidden"
+                        disabled={tokenImageUploading}
+                        onChange={async (e) => {
+                          const file = e.target.files?.[0];
+                          if (!file) return;
+                          if (file.size > 2 * 1024 * 1024) {
+                            toast.error('Image too large. Max 2MB.');
+                            return;
+                          }
+                          // Show local preview immediately
+                          const reader = new FileReader();
+                          reader.onload = (ev) => setTokenImagePreview(ev.target?.result as string);
+                          reader.readAsDataURL(file);
+
+                          // Upload to Cloudinary
+                          setTokenImageUploading(true);
+                          try {
+                            const formData = new FormData();
+                            formData.append('image', file);
+                            const res = await fetch('/api/upload/token-image', { method: 'POST', body: formData });
+                            const data = await res.json();
+                            if (res.ok && data.url) {
+                              setTokenImageUrl(data.url);
+                              toast.success('Image uploaded');
+                            } else {
+                              toast.error(data.error || 'Upload failed');
+                              setTokenImagePreview(null);
+                            }
+                          } catch {
+                            toast.error('Upload failed');
+                            setTokenImagePreview(null);
+                          } finally {
+                            setTokenImageUploading(false);
+                          }
+                        }}
+                      />
+                      {tokenImageUploading ? (
+                        <Loader2 className="w-6 h-6 text-violet-400 animate-spin mb-1" />
+                      ) : (
+                        <ImagePlus className="w-6 h-6 text-zinc-600 mb-1" />
+                      )}
+                      <span className="text-[10px] text-zinc-500 font-mono">
+                        {tokenImageUploading ? 'Uploading...' : 'Click to upload token image'}
+                      </span>
+                      <span className="text-[9px] text-zinc-700 font-mono mt-0.5">PNG, JPG, WebP. Max 2MB. Square recommended.</span>
+                    </label>
+                  )}
+                  <p className="text-[9px] text-zinc-600 font-mono mt-2">This image is permanent once the token launches. Default Hive logo used if not set.</p>
+                </div>
               </div>
             )}
           </div>

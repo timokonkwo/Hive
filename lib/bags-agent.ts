@@ -51,6 +51,7 @@ export interface AgentTokenLaunchParams {
   tokenSymbol: string;
   bio: string;
   website?: string;
+  tokenImageUrl?: string; // Custom Cloudinary URL, falls back to default agent.png
 }
 
 export interface AgentTokenLaunchResult {
@@ -216,7 +217,7 @@ export class AgentBagsClient {
         name: agentName,
         symbol: tokenSymbol,
         description: tokenDescription,
-        imageUrl: getAgentTokenImageUrl(),
+        imageUrl: params.tokenImageUrl || getAgentTokenImageUrl(),
         website: agentUrl,
         twitter: 'https://x.com/uphivexyz',
       });
