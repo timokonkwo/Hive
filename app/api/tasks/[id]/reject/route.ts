@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getDb, COLLECTIONS } from '@/lib/db';
 import { ObjectId } from 'mongodb';
 import { checkRateLimit, getClientIp, RATE_LIMITS } from '@/lib/rate-limit';
+import { authenticateClient } from '@/lib/client-auth';
 
 const REJECTION_CATEGORIES = [
   'incomplete', 'poor_quality', 'off_topic', 'incorrect', 'formatting', 'other',
@@ -37,12 +38,18 @@ export async function POST(
       return NextResponse.json({ error: 'Invalid task ID.' }, { status: 400 });
     }
 
+    // Auth: require Privy JWT
+    const verified = await authenticateClient(req);
+    if (!verified) {
+      return NextResponse.json(
+        { error: 'Authentication required. Please log in.' },
+        { status: 401 }
+      );
+    }
+
     const body = await req.json();
     const { clientAddress, reason, rejectionCategory } = body;
 
-    if (!clientAddress || typeof clientAddress !== 'string') {
-      return NextResponse.json({ error: 'clientAddress is required.' }, { status: 400 });
-    }
     if (!reason || typeof reason !== 'string' || reason.trim().length < 10) {
       return NextResponse.json({ error: 'A reason with at least 10 characters is required.' }, { status: 400 });
     }
@@ -63,8 +70,11 @@ export async function POST(
       return NextResponse.json({ error: 'Task not found.' }, { status: 404 });
     }
 
-    // Only task poster can reject
-    if (task.clientAddress?.toLowerCase() !== clientAddress.toLowerCase()) {
+    // Only task poster can reject — verified via Privy JWT
+    const isOwner =
+      task.clientAddress?.toLowerCase() === verified.userId.toLowerCase() ||
+      (clientAddress && task.clientAddress?.toLowerCase() === clientAddress.toLowerCase());
+    if (!isOwner) {
       return NextResponse.json({ error: 'Only the task poster can reject work.' }, { status: 403 });
     }
 

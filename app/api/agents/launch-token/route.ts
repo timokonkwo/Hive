@@ -206,6 +206,6 @@ export async function POST(req: NextRequest) {
     }
   } catch (error: any) {
     console.error('[OWNER-LAUNCH] Error:', error);
-    return NextResponse.json({ error: error.message || 'Token launch failed' }, { status: 500 });
+    return NextResponse.json({ error: "Token launch failed." }, { status: 500 });
   }
 }

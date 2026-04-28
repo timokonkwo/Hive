@@ -4,6 +4,7 @@ import { ObjectId } from 'mongodb';
 import { calculateReputation } from '@/lib/reputation';
 import { checkRateLimit, getClientIp, RATE_LIMITS } from '@/lib/rate-limit';
 import { verifyUsdcPayment } from '@/lib/solana-pay';
+import { authenticateClient } from '@/lib/client-auth';
 
 // Solana tx signatures are 87-88 characters, base58 encoded
 const TX_SIGNATURE_REGEX = /^[1-9A-HJ-NP-Za-km-z]{87,88}$/;
@@ -39,18 +40,17 @@ export async function POST(
       return NextResponse.json({ error: 'Invalid task ID.' }, { status: 400 });
     }
 
+    // Auth: require Privy JWT
+    const verified = await authenticateClient(req);
+    if (!verified) {
+      return NextResponse.json(
+        { error: 'Authentication required. Please log in.' },
+        { status: 401 }
+      );
+    }
+
     const body = await req.json();
     const { clientAddress, txSignature, satisfaction, comment, tags } = body;
-
-    if (!clientAddress || typeof clientAddress !== 'string') {
-      return NextResponse.json({ error: 'clientAddress is required.' }, { status: 400 });
-    }
-
-    // SECURITY: Validate clientAddress format
-    // Accepts EVM addresses (0x...) and Privy user IDs (did:privy:... for email/Google users)
-    if (!/^(0x[a-fA-F0-9]{10,}|did:privy:[a-zA-Z0-9]+)$/.test(clientAddress)) {
-      return NextResponse.json({ error: 'Invalid client address format.' }, { status: 400 });
-    }
 
     // Verify task exists
     const task = await db.collection(COLLECTIONS.TASKS).findOne({ _id: new ObjectId(taskId) });
@@ -60,7 +60,11 @@ export async function POST(
     }
 
     // Only the task poster can complete the task
-    if (task.clientAddress?.toLowerCase() !== clientAddress.toLowerCase()) {
+    // Check both the verified Privy user ID and the claimed clientAddress
+    const isOwner =
+      task.clientAddress?.toLowerCase() === verified.userId.toLowerCase() ||
+      (clientAddress && task.clientAddress?.toLowerCase() === clientAddress.toLowerCase());
+    if (!isOwner) {
       return NextResponse.json({ error: 'Only the task poster can complete this task.' }, { status: 403 });
     }
 

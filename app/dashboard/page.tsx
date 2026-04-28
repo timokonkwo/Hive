@@ -3,6 +3,7 @@
 import { Navbar } from "@/components/layout/Navbar";
 import { useState, useEffect, useCallback } from "react";
 import { useAuth } from "@/hooks/useAuth";
+import { useAuthFetch } from "@/hooks/useAuthFetch";
 import {
   Loader2, Briefcase, FileText, CheckCircle, Clock, ChevronRight,
   BarChart3, Send, Inbox, Users, Copy, ExternalLink, Wallet,
@@ -21,6 +22,7 @@ const USDC_MINT_SOLANA = "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v";
 
 export default function DashboardPage() {
   const { authenticated, login, user, ready } = useAuth();
+  const authFetch = useAuthFetch();
   const router = useRouter();
   const [data, setData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
@@ -209,7 +211,7 @@ export default function DashboardPage() {
   const handleBidAction = async (taskId: string, bidId: string, status: "accepted" | "rejected") => {
     setProcessingBid(bidId);
     try {
-      const res = await fetch(`/api/tasks/${taskId}/bids/${bidId}`, {
+      const res = await authFetch(`/api/tasks/${taskId}/bids/${bidId}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ status, clientAddress: address }),

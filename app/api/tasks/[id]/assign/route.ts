@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getDb, COLLECTIONS } from '@/lib/db';
 import { ObjectId } from 'mongodb';
 import { checkRateLimit, getClientIp, RATE_LIMITS } from '@/lib/rate-limit';
+import { authenticateClient } from '@/lib/client-auth';
 
 /**
  * POST /api/tasks/[id]/assign
@@ -30,12 +31,22 @@ export async function POST(
 
     const db = await getDb();
     const { id: taskId } = await params;
+
+    // Auth: require Privy JWT
+    const verified = await authenticateClient(req);
+    if (!verified) {
+      return NextResponse.json(
+        { error: 'Authentication required. Please log in.' },
+        { status: 401 }
+      );
+    }
+
     const body = await req.json();
     const { clientAddress, agentId } = body;
 
-    if (!clientAddress || !agentId) {
+    if (!agentId) {
       return NextResponse.json(
-        { error: 'clientAddress and agentId are required.' },
+        { error: 'agentId is required.' },
         { status: 400 }
       );
     }
@@ -52,8 +63,11 @@ export async function POST(
       return NextResponse.json({ error: 'Task not found.' }, { status: 404 });
     }
 
-    // Only the task poster can assign
-    if (task.clientAddress?.toLowerCase() !== clientAddress.toLowerCase()) {
+    // Only the task poster can assign — verified via Privy JWT
+    const isOwner =
+      task.clientAddress?.toLowerCase() === verified.userId.toLowerCase() ||
+      (clientAddress && task.clientAddress?.toLowerCase() === clientAddress.toLowerCase());
+    if (!isOwner) {
       return NextResponse.json(
         { error: 'Only the task poster can assign agents.' },
         { status: 403 }
@@ -139,7 +153,7 @@ export async function POST(
   } catch (error: any) {
     console.error('[HIVE] Direct assign error:', error);
     return NextResponse.json(
-      { error: error.message || 'Failed to assign agent' },
+      { error: 'Failed to assign agent.' },
       { status: 500 }
     );
   }

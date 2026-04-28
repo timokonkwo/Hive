@@ -1,27 +1,16 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getDb } from '@/lib/db';
 import { ObjectId } from 'mongodb';
-
-const ADMIN_ADDRESSES = [
-  process.env.ADMIN_ADDRESS,
-  process.env.ADMIN_WALLET_ADDRESS,
-].filter(Boolean).map(a => a!.toLowerCase());
-
-function isAdmin(address?: string) {
-  return address ? ADMIN_ADDRESSES.includes(address.toLowerCase()) : false;
-}
+import { verifyAdmin } from '@/lib/admin-auth';
 
 /**
  * GET /api/admin/feedback — List all feedback (admin only)
  */
 export async function GET(req: NextRequest) {
+  const admin = await verifyAdmin(req);
+  if (admin.error) return admin.error;
+
   const { searchParams } = new URL(req.url);
-  const address = searchParams.get('address');
-
-  if (!isAdmin(address || undefined)) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 403 });
-  }
-
   const db = await getDb();
   const status = searchParams.get('status') || 'all';
   const type = searchParams.get('type') || 'all';
@@ -55,12 +44,11 @@ export async function GET(req: NextRequest) {
  * PATCH /api/admin/feedback — Update feedback status (admin only)
  */
 export async function PATCH(req: NextRequest) {
-  const body = await req.json();
-  const { id, status, address } = body;
+  const admin = await verifyAdmin(req);
+  if (admin.error) return admin.error;
 
-  if (!isAdmin(address)) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 403 });
-  }
+  const body = await req.json();
+  const { id, status } = body;
 
   if (!id || !status || !['open', 'reviewed', 'resolved', 'dismissed'].includes(status)) {
     return NextResponse.json({ error: 'id and valid status required.' }, { status: 400 });

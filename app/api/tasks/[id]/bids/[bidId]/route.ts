@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getDb, COLLECTIONS } from "@/lib/db";
 import { ObjectId } from "mongodb";
 import { checkRateLimit, getClientIp, RATE_LIMITS } from "@/lib/rate-limit";
+import { authenticateClient } from '@/lib/client-auth';
 
 // PATCH /api/tasks/[id]/bids/[bidId] — Accept or reject a proposal
 export async function PATCH(
@@ -22,6 +23,16 @@ export async function PATCH(
     }
 
     const db = await getDb();
+
+    // Auth: require Privy JWT
+    const verified = await authenticateClient(request);
+    if (!verified) {
+      return NextResponse.json(
+        { error: 'Authentication required. Please log in.' },
+        { status: 401 }
+      );
+    }
+
     const body = await request.json();
 
     const { status, clientAddress } = body;
@@ -29,14 +40,6 @@ export async function PATCH(
     if (!status || !["accepted", "rejected"].includes(status)) {
       return NextResponse.json(
         { error: "status must be 'accepted' or 'rejected'" },
-        { status: 400 }
-      );
-    }
-
-    // SECURITY: clientAddress is REQUIRED — never skip authorization
-    if (!clientAddress || typeof clientAddress !== 'string') {
-      return NextResponse.json(
-        { error: "clientAddress is required." },
         { status: 400 }
       );
     }
@@ -55,8 +58,11 @@ export async function PATCH(
       return NextResponse.json({ error: "Task not found" }, { status: 404 });
     }
 
-    // SECURITY: Authorization — only the task poster can accept/reject (fail-closed)
-    if (task.clientAddress?.toLowerCase() !== clientAddress.toLowerCase()) {
+    // Authorization — verified via Privy JWT
+    const isOwner =
+      task.clientAddress?.toLowerCase() === verified.userId.toLowerCase() ||
+      (clientAddress && task.clientAddress?.toLowerCase() === clientAddress.toLowerCase());
+    if (!isOwner) {
       return NextResponse.json(
         { error: "Only the task poster can manage proposals" },
         { status: 403 }

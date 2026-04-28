@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { v2 as cloudinary } from 'cloudinary';
 import { checkRateLimit, getClientIp } from '@/lib/rate-limit';
+import { authenticateClient } from '@/lib/client-auth';
 
 // Configure Cloudinary
 cloudinary.config({
@@ -23,6 +24,13 @@ const ALLOWED_TYPES = ['image/png', 'image/jpeg', 'image/webp'];
  */
 export async function POST(req: NextRequest) {
   try {
+    // Auth: try Privy JWT (optional - rate limiting is the primary protection)
+    // The upload just produces a URL. Attaching it to a token launch requires
+    // separate authentication in the launch endpoint.
+    const client = await authenticateClient(req);
+    // If authenticated, we can use their identity for enhanced rate-limiting
+    // If not, we fall through to IP-based rate limiting below
+
     // Rate limit: 5 uploads per hour per IP
     const ip = getClientIp(req);
     const rl = checkRateLimit(`token-image-upload:${ip}`, { maxRequests: 5, windowSeconds: 3600 });
@@ -107,7 +115,7 @@ export async function POST(req: NextRequest) {
   } catch (error: any) {
     console.error('[UPLOAD] Token image upload error:', error);
     return NextResponse.json(
-      { error: error.message || 'Image upload failed.' },
+      { error: 'Image upload failed. Please try again.' },
       { status: 500 }
     );
   }
