@@ -56,7 +56,8 @@ export default function AdminDashboardPage() {
   const [agentsLoading, setAgentsLoading] = useState(false);
   const [deleteModal, setDeleteModal] = useState<{ id: string; name: string } | null>(null);
   const [deleting, setDeleting] = useState(false);
-  const [deleteType, setDeleteType] = useState<'agent' | 'task'>('agent');
+  const [deleteType, setDeleteType] = useState<'agent' | 'task' | 'submission'>('agent');
+  const [changingTaskStatus, setChangingTaskStatus] = useState<string | null>(null);
 
   // Task management state
   const [tasks, setTasks] = useState<any[]>([]);
@@ -352,15 +353,17 @@ export default function AdminDashboardPage() {
     try {
       const endpoint = deleteType === 'agent'
         ? `/api/admin/agents/${deleteModal.id}?address=${address}`
+        : deleteType === 'submission'
+        ? `/api/admin/submissions/${deleteModal.id}?address=${address}`
         : `/api/admin/tasks/${deleteModal.id}?address=${address}`;
       
       const res = await fetch(endpoint, { method: "DELETE" });
       if (res.ok) {
-        toast.success(`${deleteType === 'agent' ? 'Agent' : 'Task'} "${deleteModal.name}" deleted.`);
+        toast.success(`${deleteType === 'agent' ? 'Agent' : deleteType === 'submission' ? 'Submission' : 'Task'} "${deleteModal.name}" deleted.`);
         setDeleteModal(null);
         if (deleteType === 'agent') fetchAgents();
         if (deleteType === 'task') fetchTasks();
-        // Refresh stats
+        if (deleteType === 'submission') fetchSubmissions();
         const statsRes = await fetch(`/api/admin/stats?address=${address}`);
         if (statsRes.ok) setData(await statsRes.json());
       } else {
@@ -371,6 +374,29 @@ export default function AdminDashboardPage() {
       toast.error("Network error.");
     } finally {
       setDeleting(false);
+    }
+  };
+
+  const handleChangeTaskStatus = async (taskId: string, newStatus: string) => {
+    if (!address) return;
+    setChangingTaskStatus(taskId);
+    try {
+      const res = await fetch(`/api/admin/tasks/${taskId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ address, status: newStatus }),
+      });
+      if (res.ok) {
+        toast.success(`Task status changed to ${newStatus}`);
+        fetchTasks();
+      } else {
+        const err = await res.json();
+        toast.error(err.error || 'Failed to update status.');
+      }
+    } catch {
+      toast.error('Network error.');
+    } finally {
+      setChangingTaskStatus(null);
     }
   };
 
@@ -658,6 +684,16 @@ export default function AdminDashboardPage() {
                   {task.createdAt ? new Date(task.createdAt).toLocaleDateString() : '—'}
                 </span>
                 <div className="flex items-center gap-1">
+                  <select
+                    value={task.status}
+                    disabled={changingTaskStatus === task.id}
+                    onChange={(e) => handleChangeTaskStatus(task.id, e.target.value)}
+                    className="px-1.5 py-1 text-[10px] font-mono uppercase bg-zinc-900 border border-zinc-700 text-zinc-400 rounded cursor-pointer hover:border-zinc-500 transition-colors appearance-none"
+                  >
+                    {['Open', 'In Progress', 'In Review', 'Completed'].map(s => (
+                      <option key={s} value={s}>{s}</option>
+                    ))}
+                  </select>
                   <Link
                     href={`/marketplace/${task.id}`}
                     className="px-2 py-1 text-[10px] font-mono uppercase border border-zinc-700 text-zinc-400 hover:text-white hover:border-zinc-500 rounded transition-colors"
@@ -1144,6 +1180,13 @@ export default function AdminDashboardPage() {
                         </span>
                       )}
                       <SubmissionStatusBadge status={sub.status} />
+                      <button
+                        onClick={(e) => { e.stopPropagation(); setDeleteType('submission'); setDeleteModal({ id: sub.id, name: `${sub.agentName}'s submission on "${sub.taskTitle}"` }); }}
+                        className="p-1 text-zinc-600 hover:text-red-500 hover:bg-red-500/10 rounded transition-colors"
+                        title="Delete submission"
+                      >
+                        <Trash2 size={12} />
+                      </button>
                       <ChevronDown size={14} className={`text-zinc-600 transition-transform ${expandedSubmission === sub.id ? 'rotate-180' : ''}`} />
                     </div>
                   </button>
@@ -1301,13 +1344,15 @@ export default function AdminDashboardPage() {
               <div className="w-10 h-10 rounded-full bg-red-500/10 flex items-center justify-center">
                 <Trash2 className="text-red-500" size={20} />
               </div>
-              <h3 className="text-lg font-bold font-mono uppercase">Delete {deleteType === 'agent' ? 'Agent' : 'Task'}</h3>
+              <h3 className="text-lg font-bold font-mono uppercase">Delete {deleteType === 'agent' ? 'Agent' : deleteType === 'submission' ? 'Submission' : 'Task'}</h3>
             </div>
             <p className="text-zinc-400 text-sm mb-2">
               Are you sure you want to delete <span className="text-white font-bold">{deleteModal.name}</span>?
             </p>
             <p className="text-zinc-600 text-xs mb-6 font-mono">
-              This will permanently remove the {deleteType} and all associated data. This action cannot be undone.
+              {deleteType === 'submission'
+                ? 'This will delete the submission and revert the task to In Progress.'
+                : `This will permanently remove the ${deleteType} and all associated data. This action cannot be undone.`}
             </p>
             <div className="flex items-center gap-3 justify-end">
               <button
@@ -1839,7 +1884,7 @@ function DeliverableContent({ type, content }: { type: string; content: string }
 
     case 'code':
       return (
-        <pre className="bg-zinc-900 border border-zinc-700 rounded-lg p-4 overflow-x-auto max-h-96 overflow-y-auto">
+        <pre className="bg-zinc-900 border border-zinc-700 rounded-lg p-4 overflow-x-auto overflow-y-auto">
           <code className="text-sm text-emerald-400 font-mono whitespace-pre-wrap break-words">{cleaned}</code>
         </pre>
       );
@@ -1878,7 +1923,7 @@ function DeliverableContent({ type, content }: { type: string; content: string }
     case 'text':
     default:
       return (
-        <div className="text-zinc-300 text-sm font-light max-h-96 overflow-y-auto leading-relaxed prose prose-invert prose-sm max-w-none prose-headings:text-white prose-headings:font-mono prose-headings:font-bold prose-p:text-zinc-300 prose-a:text-emerald-400 prose-strong:text-white prose-code:text-emerald-400 prose-code:bg-zinc-800 prose-code:px-1 prose-code:py-0.5 prose-code:rounded prose-pre:bg-zinc-900 prose-pre:border prose-pre:border-zinc-700 prose-li:text-zinc-300">
+        <div className="text-zinc-300 text-sm font-light leading-relaxed prose prose-invert prose-sm max-w-none prose-headings:text-white prose-headings:font-mono prose-headings:font-bold prose-p:text-zinc-300 prose-a:text-emerald-400 prose-strong:text-white prose-code:text-emerald-400 prose-code:bg-zinc-800 prose-code:px-1 prose-code:py-0.5 prose-code:rounded prose-pre:bg-zinc-900 prose-pre:border prose-pre:border-zinc-700 prose-li:text-zinc-300">
           <ReactMarkdown>{cleaned}</ReactMarkdown>
         </div>
       );
