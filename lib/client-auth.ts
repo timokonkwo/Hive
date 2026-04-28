@@ -1,33 +1,27 @@
 import { NextRequest } from 'next/server';
-import { createRemoteJWKSet, jwtVerify } from 'jose';
+import { verifyAccessToken } from '@privy-io/node';
 
 /**
- * Server-side client authentication via Privy JWT.
+ * Server-side client authentication via Privy access token.
  *
  * The frontend sends the Privy access token in the Authorization header:
  *   Authorization: Bearer <privy-access-token>
  *
- * This module verifies the JWT against Privy's JWKS endpoint and returns
- * the authenticated user's identity (Privy user ID + linked wallet addresses).
+ * This module verifies the JWT using the Privy SDK's verifyAccessToken function
+ * with the app's verification key from the Privy dashboard.
  *
  * SECURITY: This replaces the old pattern of trusting a client-supplied
  * "clientAddress" field in the request body. With this module, the backend
  * cryptographically verifies the caller's identity.
+ *
+ * REQUIRED ENV VARS:
+ *   NEXT_PUBLIC_PRIVY_APP_ID - Your Privy app ID
+ *   PRIVY_VERIFICATION_KEY   - Your app's verification key from the Privy dashboard
+ *                               (Settings > Basics > Verification Key)
  */
 
 const PRIVY_APP_ID = process.env.NEXT_PUBLIC_PRIVY_APP_ID || '';
-
-// Cache the JWKS keyset across invocations (fetched once, auto-refreshed)
-let cachedJWKS: ReturnType<typeof createRemoteJWKSet> | null = null;
-
-function getJWKS() {
-  if (!cachedJWKS) {
-    cachedJWKS = createRemoteJWKSet(
-      new URL(`https://auth.privy.io/api/v1/apps/${PRIVY_APP_ID}/.well-known/jwks.json`)
-    );
-  }
-  return cachedJWKS;
-}
+const PRIVY_VERIFICATION_KEY = process.env.PRIVY_VERIFICATION_KEY || '';
 
 export interface VerifiedClient {
   /** Privy user ID (e.g., "did:privy:abc123") */
@@ -53,6 +47,11 @@ export async function authenticateClient(req: NextRequest): Promise<VerifiedClie
       return null;
     }
 
+    if (!PRIVY_VERIFICATION_KEY) {
+      console.error('[AUTH] PRIVY_VERIFICATION_KEY is not set. Get it from the Privy dashboard (Settings > Basics).');
+      return null;
+    }
+
     // Extract token from Authorization header or privy-token cookie
     let token: string | null = null;
 
@@ -71,32 +70,27 @@ export async function authenticateClient(req: NextRequest): Promise<VerifiedClie
       return null;
     }
 
-    // Verify the JWT against Privy's JWKS
-    const jwks = getJWKS();
-    const { payload } = await jwtVerify(token, jwks, {
-      issuer: 'privy.io',
-      audience: PRIVY_APP_ID,
+    // Verify the access token using Privy's SDK
+    const verified = await verifyAccessToken({
+      access_token: token,
+      app_id: PRIVY_APP_ID,
+      verification_key: PRIVY_VERIFICATION_KEY,
     });
 
-    const userId = payload.sub;
-    if (!userId) {
+    if (!verified.user_id) {
       return null;
     }
 
     return {
-      userId,
+      userId: verified.user_id,
       // The userId (did:privy:...) is the canonical identity
-      // The frontend can also send a wallet address in the body,
-      // but we only trust it if the Privy token is valid
-      address: userId,
-      sessionId: (payload as any).sid || '',
-      expiresAt: payload.exp || 0,
+      address: verified.user_id,
+      sessionId: verified.session_id || '',
+      expiresAt: verified.expiration || 0,
     };
   } catch (error: any) {
     // JWT verification failed — invalid, expired, or tampered token
-    if (error?.code !== 'ERR_JWT_EXPIRED') {
-      console.error('[AUTH] Client auth verification failed:', error.message);
-    }
+    console.error('[AUTH] Client auth verification failed:', error.message || error);
     return null;
   }
 }
@@ -129,37 +123,4 @@ export function clientOwnsResource(
   }
 
   return false;
-}
-
-/**
- * Verify admin access. Requires a valid Privy JWT AND the user's ID
- * must match the ADMIN_ADDRESS env var.
- *
- * SECURITY: This replaces the old pattern where admin was verified by
- * simply passing a wallet address as a query parameter. Now, the admin
- * must have a valid Privy session AND be the configured admin address.
- */
-export async function authenticateAdmin(req: NextRequest): Promise<VerifiedClient | null> {
-  const client = await authenticateClient(req);
-  if (!client) return null;
-
-  const adminAddress = process.env.ADMIN_ADDRESS;
-  if (!adminAddress) return null;
-
-  // Check if the Privy user ID or the request's claimed address matches admin
-  // The frontend sends the wallet address in x-admin-address header
-  const claimedAddress = req.headers.get('x-admin-address') || '';
-
-  // The user must be authenticated via Privy (proven above),
-  // AND their claimed address must match the admin address
-  if (claimedAddress.toLowerCase() === adminAddress.toLowerCase()) {
-    return client;
-  }
-
-  // Also accept if the Privy user ID itself is the admin
-  if (client.userId.toLowerCase() === adminAddress.toLowerCase()) {
-    return client;
-  }
-
-  return null;
 }
