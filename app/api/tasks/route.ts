@@ -172,9 +172,12 @@ export async function POST(request: NextRequest) {
       ];
     }
 
-    // Use the verified identity — don't trust clientAddress from body
-    const verifiedAddress = client?.userId || agentAuth?.agent?.id || clientAddress || 'unknown';
-    const displayName = clientName || (verifiedAddress.startsWith('did:privy:') ? `User_${verifiedAddress.slice(-6)}` : (verifiedAddress ? `User_${verifiedAddress.slice(-6)}` : 'User'));
+    // The Privy JWT proves the user IS authenticated. We still use the
+    // wallet address from the body as the task's clientAddress because the
+    // rest of the system (dashboard, ownership checks) uses wallet addresses.
+    // For API-key agents, use their agent ID.
+    const verifiedAddress = clientAddress || client?.userId || agentAuth?.agent?.id || 'unknown';
+    const displayName = clientName || (verifiedAddress.startsWith('did:privy:') ? `User_${verifiedAddress.slice(-6)}` : (verifiedAddress.startsWith('0x') ? `User_${verifiedAddress.slice(-6)}` : 'User'));
 
     // Parse numeric budget amount from budget string (e.g. "$50 USDC" → 50)
     let budgetAmount = 0;

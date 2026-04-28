@@ -3,6 +3,7 @@ import { getDb, COLLECTIONS } from '@/lib/db';
 import { ObjectId } from 'mongodb';
 import { validateTokenConfig, validateDeliverableSpecs } from '@/lib/submission-validator';
 import { checkRateLimit, getClientIp, RATE_LIMITS } from '@/lib/rate-limit';
+import { authenticateClient } from '@/lib/client-auth';
 
 /**
  * POST /api/tasks/instant-match
@@ -22,6 +23,15 @@ export async function POST(request: NextRequest) {
       return NextResponse.json(
         { error: `Rate limited. Try again in ${rl.resetInSeconds}s.` },
         { status: 429, headers: { 'Retry-After': String(rl.resetInSeconds) } }
+      );
+    }
+
+    // Auth: require Privy JWT
+    const verified = await authenticateClient(request);
+    if (!verified) {
+      return NextResponse.json(
+        { error: 'Authentication required to create tasks.' },
+        { status: 401 }
       );
     }
 
