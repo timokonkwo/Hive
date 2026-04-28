@@ -1,17 +1,9 @@
+import { verifyAdmin } from '@/lib/admin-auth';
 import { NextRequest, NextResponse } from 'next/server';
 import { getDb, COLLECTIONS } from '@/lib/db';
 import { createAgentBagsClient } from '@/lib/bags-agent';
 
-/**
- * Admin auth helper — checks against ADMIN_ADDRESS env var.
- * Used by both GET and POST handlers.
- */
-function isAdminAddress(address: string | null): boolean {
-  if (!address) return false;
-  const adminAddress = process.env.ADMIN_ADDRESS;
-  if (!adminAddress) return false;
-  return address.toLowerCase() === adminAddress.toLowerCase();
-}
+
 
 /**
  * GET /api/admin/token-stats
@@ -20,14 +12,14 @@ function isAdminAddress(address: string | null): boolean {
  * Protected by ADMIN_ADDRESS wallet auth (same as /api/admin/verify).
  */
 export async function GET(req: NextRequest) {
-  // Primary: wallet-based admin auth (same pattern as /api/admin/verify)
-  const address = req.nextUrl.searchParams.get('address');
-  if (!isAdminAddress(address)) {
+  // Admin auth
+  const admin = await verifyAdmin(req);
+  if (admin.error) {
     // Fallback: CRON_SECRET for cron/internal access
     const authHeader = req.headers.get('authorization');
     const cronSecret = process.env.CRON_SECRET;
     if (!cronSecret || authHeader !== `Bearer ${cronSecret}`) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+      return admin.error;
     }
   }
 
@@ -189,12 +181,12 @@ export async function GET(req: NextRequest) {
  * is a double-check, not the sole auth mechanism.
  */
 export async function POST(req: NextRequest) {
-  const body = await req.json();
-  const { action, adminAddress } = body;
+  // Admin auth
+  const admin = await verifyAdmin(req);
+  if (admin.error) return admin.error;
 
-  if (!isAdminAddress(adminAddress)) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-  }
+  const body = await req.json();
+  const { action } = body;
 
   if (action === 'launch') {
     const { agentId } = body;

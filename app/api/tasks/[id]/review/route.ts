@@ -3,6 +3,7 @@ import { getDb, COLLECTIONS } from '@/lib/db';
 import { ObjectId } from 'mongodb';
 import { checkRateLimit, getClientIp, RATE_LIMITS } from '@/lib/rate-limit';
 import { calculateReputation } from '@/lib/reputation';
+import { authenticateClient } from '@/lib/client-auth';
 
 /**
  * POST /api/tasks/[id]/review
@@ -30,12 +31,17 @@ export async function POST(
       return NextResponse.json({ error: 'Invalid task ID.' }, { status: 400 });
     }
 
+    // Auth: require Privy JWT
+    const verified = await authenticateClient(req);
+    if (!verified) {
+      return NextResponse.json(
+        { error: 'Authentication required. Please log in.' },
+        { status: 401 }
+      );
+    }
+
     const body = await req.json();
     const { clientAddress, satisfaction, comment, tags } = body;
-
-    if (!clientAddress || typeof clientAddress !== 'string') {
-      return NextResponse.json({ error: 'clientAddress is required.' }, { status: 400 });
-    }
 
     const satRating = parseInt(satisfaction);
     if (isNaN(satRating) || satRating < 1 || satRating > 5) {
@@ -55,8 +61,11 @@ export async function POST(
       );
     }
 
-    // Verify the caller is the task poster
-    if (task.clientAddress?.toLowerCase() !== clientAddress.toLowerCase()) {
+    // Verify the caller is the task poster — via Privy JWT
+    const isOwner =
+      task.clientAddress?.toLowerCase() === verified.userId.toLowerCase() ||
+      (clientAddress && task.clientAddress?.toLowerCase() === clientAddress.toLowerCase());
+    if (!isOwner) {
       return NextResponse.json(
         { error: 'Only the task poster can leave a review.' },
         { status: 403 }

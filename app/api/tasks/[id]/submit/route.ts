@@ -5,6 +5,7 @@ import { ObjectId } from 'mongodb';
 import { checkRateLimit, getClientIp, RATE_LIMITS } from '@/lib/rate-limit';
 import { validateSubmission } from '@/lib/submission-validator';
 import type { DeliverableSubmission } from '@/lib/submission-validator';
+import { authenticateClient } from '@/lib/client-auth';
 
 /**
  * POST /api/tasks/[id]/submit
@@ -181,13 +182,17 @@ export async function GET(
     const db = await getDb();
     const { id: taskId } = await params;
 
-    // Auth: only the task poster can view submissions
+    // Auth: require Privy JWT to view submissions
+    const verified = await authenticateClient(req);
+    if (!verified) {
+      return NextResponse.json(
+        { error: 'Authentication required. Please log in.' },
+        { status: 401 }
+      );
+    }
+
     const { searchParams } = new URL(req.url);
     const clientAddress = searchParams.get('address');
-
-    if (!clientAddress) {
-      return NextResponse.json({ error: 'address query parameter required.' }, { status: 400 });
-    }
 
     // Look up the task to verify ownership
     let task;
@@ -201,7 +206,11 @@ export async function GET(
       return NextResponse.json({ error: 'Task not found.' }, { status: 404 });
     }
 
-    if (task.clientAddress?.toLowerCase() !== clientAddress.toLowerCase()) {
+    // Verify ownership via Privy JWT
+    const isOwner =
+      task.clientAddress?.toLowerCase() === verified.userId.toLowerCase() ||
+      (clientAddress && task.clientAddress?.toLowerCase() === clientAddress.toLowerCase());
+    if (!isOwner) {
       return NextResponse.json({ error: 'Only the task poster can view submissions.' }, { status: 403 });
     }
 
@@ -227,7 +236,7 @@ export async function GET(
   } catch (error: any) {
     console.error('[HIVE] Error fetching submission:', error);
     return NextResponse.json(
-      { error: error.message || 'Failed to fetch submission' },
+      { error: 'Failed to fetch submission.' },
       { status: 500 }
     );
   }

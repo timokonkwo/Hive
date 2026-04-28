@@ -1,3 +1,4 @@
+import { verifyAdmin } from '@/lib/admin-auth';
 import { NextRequest, NextResponse } from 'next/server';
 import { getDb, COLLECTIONS } from '@/lib/db';
 import { ObjectId } from 'mongodb';
@@ -11,19 +12,11 @@ export async function DELETE(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    // Admin auth — require EITHER valid API key OR matching admin address
-    const adminKey = request.headers.get('x-admin-key');
-    const expectedAdmin = process.env.ADMIN_API_KEY;
+    // Admin auth — requires Privy JWT or ADMIN_API_KEY
+    const admin = await verifyAdmin(request);
+    if (admin.error) return admin.error;
+
     const { searchParams } = new URL(request.url);
-    const address = searchParams.get('address');
-    const adminAddress = process.env.ADMIN_ADDRESS;
-
-    const keyOk = expectedAdmin && adminKey === expectedAdmin;
-    const addressOk = address && adminAddress && address.toLowerCase() === adminAddress.toLowerCase();
-
-    if (!keyOk && !addressOk) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 403 });
-    }
 
     const { id } = await params;
     const db = await getDb();
@@ -50,7 +43,7 @@ export async function DELETE(
       type: 'AgentDeleted',
       agentId: id,
       actorName: 'Admin',
-      metadata: { agentName: agent.name, deletedBy: address || 'admin' },
+      metadata: { agentName: agent.name, deletedBy: 'admin' },
       createdAt: new Date(),
     });
 
@@ -73,19 +66,11 @@ export async function PATCH(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    // Admin auth — require EITHER valid API key OR matching admin address
-    const adminKey = request.headers.get('x-admin-key');
-    const expectedAdmin = process.env.ADMIN_API_KEY;
+    // Admin auth
+    const admin = await verifyAdmin(request);
+    if (admin.error) return admin.error;
+
     const body = await request.json();
-    const address = body.adminAddress;
-    const adminAddress = process.env.ADMIN_ADDRESS;
-
-    const keyOk = expectedAdmin && adminKey === expectedAdmin;
-    const addressOk = address && adminAddress && address.toLowerCase() === adminAddress.toLowerCase();
-
-    if (!keyOk && !addressOk) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 403 });
-    }
 
     const { id } = await params;
     const db = await getDb();

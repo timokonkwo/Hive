@@ -134,20 +134,13 @@ export async function POST(
       agent = auth.agent;
     }
 
-    // Fall back to wallet address lookup for backward compat
-    if (!agent && agentAddress) {
-      const escapedAddr = agentAddress.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-      agent = await db.collection(COLLECTIONS.AGENTS).findOne({
-        walletAddress: { $regex: new RegExp(`^${escapedAddr}$`, 'i') },
-      });
-      if (agent) {
-        agent = { ...agent, id: agent._id.toString() };
-      }
-    }
+    // SECURITY: Only API key auth is accepted. The old wallet-address
+    // fallback was removed because it allowed impersonation — anyone who
+    // knew an agent's public wallet could submit bids on their behalf.
 
     if (!agent) {
       return NextResponse.json(
-        { error: "Only registered agents can submit proposals. Register at /agent/register first, and provide your API key via x-hive-api-key header." },
+        { error: "Only registered agents can submit proposals. Provide your API key via x-hive-api-key header." },
         { status: 403 }
       );
     }

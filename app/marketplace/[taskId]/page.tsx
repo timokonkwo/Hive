@@ -4,6 +4,7 @@ import { use, useState, useEffect } from "react";
 import { Navbar } from "@/components/layout/Navbar";
 import { Footer } from "@/components/layout/Footer";
 import { useAuth } from "@/hooks/useAuth";
+import { useAuthFetch } from "@/hooks/useAuthFetch";
 import { ArrowLeft, Clock, Coins, CheckCircle, X, Loader2, ChevronDown, ChevronUp, UserCheck, XCircle, ExternalLink, BadgeCheck, Rocket, Copy, Star, MessageSquare, AlertTriangle, Download } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -16,6 +17,7 @@ export default function TaskDetailsPage({ params }: { params: Promise<{ taskId: 
   const taskId = resolvedParams.taskId;
   const router = useRouter();
   const { authenticated, login, user } = useAuth();
+  const authFetch = useAuthFetch();
 
   const [task, setTask] = useState<any>(null);
   const [bids, setBids] = useState<any[]>([]);
@@ -91,7 +93,7 @@ export default function TaskDetailsPage({ params }: { params: Promise<{ taskId: 
 
     async function fetchSubmission() {
       try {
-        const res = await fetch(`/api/tasks/${taskId}/submit?address=${userAddress}`);
+        const res = await authFetch(`/api/tasks/${taskId}/submit?address=${userAddress}`);
         if (res.ok) {
           const data = await res.json();
           setSubmission(data.submissions?.[0] || null);
@@ -118,7 +120,7 @@ export default function TaskDetailsPage({ params }: { params: Promise<{ taskId: 
   const handleBidAction = async (bidId: string, status: "accepted" | "rejected") => {
     setProcessingBid(bidId);
     try {
-      const res = await fetch(`/api/tasks/${taskId}/bids/${bidId}`, {
+      const res = await authFetch(`/api/tasks/${taskId}/bids/${bidId}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ status, clientAddress: user?.wallet?.address }),
@@ -236,7 +238,7 @@ export default function TaskDetailsPage({ params }: { params: Promise<{ taskId: 
     // No budget — just complete without payment
     setCompletingTask(true);
     try {
-      const res = await fetch(`/api/tasks/${taskId}/complete`, {
+      const res = await authFetch(`/api/tasks/${taskId}/complete`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ clientAddress: user?.wallet?.address }),
@@ -278,7 +280,7 @@ export default function TaskDetailsPage({ params }: { params: Promise<{ taskId: 
       }
 
       // Build the transaction
-      const buildRes = await fetch(`/api/tasks/${taskId}/payment/build`, {
+      const buildRes = await authFetch(`/api/tasks/${taskId}/payment/build`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -324,7 +326,7 @@ export default function TaskDetailsPage({ params }: { params: Promise<{ taskId: 
       setPaymentStep('verifying');
 
       // Send signed tx to server (avoids client-side RPC 403 issues)
-      const sendRes = await fetch(`/api/tasks/${taskId}/payment/send`, {
+      const sendRes = await authFetch(`/api/tasks/${taskId}/payment/send`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -342,7 +344,7 @@ export default function TaskDetailsPage({ params }: { params: Promise<{ taskId: 
       const txSignature = sendData.txSignature;
 
       // Submit the signature for backend verification + task completion
-      const completeRes = await fetch(`/api/tasks/${taskId}/complete`, {
+      const completeRes = await authFetch(`/api/tasks/${taskId}/complete`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -402,7 +404,7 @@ export default function TaskDetailsPage({ params }: { params: Promise<{ taskId: 
     }
     setSubmittingReview(true);
     try {
-      const res = await fetch(`/api/tasks/${taskId}/review`, {
+      const res = await authFetch(`/api/tasks/${taskId}/review`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -438,7 +440,7 @@ export default function TaskDetailsPage({ params }: { params: Promise<{ taskId: 
     }
     setRejecting(true);
     try {
-      const res = await fetch(`/api/tasks/${taskId}/reject`, {
+      const res = await authFetch(`/api/tasks/${taskId}/reject`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

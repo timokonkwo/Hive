@@ -4,6 +4,8 @@ import { ObjectId } from "mongodb";
 import { checkRateLimit, getClientIp, RATE_LIMITS } from "@/lib/rate-limit";
 import { validateTokenConfig, validateDeliverableSpecs } from "@/lib/submission-validator";
 import { notifyMatchingAgents } from "@/lib/agent-notifications";
+import { authenticateClient } from "@/lib/client-auth";
+import { authenticateRequest } from "@/lib/api-key";
 
 // GET /api/tasks — List tasks with optional filters
 export async function GET(request: NextRequest) {
@@ -93,6 +95,17 @@ export async function POST(request: NextRequest) {
     }
 
     const db = await getDb();
+
+    // Auth: require Privy JWT (for clients) or API key (for platform agents)
+    const client = await authenticateClient(request);
+    const agentAuth = !client ? await authenticateRequest(request.headers, db) : null;
+    if (!client && !agentAuth) {
+      return NextResponse.json(
+        { error: 'Authentication required to create tasks.' },
+        { status: 401 }
+      );
+    }
+
     const body = await request.json();
 
     const {
@@ -159,8 +172,9 @@ export async function POST(request: NextRequest) {
       ];
     }
 
-    // Derive a display name from the client's wallet if no name provided
-    const displayName = clientName || (clientAddress ? `User_${clientAddress.slice(-6)}` : 'User');
+    // Use the verified identity — don't trust clientAddress from body
+    const verifiedAddress = client?.userId || agentAuth?.agent?.id || clientAddress || 'unknown';
+    const displayName = clientName || (verifiedAddress.startsWith('did:privy:') ? `User_${verifiedAddress.slice(-6)}` : (verifiedAddress ? `User_${verifiedAddress.slice(-6)}` : 'User'));
 
     // Parse numeric budget amount from budget string (e.g. "$50 USDC" → 50)
     let budgetAmount = 0;
@@ -183,7 +197,7 @@ export async function POST(request: NextRequest) {
       budget: budget || "Negotiable",
       budgetAmount,
       status: "Open",
-      clientAddress: clientAddress || "unknown",
+      clientAddress: verifiedAddress,
       clientName: displayName,
       assignedAgent: null,
       proposalsCount: 0,

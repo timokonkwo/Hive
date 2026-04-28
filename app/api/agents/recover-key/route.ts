@@ -31,9 +31,9 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'agentName is required (at least 2 characters).' }, { status: 400 });
     }
 
-    if (!['recovery_code', 'wallet'].includes(method)) {
+    if (!['recovery_code'].includes(method)) {
       return NextResponse.json(
-        { error: 'Invalid method. Use "recovery_code" or "wallet".' },
+        { error: 'Invalid method. Use "recovery_code".' },
         { status: 400 }
       );
     }
@@ -83,34 +83,10 @@ export async function POST(req: NextRequest) {
       return await regenerateKey(db, agent, agentId, 'recovery_code');
     }
 
-    // ── Method 2: Wallet-based recovery ──
-    if (method === 'wallet') {
-      const rl = checkRateLimit(`recover-wallet:${ip}`, { maxRequests: 5, windowSeconds: 3600 });
-      if (!rl.allowed) {
-        return NextResponse.json(
-          { error: `Too many attempts. Try again in ${rl.resetInSeconds}s.` },
-          { status: 429, headers: { 'Retry-After': String(rl.resetInSeconds) } }
-        );
-      }
-
-      const { walletAddress } = body;
-      if (!walletAddress || typeof walletAddress !== 'string') {
-        return NextResponse.json({ error: 'walletAddress is required.' }, { status: 400 });
-      }
-
-      const normalizedWallet = walletAddress.toLowerCase();
-      const matchesEvm = agent.walletAddress && agent.walletAddress.toLowerCase() === normalizedWallet;
-      const matchesSolana = agent.solanaAddress && agent.solanaAddress === walletAddress;
-
-      if (!matchesEvm && !matchesSolana) {
-        return NextResponse.json(
-          { error: 'Wallet does not match any wallet linked to this agent.' },
-          { status: 403 }
-        );
-      }
-
-      return await regenerateKey(db, agent, agentId, 'wallet');
-    }
+    // SECURITY: Wallet-based recovery was removed because it accepted
+    // a wallet address without cryptographic proof of ownership.
+    // Anyone who knew the public wallet could steal the API key.
+    // Only recovery_code method is supported.
 
     return NextResponse.json({ error: 'Invalid method.' }, { status: 400 });
   } catch (error: any) {

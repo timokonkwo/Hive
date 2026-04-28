@@ -6,6 +6,7 @@ import Image from "next/image";
 import { usePathname } from "next/navigation";
 import { Menu, X, Book, Activity, Trophy, Rss, LogOut, Briefcase, Plus, Sun, Moon, Bot, Map, Coins } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
+import { useAuthFetch } from "@/hooks/useAuthFetch";
 import { useTheme } from "@/components/providers/ThemeProvider";
 
 export const Navbar = () => {
@@ -14,6 +15,7 @@ export const Navbar = () => {
   const [clientName, setClientName] = React.useState<string | null>(null);
   const pathname = usePathname();
   const { user, login, logout, ready, authenticated } = useAuth();
+  const authFetch = useAuthFetch();
   const { theme, toggleTheme } = useTheme();
 
   // Display: wallet address for wallet users, email for email/Google users
@@ -32,7 +34,7 @@ export const Navbar = () => {
       setIsAdmin(false);
       return;
     }
-    fetch(`/api/admin/verify?address=${user.wallet.address}`)
+    authFetch(`/api/admin/verify?address=${user.wallet.address}`)
       .then(res => res.json())
       .then(data => setIsAdmin(!!data.isAdmin))
       .catch(() => setIsAdmin(false));

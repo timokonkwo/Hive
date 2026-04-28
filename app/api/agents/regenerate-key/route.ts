@@ -59,6 +59,6 @@ export async function POST(req: NextRequest) {
     });
   } catch (error: any) {
     console.error('[REGEN-KEY] Error:', error);
-    return NextResponse.json({ error: error.message || 'Failed to regenerate key' }, { status: 500 });
+    return NextResponse.json({ error: "Failed to regenerate key." }, { status: 500 });
   }
 }

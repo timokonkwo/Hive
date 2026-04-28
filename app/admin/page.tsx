@@ -3,6 +3,7 @@
 import React, { useState, useEffect, useCallback } from "react";
 import { Navbar } from "@/components/layout/Navbar";
 import { useAuth } from "@/hooks/useAuth";
+import { useAuthFetch } from "@/hooks/useAuthFetch";
 import ReactMarkdown from "react-markdown";
 import {
   Loader2, Shield, Users, FileText, CheckCircle,
@@ -110,14 +111,16 @@ export default function AdminDashboardPage() {
 
   const address = user?.wallet?.address;
 
-  // Server-side admin verification
+  const authFetch = useAuthFetch();
+
+  // Server-side admin verification (now with Privy JWT)
   useEffect(() => {
     if (!user?.wallet?.address) {
       setIsAdmin(false);
       setAdminChecked(true);
       return;
     }
-    fetch(`/api/admin/verify?address=${user.wallet.address}`)
+    authFetch(`/api/admin/verify?address=${user.wallet.address}`)
       .then(res => res.json())
       .then(data => {
         setIsAdmin(!!data.isAdmin);
@@ -135,7 +138,7 @@ export default function AdminDashboardPage() {
     const fetchData = async () => {
       setLoading(true);
       try {
-        const res = await fetch(`/api/admin/stats?address=${user?.wallet?.address}`);
+        const res = await authFetch(`/api/admin/stats?address=${user?.wallet?.address}`);
         if (res.ok) setData(await res.json());
       } catch (err) {
         console.error("Admin fetch error:", err);
@@ -161,7 +164,7 @@ export default function AdminDashboardPage() {
       if (agentsSearch) params.set("search", agentsSearch);
       if (agentsVerifiedFilter !== "all") params.set("verified", agentsVerifiedFilter);
 
-      const res = await fetch(`/api/admin/agents?${params.toString()}`);
+      const res = await authFetch(`/api/admin/agents?${params.toString()}`);
       if (res.ok) {
         const data = await res.json();
         setAgents(data.agents || []);
@@ -199,7 +202,7 @@ export default function AdminDashboardPage() {
       if (tasksSearch) params.set("search", tasksSearch);
       if (tasksStatusFilter !== "all") params.set("status", tasksStatusFilter);
 
-      const res = await fetch(`/api/admin/tasks?${params.toString()}`);
+      const res = await authFetch(`/api/admin/tasks?${params.toString()}`);
       if (res.ok) {
         const data = await res.json();
         setTasks(data.tasks || []);
@@ -243,7 +246,7 @@ export default function AdminDashboardPage() {
     let deleted = 0;
     for (const id of selectedTasks) {
       try {
-        const res = await fetch(`/api/admin/tasks/${id}?address=${address}`, { method: "DELETE" });
+        const res = await authFetch(`/api/admin/tasks/${id}?address=${address}`, { method: "DELETE" });
         if (res.ok) deleted++;
       } catch { /* skip */ }
     }
@@ -252,7 +255,7 @@ export default function AdminDashboardPage() {
     setBulkDeleting(false);
     fetchTasks();
     // Refresh stats
-    const statsRes = await fetch(`/api/admin/stats?address=${address}`);
+    const statsRes = await authFetch(`/api/admin/stats?address=${address}`);
     if (statsRes.ok) setData(await statsRes.json());
   };
 
@@ -264,7 +267,7 @@ export default function AdminDashboardPage() {
       const params = new URLSearchParams({ page: String(feedbackPage), address });
       if (feedbackTypeFilter !== "all") params.set("type", feedbackTypeFilter);
       if (feedbackStatusFilter !== "all") params.set("status", feedbackStatusFilter);
-      const res = await fetch(`/api/admin/feedback?${params.toString()}`);
+      const res = await authFetch(`/api/admin/feedback?${params.toString()}`);
       if (res.ok) {
         const data = await res.json();
         setFeedbackItems(data.feedback || []);
@@ -278,7 +281,7 @@ export default function AdminDashboardPage() {
     if (activeTab === "feedback") fetchFeedback();
     if (activeTab === "tokens") {
       setTokenStatsLoading(true);
-      fetch(`/api/admin/token-stats?address=${user?.wallet?.address}`)
+      authFetch(`/api/admin/token-stats?address=${user?.wallet?.address}`)
         .then(res => res.ok ? res.json() : null)
         .then(data => { if (data) setTokenStats(data); })
         .catch(() => {})
@@ -309,7 +312,7 @@ export default function AdminDashboardPage() {
       if (submissionsSearch) params.set("search", submissionsSearch);
       if (submissionsStatusFilter !== "all") params.set("status", submissionsStatusFilter);
 
-      const res = await fetch(`/api/admin/submissions?${params.toString()}`);
+      const res = await authFetch(`/api/admin/submissions?${params.toString()}`);
       if (res.ok) {
         const data = await res.json();
         setSubmissions(data.submissions || []);
@@ -335,7 +338,7 @@ export default function AdminDashboardPage() {
   const updateFeedbackStatus = async (id: string, newStatus: string) => {
     if (!address) return;
     try {
-      const res = await fetch("/api/admin/feedback", {
+      const res = await authFetch("/api/admin/feedback", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ id, status: newStatus, address }),
@@ -364,7 +367,7 @@ export default function AdminDashboardPage() {
         if (deleteType === 'agent') fetchAgents();
         if (deleteType === 'task') fetchTasks();
         if (deleteType === 'submission') fetchSubmissions();
-        const statsRes = await fetch(`/api/admin/stats?address=${address}`);
+        const statsRes = await authFetch(`/api/admin/stats?address=${address}`);
         if (statsRes.ok) setData(await statsRes.json());
       } else {
         const err = await res.json();
@@ -381,7 +384,7 @@ export default function AdminDashboardPage() {
     if (!address) return;
     setChangingTaskStatus(taskId);
     try {
-      const res = await fetch(`/api/admin/tasks/${taskId}`, {
+      const res = await authFetch(`/api/admin/tasks/${taskId}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ address, status: newStatus }),
@@ -403,7 +406,7 @@ export default function AdminDashboardPage() {
   const handleToggleVerified = async (agentId: string, currentlyVerified: boolean) => {
     if (!address) return;
     try {
-      const res = await fetch(`/api/admin/agents/${agentId}`, {
+      const res = await authFetch(`/api/admin/agents/${agentId}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ isVerified: !currentlyVerified, adminAddress: address }),
@@ -425,7 +428,7 @@ export default function AdminDashboardPage() {
       return;
     }
     try {
-      const res = await fetch(`/api/admin/agents/${agentId}`, {
+      const res = await authFetch(`/api/admin/agents/${agentId}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ reputation: rep, adminAddress: address }),
@@ -1307,7 +1310,7 @@ export default function AdminDashboardPage() {
                   const { id, name } = tokenLaunchModal;
                   setLaunchingTokenFor(id);
                   try {
-                    const res = await fetch('/api/admin/token-stats', {
+                    const res = await authFetch('/api/admin/token-stats', {
                       method: 'POST',
                       headers: { 'Content-Type': 'application/json' },
                       body: JSON.stringify({ action: 'launch', agentId: id, adminAddress: user?.wallet?.address }),
@@ -1440,7 +1443,7 @@ export default function AdminDashboardPage() {
                     onClick={async () => {
                       setClaimingFees(true);
                       try {
-                        const res = await fetch('/api/admin/token-stats', {
+                        const res = await authFetch('/api/admin/token-stats', {
                           method: 'POST',
                           headers: { 'Content-Type': 'application/json' },
                           body: JSON.stringify({ action: 'claim-fees', adminAddress: user?.wallet?.address }),
@@ -1450,7 +1453,7 @@ export default function AdminDashboardPage() {
                           toast.success(data.message || 'Fees claimed');
                           if (data.solGained) toast.success(`+${data.solGained} SOL received`);
                           // Refetch token stats to update revenue section
-                          fetch(`/api/admin/token-stats?address=${user?.wallet?.address}`)
+                          authFetch(`/api/admin/token-stats?address=${user?.wallet?.address}`)
                             .then(r => r.ok ? r.json() : null)
                             .then(d => { if (d) setTokenStats(d); })
                             .catch(() => {});

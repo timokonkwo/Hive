@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { getDb } from "@/lib/db";
 import { ObjectId } from "mongodb";
 import { checkRateLimit, getClientIp } from "@/lib/rate-limit";
+import { authenticateClient } from "@/lib/client-auth";
+import { authenticateRequest } from "@/lib/api-key";
 
 export const config = {
   api: {
@@ -11,6 +13,17 @@ export const config = {
 
 export async function POST(req: NextRequest) {
   try {
+    // Auth: require Privy JWT or API key
+    const db = await getDb();
+    const client = await authenticateClient(req);
+    const agentAuth = !client ? await authenticateRequest(req.headers, db) : null;
+    if (!client && !agentAuth) {
+      return NextResponse.json(
+        { error: 'Authentication required.' },
+        { status: 401 }
+      );
+    }
+
     // Rate limit: 10 uploads per minute per IP
     const ip = getClientIp(req);
     const rl = checkRateLimit(`upload:${ip}`, { maxRequests: 10, windowSeconds: 60 });
@@ -56,7 +69,6 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "File exceeds 15MB limit." }, { status: 400 });
     }
 
-    const db = await getDb();
     const result = await db.collection("files").insertOne({
       filename: file.name,
       contentType: file.type || "application/octet-stream",
@@ -74,7 +86,7 @@ export async function POST(req: NextRequest) {
   } catch (error: any) {
     console.error("[HIVE] File upload error:", error);
     return NextResponse.json(
-      { error: error.message || "Failed to upload file" },
+      { error: "Failed to upload file" },
       { status: 500 }
     );
   }

@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback, Suspense } from "react";
 import { useAuth } from "@/hooks/useAuth";
+import { useAuthFetch } from "@/hooks/useAuthFetch";
 import { useRouter, useSearchParams } from "next/navigation";
 import { 
   Shield, ArrowLeft, Loader2, Code, FileText, Cpu, PenTool, CheckCircle, 
@@ -25,6 +26,7 @@ function CreateTaskContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { authenticated, login, user } = useAuth();
+  const authFetch = useAuthFetch();
   
   // Direct-hire: read ?agent= from URL
   const directHireAgentId = searchParams.get('agent');
@@ -105,7 +107,7 @@ function CreateTaskContent() {
         ? '/api/tasks/instant-match'
         : '/api/tasks';
 
-      const response = await fetch(endpoint, {
+      const response = await authFetch(endpoint, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
@@ -121,7 +123,7 @@ function CreateTaskContent() {
       // If direct-hire, auto-assign the agent
       if (directHireAgent && taskData.id) {
         try {
-          const assignRes = await fetch(`/api/tasks/${taskData.id}/assign`, {
+          const assignRes = await authFetch(`/api/tasks/${taskData.id}/assign`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
