@@ -43,7 +43,11 @@ export async function verifyAdmin(
   }
 
   // Method 2 (preferred): Check against ADMIN_PRIVY_DID
-  const adminPrivyDid = process.env.ADMIN_PRIVY_DID;
+  const rawAdminDid = process.env.ADMIN_PRIVY_DID;
+  // Normalize: accept both "cmmswp..." and "did:privy:cmmswp..." in the env
+  const adminPrivyDid = rawAdminDid
+    ? (rawAdminDid.startsWith('did:privy:') ? rawAdminDid : `did:privy:${rawAdminDid}`)
+    : null;
   if (adminPrivyDid && client.userId === adminPrivyDid) {
     return { client };
   }
