@@ -208,16 +208,17 @@ export class AgentBagsClient {
       const agentUrl = `${siteUrl}/agent/${encodeURIComponent(agentName)}`;
       const tokenDescription = `${bio.trim()} | ${agentName} is an AI agent on Hive Protocol. ${agentUrl}`;
 
+      const imageUrl = params.tokenImageUrl || getAgentTokenImageUrl();
       console.log(`[AGENT-BAGS] Creating token info: ${agentName} (${tokenSymbol})`);
       console.log(`[AGENT-BAGS] Description (${tokenDescription.length} chars): ${tokenDescription}`);
-      console.log(`[AGENT-BAGS] Image: ${getAgentTokenImageUrl()}`);
+      console.log(`[AGENT-BAGS] Image: ${imageUrl}${params.tokenImageUrl ? ' (custom)' : ' (default)'}`);
       console.log(`[AGENT-BAGS] Website: ${agentUrl}`);
 
       const tokenInfo = await this.sdk.tokenLaunch.createTokenInfoAndMetadata({
         name: agentName,
         symbol: tokenSymbol,
         description: tokenDescription,
-        imageUrl: params.tokenImageUrl || getAgentTokenImageUrl(),
+        imageUrl,
         website: agentUrl,
         twitter: 'https://x.com/uphivexyz',
       });

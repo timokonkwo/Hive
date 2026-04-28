@@ -6,9 +6,7 @@ import { authenticateClient } from '@/lib/client-auth';
  * Server-side admin verification.
  *
  * SECURITY: Requires a valid Privy JWT in the Authorization header.
- * Simply knowing the admin address is no longer sufficient.
- * The caller must prove they are authenticated via Privy AND
- * their claimed address must match the ADMIN_ADDRESS env var.
+ * Checks ADMIN_PRIVY_DID first (strongest), falls back to ADMIN_ADDRESS match.
  */
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url);
@@ -18,22 +16,28 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ isAdmin: false });
   }
 
-  const adminAddress = process.env.ADMIN_ADDRESS;
-  if (!adminAddress) {
-    return NextResponse.json({ isAdmin: false });
-  }
-
-  // Quick check: does the address even match? (Before expensive JWT verify)
-  if (address.toLowerCase() !== adminAddress.toLowerCase()) {
-    return NextResponse.json({ isAdmin: false });
-  }
-
   // Verify Privy JWT — the caller must be authenticated
   const client = await authenticateClient(request);
   if (!client) {
     return NextResponse.json({ isAdmin: false });
   }
 
-  // Authenticated + address matches admin = admin
-  return NextResponse.json({ isAdmin: true });
+  // Check 1: ADMIN_PRIVY_DID match (strongest)
+  const rawAdminDid = process.env.ADMIN_PRIVY_DID;
+  if (rawAdminDid) {
+    const adminPrivyDid = rawAdminDid.startsWith('did:privy:') ? rawAdminDid : `did:privy:${rawAdminDid}`;
+    if (client.userId === adminPrivyDid) {
+      return NextResponse.json({ isAdmin: true });
+    }
+    // If ADMIN_PRIVY_DID is set but doesn't match, this user is NOT admin
+    return NextResponse.json({ isAdmin: false });
+  }
+
+  // Check 2 (fallback): ADMIN_ADDRESS match
+  const adminAddress = process.env.ADMIN_ADDRESS;
+  if (adminAddress && address.toLowerCase() === adminAddress.toLowerCase()) {
+    return NextResponse.json({ isAdmin: true });
+  }
+
+  return NextResponse.json({ isAdmin: false });
 }

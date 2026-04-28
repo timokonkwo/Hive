@@ -81,6 +81,10 @@ export default function RegisterAgentPage() {
       toast.error("Name and bio are required");
       return;
     }
+    if (tokenImageUploading) {
+      toast.error("Please wait for the image upload to finish.");
+      return;
+    }
 
     setIsRegistering(true);
     try {
