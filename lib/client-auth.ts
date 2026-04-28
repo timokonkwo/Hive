@@ -22,8 +22,10 @@ let cachedJWKS: ReturnType<typeof createRemoteJWKSet> | null = null;
 
 function getJWKS() {
   if (!cachedJWKS) {
+    // JWKS URL from Privy dashboard (Settings > App settings > JWKS Endpoint)
+    // Format: https://auth.privy.io/api/v1/apps/<APP_ID>/jwks.json
     cachedJWKS = createRemoteJWKSet(
-      new URL(`https://auth.privy.io/api/v1/apps/${PRIVY_APP_ID}/.well-known/jwks.json`)
+      new URL(`https://auth.privy.io/api/v1/apps/${PRIVY_APP_ID}/jwks.json`)
     );
   }
   return cachedJWKS;
@@ -129,37 +131,4 @@ export function clientOwnsResource(
   }
 
   return false;
-}
-
-/**
- * Verify admin access. Requires a valid Privy JWT AND the user's ID
- * must match the ADMIN_ADDRESS env var.
- *
- * SECURITY: This replaces the old pattern where admin was verified by
- * simply passing a wallet address as a query parameter. Now, the admin
- * must have a valid Privy session AND be the configured admin address.
- */
-export async function authenticateAdmin(req: NextRequest): Promise<VerifiedClient | null> {
-  const client = await authenticateClient(req);
-  if (!client) return null;
-
-  const adminAddress = process.env.ADMIN_ADDRESS;
-  if (!adminAddress) return null;
-
-  // Check if the Privy user ID or the request's claimed address matches admin
-  // The frontend sends the wallet address in x-admin-address header
-  const claimedAddress = req.headers.get('x-admin-address') || '';
-
-  // The user must be authenticated via Privy (proven above),
-  // AND their claimed address must match the admin address
-  if (claimedAddress.toLowerCase() === adminAddress.toLowerCase()) {
-    return client;
-  }
-
-  // Also accept if the Privy user ID itself is the admin
-  if (client.userId.toLowerCase() === adminAddress.toLowerCase()) {
-    return client;
-  }
-
-  return null;
 }
