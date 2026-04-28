@@ -1,27 +1,35 @@
 import { NextRequest } from 'next/server';
-import { verifyAccessToken } from '@privy-io/node';
+import { createRemoteJWKSet, jwtVerify } from 'jose';
 
 /**
- * Server-side client authentication via Privy access token.
+ * Server-side client authentication via Privy JWT.
  *
  * The frontend sends the Privy access token in the Authorization header:
  *   Authorization: Bearer <privy-access-token>
  *
- * This module verifies the JWT using the Privy SDK's verifyAccessToken function
- * with the app's verification key from the Privy dashboard.
+ * This module verifies the JWT against Privy's JWKS endpoint and returns
+ * the authenticated user's identity (Privy user ID + linked wallet addresses).
  *
  * SECURITY: This replaces the old pattern of trusting a client-supplied
  * "clientAddress" field in the request body. With this module, the backend
  * cryptographically verifies the caller's identity.
- *
- * REQUIRED ENV VARS:
- *   NEXT_PUBLIC_PRIVY_APP_ID - Your Privy app ID
- *   PRIVY_VERIFICATION_KEY   - Your app's verification key from the Privy dashboard
- *                               (Settings > Basics > Verification Key)
  */
 
 const PRIVY_APP_ID = process.env.NEXT_PUBLIC_PRIVY_APP_ID || '';
-const PRIVY_VERIFICATION_KEY = process.env.PRIVY_VERIFICATION_KEY || '';
+
+// Cache the JWKS keyset across invocations (fetched once, auto-refreshed)
+let cachedJWKS: ReturnType<typeof createRemoteJWKSet> | null = null;
+
+function getJWKS() {
+  if (!cachedJWKS) {
+    // JWKS URL from Privy dashboard (Settings > App settings > JWKS Endpoint)
+    // Format: https://auth.privy.io/api/v1/apps/<APP_ID>/jwks.json
+    cachedJWKS = createRemoteJWKSet(
+      new URL(`https://auth.privy.io/api/v1/apps/${PRIVY_APP_ID}/jwks.json`)
+    );
+  }
+  return cachedJWKS;
+}
 
 export interface VerifiedClient {
   /** Privy user ID (e.g., "did:privy:abc123") */
@@ -47,11 +55,6 @@ export async function authenticateClient(req: NextRequest): Promise<VerifiedClie
       return null;
     }
 
-    if (!PRIVY_VERIFICATION_KEY) {
-      console.error('[AUTH] PRIVY_VERIFICATION_KEY is not set. Get it from the Privy dashboard (Settings > Basics).');
-      return null;
-    }
-
     // Extract token from Authorization header or privy-token cookie
     let token: string | null = null;
 
@@ -70,27 +73,32 @@ export async function authenticateClient(req: NextRequest): Promise<VerifiedClie
       return null;
     }
 
-    // Verify the access token using Privy's SDK
-    const verified = await verifyAccessToken({
-      access_token: token,
-      app_id: PRIVY_APP_ID,
-      verification_key: PRIVY_VERIFICATION_KEY,
+    // Verify the JWT against Privy's JWKS
+    const jwks = getJWKS();
+    const { payload } = await jwtVerify(token, jwks, {
+      issuer: 'privy.io',
+      audience: PRIVY_APP_ID,
     });
 
-    if (!verified.user_id) {
+    const userId = payload.sub;
+    if (!userId) {
       return null;
     }
 
     return {
-      userId: verified.user_id,
+      userId,
       // The userId (did:privy:...) is the canonical identity
-      address: verified.user_id,
-      sessionId: verified.session_id || '',
-      expiresAt: verified.expiration || 0,
+      // The frontend can also send a wallet address in the body,
+      // but we only trust it if the Privy token is valid
+      address: userId,
+      sessionId: (payload as any).sid || '',
+      expiresAt: payload.exp || 0,
     };
   } catch (error: any) {
     // JWT verification failed — invalid, expired, or tampered token
-    console.error('[AUTH] Client auth verification failed:', error.message || error);
+    if (error?.code !== 'ERR_JWT_EXPIRED') {
+      console.error('[AUTH] Client auth verification failed:', error.message);
+    }
     return null;
   }
 }
