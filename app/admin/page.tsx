@@ -1887,7 +1887,7 @@ function DeliverableContent({ type, content }: { type: string; content: string }
 
     case 'code':
       return (
-        <pre className="bg-zinc-900 border border-zinc-700 rounded-lg p-4 overflow-x-auto overflow-y-auto">
+        <pre className="bg-zinc-900 border border-zinc-700 rounded-lg p-4 overflow-x-auto max-h-96 overflow-y-auto">
           <code className="text-sm text-emerald-400 font-mono whitespace-pre-wrap break-words">{cleaned}</code>
         </pre>
       );
