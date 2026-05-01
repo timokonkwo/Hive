@@ -47,7 +47,7 @@ const CLIENT_POOL = [
 const CATEGORIES = [
   {
     name: 'Development',
-    weight: 25,
+    weight: 70,
     guidance: 'Code tasks: scripts, APIs, unit tests, CI/CD pipelines, refactoring, automation, CLI tools. Languages: Python, TypeScript, Node.js, Bash.',
     examples: [
       {
@@ -95,7 +95,7 @@ const CATEGORIES = [
   },
   {
     name: 'Research',
-    weight: 20,
+    weight: 7,
     guidance: 'Competitive analysis, market research, tool comparisons, pricing research, industry reports. Structured output with data tables.',
     examples: [
       {
@@ -127,7 +127,7 @@ const CATEGORIES = [
   },
   {
     name: 'Analysis',
-    weight: 15,
+    weight: 4,
     guidance: 'Data analysis, sentiment analysis, unit economics, SEO audits, financial modeling. Quantitative with structured output.',
     examples: [
       {
@@ -155,7 +155,7 @@ const CATEGORIES = [
   },
   {
     name: 'Content',
-    weight: 20,
+    weight: 7,
     guidance: 'API documentation, technical blog posts, email sequences, SEO copy, product descriptions. Professional, specific, with clear deliverable format.',
     examples: [
       {
@@ -187,7 +187,7 @@ const CATEGORIES = [
   },
   {
     name: 'Social',
-    weight: 5,
+    weight: 4,
     guidance: 'Content calendars, Twitter/X threads, LinkedIn posts, community copy. Platform-specific, with actual draft copy.',
     examples: [
       {
@@ -207,7 +207,7 @@ const CATEGORIES = [
   },
   {
     name: 'Design',
-    weight: 5,
+    weight: 4,
     guidance: 'Design system specs, UX copy, style guides, checkout flows. Written deliverables (not visual).',
     examples: [
       {
@@ -227,7 +227,7 @@ const CATEGORIES = [
   },
   {
     name: 'Security',
-    weight: 5,
+    weight: 4,
     guidance: 'Code security audits, vulnerability assessments, dependency reviews. Structured report with severity ratings.',
     examples: [
       {
@@ -297,7 +297,7 @@ async function generateUniqueTask(
       ? `\n\nDO NOT use any of these titles or close variations — they were recently posted:\n${recentTitles.map(t => `- ${t}`).join('\n')}`
       : '';
 
-    const prompt = `Generate a single task for a freelance marketplace where clients hire AI agents.
+    const prompt = `Generate a single task for a freelance marketplace where clients hire autonomous AI agents to do real work.
 
 CATEGORY: ${category.name}
 GUIDANCE: ${category.guidance}
@@ -306,10 +306,25 @@ EXAMPLE TASKS IN THIS CATEGORY (for style reference only — generate something 
 ${category.examples.map(e => `- ${e.title}`).join('\n')}
 ${avoidList}
 
+CRITICAL DISTINCTION — AI AGENT vs CHATBOT:
+These tasks are for AI AGENTS, not chatbots. An AI agent can:
+- Write, test, and debug multi-file codebases
+- Process datasets, scrape live data, generate structured output files
+- Build complete automation pipelines with error handling
+- Produce production-ready artifacts (scripts, configs, documentation sets)
+- Execute multi-step workflows that require planning and iteration
+
+DO NOT generate tasks like:
+- "Explain the difference between X and Y" (ChatGPT can do this)
+- "Summarize this article" (trivial for any LLM)
+- "Write a paragraph about..." (no structured output needed)
+- Generic advice or opinion tasks
+- Tasks with no concrete, verifiable deliverable
+
 RULES:
 - The task MUST be related to the ${category.name} category. Do NOT generate a task for a different category.
-- The task should be something a client would delegate to an AI agent (not something trivial enough for a quick ChatGPT prompt)
-- It should require multi-step work, structured output, or domain expertise
+- The task must require MULTI-STEP work with a concrete, structured deliverable
+- It should involve building something, processing data, creating a system, or producing a structured artifact
 - Title: concise, action-oriented, under 80 characters
 - Description: Use markdown formatting. Start with 1-2 sentences of context, then a bullet list of specific deliverables. Use **bold** for key terms. A reader should know exactly what work is expected and what to deliver.
 - Tags: 2-4 relevant tags

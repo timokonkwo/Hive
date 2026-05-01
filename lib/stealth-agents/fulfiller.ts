@@ -186,21 +186,24 @@ async function generateWork(
   specs: any[],
   previousErrors?: string[]
 ): Promise<{ summary: string; deliverables: any[] }> {
-  const specDescriptions =
-    specs.length > 0
-      ? specs
-          .map(
-            (s: any, i: number) =>
-              `Deliverable ${i}: type="${s.type}", label="${s.label}", required=${s.required}, description="${s.description || ''}"`
-          )
-          .join('\n')
-      : 'No specific deliverable specs. Provide a single text deliverable with your work.';
+  // If no specs provided, infer them from the task category
+  const effectiveSpecs = specs.length > 0 ? specs : inferSpecsFromCategory(task.category);
+
+  const specDescriptions = effectiveSpecs
+    .map(
+      (s: any, i: number) =>
+        `Deliverable ${i}: type="${s.type}", label="${s.label}", required=${s.required}, description="${s.description || ''}"`
+    )
+    .join('\n');
 
   const errorContext = previousErrors
     ? `\n\nPREVIOUS ATTEMPT FAILED WITH ERRORS:\n${previousErrors.join('\n')}\nFix these issues in your response.`
     : '';
 
-  const prompt = `Complete the following task and provide deliverables.
+  // Category-specific quality instructions
+  const categoryInstructions = getCategoryInstructions(task.category);
+
+  const prompt = `You are an autonomous AI agent completing a real freelance task. Produce professional, production-quality deliverables.
 
 TASK:
 Title: ${task.title}
@@ -213,9 +216,12 @@ DELIVERABLE SPECIFICATIONS:
 ${specDescriptions}
 ${errorContext}
 
+CATEGORY-SPECIFIC INSTRUCTIONS:
+${categoryInstructions}
+
 TYPE-SPECIFIC FORMATTING RULES (follow strictly):
-- For type "code": Write actual source code, NOT prose about code. Include the programming language as a comment on line 1 (e.g. "// language: python" or "# language: bash"). Add inline comments. The content must be valid, runnable code.
-- For type "text": Use markdown formatting. Use ## headings, **bold** key terms, bullet lists, numbered steps, and markdown tables where data comparison is involved. Structure the content professionally. Never deliver a wall of unformatted text.
+- For type "code": Write ACTUAL, COMPLETE, RUNNABLE source code. Include the programming language as a comment on line 1 (e.g. "// language: python" or "# language: bash"). Add inline comments explaining logic. Include error handling. The code must be production-quality, not pseudocode or snippets.
+- For type "text": Use rich markdown formatting. Use ## headings to organize sections, **bold** for key terms, bullet lists for items, numbered steps for procedures, and markdown tables (| col1 | col2 |) where data comparison is involved. Include concrete data, specific numbers, and actionable recommendations. Never deliver a wall of unformatted plain text.
 - For type "url": Provide a single valid URL.
 
 RESPOND IN EXACTLY THIS JSON FORMAT (no markdown wrapping, no code fences, just raw JSON):
@@ -240,10 +246,10 @@ RESPOND IN EXACTLY THIS JSON FORMAT (no markdown wrapping, no code fences, just 
 CRITICAL RULES:
 - For EACH deliverable spec, include a matching deliverable with the correct specIndex and type.
 - The "type" field MUST match the spec's type exactly. Do not change "code" to "text" or vice versa.
-- If there are no specs, provide a single text deliverable (specIndex: 0, type: "text") with markdown formatting.
 - The summary must be at least 20 characters long.
 - Content must be substantial, thorough, and demonstrate real professional work.
-- Code deliverables must contain actual code, not descriptions of code.`;
+- Code deliverables must contain actual runnable code, not descriptions of code.
+- Text deliverables must use markdown formatting with headers, tables, and structure.`;
 
   const responseText = await generateWithGemini(agent.workPersonality, prompt);
 
@@ -278,3 +284,118 @@ CRITICAL RULES:
     };
   }
 }
+
+/**
+ * Infer deliverable specs from task category when none are provided.
+ * Mirrors getDeliverableSpecs in auto-post-tasks.ts.
+ */
+function inferSpecsFromCategory(category: string): Array<{ type: string; label: string; description: string; required: boolean }> {
+  switch (category) {
+    case 'Development':
+      return [
+        { type: 'code', label: 'Source Code', description: 'Complete, runnable source code with inline comments', required: true },
+        { type: 'text', label: 'Documentation', description: 'Setup instructions, dependencies, and usage guide', required: true },
+      ];
+    case 'Research':
+      return [
+        { type: 'text', label: 'Research Report', description: 'Structured report with findings, comparison tables, data, and citations', required: true },
+      ];
+    case 'Analysis':
+      return [
+        { type: 'text', label: 'Analysis Report', description: 'Data-driven analysis with methodology, findings, tables, and recommendations', required: true },
+        { type: 'code', label: 'Data / Formulas', description: 'Supporting calculations, scripts, or raw data', required: false },
+      ];
+    case 'Content':
+      return [
+        { type: 'text', label: 'Content Deliverable', description: 'Final polished copy with proper formatting, ready to publish', required: true },
+      ];
+    case 'Social':
+      return [
+        { type: 'text', label: 'Content Calendar / Posts', description: 'Ready-to-publish posts with platform-specific formatting and schedule', required: true },
+      ];
+    case 'Design':
+      return [
+        { type: 'text', label: 'Design Specification', description: 'Complete spec with tokens, color values, typography, and component definitions', required: true },
+        { type: 'code', label: 'Design Tokens', description: 'Design tokens as CSS custom properties or JSON', required: false },
+      ];
+    case 'Security':
+      return [
+        { type: 'text', label: 'Security Report', description: 'Vulnerability report with severity ratings and remediation steps', required: true },
+        { type: 'code', label: 'Fix Patches', description: 'Code patches or configuration fixes for identified vulnerabilities', required: false },
+      ];
+    default:
+      return [
+        { type: 'text', label: 'Deliverable', description: 'Complete work product with structured formatting', required: true },
+      ];
+  }
+}
+
+/**
+ * Get category-specific quality instructions for the fulfiller prompt.
+ */
+function getCategoryInstructions(category: string): string {
+  switch (category) {
+    case 'Development':
+      return `This is a DEVELOPMENT task. Your primary deliverable must be actual source code.
+- Write complete, runnable code -- not snippets or pseudocode
+- Include proper imports, error handling, and edge cases
+- Add inline comments explaining non-obvious logic
+- Use consistent code style and meaningful variable names
+- The documentation deliverable should include: how to install dependencies, how to run the code, and expected output`;
+
+    case 'Research':
+      return `This is a RESEARCH task. Deliver a structured, data-rich report.
+- Use markdown tables for comparisons (| Feature | Tool A | Tool B |)
+- Include specific data points, numbers, and pricing where relevant
+- Cite sources or reference specific tools/products by name
+- Organize with clear sections: Overview, Findings, Comparison, Recommendations
+- End with actionable recommendations, not just observations`;
+
+    case 'Analysis':
+      return `This is an ANALYSIS task. Deliver data-driven insights with methodology.
+- Show your analytical framework/methodology upfront
+- Use markdown tables for data presentation
+- Include specific metrics, calculations, and benchmarks
+- Provide severity ratings or priority rankings where appropriate
+- End with prioritized, actionable recommendations`;
+
+    case 'Content':
+      return `This is a CONTENT task. Deliver polished, publish-ready copy.
+- Write in the appropriate tone for the target audience
+- Use proper markdown formatting (headings, bold, lists)
+- Include specific details, not generic filler
+- If writing multiple pieces, clearly separate each one
+- Follow any specified word counts or format requirements`;
+
+    case 'Social':
+      return `This is a SOCIAL MEDIA task. Deliver platform-specific, ready-to-post content.
+- Write actual post copy, not descriptions of what to post
+- Respect platform character limits (Twitter/X: 280 chars per tweet)
+- Include hashtags, posting schedule, and content type labels
+- If creating threads, write out every tweet in the thread
+- Use a content calendar format with dates and times`;
+
+    case 'Design':
+      return `This is a DESIGN task. Deliver precise, implementable specifications.
+- Include specific values: hex colors, font sizes in px/rem, spacing in px
+- Use markdown tables for token documentation
+- Provide CSS custom properties or JSON tokens as code deliverables
+- Document component states (default, hover, active, disabled, error)
+- Be precise enough that a developer could implement from your spec alone`;
+
+    case 'Security':
+      return `This is a SECURITY task. Deliver a structured vulnerability assessment.
+- Rate each finding: Critical / High / Medium / Low severity
+- Include: description, affected component, impact, and remediation steps
+- Use a consistent format for each finding
+- Provide code patches as separate code deliverables where applicable
+- Include a prioritized remediation roadmap`;
+
+    default:
+      return `Deliver a thorough, well-structured response using markdown formatting.
+- Use headers to organize sections
+- Use tables for any comparative data
+- Be specific and actionable, not generic`;
+  }
+}
+
