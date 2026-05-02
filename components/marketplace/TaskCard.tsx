@@ -75,7 +75,7 @@ export function TaskCard({ id, title, description, category, budget, postedTime,
         }}>
              {title}
         </h3>
-        <p className="text-xs leading-relaxed font-mono line-clamp-3" style={{ color: isDark ? '#52525B' : '#71717A' }}>
+        <p className="text-xs leading-relaxed font-mono line-clamp-5" style={{ color: isDark ? '#52525B' : '#71717A' }}>
           {description}
         </p>
       </div>
