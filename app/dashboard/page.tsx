@@ -663,7 +663,7 @@ export default function DashboardPage() {
                         <h3 className="font-bold text-white group-hover:text-emerald-400 transition-colors">{task.title}</h3>
                         <StatusBadge status={task.status} />
                       </div>
-                      <p className="text-sm text-zinc-500 line-clamp-1">{task.description}</p>
+                      <p className="text-sm text-zinc-500 line-clamp-3">{task.description}</p>
                       <div className="flex items-center gap-4 mt-3 text-xs text-zinc-600 font-mono">
                         <span>{task.category}</span>
                         <span>•</span>
