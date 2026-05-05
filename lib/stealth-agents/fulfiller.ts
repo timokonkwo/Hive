@@ -31,7 +31,12 @@ export async function fulfillAcceptedBids(limit: number = 1): Promise<void> {
   );
   const stealthAgentIds = [...stealthAgentMap.keys()];
 
-  if (stealthAgentIds.length === 0) return;
+  if (stealthAgentIds.length === 0) {
+    console.log('[FULFILL] No stealth agents found (isHiveOwned: true)');
+    return;
+  }
+
+  console.log(`[FULFILL] Found ${stealthAgentIds.length} stealth agent(s): ${stealthAgents.map(a => a.name).join(', ')}`);
 
   // Find accepted bids from stealth agents that don't have a submission yet
   // Skip bids that have permanently failed fulfillment
@@ -43,6 +48,28 @@ export async function fulfillAcceptedBids(limit: number = 1): Promise<void> {
     })
     .toArray();
 
+  console.log(`[FULFILL] Found ${acceptedBids.length} accepted bid(s) from stealth agents`);
+
+  if (acceptedBids.length === 0) {
+    // Log bid status breakdown for diagnostics
+    const allBids = await db
+      .collection(COLLECTIONS.BIDS)
+      .find({ agentId: { $in: stealthAgentIds } })
+      .project({ status: 1, taskId: 1, agentName: 1 })
+      .toArray();
+    
+    if (allBids.length > 0) {
+      const statusCounts: Record<string, number> = {};
+      for (const b of allBids) {
+        statusCounts[b.status] = (statusCounts[b.status] || 0) + 1;
+      }
+      console.log(`[FULFILL] Bid status breakdown: ${JSON.stringify(statusCounts)}`);
+    } else {
+      console.log('[FULFILL] No bids at all from stealth agents');
+    }
+    return;
+  }
+
   let fulfilled = 0;
 
   for (const bid of acceptedBids) {
@@ -53,7 +80,10 @@ export async function fulfillAcceptedBids(limit: number = 1): Promise<void> {
       .collection(COLLECTIONS.SUBMISSIONS)
       .findOne({ taskId: bid.taskId, agentId: bid.agentId });
 
-    if (existingSubmission) continue; // Already submitted
+    if (existingSubmission) {
+      console.log(`[FULFILL] Skipping ${bid.agentName} on task ${bid.taskId} -- already submitted`);
+      continue;
+    }
 
     // Get the task details
     let task;
@@ -65,13 +95,19 @@ export async function fulfillAcceptedBids(limit: number = 1): Promise<void> {
       continue;
     }
 
-    if (!task || task.status === 'Completed') continue;
+    if (!task || task.status === 'Completed') {
+      console.log(`[FULFILL] Skipping task ${bid.taskId} -- status: ${task?.status || 'not found'}`);
+      continue;
+    }
 
     // Find the agent config
     const agentConfig = STEALTH_AGENTS.find(
       (a) => a.name === bid.agentName
     );
-    if (!agentConfig) continue;
+    if (!agentConfig) {
+      console.log(`[FULFILL] Skipping -- no config for agent "${bid.agentName}"`);
+      continue;
+    }
 
     console.log(`[FULFILL] ${agentConfig.name} fulfilling "${task.title}" (${bid.taskId})`);
 
@@ -85,6 +121,8 @@ export async function fulfillAcceptedBids(limit: number = 1): Promise<void> {
       );
     }
   }
+
+  console.log(`[FULFILL] Run complete: ${fulfilled} task(s) fulfilled`);
 }
 
 /**
