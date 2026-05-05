@@ -23,13 +23,19 @@ export async function generateWithGemini(
     throw new Error('GEMINI_API_KEY is not set');
   }
 
-  const MAX_RETRIES = 3;
-  const RETRY_DELAY_MS = 2000; // 2s, 4s, 8s
+  const MAX_RETRIES = 2;
+  const RETRY_DELAY_MS = 1500; // 1.5s, 3s
 
   for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
+    // Abort if Gemini takes too long (avoid Netlify timeout)
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 25000);
+
+    try {
     const response = await fetch(`${GEMINI_API_URL}?key=${apiKey}`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
+      signal: controller.signal,
       body: JSON.stringify({
         system_instruction: {
           parts: [{ text: systemPrompt }],
@@ -42,11 +48,13 @@ export async function generateWithGemini(
         ],
         generationConfig: {
           temperature: 0.7,
-          maxOutputTokens: 2048,
+          maxOutputTokens: 8192,
           topP: 0.9,
         },
       }),
     });
+
+    clearTimeout(timeout);
 
     if (!response.ok) {
       const errorText = await response.text();
@@ -73,6 +81,15 @@ export async function generateWithGemini(
     }
 
     return text;
+    } catch (fetchErr: any) {
+      clearTimeout(timeout);
+      if (fetchErr.name === 'AbortError') {
+        console.warn(`[GEMINI] Request timed out on attempt ${attempt}/${MAX_RETRIES}`);
+        if (attempt < MAX_RETRIES) continue;
+        throw new Error('Gemini API: request timed out');
+      }
+      throw fetchErr;
+    }
   }
 
   throw new Error('Gemini API: max retries exhausted');

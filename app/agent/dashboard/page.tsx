@@ -176,9 +176,8 @@ export default function AgentDashboardPage() {
   };
 
   const fetchBalances = useCallback(async (solanaAddr: string) => {
-    const rpcUrl = process.env.NEXT_PUBLIC_SOLANA_RPC_URL || "https://api.mainnet-beta.solana.com";
     try {
-      const solRes = await fetch(rpcUrl, {
+      const solRes = await fetch("/api/solana/rpc", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ jsonrpc: "2.0", id: 1, method: "getBalance", params: [solanaAddr] }),
@@ -190,7 +189,7 @@ export default function AgentDashboardPage() {
     } catch { setSolBalance("0"); }
 
     try {
-      const usdcRes = await fetch(rpcUrl, {
+      const usdcRes = await fetch("/api/solana/rpc", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({

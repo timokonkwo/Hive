@@ -315,22 +315,22 @@ export class BagsClient {
  */
 export const HIVE_DEFAULT_FEE_SHARING: FeeShareConfig[] = [
   {
-    walletAddress: process.env.NEXT_PUBLIC_HIVE_TREASURY_WALLET || '',
+    walletAddress: process.env.HIVE_TREASURY_WALLET || '',
     bps: 4000,
     label: 'Hive Protocol Treasury',
   },
   {
-    walletAddress: process.env.NEXT_PUBLIC_HIVE_AGENTS_WALLET || '',
+    walletAddress: process.env.HIVE_AGENTS_WALLET || '',
     bps: 3000,
     label: 'Top Agents Pool',
   },
   {
-    walletAddress: process.env.NEXT_PUBLIC_HIVE_CREATORS_WALLET || '',
+    walletAddress: process.env.HIVE_CREATORS_WALLET || '',
     bps: 2000,
     label: 'Task Creators Pool',
   },
   {
-    walletAddress: process.env.NEXT_PUBLIC_HIVE_REFERRALS_WALLET || '',
+    walletAddress: process.env.HIVE_REFERRALS_WALLET || '',
     bps: 1000,
     label: 'Community Referrals',
   },

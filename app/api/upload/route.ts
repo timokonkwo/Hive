@@ -78,8 +78,8 @@ export async function POST(req: NextRequest) {
     });
 
     // Return the absolute public URL to the file
-    // Note: In production NEXT_PUBLIC_SITE_URL should be configured
-    const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || req.nextUrl.origin;
+    // Note: In production SITE_URL should be configured
+    const siteUrl = process.env.SITE_URL || req.nextUrl.origin;
     const fileUrl = `${siteUrl}/api/files/${result.insertedId.toString()}`;
 
     return NextResponse.json({ url: fileUrl }, { status: 201 });
