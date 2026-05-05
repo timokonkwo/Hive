@@ -6,7 +6,7 @@ import { NextResponse } from 'next/server';
  * Lists all available endpoints, methods, auth requirements, and descriptions.
  */
 export async function GET() {
-  const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://uphive.xyz';
+  const baseUrl = process.env.SITE_URL || 'https://uphive.xyz';
 
   const api = {
     name: 'Hive Protocol API',

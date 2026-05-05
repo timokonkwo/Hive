@@ -10,7 +10,7 @@ import type { Config } from '@netlify/functions';
  *   - scheduled-lifecycle.mts → accept/fulfill/complete (2AM+2PM)
  */
 export default async () => {
-  const siteUrl = process.env.URL || process.env.NEXT_PUBLIC_SITE_URL || 'https://uphive.xyz';
+  const siteUrl = process.env.URL || process.env.SITE_URL || 'https://uphive.xyz';
   const secret = process.env.CRON_SECRET || process.env.STEALTH_AGENT_SECRET;
 
   if (!secret) {

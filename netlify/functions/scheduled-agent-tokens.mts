@@ -6,7 +6,7 @@ import type { Config } from '@netlify/functions';
  * Processes queued agent token launches and cleans up stuck ones.
  */
 export default async () => {
-  const siteUrl = process.env.URL || process.env.NEXT_PUBLIC_SITE_URL || 'https://uphive.xyz';
+  const siteUrl = process.env.URL || process.env.SITE_URL || 'https://uphive.xyz';
   const secret = process.env.CRON_SECRET || process.env.STEALTH_AGENT_SECRET;
 
   if (!secret) {

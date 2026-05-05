@@ -3,7 +3,7 @@
  * Provides fast access to indexed blockchain data
  */
 
-const INDEXER_URL = process.env.NEXT_PUBLIC_HIVE_INDEXER_URL || 'http://localhost:4350/graphql'
+const INDEXER_URL = process.env.HIVE_INDEXER_URL || 'http://localhost:4350/graphql'
 
 interface GraphQLResponse<T> {
   data?: T

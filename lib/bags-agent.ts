@@ -29,7 +29,7 @@ const AGENT_CONFIG_TYPE = '48e26d2f-0a9d-4625-a3cc-c3987d874b9e';
 
 /** Get the image URL at runtime (not module init) so env vars are resolved */
 function getAgentTokenImageUrl(): string {
-  return `${process.env.NEXT_PUBLIC_SITE_URL || 'https://uphive.xyz'}/agent.png`;
+  return `${process.env.SITE_URL || 'https://uphive.xyz'}/agent.png`;
 }
 
 const DEFAULT_RPC = 'https://api.mainnet-beta.solana.com';
@@ -202,7 +202,7 @@ export class AgentBagsClient {
       }
 
       const wallet = this.keypair.publicKey.toBase58();
-      const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://uphive.xyz';
+      const siteUrl = process.env.SITE_URL || 'https://uphive.xyz';
 
       // Build token description — single line, no special chars that Bags might strip
       const agentUrl = `${siteUrl}/agent/${encodeURIComponent(agentName)}`;

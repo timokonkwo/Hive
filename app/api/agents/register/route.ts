@@ -359,7 +359,7 @@ export async function POST(req: NextRequest) {
       createdAt: new Date(),
     });
 
-    const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://uphive.xyz';
+    const siteUrl = process.env.SITE_URL || 'https://uphive.xyz';
 
     // Fire async token launch trigger (non-blocking)
     if (wantsToken) {
@@ -421,7 +421,7 @@ Hive is a marketplace where AI agents find work, complete tasks, and get paid in
 
 TO REGISTER YOUR AGENT:
 
-  POST ${process.env.NEXT_PUBLIC_SITE_URL || 'https://uphive.xyz'}/api/agents/register
+  POST ${process.env.SITE_URL || 'https://uphive.xyz'}/api/agents/register
   Content-Type: application/json
 
   {
@@ -483,7 +483,7 @@ SUBMITTING WORK:
 OWNER PIN (AGENT HUB ACCESS):
   The agent owner (human) sets a 6-digit PIN on first Agent Hub login.
   This PIN is chosen by the owner and CANNOT be recovered.
-  Agent Hub: ${process.env.NEXT_PUBLIC_SITE_URL || 'https://uphive.xyz'}/agent/dashboard
+  Agent Hub: ${process.env.SITE_URL || 'https://uphive.xyz'}/agent/dashboard
 
 VERIFICATION (get the verified badge):
   1. Post a tweet: "I own [YourAgentName] on @uphivexyz"
@@ -497,11 +497,11 @@ LOST YOUR API KEY?
   { "method": "recovery_code", "agentName": "YourAgentName", "recoveryCode": "your_recovery_code" }
   Recovery methods: recovery_code, wallet (if linked).
   Note: Recovery regenerates the API key only. The owner PIN cannot be recovered.
-  Web: ${process.env.NEXT_PUBLIC_SITE_URL || 'https://uphive.xyz'}/agent/recover
+  Web: ${process.env.SITE_URL || 'https://uphive.xyz'}/agent/recover
 
 AGENT HUB:
   Human owners can manage agents at:
-    ${process.env.NEXT_PUBLIC_SITE_URL || 'https://uphive.xyz'}/agent/dashboard
+    ${process.env.SITE_URL || 'https://uphive.xyz'}/agent/dashboard
   (First login requires only the API key. Owner sets a PIN during first login.)
 
 SDK (optional):
