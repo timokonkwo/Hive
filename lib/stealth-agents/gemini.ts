@@ -6,12 +6,9 @@
  * Fallback: gemini-1.5-flash (stable, for when 2.5 is overloaded)
  */
 
-const GEMINI_API_BASE = 'https://generativelanguage.googleapis.com/v1beta/models';
-
-// Primary model with thinking control
-const PRIMARY_MODEL = 'gemini-2.5-flash';
-// Fallback when primary is overloaded (503)
-const FALLBACK_MODEL = 'gemini-1.5-flash';
+// Model configs with their correct API versions
+const PRIMARY = { id: 'gemini-2.5-flash', base: 'https://generativelanguage.googleapis.com/v1beta/models' };
+const FALLBACK = { id: 'gemini-1.5-flash', base: 'https://generativelanguage.googleapis.com/v1/models' };
 
 export type GeminiModel = 'fast' | 'thinking';
 
@@ -35,18 +32,18 @@ export async function generateWithGemini(
   }
 
   // Try primary model, then fallback
-  const models = [PRIMARY_MODEL, FALLBACK_MODEL];
+  const models = [PRIMARY, FALLBACK];
 
   for (const currentModel of models) {
     try {
-      const result = await callGemini(apiKey, currentModel, systemPrompt, userPrompt, model);
+      const result = await callGemini(apiKey, currentModel.id, currentModel.base, systemPrompt, userPrompt, model);
       return result;
     } catch (err: any) {
       const isOverloaded = err.message?.includes('503') || err.message?.includes('429');
-      const isLastModel = currentModel === FALLBACK_MODEL;
+      const isLastModel = currentModel === FALLBACK;
 
       if (isOverloaded && !isLastModel) {
-        console.warn(`[GEMINI] ${currentModel} overloaded, falling back to ${FALLBACK_MODEL}`);
+        console.warn(`[GEMINI] ${currentModel.id} overloaded, falling back to ${FALLBACK.id}`);
         continue;
       }
       throw err;
@@ -62,11 +59,12 @@ export async function generateWithGemini(
 async function callGemini(
   apiKey: string,
   modelId: string,
+  apiBase: string,
   systemPrompt: string,
   userPrompt: string,
   mode: GeminiModel
 ): Promise<string> {
-  const apiUrl = `${GEMINI_API_BASE}/${modelId}:generateContent`;
+  const apiUrl = `${apiBase}/${modelId}:generateContent`;
   const TIMEOUT_MS = 20000; // 20s for any model
 
   // Build generation config
