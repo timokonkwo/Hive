@@ -34,6 +34,7 @@ export async function fulfillAcceptedBids(limit: number = 1): Promise<void> {
   if (stealthAgentIds.length === 0) return;
 
   // Find accepted bids from stealth agents that don't have a submission yet
+  // Skip bids that have permanently failed fulfillment
   const acceptedBids = await db
     .collection(COLLECTIONS.BIDS)
     .find({
@@ -111,7 +112,31 @@ async function fulfillTask(
     const retryResult = await generateWork(task, agent, specs, validation.errors);
     const retryValidation = validateSubmission(specs, retryResult.deliverables, retryResult.summary);
     if (!retryValidation.valid) {
-      console.error(`[STEALTH] Retry also failed. Skipping task ${bid.taskId}.`);
+      console.error(`[STEALTH] Retry also failed. Marking bid ${bid._id} as failed.`);
+
+      // Track the failure so we don't retry this bid forever
+      const currentAttempts = (bid.fulfillmentAttempts || 0) + 1;
+      await db.collection(COLLECTIONS.BIDS).updateOne(
+        { _id: bid._id },
+        {
+          $set: {
+            fulfillmentAttempts: currentAttempts,
+            lastFulfillmentError: retryValidation.errors.join('; '),
+            updatedAt: new Date(),
+            ...(currentAttempts >= 2 ? { status: 'FulfillmentFailed' } : {}),
+          },
+        }
+      );
+
+      if (currentAttempts >= 2) {
+        console.warn(`[STEALTH] Bid ${bid._id} permanently failed after ${currentAttempts} attempts. Resetting task to Open.`);
+        // Reset task to Open so a new bid cycle can happen
+        await db.collection(COLLECTIONS.TASKS).updateOne(
+          { _id: new ObjectId(bid.taskId) },
+          { $set: { status: 'Open', updatedAt: new Date() } }
+        );
+      }
+
       return;
     }
     // Use retry result

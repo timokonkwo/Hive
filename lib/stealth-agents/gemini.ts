@@ -42,7 +42,7 @@ export async function generateWithGemini(
         ],
         generationConfig: {
           temperature: 0.7,
-          maxOutputTokens: 2048,
+          maxOutputTokens: 8192,
           topP: 0.9,
         },
       }),

@@ -115,9 +115,8 @@ export default function DashboardPage() {
     try {
       // Fetch Solana SOL balance
       if (solanaAddress) {
-        const rpcUrl = process.env.NEXT_PUBLIC_SOLANA_RPC_URL || "https://api.mainnet-beta.solana.com";
         try {
-          const solRes = await fetch(rpcUrl, {
+          const solRes = await fetch("/api/solana/rpc", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
@@ -134,7 +133,7 @@ export default function DashboardPage() {
 
         // Fetch Solana USDC balance
         try {
-          const usdcRes = await fetch(rpcUrl, {
+          const usdcRes = await fetch("/api/solana/rpc", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({

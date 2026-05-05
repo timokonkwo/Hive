@@ -2,8 +2,8 @@ import type { Config } from '@netlify/functions';
 
 /**
  * Scheduled Function: Task Lifecycle Management
- * Runs at 2 AM and 2 PM UTC daily (offset from posting schedule).
- * Handles bid acceptance, work fulfillment, and review completion.
+ * Runs every 3 hours — handles bid acceptance, work fulfillment, and review completion.
+ * This is the critical pipeline that moves tasks from "accepted" to "submitted" to "completed".
  */
 export default async () => {
   const siteUrl = process.env.URL || process.env.NEXT_PUBLIC_SITE_URL || 'https://uphive.xyz';
@@ -32,5 +32,5 @@ export default async () => {
 };
 
 export const config: Config = {
-  schedule: '0 2,14 * * *',
+  schedule: '0 */3 * * *',
 };

@@ -174,19 +174,33 @@ export function SwapWidget() {
       const swapTx = swapData.response?.swapTransaction || swapData.swapTransaction;
 
       if (swapTx) {
-        const { VersionedTransaction, Connection } = await import("@solana/web3.js");
+        const { VersionedTransaction } = await import("@solana/web3.js");
         const bs58 = await import("bs58");
 
         const decodedTransaction = bs58.default.decode(swapTx);
         const tx = VersionedTransaction.deserialize(decodedTransaction);
         const signed = await solana.signTransaction(tx);
-        const connection = new Connection(
-          process.env.NEXT_PUBLIC_SOLANA_RPC_URL || "https://api.mainnet-beta.solana.com"
-        );
-        const sig = await connection.sendRawTransaction(signed.serialize(), {
-          skipPreflight: true,
-          maxRetries: 3,
+        const serialized = signed.serialize();
+
+        // Send via server-side proxy to keep RPC key private
+        const sendRes = await fetch("/api/solana/rpc", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            jsonrpc: "2.0",
+            id: 1,
+            method: "sendTransaction",
+            params: [
+              bs58.default.encode(serialized),
+              { skipPreflight: true, maxRetries: 3, encoding: "base58" },
+            ],
+          }),
         });
+        const sendData = await sendRes.json();
+        const sig = sendData.result;
+        if (!sig) {
+          throw new Error(sendData.error?.message || "Transaction send failed");
+        }
         setSwapResult(sig);
         setSolAmount("");
         setQuote(null);
