@@ -276,38 +276,163 @@ CRITICAL RULES:
 - Code deliverables must contain actual runnable code, not descriptions of code.
 - Text deliverables must use markdown formatting with headers, tables, and structure.`;
 
-  const responseText = await generateWithGemini(agent.workPersonality, prompt);
+  // Use 'fast' model (gemini-2.0-flash) for structured JSON output
+  // This responds in 3-8s instead of 30-40s with 2.5-flash's thinking
+  const responseText = await generateWithGemini(agent.workPersonality, prompt, 'fast');
 
-  // Parse the JSON response — handle potential markdown wrapping
+  return parseGeminiResponse(responseText, task, effectiveSpecs);
+}
+
+/**
+ * Parse Gemini's response into structured deliverables.
+ * Handles: clean JSON, markdown-wrapped JSON, truncated JSON, and raw text fallback.
+ */
+function parseGeminiResponse(
+  responseText: string,
+  task: any,
+  specs: any[]
+): { summary: string; deliverables: any[] } {
   let cleaned = responseText.trim();
-  // Strip markdown code fences if present
-  if (cleaned.startsWith('```')) {
+
+  // Strip markdown code fences (```json ... ``` or ``` ... ```)
+  const fenceMatch = cleaned.match(/```(?:json)?\s*([\s\S]*?)```/);
+  if (fenceMatch) {
+    cleaned = fenceMatch[1].trim();
+  } else if (cleaned.startsWith('```')) {
     cleaned = cleaned.replace(/^```(?:json)?\s*/, '').replace(/\s*```$/, '');
   }
 
+  // Attempt 1: Direct JSON parse
   try {
     const parsed = JSON.parse(cleaned);
-    return {
-      summary: parsed.summary || 'Work completed as specified.',
-      deliverables: Array.isArray(parsed.deliverables)
-        ? parsed.deliverables
-        : [{ specIndex: 0, type: 'text', label: 'Deliverable', content: parsed.summary || cleaned }],
-    };
+    if (parsed.summary && Array.isArray(parsed.deliverables)) {
+      console.log(`[STEALTH] Parsed ${parsed.deliverables.length} deliverable(s) from JSON`);
+      return { summary: parsed.summary, deliverables: parsed.deliverables };
+    }
   } catch {
-    // If JSON parsing fails, wrap the raw text as a single deliverable
-    console.warn('[STEALTH] Could not parse Gemini response as JSON, wrapping as text deliverable');
-    return {
-      summary: `Work completed for: ${task.title}`,
-      deliverables: [
-        {
-          specIndex: 0,
-          type: 'text',
-          label: 'Deliverable',
-          content: cleaned.slice(0, 5000),
-        },
-      ],
-    };
+    // Fall through to repair attempts
   }
+
+  // Attempt 2: Try to repair truncated JSON (common with token limits)
+  try {
+    let repaired = cleaned;
+    // Count open/close braces and brackets
+    const openBraces = (repaired.match(/{/g) || []).length;
+    const closeBraces = (repaired.match(/}/g) || []).length;
+    const openBrackets = (repaired.match(/\[/g) || []).length;
+    const closeBrackets = (repaired.match(/\]/g) || []).length;
+
+    // If truncated mid-string, close the string
+    const lastQuote = repaired.lastIndexOf('"');
+    const afterLastQuote = repaired.slice(lastQuote + 1).trim();
+    if (lastQuote > 0 && !afterLastQuote.startsWith(':') && !afterLastQuote.startsWith(',') && !afterLastQuote.startsWith('}') && !afterLastQuote.startsWith(']')) {
+      repaired = repaired.slice(0, lastQuote + 1);
+    }
+
+    // Close any unclosed structures
+    for (let i = 0; i < openBrackets - closeBrackets; i++) repaired += ']';
+    for (let i = 0; i < openBraces - closeBraces; i++) repaired += '}';
+
+    const parsed = JSON.parse(repaired);
+    if (parsed.summary && Array.isArray(parsed.deliverables) && parsed.deliverables.length > 0) {
+      console.log(`[STEALTH] Repaired truncated JSON, got ${parsed.deliverables.length} deliverable(s)`);
+      return { summary: parsed.summary, deliverables: parsed.deliverables };
+    }
+  } catch {
+    // Fall through to content extraction
+  }
+
+  // Attempt 3: Extract structured content from raw text
+  console.warn('[STEALTH] JSON parsing failed, extracting content from raw text');
+  return extractDeliverablesFromText(responseText, task, specs);
+}
+
+/**
+ * Extract deliverables from raw text when JSON parsing fails.
+ * Looks for code blocks, markdown sections, and structured content.
+ */
+function extractDeliverablesFromText(
+  rawText: string,
+  task: any,
+  specs: any[]
+): { summary: string; deliverables: any[] } {
+  const deliverables: any[] = [];
+
+  // Extract code blocks (```language ... ```)
+  const codeBlockRegex = /```(\w+)?\s*\n([\s\S]*?)```/g;
+  const codeBlocks: { language: string; content: string }[] = [];
+  let match;
+  while ((match = codeBlockRegex.exec(rawText)) !== null) {
+    const lang = match[1] || '';
+    const content = match[2].trim();
+    // Skip JSON blocks (those are failed response format, not actual code)
+    if (lang !== 'json' && content.length > 50) {
+      codeBlocks.push({ language: lang, content: `// language: ${lang}\n${content}` });
+    }
+  }
+
+  // Extract text content (everything outside code blocks)
+  let textContent = rawText
+    .replace(/```[\s\S]*?```/g, '') // Remove code blocks
+    .replace(/^[\s\S]*?"summary"\s*:\s*"[^"]*"/, '') // Remove JSON artifacts
+    .replace(/[{}[\]]/g, '') // Remove JSON brackets
+    .replace(/"specIndex"\s*:\s*\d+\s*,?/g, '') // Remove JSON fields
+    .replace(/"type"\s*:\s*"[^"]*"\s*,?/g, '')
+    .replace(/"label"\s*:\s*"[^"]*"\s*,?/g, '')
+    .replace(/"content"\s*:\s*/g, '')
+    .replace(/"deliverables"\s*:\s*/g, '')
+    .trim();
+
+  // Remove leading/trailing quotes from extracted text
+  if (textContent.startsWith('"')) textContent = textContent.slice(1);
+  if (textContent.endsWith('"')) textContent = textContent.slice(0, -1);
+  // Unescape JSON-encoded newlines
+  textContent = textContent.replace(/\\n/g, '\n').replace(/\\t/g, '\t').replace(/\\"/g, '"');
+
+  // Map extracted content to specs
+  let codeBlockIndex = 0;
+  for (let i = 0; i < specs.length; i++) {
+    const spec = specs[i];
+
+    if (spec.type === 'code' && codeBlockIndex < codeBlocks.length) {
+      deliverables.push({
+        specIndex: i,
+        type: 'code',
+        label: spec.label,
+        content: codeBlocks[codeBlockIndex].content,
+      });
+      codeBlockIndex++;
+    } else if (spec.type === 'code' && codeBlocks.length === 0) {
+      // No code blocks found, use text content as code (Gemini didn't format properly)
+      deliverables.push({
+        specIndex: i,
+        type: 'code',
+        label: spec.label,
+        content: `// Auto-extracted from response\n${textContent.slice(0, 3000)}`,
+      });
+    } else if (spec.type === 'text') {
+      deliverables.push({
+        specIndex: i,
+        type: 'text',
+        label: spec.label,
+        content: textContent.length > 20 ? textContent.slice(0, 5000) : `Work completed for: ${task.title}\n\n${rawText.slice(0, 3000)}`,
+      });
+    } else {
+      deliverables.push({
+        specIndex: i,
+        type: spec.type,
+        label: spec.label,
+        content: textContent.slice(0, 3000) || `Deliverable for: ${task.title}`,
+      });
+    }
+  }
+
+  // Generate a summary from the first 200 chars of text content
+  const summary = textContent.length > 20
+    ? textContent.replace(/[#*\-_]/g, '').trim().slice(0, 200)
+    : `Work completed for: ${task.title}`;
+
+  return { summary, deliverables };
 }
 
 /**
