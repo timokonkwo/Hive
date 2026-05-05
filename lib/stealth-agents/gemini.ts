@@ -8,10 +8,8 @@
 
 const GEMINI_API_BASE = 'https://generativelanguage.googleapis.com/v1beta/models';
 
-// 2.0 Flash: fast (3-8s), no thinking overhead, good for structured JSON output
-const MODEL_FAST = 'gemini-2.0-flash';
-// 2.5 Flash: slower (15-40s due to thinking), better for creative/nuanced text
-const MODEL_THINKING = 'gemini-2.5-flash';
+// Both use gemini-2.5-flash, but 'fast' disables thinking for speed
+const MODEL_ID = 'gemini-2.5-flash';
 
 export type GeminiModel = 'fast' | 'thinking';
 
@@ -20,7 +18,7 @@ export type GeminiModel = 'fast' | 'thinking';
  * 
  * @param systemPrompt - System/persona instructions
  * @param userPrompt - The actual task/request
- * @param model - 'fast' for structured output, 'thinking' for creative tasks
+ * @param model - 'fast' disables thinking (3-8s), 'thinking' enables it (15-40s)
  * @returns Generated text
  */
 export async function generateWithGemini(
@@ -33,13 +31,22 @@ export async function generateWithGemini(
     throw new Error('GEMINI_API_KEY is not set');
   }
 
-  const modelId = model === 'thinking' ? MODEL_THINKING : MODEL_FAST;
-  const apiUrl = `${GEMINI_API_BASE}/${modelId}:generateContent`;
+  const apiUrl = `${GEMINI_API_BASE}/${MODEL_ID}:generateContent`;
 
   const MAX_RETRIES = 2;
   const RETRY_DELAY_MS = 1500;
-  // Fast model responds in 3-8s, thinking model in 15-40s
   const TIMEOUT_MS = model === 'thinking' ? 30000 : 15000;
+
+  // Build generation config -- disable thinking for fast mode
+  const generationConfig: Record<string, any> = {
+    temperature: 0.7,
+    maxOutputTokens: 8192,
+    topP: 0.9,
+  };
+  if (model === 'fast') {
+    // thinkingBudget: 0 disables the thinking/reasoning step
+    generationConfig.thinkingConfig = { thinkingBudget: 0 };
+  }
 
   for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
     const controller = new AbortController();
@@ -60,11 +67,7 @@ export async function generateWithGemini(
               parts: [{ text: userPrompt }],
             },
           ],
-          generationConfig: {
-            temperature: 0.7,
-            maxOutputTokens: 8192,
-            topP: 0.9,
-          },
+          generationConfig,
         }),
       });
 
@@ -81,7 +84,7 @@ export async function generateWithGemini(
           continue;
         }
 
-        console.error(`[GEMINI] API error (${modelId}):`, status, errorText.slice(0, 300));
+        console.error(`[GEMINI] API error (${MODEL_ID}):`, status, errorText.slice(0, 300));
         throw new Error(`Gemini API error: ${status}`);
       }
 
@@ -89,7 +92,7 @@ export async function generateWithGemini(
       const text = data?.candidates?.[0]?.content?.parts?.[0]?.text;
 
       if (!text) {
-        console.error(`[GEMINI] No text in response (${modelId}):`, JSON.stringify(data).slice(0, 300));
+        console.error(`[GEMINI] No text in response (${MODEL_ID}):`, JSON.stringify(data).slice(0, 300));
         throw new Error('Gemini returned no text');
       }
 
@@ -97,9 +100,9 @@ export async function generateWithGemini(
     } catch (fetchErr: any) {
       clearTimeout(timeout);
       if (fetchErr.name === 'AbortError') {
-        console.warn(`[GEMINI] ${modelId} timed out on attempt ${attempt}/${MAX_RETRIES}`);
+        console.warn(`[GEMINI] ${MODEL_ID} timed out on attempt ${attempt}/${MAX_RETRIES}`);
         if (attempt < MAX_RETRIES) continue;
-        throw new Error(`Gemini API: ${modelId} request timed out`);
+        throw new Error(`Gemini API: ${MODEL_ID} request timed out`);
       }
       throw fetchErr;
     }
