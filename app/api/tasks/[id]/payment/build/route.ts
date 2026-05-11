@@ -3,6 +3,8 @@ import { getDb, COLLECTIONS } from '@/lib/db';
 import { ObjectId } from 'mongodb';
 import { buildUsdcTransferTransaction, getUsdcBalance, isValidSolanaAddress } from '@/lib/solana-pay';
 import { checkRateLimit, getClientIp, RATE_LIMITS } from '@/lib/rate-limit';
+import { authenticateClient } from '@/lib/client-auth';
+import { verifiedClientOwnsResource } from '@/lib/client-ownership';
 
 /**
  * POST /api/tasks/[id]/payment/build
@@ -29,12 +31,17 @@ export async function POST(
 
     const db = await getDb();
     const { id: taskId } = await params;
+    const verified = await authenticateClient(req);
+    if (!verified) {
+      return NextResponse.json(
+        { error: 'Authentication required. Please log in.' },
+        { status: 401 }
+      );
+    }
+
     const body = await req.json();
     const { clientAddress, clientSolanaAddress } = body;
 
-    if (!clientAddress) {
-      return NextResponse.json({ error: 'clientAddress is required.' }, { status: 400 });
-    }
     if (!clientSolanaAddress || !isValidSolanaAddress(clientSolanaAddress)) {
       return NextResponse.json({ error: 'A valid Solana wallet address is required.' }, { status: 400 });
     }
@@ -51,8 +58,7 @@ export async function POST(
       return NextResponse.json({ error: 'Task not found.' }, { status: 404 });
     }
 
-    // Only task poster can build payment
-    if (task.clientAddress?.toLowerCase() !== clientAddress.toLowerCase()) {
+    if (!verifiedClientOwnsResource(verified, task, clientAddress)) {
       return NextResponse.json({ error: 'Only the task poster can initiate payment.' }, { status: 403 });
     }
 

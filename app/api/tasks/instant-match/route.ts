@@ -171,6 +171,7 @@ export async function POST(request: NextRequest) {
       budgetAmount,
       status: 'In Progress',
       clientAddress: clientAddress || 'unknown',
+      clientPrivyUserId: verified.userId,
       clientName: displayName,
       assignedAgent: bestAgent.name,
       proposalsCount: 1,
@@ -206,7 +207,7 @@ export async function POST(request: NextRequest) {
     await db.collection(COLLECTIONS.ACTIVITY).insertOne({
       type: 'TaskCreated',
       taskId: taskResult.insertedId,
-      actorAddress: clientAddress || 'unknown',
+      actorAddress: verified.userId,
       actorName: displayName,
       metadata: { title, category, budget, instantMatch: true },
       createdAt: new Date(),

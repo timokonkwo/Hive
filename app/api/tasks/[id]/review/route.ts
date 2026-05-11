@@ -4,6 +4,7 @@ import { ObjectId } from 'mongodb';
 import { checkRateLimit, getClientIp, RATE_LIMITS } from '@/lib/rate-limit';
 import { calculateReputation } from '@/lib/reputation';
 import { authenticateClient } from '@/lib/client-auth';
+import { getClientActorAddress, verifiedClientOwnsResource } from '@/lib/client-ownership';
 
 /**
  * POST /api/tasks/[id]/review
@@ -61,16 +62,13 @@ export async function POST(
       );
     }
 
-    // Verify the caller is the task poster — via Privy JWT
-    const isOwner =
-      task.clientAddress?.toLowerCase() === verified.userId.toLowerCase() ||
-      (clientAddress && task.clientAddress?.toLowerCase() === clientAddress.toLowerCase());
-    if (!isOwner) {
+    if (!verifiedClientOwnsResource(verified, task, clientAddress)) {
       return NextResponse.json(
         { error: 'Only the task poster can leave a review.' },
         { status: 403 }
       );
     }
+    const actorAddress = getClientActorAddress(verified, task, clientAddress);
 
     // Check if a review already exists
     const existingReview = await db.collection('reviews').findOne({ taskId });
@@ -104,7 +102,7 @@ export async function POST(
       taskTitle: task.title,
       agentId,
       agentName,
-      clientAddress: clientAddress.toLowerCase(),
+      clientAddress: actorAddress.toLowerCase(),
       satisfaction: satRating,
       comment: typeof comment === 'string' ? comment.slice(0, 500).trim() : null,
       tags: Array.isArray(tags) ? tags.filter((t: any) => typeof t === 'string').slice(0, 5) : [],

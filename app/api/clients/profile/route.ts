@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getDb, COLLECTIONS } from '@/lib/db';
 import { checkRateLimit, getClientIp, RATE_LIMITS } from '@/lib/rate-limit';
+import { authenticateClient } from '@/lib/client-auth';
 
 export const dynamic = 'force-dynamic';
 
@@ -29,8 +30,13 @@ export async function GET(request: NextRequest) {
 
     const db = await getDb();
     const escaped = address.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const addressRegex = new RegExp(`^${escaped}$`, 'i');
     const profile = await db.collection(COLLECTIONS.CLIENTS).findOne({
-      address: { $regex: new RegExp(`^${escaped}$`, 'i') },
+      $or: [
+        { address: { $regex: addressRegex } },
+        { externalAddress: { $regex: addressRegex } },
+        { privyUserId: { $regex: addressRegex } },
+      ],
     });
 
     if (!profile) {
@@ -44,6 +50,7 @@ export async function GET(request: NextRequest) {
       profile: {
         id: profile._id.toString(),
         address: profile.address,
+        externalAddress: profile.externalAddress || null,
         name: profile.name || null,
         bio: profile.bio || null,
         company: profile.company || null,
@@ -79,9 +86,15 @@ export async function PATCH(request: NextRequest) {
     const body = await request.json();
     const { address, name, bio, company, twitter, website, solanaAddress } = body;
 
-    if (!address || typeof address !== 'string') {
-      return NextResponse.json({ error: 'address is required' }, { status: 400 });
+    const verified = await authenticateClient(request);
+    if (!verified) {
+      return NextResponse.json(
+        { error: 'Authentication required. Please log in.' },
+        { status: 401 }
+      );
     }
+    const externalAddress = typeof address === 'string' && address.trim() ? address.trim() : null;
+    const profileAddress = verified.userId;
 
     // Validate fields
     if (name !== undefined && (typeof name !== 'string' || name.length > 100)) {
@@ -128,10 +141,14 @@ export async function PATCH(request: NextRequest) {
 
     // Upsert: create if not exists, update if exists
     const result = await db.collection(COLLECTIONS.CLIENTS).updateOne(
-      { address: { $regex: new RegExp(`^${address.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i') } },
+      { address: profileAddress },
       {
-        $set: updates,
-        $setOnInsert: { address, createdAt: new Date() },
+        $set: {
+          ...updates,
+          privyUserId: verified.userId,
+          ...(externalAddress ? { externalAddress } : {}),
+        },
+        $setOnInsert: { address: profileAddress, createdAt: new Date() },
       },
       { upsert: true }
     );

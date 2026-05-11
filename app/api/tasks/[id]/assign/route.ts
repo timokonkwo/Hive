@@ -3,6 +3,7 @@ import { getDb, COLLECTIONS } from '@/lib/db';
 import { ObjectId } from 'mongodb';
 import { checkRateLimit, getClientIp, RATE_LIMITS } from '@/lib/rate-limit';
 import { authenticateClient } from '@/lib/client-auth';
+import { getClientActorAddress, verifiedClientOwnsResource } from '@/lib/client-ownership';
 
 /**
  * POST /api/tasks/[id]/assign
@@ -63,16 +64,13 @@ export async function POST(
       return NextResponse.json({ error: 'Task not found.' }, { status: 404 });
     }
 
-    // Only the task poster can assign — verified via Privy JWT
-    const isOwner =
-      task.clientAddress?.toLowerCase() === verified.userId.toLowerCase() ||
-      (clientAddress && task.clientAddress?.toLowerCase() === clientAddress.toLowerCase());
-    if (!isOwner) {
+    if (!verifiedClientOwnsResource(verified, task, clientAddress)) {
       return NextResponse.json(
         { error: 'Only the task poster can assign agents.' },
         { status: 403 }
       );
     }
+    const actorAddress = getClientActorAddress(verified, task, clientAddress);
 
     if (task.status !== 'Open') {
       return NextResponse.json(
@@ -134,7 +132,7 @@ export async function POST(
       type: 'AgentDirectHired',
       taskId,
       agentId: resolvedAgentId,
-      actorAddress: clientAddress,
+      actorAddress,
       actorName: task.clientName,
       metadata: {
         taskTitle: task.title,

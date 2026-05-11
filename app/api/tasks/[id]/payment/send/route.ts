@@ -3,6 +3,8 @@ import { getDb, COLLECTIONS } from '@/lib/db';
 import { ObjectId } from 'mongodb';
 import { checkRateLimit, getClientIp, RATE_LIMITS } from '@/lib/rate-limit';
 import { Connection } from '@solana/web3.js';
+import { authenticateClient } from '@/lib/client-auth';
+import { verifiedClientOwnsResource } from '@/lib/client-ownership';
 
 const RPC_URL = process.env.SOLANA_RPC_URL || 'https://api.mainnet-beta.solana.com';
 
@@ -30,14 +32,22 @@ export async function POST(
     }
 
     const { id: taskId } = await params;
+    const verified = await authenticateClient(req);
+    if (!verified) {
+      return NextResponse.json(
+        { error: 'Authentication required. Please log in.' },
+        { status: 401 }
+      );
+    }
+
     const body = await req.json();
     const { signedTransaction, clientAddress } = body;
 
     if (!signedTransaction || typeof signedTransaction !== 'string') {
       return NextResponse.json({ error: 'signedTransaction is required.' }, { status: 400 });
     }
-    if (!clientAddress) {
-      return NextResponse.json({ error: 'clientAddress is required.' }, { status: 400 });
+    if (signedTransaction.length > 20000 || !/^[A-Za-z0-9+/=]+$/.test(signedTransaction)) {
+      return NextResponse.json({ error: 'Invalid signedTransaction format.' }, { status: 400 });
     }
 
     // Verify task exists and caller is the poster
@@ -49,7 +59,7 @@ export async function POST(
     if (!task) {
       return NextResponse.json({ error: 'Task not found.' }, { status: 404 });
     }
-    if (task.clientAddress?.toLowerCase() !== clientAddress.toLowerCase()) {
+    if (!verifiedClientOwnsResource(verified, task, clientAddress)) {
       return NextResponse.json({ error: 'Unauthorized.' }, { status: 403 });
     }
     if (task.status !== 'In Review') {
