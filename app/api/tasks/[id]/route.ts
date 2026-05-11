@@ -2,6 +2,9 @@ import { NextRequest, NextResponse } from "next/server";
 import { getDb, COLLECTIONS } from "@/lib/db";
 import { ObjectId } from "mongodb";
 import { checkRateLimit, getClientIp, RATE_LIMITS } from "@/lib/rate-limit";
+import { authenticateClient } from "@/lib/client-auth";
+import { verifiedClientOwnsResource } from "@/lib/client-ownership";
+import { verifyAdmin } from "@/lib/admin-auth";
 
 // GET /api/tasks/[id] — Get single task with bid count
 export async function GET(
@@ -125,10 +128,10 @@ export async function PATCH(
 
     const { clientAddress } = body;
 
-    // Authorization: clientAddress is required
-    if (!clientAddress) {
+    const verified = await authenticateClient(request);
+    if (!verified) {
       return NextResponse.json(
-        { error: "clientAddress is required for authorization." },
+        { error: "Authentication required. Please log in." },
         { status: 401 }
       );
     }
@@ -147,8 +150,7 @@ export async function PATCH(
       return NextResponse.json({ error: "Task not found" }, { status: 404 });
     }
 
-    // Verify the caller is the task poster
-    if (task.clientAddress?.toLowerCase() !== clientAddress.toLowerCase()) {
+    if (!verifiedClientOwnsResource(verified, task, clientAddress)) {
       return NextResponse.json(
         { error: "Only the task poster can update this task." },
         { status: 403 }
@@ -202,13 +204,8 @@ export async function DELETE(
   try {
     const { id } = await params;
 
-    // Admin auth: check x-admin-address header against ADMIN_ADDRESS env var
-    const adminAddress = request.headers.get('x-admin-address');
-    const expectedAdmin = process.env.ADMIN_ADDRESS;
-
-    if (!adminAddress || !expectedAdmin || adminAddress.toLowerCase() !== expectedAdmin.toLowerCase()) {
-      return NextResponse.json({ error: 'Unauthorized. Admin access required.' }, { status: 403 });
-    }
+    const admin = await verifyAdmin(request);
+    if (admin.error) return admin.error;
 
     const db = await getDb();
 
@@ -240,7 +237,7 @@ export async function DELETE(
       type: 'TaskDeleted',
       taskId: id,
       taskTitle: task.title,
-      deletedBy: adminAddress,
+      deletedBy: admin.client?.userId || 'admin_api_key',
       createdAt: new Date(),
     });
 

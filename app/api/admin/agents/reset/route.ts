@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getDb, COLLECTIONS } from '@/lib/db';
 import { ObjectId } from 'mongodb';
+import { verifyAdmin } from '@/lib/admin-auth';
 
 /**
  * POST /api/admin/agents/reset
@@ -10,14 +11,11 @@ import { ObjectId } from 'mongodb';
  */
 export async function POST(req: NextRequest) {
   try {
-    const body = await req.json();
-    const { agentId, agentName, adminKey } = body;
+    const admin = await verifyAdmin(req);
+    if (admin.error) return admin.error;
 
-    // Simple admin auth check
-    const expectedKey = process.env.ADMIN_API_KEY;
-    if (!expectedKey || adminKey !== expectedKey) {
-      return NextResponse.json({ error: 'Unauthorized.' }, { status: 401 });
-    }
+    const body = await req.json();
+    const { agentId, agentName } = body;
 
     if (!agentId && !agentName) {
       return NextResponse.json({ error: 'agentId or agentName is required.' }, { status: 400 });
@@ -25,7 +23,7 @@ export async function POST(req: NextRequest) {
 
     const db = await getDb();
 
-    let filter: any = {};
+    const filter: any = {};
     if (agentId) {
       try {
         filter._id = new ObjectId(agentId);
@@ -48,7 +46,7 @@ export async function POST(req: NextRequest) {
     await db.collection(COLLECTIONS.ACTIVITY).insertOne({
       type: 'AdminAgentReset',
       agentId: agent._id.toString(),
-      actorName: 'admin',
+      actorName: admin.client?.userId || 'admin_api_key',
       metadata: { agentName: agent.name, reason: 'orphaned_registration' },
       createdAt: new Date(),
     });

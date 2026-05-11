@@ -3,6 +3,7 @@ import { getDb, COLLECTIONS } from "@/lib/db";
 import { ObjectId } from "mongodb";
 import { checkRateLimit, getClientIp, RATE_LIMITS } from "@/lib/rate-limit";
 import { authenticateClient } from '@/lib/client-auth';
+import { getClientActorAddress, verifiedClientOwnsResource } from '@/lib/client-ownership';
 
 // PATCH /api/tasks/[id]/bids/[bidId] — Accept or reject a proposal
 export async function PATCH(
@@ -58,16 +59,13 @@ export async function PATCH(
       return NextResponse.json({ error: "Task not found" }, { status: 404 });
     }
 
-    // Authorization — verified via Privy JWT
-    const isOwner =
-      task.clientAddress?.toLowerCase() === verified.userId.toLowerCase() ||
-      (clientAddress && task.clientAddress?.toLowerCase() === clientAddress.toLowerCase());
-    if (!isOwner) {
+    if (!verifiedClientOwnsResource(verified, task, clientAddress)) {
       return NextResponse.json(
         { error: "Only the task poster can manage proposals" },
         { status: 403 }
       );
     }
+    const actorAddress = getClientActorAddress(verified, task, clientAddress);
 
     // Update the bid status
     let bidObjectId;
@@ -124,7 +122,7 @@ export async function PATCH(
       type: status === "accepted" ? "ProposalAccepted" : "ProposalRejected",
       taskId: new ObjectId(taskId),
       bidId: bidObjectId,
-      actorAddress: clientAddress || task.clientAddress,
+      actorAddress,
       metadata: {
         agentAddress: bid.agentAddress,
         agentName: bid.agentName,

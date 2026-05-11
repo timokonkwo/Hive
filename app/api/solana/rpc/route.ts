@@ -18,7 +18,6 @@ const ALLOWED_METHODS = new Set([
   'getSignatureStatuses',
   'getTransaction',
   'getRecentBlockhash',
-  'sendTransaction',
 ]);
 
 export async function POST(req: NextRequest) {

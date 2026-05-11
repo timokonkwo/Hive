@@ -5,6 +5,7 @@ import { calculateReputation } from '@/lib/reputation';
 import { checkRateLimit, getClientIp, RATE_LIMITS } from '@/lib/rate-limit';
 import { verifyUsdcPayment } from '@/lib/solana-pay';
 import { authenticateClient } from '@/lib/client-auth';
+import { getClientActorAddress, verifiedClientOwnsResource } from '@/lib/client-ownership';
 
 // Solana tx signatures are 87-88 characters, base58 encoded
 const TX_SIGNATURE_REGEX = /^[1-9A-HJ-NP-Za-km-z]{87,88}$/;
@@ -59,14 +60,10 @@ export async function POST(
       return NextResponse.json({ error: 'Task not found.' }, { status: 404 });
     }
 
-    // Only the task poster can complete the task
-    // Check both the verified Privy user ID and the claimed clientAddress
-    const isOwner =
-      task.clientAddress?.toLowerCase() === verified.userId.toLowerCase() ||
-      (clientAddress && task.clientAddress?.toLowerCase() === clientAddress.toLowerCase());
-    if (!isOwner) {
+    if (!verifiedClientOwnsResource(verified, task, clientAddress)) {
       return NextResponse.json({ error: 'Only the task poster can complete this task.' }, { status: 403 });
     }
+    const actorAddress = getClientActorAddress(verified, task, clientAddress);
 
     // Task must be in "In Review" status
     if (task.status !== 'In Review') {
@@ -115,7 +112,7 @@ export async function POST(
         await db.collection('payment_signatures').insertOne({
           txSignature,
           taskId,
-          clientAddress: clientAddress.toLowerCase(),
+          clientAddress: actorAddress.toLowerCase(),
           status: 'pending',
           createdAt: now,
         });
@@ -163,10 +160,13 @@ export async function POST(
       }
 
       // Get client's Solana address — exact match first, then case-insensitive fallback
+      const lookupAddresses = [verified.userId, clientAddress, task.clientAddress].filter(
+        (value, index, arr): value is string => typeof value === 'string' && value.length > 0 && arr.indexOf(value) === index
+      );
       const client = await db.collection(COLLECTIONS.CLIENTS).findOne({
-        address: clientAddress,
-      }) || await db.collection(COLLECTIONS.CLIENTS).findOne({
-        address: { $regex: new RegExp(`^${clientAddress.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i') },
+        $or: lookupAddresses.map((address) => ({
+          address: { $regex: new RegExp(`^${address.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i') },
+        })),
       });
 
       const clientSolanaAddress = client?.solanaAddress;
@@ -258,7 +258,7 @@ export async function POST(
     await db.collection(COLLECTIONS.ACTIVITY).insertOne({
       type: 'TaskCompleted',
       taskId,
-      actorAddress: clientAddress,
+      actorAddress,
       metadata: {
         taskTitle: task.title,
         assignedAgent: task.assignedAgentName || task.assignedAgent,
@@ -287,7 +287,7 @@ export async function POST(
           taskTitle: task.title,
           agentId,
           agentName,
-          clientAddress: clientAddress.toLowerCase(),
+          clientAddress: actorAddress.toLowerCase(),
           satisfaction: satRating,
           comment: typeof comment === 'string' ? comment.slice(0, 500).trim() : null,
           tags: Array.isArray(tags) ? tags.filter((t: any) => typeof t === 'string').slice(0, 5) : [],

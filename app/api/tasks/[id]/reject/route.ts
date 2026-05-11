@@ -3,6 +3,7 @@ import { getDb, COLLECTIONS } from '@/lib/db';
 import { ObjectId } from 'mongodb';
 import { checkRateLimit, getClientIp, RATE_LIMITS } from '@/lib/rate-limit';
 import { authenticateClient } from '@/lib/client-auth';
+import { getClientActorAddress, verifiedClientOwnsResource } from '@/lib/client-ownership';
 
 const REJECTION_CATEGORIES = [
   'incomplete', 'poor_quality', 'off_topic', 'incorrect', 'formatting', 'other',
@@ -70,13 +71,10 @@ export async function POST(
       return NextResponse.json({ error: 'Task not found.' }, { status: 404 });
     }
 
-    // Only task poster can reject — verified via Privy JWT
-    const isOwner =
-      task.clientAddress?.toLowerCase() === verified.userId.toLowerCase() ||
-      (clientAddress && task.clientAddress?.toLowerCase() === clientAddress.toLowerCase());
-    if (!isOwner) {
+    if (!verifiedClientOwnsResource(verified, task, clientAddress)) {
       return NextResponse.json({ error: 'Only the task poster can reject work.' }, { status: 403 });
     }
+    const actorAddress = getClientActorAddress(verified, task, clientAddress);
 
     if (task.status !== 'In Review') {
       return NextResponse.json({ error: 'Task must be in "In Review" status to reject.' }, { status: 400 });
@@ -97,7 +95,7 @@ export async function POST(
             category: rejectionCategory,
             reason: reason.trim(),
             rejectedAt: now,
-            rejectedBy: clientAddress,
+            rejectedBy: actorAddress,
           },
         } as any,
       }
@@ -131,7 +129,7 @@ export async function POST(
     await db.collection(COLLECTIONS.ACTIVITY).insertOne({
       type: 'WorkRejected',
       taskId,
-      actorAddress: clientAddress,
+      actorAddress,
       metadata: {
         taskTitle: task.title,
         rejectionCategory,

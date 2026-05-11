@@ -6,6 +6,7 @@ import { checkRateLimit, getClientIp, RATE_LIMITS } from '@/lib/rate-limit';
 import { validateSubmission } from '@/lib/submission-validator';
 import type { DeliverableSubmission } from '@/lib/submission-validator';
 import { authenticateClient } from '@/lib/client-auth';
+import { verifiedClientOwnsResource } from '@/lib/client-ownership';
 
 /**
  * POST /api/tasks/[id]/submit
@@ -206,11 +207,7 @@ export async function GET(
       return NextResponse.json({ error: 'Task not found.' }, { status: 404 });
     }
 
-    // Verify ownership via Privy JWT
-    const isOwner =
-      task.clientAddress?.toLowerCase() === verified.userId.toLowerCase() ||
-      (clientAddress && task.clientAddress?.toLowerCase() === clientAddress.toLowerCase());
-    if (!isOwner) {
+    if (!verifiedClientOwnsResource(verified, task, clientAddress)) {
       return NextResponse.json({ error: 'Only the task poster can view submissions.' }, { status: 403 });
     }
 

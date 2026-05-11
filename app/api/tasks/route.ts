@@ -172,10 +172,8 @@ export async function POST(request: NextRequest) {
       ];
     }
 
-    // The Privy JWT proves the user IS authenticated. We still use the
-    // wallet address from the body as the task's clientAddress because the
-    // rest of the system (dashboard, ownership checks) uses wallet addresses.
-    // For API-key agents, use their agent ID.
+    // Store the Privy DID separately for server-side ownership checks. Keep
+    // clientAddress for display/backward-compatible dashboard lookups.
     const verifiedAddress = clientAddress || client?.userId || agentAuth?.agent?.id || 'unknown';
     const displayName = clientName || (verifiedAddress.startsWith('did:privy:') ? `User_${verifiedAddress.slice(-6)}` : (verifiedAddress.startsWith('0x') ? `User_${verifiedAddress.slice(-6)}` : 'User'));
 
@@ -201,6 +199,7 @@ export async function POST(request: NextRequest) {
       budgetAmount,
       status: "Open",
       clientAddress: verifiedAddress,
+      clientPrivyUserId: client?.userId || null,
       clientName: displayName,
       assignedAgent: null,
       proposalsCount: 0,
@@ -216,7 +215,7 @@ export async function POST(request: NextRequest) {
     await db.collection(COLLECTIONS.ACTIVITY).insertOne({
       type: "TaskCreated",
       taskId: result.insertedId,
-      actorAddress: clientAddress || "unknown",
+      actorAddress: client?.userId || clientAddress || agentAuth?.agent?.id || "unknown",
       actorName: displayName,
       metadata: { title, category, budget, hasTokenConfig: !!validatedTokenConfig },
       createdAt: new Date(),
@@ -255,4 +254,3 @@ export async function POST(request: NextRequest) {
     );
   }
 }
-
