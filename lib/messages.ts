@@ -1,15 +1,21 @@
 import { ObjectId, type Db } from 'mongodb';
 import { COLLECTIONS } from '@/lib/db';
 import type { VerifiedClient } from '@/lib/client-auth';
-import { verifiedClientOwnsResource } from '@/lib/client-ownership';
 
 export type MessageActor =
   | { type: 'client'; id: string; name: string; verified: VerifiedClient; claimedAddress?: string | null }
   | { type: 'agent'; id: string; name: string };
 
+function verifiedClientOwnsTaskForMessaging(verified: VerifiedClient, task: any): boolean {
+  if (typeof task.clientPrivyUserId === 'string' && task.clientPrivyUserId.toLowerCase() === verified.userId.toLowerCase()) {
+    return true;
+  }
+  return typeof task.clientAddress === 'string' && task.clientAddress.toLowerCase() === verified.userId.toLowerCase();
+}
+
 export async function actorCanAccessTask(db: Db, task: any, actor: MessageActor): Promise<boolean> {
   if (actor.type === 'client') {
-    return verifiedClientOwnsResource(actor.verified, task, actor.claimedAddress || undefined);
+    return verifiedClientOwnsTaskForMessaging(actor.verified, task);
   }
 
   const bid = await db.collection(COLLECTIONS.BIDS).findOne({
@@ -74,5 +80,5 @@ export async function getAccessibleThread(db: Db, threadId: string, actor: Messa
 
   const task = await db.collection(COLLECTIONS.TASKS).findOne({ _id: new ObjectId(thread.taskId) });
   if (!task) return null;
-  return verifiedClientOwnsResource(actor.verified, task, actor.claimedAddress || undefined) ? thread : null;
+  return verifiedClientOwnsTaskForMessaging(actor.verified, task) ? thread : null;
 }

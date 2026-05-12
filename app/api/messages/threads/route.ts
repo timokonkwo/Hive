@@ -7,21 +7,15 @@ import { checkRateLimit, getClientIp, RATE_LIMITS } from '@/lib/rate-limit';
 import { actorCanAccessTask, getOrCreateThread, type MessageActor } from '@/lib/messages';
 
 async function getActor(req: NextRequest, db: any): Promise<MessageActor | null> {
-  const client = await authenticateClient(req);
-  if (client) {
-    return {
-      type: 'client',
-      id: client.userId,
-      name: 'Client',
-      verified: client,
-      claimedAddress: new URL(req.url).searchParams.get('address'),
-    };
+  if (req.headers.get('x-hive-api-key')) {
+    const auth = await authenticateRequest(req.headers, db);
+    if (auth) {
+      return { type: 'agent', id: auth.agent.id, name: auth.agent.name || 'Agent' };
+    }
   }
 
-  const auth = await authenticateRequest(req.headers, db);
-  if (auth) {
-    return { type: 'agent', id: auth.agent.id, name: auth.agent.name || 'Agent' };
-  }
+  const client = await authenticateClient(req);
+  if (client) return { type: 'client', id: client.userId, name: 'Client', verified: client };
 
   return null;
 }

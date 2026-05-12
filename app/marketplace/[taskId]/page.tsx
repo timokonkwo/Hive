@@ -36,6 +36,7 @@ export default function TaskDetailsPage({ params }: { params: Promise<{ taskId: 
   const [messageDraft, setMessageDraft] = useState('');
   const [messagesLoading, setMessagesLoading] = useState(false);
   const [sendingMessage, setSendingMessage] = useState(false);
+  const [messageAgentId, setMessageAgentId] = useState<string | null>(null);
 
   // Payment flow state
   const [showPaymentModal, setShowPaymentModal] = useState(false);
@@ -78,6 +79,21 @@ export default function TaskDetailsPage({ params }: { params: Promise<{ taskId: 
       setAgentApiKey('');
     }
   }, []);
+
+  useEffect(() => {
+    if (!agentApiKey) {
+      setMessageAgentId(null);
+      return;
+    }
+
+    fetch('/api/agents/me', { headers: { 'x-hive-api-key': agentApiKey } })
+      .then((res) => res.ok ? res.json() : null)
+      .then((data) => setMessageAgentId(data?.agent?.id || null))
+      .catch(() => setMessageAgentId(null));
+  }, [agentApiKey]);
+
+  const agentHasProposed = !!messageAgentId && bids.some((bid) => bid.agentId === messageAgentId);
+  const canUseMessages = isTaskPoster || agentHasProposed;
 
   // Fetch task + bids from API
   useEffect(() => {
@@ -180,7 +196,7 @@ export default function TaskDetailsPage({ params }: { params: Promise<{ taskId: 
   }, [agentApiKey, authFetch, isTaskPoster, userAddress]);
 
   const loadMessages = useCallback(async () => {
-    if (!task || (!isTaskPoster && !agentApiKey)) return;
+    if (!task || !canUseMessages) return;
     setMessagesLoading(true);
     try {
       const threadsRes = await messageRequest(`/api/messages/threads?taskId=${taskId}`);
@@ -210,7 +226,7 @@ export default function TaskDetailsPage({ params }: { params: Promise<{ taskId: 
     } finally {
       setMessagesLoading(false);
     }
-  }, [agentApiKey, isTaskPoster, messageRequest, task, taskId]);
+  }, [canUseMessages, messageRequest, task, taskId]);
 
   useEffect(() => {
     loadMessages();
@@ -859,22 +875,29 @@ export default function TaskDetailsPage({ params }: { params: Promise<{ taskId: 
 	                </div>
 	                )}
 
-	                {(isTaskPoster || agentApiKey) && (
+	                {(canUseMessages || agentApiKey) && (
 	                <div>
 	                    <div className="flex items-center justify-between gap-3 mb-4">
 	                        <h3 className="text-sm font-bold font-mono uppercase tracking-widest text-zinc-400 flex items-center gap-2">
 	                            <MessageSquare size={14} className="text-emerald-500" /> Messages
 	                        </h3>
-	                        <button
-	                          type="button"
-	                          onClick={loadMessages}
-	                          className="text-[10px] font-mono uppercase tracking-widest text-zinc-500 hover:text-emerald-500 transition-colors"
-	                        >
-	                          Refresh
-	                        </button>
+	                        {canUseMessages && (
+	                          <button
+	                            type="button"
+	                            onClick={loadMessages}
+	                            className="text-[10px] font-mono uppercase tracking-widest text-zinc-500 hover:text-emerald-500 transition-colors"
+	                          >
+	                            Refresh
+	                          </button>
+	                        )}
 	                    </div>
 	                    <div className="bg-zinc-950/70 border border-zinc-800 rounded-sm p-4">
-	                        {messagesLoading ? (
+	                        {!canUseMessages ? (
+	                          <div className="text-center py-6 border border-dashed border-zinc-800 rounded-sm">
+	                            <MessageSquare className="w-7 h-7 text-zinc-700 mx-auto mb-2" />
+	                            <p className="text-zinc-600 text-xs font-mono">Messages unlock after your agent submits a proposal on this task.</p>
+	                          </div>
+	                        ) : messagesLoading ? (
 	                          <div className="flex items-center justify-center py-8 text-zinc-500 font-mono text-xs">
 	                            <Loader2 size={14} className="animate-spin mr-2" /> Loading messages
 	                          </div>
