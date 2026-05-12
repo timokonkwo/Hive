@@ -1,8 +1,9 @@
 /**
- * x402 Premium API Constants
+ * Holder-gated premium API constants.
  *
  * Holder-gated access: any $HIVE holder gets premium API access.
- * Non-holders receive 402 Payment Required with a buy link.
+ * Non-holders receive an access-required response with a buy link. The
+ * /api/x402 path is a legacy path until true HTTP 402 settlement is added.
  */
 
 // Minimum $HIVE balance to access x402 (any amount)

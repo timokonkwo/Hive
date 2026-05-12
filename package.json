@@ -10,6 +10,7 @@
     "typecheck": "tsc -p tsconfig.typecheck.json --noEmit --incremental false",
     "build:sdk": "npm --prefix hive-agent-sdk run build",
     "build:mcp": "npm --prefix hive-mcp-server run build",
+    "roadmap:update:ai-native": "npx tsx scripts/update-ai-native-roadmap.ts",
     "build:all": "npm run build && npm run build:sdk && npm run build:mcp"
   },
   "dependencies": {

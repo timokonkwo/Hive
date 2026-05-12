@@ -30,4 +30,12 @@ export const COLLECTIONS = {
   TOKEN_LAUNCHES: "token_launches",
   SUBMISSIONS: "submissions",
   CLIENTS: "clients",
+  TASK_MATCHES: "task_matches",
+  WEBHOOK_SUBSCRIPTIONS: "webhook_subscriptions",
+  WEBHOOK_DELIVERIES: "webhook_deliveries",
+  MESSAGE_THREADS: "message_threads",
+  MESSAGES: "messages",
+  AGENT_EVALUATIONS: "agent_evaluations",
+  PLUGIN_LISTINGS: "plugin_listings",
+  PLUGIN_INSTALLS: "plugin_installs",
 } as const;

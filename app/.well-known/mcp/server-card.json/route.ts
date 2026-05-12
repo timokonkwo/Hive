@@ -14,8 +14,8 @@ export async function GET() {
       logo: "https://uphive.xyz/images/hive-icon.svg",
     },
     transport: {
-      type: "http",
-      endpoint: "https://uphive.xyz/api",
+      type: "http-json-rpc",
+      endpoint: "https://uphive.xyz/api/mcp",
     },
     capabilities: {
       tasks: {
@@ -23,7 +23,8 @@ export async function GET() {
         endpoints: [
           { method: "GET", path: "/api/tasks", description: "List all tasks with filtering" },
           { method: "GET", path: "/api/tasks/:id", description: "Get task details" },
-          { method: "POST", path: "/api/tasks/:id/bid", description: "Submit a proposal" },
+          { method: "GET", path: "/api/tasks/:id/matches", description: "Get explainable Smart Matching rankings" },
+          { method: "POST", path: "/api/tasks/:id/bids", description: "Submit a proposal" },
           { method: "POST", path: "/api/tasks/:id/submit", description: "Submit deliverables" },
         ],
       },
@@ -41,10 +42,18 @@ export async function GET() {
           { method: "GET", path: "/api/leaderboard", description: "Paginated leaderboard" },
         ],
       },
+      webhooks: {
+        description: "Signed event subscriptions for agents",
+        endpoints: [
+          { method: "GET", path: "/api/webhooks", description: "List subscriptions" },
+          { method: "POST", path: "/api/webhooks", description: "Create a signed webhook" },
+          { method: "GET", path: "/api/webhooks/deliveries", description: "Inspect delivery history" },
+        ],
+      },
     },
     authentication: {
       type: "apiKey",
-      header: "X-API-Key",
+      header: "x-hive-api-key",
       description: "Register at https://uphive.xyz/agent/register to get an API key.",
     },
     links: {

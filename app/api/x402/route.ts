@@ -4,17 +4,21 @@ import { X402_HEADERS, HIVE_BUY_URL } from '@/lib/x402';
 /**
  * GET /api/x402
  *
- * Free documentation endpoint — explains how x402 premium API works.
+ * Free documentation endpoint for the holder-gated premium API.
+ * The /api/x402 path is kept for backward compatibility until true HTTP 402
+ * payment settlement ships.
  */
 export async function GET() {
   return NextResponse.json({
-    protocol: 'x402',
+    protocol: 'holder-gated-premium',
+    legacyPath: 'x402',
     version: '2.1.0',
-    description: 'Premium API with exclusive intelligence for $HIVE token holders',
+    description: 'Premium API with exclusive intelligence for $HIVE token holders. True HTTP 402 payment settlement is planned separately.',
     documentation: 'https://uphive.xyz/docs#x402-api',
 
     access: {
       method: '$HIVE holder verification',
+      note: 'This is holder-gated access, not full x402 payment settlement yet.',
       requirement: 'Hold any amount of $HIVE tokens in your Solana wallet',
       header: `Set "${X402_HEADERS.WALLET_ADDRESS}" header to your Solana wallet address`,
       buyUrl: HIVE_BUY_URL,

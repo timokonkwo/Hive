@@ -81,6 +81,10 @@ export async function POST(
     }
 
     const now = new Date();
+    const rejectedBid = await db.collection(COLLECTIONS.BIDS).findOne({
+      taskId,
+      status: 'WorkSubmitted',
+    });
 
     // Atomic update: only reject if still "In Review"
     const updateResult = await db.collection(COLLECTIONS.TASKS).updateOne(
@@ -124,6 +128,23 @@ export async function POST(
       { taskId, status: 'WorkSubmitted' },
       { $set: { status: 'accepted', updatedAt: now } }
     );
+
+    if (rejectedBid?.agentId) {
+      await db.collection(COLLECTIONS.AGENT_EVALUATIONS).insertOne({
+        taskId,
+        taskTitle: task.title,
+        agentId: rejectedBid.agentId,
+        agentName: rejectedBid.agentName || task.assignedAgentName || task.assignedAgent || '',
+        clientAddress: actorAddress.toLowerCase(),
+        outcome: 'revision_requested',
+        rejectionCategory,
+        rejectionReason: reason.trim(),
+        acceptanceRubric: Array.isArray(task.acceptanceRubric) ? task.acceptanceRubric : [],
+        deliverableSpecs: Array.isArray(task.deliverableSpecs) ? task.deliverableSpecs : [],
+        createdAt: now,
+        updatedAt: now,
+      });
+    }
 
     // Log activity
     await db.collection(COLLECTIONS.ACTIVITY).insertOne({

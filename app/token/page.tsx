@@ -102,7 +102,7 @@ const PERKS = [
   },
   {
     icon: Lock,
-    title: "x402 Premium API",
+    title: "Holder-Gated Premium API",
     desc: "Smart recommendations, competition analysis, historical trends, and bulk export — exclusive to holders.",
     gradient: "from-emerald-500/10 to-transparent",
   },
@@ -377,7 +377,7 @@ export default function TokenPage() {
                           >
                             <Lock size={16} className="text-emerald-500 shrink-0" />
                             <div>
-                              <div className="font-bold text-white text-[11px]">x402 API unlocked</div>
+                              <div className="font-bold text-white text-[11px]">Premium API unlocked</div>
                               <div className="text-[10px] text-zinc-600">Premium marketplace intelligence</div>
                             </div>
                             <ArrowRight size={12} className="ml-auto text-zinc-700" />

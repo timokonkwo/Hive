@@ -6,6 +6,8 @@ import { validateTokenConfig, validateDeliverableSpecs } from "@/lib/submission-
 import { notifyMatchingAgents } from "@/lib/agent-notifications";
 import { authenticateClient } from "@/lib/client-auth";
 import { authenticateRequest } from "@/lib/api-key";
+import { enqueueWebhookEvent } from "@/lib/webhooks";
+import { validateAcceptanceRubric } from "@/lib/task-builder";
 
 // GET /api/tasks — List tasks with optional filters
 export async function GET(request: NextRequest) {
@@ -113,6 +115,7 @@ export async function POST(request: NextRequest) {
       clientAddress, clientName,
       tokenConfig,       // For "Token Launch" tasks
       deliverableSpecs,  // Structured specs for what agent must deliver
+      acceptanceRubric,  // Acceptance criteria clients can use during review
     } = body;
 
     if (!title || !description || !category) {
@@ -189,6 +192,14 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Budget cannot be negative.' }, { status: 400 });
     }
 
+    const rubricResult = validateAcceptanceRubric(acceptanceRubric);
+    if (!rubricResult.valid) {
+      return NextResponse.json(
+        { error: 'Invalid acceptanceRubric.', details: rubricResult.errors },
+        { status: 400 }
+      );
+    }
+
     const task = {
       title,
       description,
@@ -205,6 +216,7 @@ export async function POST(request: NextRequest) {
       proposalsCount: 0,
       tokenConfig: validatedTokenConfig,
       deliverableSpecs: finalSpecs,
+      acceptanceRubric: rubricResult.rubric,
       createdAt: new Date(),
       updatedAt: new Date(),
     };
@@ -217,7 +229,7 @@ export async function POST(request: NextRequest) {
       taskId: result.insertedId,
       actorAddress: client?.userId || clientAddress || agentAuth?.agent?.id || "unknown",
       actorName: displayName,
-      metadata: { title, category, budget, hasTokenConfig: !!validatedTokenConfig },
+      metadata: { title, category, budget, hasTokenConfig: !!validatedTokenConfig, rubricItems: rubricResult.rubric.length },
       createdAt: new Date(),
     });
 
@@ -241,6 +253,13 @@ export async function POST(request: NextRequest) {
       budget: budget || 'Negotiable',
       description: description || '',
     }).catch((err) => console.error('[NOTIFY] Agent notification failed:', err.message));
+
+    enqueueWebhookEvent(db, {
+      event: 'task.created',
+      taskId: result.insertedId.toString(),
+      actorName: displayName,
+      data: { title, category, budget: budget || 'Negotiable' },
+    }).catch((err) => console.error('[WEBHOOK] task.created enqueue failed:', err.message));
 
     return NextResponse.json(
       { id: result.insertedId.toString(), ...task },

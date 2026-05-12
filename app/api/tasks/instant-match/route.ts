@@ -4,13 +4,16 @@ import { ObjectId } from 'mongodb';
 import { validateTokenConfig, validateDeliverableSpecs } from '@/lib/submission-validator';
 import { checkRateLimit, getClientIp, RATE_LIMITS } from '@/lib/rate-limit';
 import { authenticateClient } from '@/lib/client-auth';
+import { rankAgentsForTask } from '@/lib/smart-matching';
+import { enqueueWebhookEvent } from '@/lib/webhooks';
+import { validateAcceptanceRubric } from '@/lib/task-builder';
 
 /**
  * POST /api/tasks/instant-match
  * 
  * One-click task creation + auto-assignment.
- * Creates the task and immediately assigns the best available agent
- * in the task's category (by reputation, active in the last 7 days).
+ * Creates the task and immediately assigns the best available agent using
+ * the shared smart matching scorer.
  * 
  * Same body as POST /api/tasks, plus the instant match is implied.
  */
@@ -41,7 +44,7 @@ export async function POST(request: NextRequest) {
     const {
       title, description, category, tags, requirements, budget,
       clientAddress, clientName,
-      tokenConfig, deliverableSpecs,
+      tokenConfig, deliverableSpecs, acceptanceRubric,
     } = body;
 
     if (!title || !description || !category) {
@@ -109,55 +112,31 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Budget cannot be negative.' }, { status: 400 });
     }
 
-    // ─── Find best available agent ─────────────────────────────────
-
-    // Map task categories to agent capability keywords
-    const categoryCapabilities: Record<string, string[]> = {
-      'Development': ['web-development', 'code-review', 'smart-contract', 'solana', 'typescript'],
-      'Security': ['security-review', 'smart-contract-audit', 'code-review'],
-      'Token Launch': ['smart-contract', 'solana', 'web-development'],
-      'Research': ['research', 'data-analysis', 'market-research'],
-      'Analysis': ['data-analysis', 'market-research', 'reporting'],
-      'Content': ['content-creation', 'copywriting', 'research'],
-      'Legal': ['research', 'content-creation'],
-      'Translation': ['translation', 'content-creation'],
-      'Social': ['social-media', 'community-management'],
-      'Design': ['ui-design', 'graphic-design', 'branding'],
-      'Other': [],
-    };
-
-    const relevantCaps = categoryCapabilities[category] || [];
-
-    // Find active agents (active in the last 7 days OR verified)
-    const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
-
-    const agentQuery: Record<string, any> = {
-      status: 'active',
-      $or: [
-        { updatedAt: { $gte: sevenDaysAgo } },
-        { isVerified: true },
-      ],
-    };
-
-    if (relevantCaps.length > 0) {
-      agentQuery.capabilities = { $in: relevantCaps };
+    const rubricResult = validateAcceptanceRubric(acceptanceRubric);
+    if (!rubricResult.valid) {
+      return NextResponse.json(
+        { error: 'Invalid acceptanceRubric.', details: rubricResult.errors },
+        { status: 400 }
+      );
     }
 
-    const candidates = await db
-      .collection(COLLECTIONS.AGENTS)
-      .find(agentQuery)
-      .sort({ reputation: -1 }) // Best reputation first
-      .limit(5)
-      .toArray();
+    // ─── Find best available agent ─────────────────────────────────
 
-    if (candidates.length === 0) {
+    const matches = await rankAgentsForTask(
+      db,
+      { title, description, category, requirements, tags, budget, budgetAmount },
+      { limit: 5 }
+    );
+
+    if (matches.length === 0) {
       return NextResponse.json(
         { error: 'No agents available for this category. Try posting as a regular task.' },
         { status: 404 }
       );
     }
 
-    const bestAgent = candidates[0];
+    const bestMatch = matches[0];
+    const bestAgent = bestMatch.agent;
 
     // ─── Create the task ─────────────────────────────────────────
 
@@ -170,14 +149,18 @@ export async function POST(request: NextRequest) {
       budget: budget || 'Negotiable',
       budgetAmount,
       status: 'In Progress',
-      clientAddress: clientAddress || 'unknown',
+      clientAddress: clientAddress || verified.userId,
       clientPrivyUserId: verified.userId,
       clientName: displayName,
       assignedAgent: bestAgent.name,
+      assignedAgentId: bestAgent._id.toString(),
       proposalsCount: 1,
       tokenConfig: validatedTokenConfig,
       deliverableSpecs: finalSpecs,
+      acceptanceRubric: rubricResult.rubric,
       instantMatch: true,
+      matchScore: bestMatch.score,
+      matchConfidence: bestMatch.confidence,
       createdAt: new Date(),
       updatedAt: new Date(),
     };
@@ -194,13 +177,39 @@ export async function POST(request: NextRequest) {
       agentAddress: bestAgent.solanaAddress || null,
       amount: budget || 'Negotiable',
       timeEstimate: '2-4 days',
-      coverLetter: `Matched automatically by Hive. ${bestAgent.name} is the highest-rated agent for ${category} tasks.`,
+      coverLetter: `Matched automatically by Hive with ${bestMatch.confidence} confidence (${bestMatch.score}/100). ${bestMatch.reasons.join(' ')}`,
       status: 'accepted',
       autoMatched: true,
+      matchScore: bestMatch.score,
+      matchReasons: bestMatch.reasons,
       createdAt: new Date(),
     };
 
     await db.collection(COLLECTIONS.BIDS).insertOne(bid);
+
+    await db.collection(COLLECTIONS.TASK_MATCHES).updateOne(
+      { taskId },
+      {
+        $set: {
+          taskId,
+          category,
+          matches: matches.map(({ agent, ...match }) => ({
+            ...match,
+            agent: {
+              id: match.agentId,
+              name: match.agentName,
+              reputation: agent.reputation || 0,
+              capabilities: agent.capabilities || [],
+              isVerified: !!agent.isVerified,
+            },
+          })),
+          selectedAgentId: bestAgent._id.toString(),
+          updatedAt: new Date(),
+        },
+        $setOnInsert: { createdAt: new Date() },
+      },
+      { upsert: true }
+    );
 
     // ─── Log activity ────────────────────────────────────────────
 
@@ -209,7 +218,7 @@ export async function POST(request: NextRequest) {
       taskId: taskResult.insertedId,
       actorAddress: verified.userId,
       actorName: displayName,
-      metadata: { title, category, budget, instantMatch: true },
+      metadata: { title, category, budget, instantMatch: true, rubricItems: rubricResult.rubric.length },
       createdAt: new Date(),
     });
 
@@ -226,6 +235,21 @@ export async function POST(request: NextRequest) {
       createdAt: new Date(),
     });
 
+    enqueueWebhookEvent(db, {
+      event: 'task.created',
+      taskId,
+      actorName: displayName,
+      data: { title, category, budget, instantMatch: true },
+    }).catch((err) => console.error('[WEBHOOK] task.created enqueue failed:', err.message));
+
+    enqueueWebhookEvent(db, {
+      event: 'bid.accepted',
+      taskId,
+      agentId: bestAgent._id.toString(),
+      actorName: bestAgent.name,
+      data: { taskTitle: title, matchScore: bestMatch.score, instantMatch: true },
+    }).catch((err) => console.error('[WEBHOOK] bid.accepted enqueue failed:', err.message));
+
     return NextResponse.json(
       {
         id: taskId,
@@ -233,7 +257,10 @@ export async function POST(request: NextRequest) {
         assignedAgentId: bestAgent._id.toString(),
         assignedAgentName: bestAgent.name,
         assignedAgentReputation: bestAgent.reputation || 0,
-        message: `Task created and instantly assigned to ${bestAgent.name} (reputation: ${bestAgent.reputation || 0}).`,
+        matchScore: bestMatch.score,
+        matchConfidence: bestMatch.confidence,
+        matchReasons: bestMatch.reasons,
+        message: `Task created and instantly assigned to ${bestAgent.name} (${bestMatch.score}/100 match, ${bestMatch.confidence} confidence).`,
       },
       { status: 201 }
     );

@@ -22,5 +22,8 @@
 [functions."scheduled-agent-fees"]
   timeout = 60
 
+[functions."scheduled-webhooks"]
+  timeout = 60
+
 [[plugins]]
   package = "@netlify/plugin-nextjs"

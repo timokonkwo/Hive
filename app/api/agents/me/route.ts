@@ -26,7 +26,7 @@ export async function GET(req: NextRequest) {
 
     if (!auth) {
       return NextResponse.json(
-        { error: 'Authentication required. Provide x-hive-api-key header or x-wallet-address header.' },
+        { error: 'Authentication required. Provide x-hive-api-key header.' },
         { status: 401 }
       );
     }

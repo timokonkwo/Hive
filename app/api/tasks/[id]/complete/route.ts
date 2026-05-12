@@ -6,6 +6,7 @@ import { checkRateLimit, getClientIp, RATE_LIMITS } from '@/lib/rate-limit';
 import { verifyUsdcPayment } from '@/lib/solana-pay';
 import { authenticateClient } from '@/lib/client-auth';
 import { getClientActorAddress, verifiedClientOwnsResource } from '@/lib/client-ownership';
+import { enqueueWebhookEvent } from '@/lib/webhooks';
 
 // Solana tx signatures are 87-88 characters, base58 encoded
 const TX_SIGNATURE_REGEX = /^[1-9A-HJ-NP-Za-km-z]{87,88}$/;
@@ -275,12 +276,36 @@ export async function POST(
       taskId,
       status: 'Completed',
     });
-    const agentId = completionBid?.agentId;
-    const agentName = completionBid?.agentName || task.assignedAgentName || '';
+	    const agentId = completionBid?.agentId;
+	    const agentName = completionBid?.agentName || task.assignedAgentName || '';
+	    const satRating = parseInt(satisfaction);
 
-    // Store review if satisfaction provided (1-5)
-    const satRating = parseInt(satisfaction);
-    if (agentId && satRating >= 1 && satRating <= 5) {
+	    if (agentId) {
+	      await db.collection(COLLECTIONS.AGENT_EVALUATIONS).updateOne(
+	        { taskId, agentId },
+	        {
+	          $set: {
+	            taskId,
+	            taskTitle: task.title,
+	            agentId,
+	            agentName,
+	            clientAddress: actorAddress.toLowerCase(),
+	            outcome: 'completed',
+	            satisfaction: satRating >= 1 && satRating <= 5 ? satRating : null,
+	            comment: typeof comment === 'string' ? comment.slice(0, 500).trim() : null,
+	            acceptanceRubric: Array.isArray(task.acceptanceRubric) ? task.acceptanceRubric : [],
+	            deliverableSpecs: Array.isArray(task.deliverableSpecs) ? task.deliverableSpecs : [],
+	            completedAt: now,
+	            updatedAt: now,
+	          },
+	          $setOnInsert: { createdAt: now },
+	        },
+	        { upsert: true }
+	      );
+	    }
+
+	    // Store review if satisfaction provided (1-5)
+	    if (agentId && satRating >= 1 && satRating <= 5) {
       try {
         await db.collection('reviews').insertOne({
           taskId,
@@ -342,6 +367,34 @@ export async function POST(
       } catch (repErr) {
         console.error('[HIVE] Reputation update error:', repErr);
       }
+    }
+
+    enqueueWebhookEvent(db, {
+      event: 'task.completed',
+      taskId,
+      agentId,
+      actorName: agentName,
+      data: {
+        taskTitle: task.title,
+        paid: paymentVerified,
+        paidAmount: paymentVerified ? paymentDetails.paidAmount : null,
+      },
+    }).catch((err) => console.error('[WEBHOOK] task.completed enqueue failed:', err.message));
+
+    if (paymentVerified) {
+      enqueueWebhookEvent(db, {
+        event: 'payment.sent',
+        taskId,
+        agentId,
+        actorName: agentName,
+        data: {
+          taskTitle: task.title,
+          paidAmount: paymentDetails.paidAmount,
+          paymentTxSignature: txSignature,
+          paymentChain: 'solana',
+          paymentToken: 'USDC',
+        },
+      }).catch((err) => console.error('[WEBHOOK] payment.sent enqueue failed:', err.message));
     }
 
     return NextResponse.json({

@@ -596,13 +596,13 @@ export default function DashboardPage() {
                 </ul>
               </div>
 
-              {/* x402 badge */}
+              {/* Premium API badge */}
               <Link
                 href="/docs#x402-api"
                 className="flex items-center gap-2 px-3 py-2.5 bg-emerald-500/5 border border-emerald-500/20 rounded text-[11px] text-emerald-400 hover:bg-emerald-500/10 transition-colors"
               >
                 <Lock size={12} />
-                <span className="font-bold">x402 Premium API</span>
+                <span className="font-bold">Holder-Gated Premium API</span>
                 <span className="text-emerald-600 ml-auto">Unlocked</span>
               </Link>
             </div>
