@@ -173,10 +173,20 @@ export default function TokenPage() {
   const resultTier = result?.tierInfo ? TIER_CARDS.find(t => t.id === result.tierInfo!.id) : null;
 
   return (
-    <div className="min-h-screen bg-[#020202] text-white font-sans selection:bg-emerald-500 selection:text-black">
+    <div className="min-h-screen bg-[#020202] text-white font-sans selection:bg-emerald-500 selection:text-black relative overflow-x-hidden">
+      {/* Subtle Ambient Dot Grid */}
+      <div 
+        className="absolute inset-0 pointer-events-none z-0" 
+        style={{
+          backgroundImage: 'radial-gradient(rgba(255, 255, 255, 0.1) 1px, transparent 1px)',
+          backgroundSize: '32px 32px',
+          maskImage: 'radial-gradient(circle at center 200px, black, transparent 70%)',
+          WebkitMaskImage: 'radial-gradient(circle at center 200px, black, transparent 70%)'
+        }}
+      />
       <Navbar />
 
-      <main className="pt-28 pb-20">
+      <main className="pt-28 pb-20 relative z-10">
         <div className="max-w-6xl mx-auto px-4 md:px-6">
 
           {/* Hero Section */}

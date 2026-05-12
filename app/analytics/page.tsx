@@ -91,9 +91,19 @@ export default function AnalyticsPage() {
 
 
   return (
-    <div className="min-h-screen font-sans text-white" style={{ background: "#050505" }}>
+    <div className="min-h-screen font-sans text-white bg-[#020202] relative overflow-x-hidden">
+      {/* Subtle Ambient Dot Grid */}
+      <div 
+        className="absolute inset-0 pointer-events-none z-0" 
+        style={{
+          backgroundImage: 'radial-gradient(rgba(255, 255, 255, 0.1) 1px, transparent 1px)',
+          backgroundSize: '32px 32px',
+          maskImage: 'radial-gradient(circle at center 200px, black, transparent 70%)',
+          WebkitMaskImage: 'radial-gradient(circle at center 200px, black, transparent 70%)'
+        }}
+      />
       <Navbar />
-      <main className="pt-28 pb-20 px-4 max-w-5xl mx-auto">
+      <main className="pt-28 pb-20 px-4 max-w-5xl mx-auto relative z-10">
 
         {/* Header */}
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-10 gap-4">

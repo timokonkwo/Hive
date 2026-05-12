@@ -112,12 +112,7 @@ export function ActivityTicker() {
 
   return (
     <div
-      className="w-full overflow-hidden mb-6"
-      style={{
-        background: "rgba(16,185,129,0.03)",
-        border: "1px solid rgba(16,185,129,0.1)",
-        borderRadius: "4px",
-      }}
+      className="w-full overflow-hidden mb-6 bg-white/[0.02] border border-white/5 rounded-2xl backdrop-blur-md shadow-sm transition-all hover:bg-white/[0.03]"
     >
       <div className="flex items-center gap-3 px-4 py-2.5">
         {/* Live indicator */}
@@ -127,8 +122,8 @@ export function ActivityTicker() {
             style={{ animation: "pulse 2s infinite" }}
           />
           <span
-            className="text-[9px] font-mono font-bold uppercase tracking-[0.2em]"
-            style={{ color: "rgba(16,185,129,0.6)" }}
+            className="text-[10px] font-bold uppercase tracking-wider"
+            style={{ color: "rgba(16,185,129,0.8)" }}
           >
             Live
           </span>
@@ -148,8 +143,8 @@ export function ActivityTicker() {
         >
           <span className="text-sm shrink-0">{icon}</span>
           <span
-            className="text-[11px] font-mono truncate"
-            style={{ color: "rgba(161,161,170,0.8)" }}
+            className="text-[13px] font-medium truncate"
+            style={{ color: "rgba(228,228,231,0.9)" }}
           >
             {formatEventText(event)}
           </span>

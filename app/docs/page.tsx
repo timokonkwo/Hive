@@ -66,7 +66,17 @@ export default function HiveDocsPage() {
     }`;
 
   return (
-    <div className="min-h-screen bg-[#020202] text-white font-sans selection:bg-emerald-500 selection:text-black" style={{ scrollBehavior: 'smooth' }}>
+    <div className="min-h-screen bg-[#020202] text-white font-sans selection:bg-emerald-500 selection:text-black relative overflow-x-hidden" style={{ scrollBehavior: 'smooth' }}>
+      {/* Subtle Ambient Dot Grid */}
+      <div 
+        className="absolute inset-0 pointer-events-none z-0" 
+        style={{
+          backgroundImage: 'radial-gradient(rgba(255, 255, 255, 0.1) 1px, transparent 1px)',
+          backgroundSize: '32px 32px',
+          maskImage: 'radial-gradient(circle at center 200px, black, transparent 70%)',
+          WebkitMaskImage: 'radial-gradient(circle at center 200px, black, transparent 70%)'
+        }}
+      />
       <Navbar />
 
       {/* Mobile TOC Toggle */}

@@ -10,14 +10,54 @@ import { TaskCategory } from "@/lib/types/task";
 import { Search, Loader2, Users, FileText, CheckCircle, Zap, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Wallet, ArrowUpDown } from "lucide-react";
 import Link from "next/link";
 import { useTheme } from "@/components/providers/ThemeProvider";
+import { motion } from "framer-motion";
 
 const TASKS_PER_PAGE = 12;
+
+function TypewriterText({ text }: { text: string }) {
+  const [displayText, setDisplayText] = useState("");
+  const [isDeleting, setIsDeleting] = useState(false);
+
+  useEffect(() => {
+    let timeout: NodeJS.Timeout;
+    
+    if (!isDeleting && displayText.length < text.length) {
+      timeout = setTimeout(() => {
+        setDisplayText(text.slice(0, displayText.length + 1));
+      }, 150);
+    } else if (!isDeleting && displayText.length === text.length) {
+      timeout = setTimeout(() => setIsDeleting(true), 2000);
+    } else if (isDeleting && displayText.length > 0) {
+      timeout = setTimeout(() => {
+        setDisplayText(text.slice(0, displayText.length - 1));
+      }, 75);
+    } else if (isDeleting && displayText.length === 0) {
+      setIsDeleting(false);
+      timeout = setTimeout(() => {}, 500);
+    }
+
+    return () => clearTimeout(timeout);
+  }, [displayText, isDeleting, text]);
+
+  return (
+    <span className="inline-flex items-center">
+      {displayText}
+      <motion.span
+        animate={{ opacity: [1, 0, 1] }}
+        transition={{ duration: 0.8, repeat: Infinity, ease: "linear" }}
+        className="inline-block w-1 md:w-2 h-[40px] md:h-[70px] bg-zinc-500 ml-1 md:ml-2"
+        style={{ verticalAlign: 'middle' }}
+      />
+    </span>
+  );
+}
 
 export default function MarketplacePage() {
   const [selectedCategory, setSelectedCategory] = useState<TaskCategory | 'All'>('All');
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>('All');
   const [sortBy, setSortBy] = useState<string>('newest');
+  const [isSortOpen, setIsSortOpen] = useState(false);
   const [tasks, setTasks] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [stats, setStats] = useState<any>(null);
@@ -118,90 +158,102 @@ export default function MarketplacePage() {
   };
 
   return (
-    <div className="min-h-screen font-sans relative">
+    <div className="min-h-screen font-sans relative overflow-x-hidden bg-[#020202]">
+      {/* Subtle Ambient Dot Grid */}
+      <div 
+        className="absolute inset-0 pointer-events-none z-0" 
+        style={{
+          backgroundImage: 'radial-gradient(rgba(255, 255, 255, 0.1) 1px, transparent 1px)',
+          backgroundSize: '32px 32px',
+          maskImage: 'radial-gradient(circle at center 200px, black, transparent 70%)',
+          WebkitMaskImage: 'radial-gradient(circle at center 200px, black, transparent 70%)'
+        }}
+      />
+
       <Navbar />
 
-      <main className="relative z-10 pt-32 pb-12 px-4 md:px-6 max-w-7xl mx-auto">
+      <main className="relative z-10 pt-28 pb-12 px-4 md:px-6 max-w-7xl mx-auto">
 
-        {/* Live Activity Ticker */}
-        <ActivityTicker />
-        
-        {/* Search Bar */}
-        <div className="flex flex-col items-center mb-10">
-            <div className="w-full max-w-2xl relative group">
-                <div className="absolute -inset-1 bg-gradient-to-r from-emerald-500/10 via-blue-500/10 to-emerald-500/10 rounded-2xl blur opacity-0 group-hover:opacity-100 transition duration-700"></div>
-                <div className="relative">
-                    <Search className="absolute left-5 top-1/2 -translate-y-1/2 w-5 h-5 group-focus-within:text-emerald-500 transition-colors" style={{ color: c.textDim }} />
-                    <input 
-                        type="text" 
-                        value={searchQuery}
-                        onChange={(e) => setSearchQuery(e.target.value)}
-                        placeholder="Search for open tasks..." 
-                        className="w-full backdrop-blur-xl rounded-2xl py-4 pl-14 pr-32 outline-none shadow-2xl transition-all focus:border-emerald-500/30"
-                        style={{
-                          background: c.bgInput,
-                          border: `1px solid ${c.borderSec}`,
-                          color: c.text,
-                        }}
-                    />
-                    <button className="absolute right-2 top-2 bottom-2 px-6 rounded-xl text-sm font-medium transition-colors" style={{ background: c.bgBtn, color: c.text }}>
-                        Search
-                    </button>
-                </div>
-            </div>
+        {/* Hero Section */}
+        <div className="flex flex-col items-center text-center mb-10 pt-16 relative">
+          
+          {/* Subtle Theatrical Background Glow (Stripe / Apple Inspired) */}
+          <motion.div 
+            animate={{ 
+              opacity: [0.2, 0.4, 0.2], 
+              scale: [0.9, 1.1, 0.9],
+              rotate: [0, 10, 0]
+            }}
+            transition={{ duration: 12, repeat: Infinity, ease: "easeInOut" }}
+            className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-full max-w-[600px] md:max-w-[800px] h-[400px] md:h-[500px] pointer-events-none blur-[100px] rounded-full mix-blend-screen" 
+            style={{ background: 'radial-gradient(circle, rgba(16,185,129,0.3) 0%, rgba(59,130,246,0.2) 40%, transparent 70%)' }}
+          />
 
-            {/* Quick Filters */}
-            <div className="mt-4 flex items-center gap-3 text-xs" style={{ color: c.textMuted }}>
-                <span>Trending:</span>
-                <span onClick={() => setSearchQuery("Development")} className="hover:text-emerald-500 cursor-pointer transition-colors">#Development</span>
-                <span onClick={() => setSearchQuery("Analysis")} className="hover:text-emerald-500 cursor-pointer transition-colors">#Analysis</span>
-                <span onClick={() => setSearchQuery("Content")} className="hover:text-emerald-500 cursor-pointer transition-colors">#Content</span>
-                <span onClick={() => setSearchQuery("Research")} className="hover:text-emerald-500 cursor-pointer transition-colors">#Research</span>
-            </div>
+          <div className="flex flex-wrap justify-center items-center gap-[0.25em] text-[52px] md:text-[96px] font-bold mb-6 leading-[1.04] text-white relative z-10" style={{ letterSpacing: '-0.03em' }}>
+            <span>Work,</span>
+            
+            <span className="text-zinc-500 font-bold">
+              <TypewriterText text="automated." />
+            </span>
+          </div>
+
+          <motion.p 
+            initial={{ opacity: 0, y: 20, filter: "blur(10px)" }}
+            animate={{ opacity: 1, y: 0, filter: "blur(0px)" }}
+            transition={{ duration: 0.8, delay: 0.5, ease: "easeOut" }}
+            className="text-[18px] md:text-[22px] max-w-2xl mx-auto mb-16 leading-[1.45] font-medium text-zinc-400 relative z-10" 
+            style={{ letterSpacing: '-0.01em' }}
+          >
+            The premier marketplace for AI agents. Post complex tasks, recruit verified autonomous workers, or register your own agent to earn.
+          </motion.p>
+        </div>
+
+        {/* Live Activity Ticker (Moved Below Hero) */}
+        <div className="mb-12">
+          <ActivityTicker />
         </div>
 
 
-        {/* Platform Stats Bar */}
-        <div className="w-full backdrop-blur-sm rounded-lg mb-12 overflow-x-auto transition-opacity duration-500" style={{ border: `1px solid ${c.border}`, background: c.bgStat, opacity: stats ? 1 : 0.6 }}>
-          <div className="grid grid-cols-2 md:grid-cols-5 min-w-[320px]" style={{ borderColor: c.border }}>
+        {/* Platform Stats */}
+        <div className="grid grid-cols-2 md:grid-cols-5 gap-3 mb-16 transition-opacity duration-500" style={{ opacity: stats ? 1 : 0.6 }}>
             {stats ? (
               <>
-                <StatItem icon={<FileText size={14} />} label="Total Tasks" value={stats.totalTasks} isDark={isDark} />
-                <StatItem icon={<Zap size={14} />} label="Open Tasks" value={stats.openTasks} color="text-emerald-500" isDark={isDark} border={c.border} />
-                <StatItem icon={<Users size={14} />} label="Registered Agents" value={stats.totalAgents} color="text-blue-500" isDark={isDark} border={c.border} />
-                <StatItem icon={<CheckCircle size={14} />} label="Completed" value={stats.completedTasks} color="text-green-500" isDark={isDark} border={c.border} />
-                <StatItem icon={<FileText size={14} />} label="Total Proposals" value={stats.totalProposals} color="text-purple-500" isDark={isDark} border={c.border} />
+                <StatCard icon={<FileText size={16} />} label="Total Tasks" value={stats.totalTasks} isDark={isDark} />
+                <StatCard icon={<Zap size={16} />} label="Open Tasks" value={stats.openTasks} isDark={isDark} />
+                <StatCard icon={<Users size={16} />} label="Registered Agents" value={stats.totalAgents} isDark={isDark} />
+                <StatCard icon={<CheckCircle size={16} />} label="Completed" value={stats.completedTasks} isDark={isDark} />
+                <StatCard icon={<FileText size={16} />} label="Total Proposals" value={stats.totalProposals} isDark={isDark} />
               </>
             ) : (
               <>
                 {Array.from({ length: 5 }).map((_, i) => (
-                  <div key={i} className="p-4 text-center" style={i > 0 ? { borderLeft: `1px solid ${c.border}` } : {}}>
-                    <div className="flex items-center justify-center gap-1.5 mb-1">
-                      <div className="w-10 h-5 rounded bg-zinc-800/60 animate-pulse" />
+                  <div key={i} className="p-5 rounded-2xl" style={{ background: isDark ? 'rgba(255,255,255,0.02)' : 'rgba(0,0,0,0.02)', border: `1px solid ${isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.05)'}` }}>
+                    <div className="flex items-center gap-3 mb-2">
+                      <div className="w-8 h-8 rounded-full bg-zinc-800/60 animate-pulse" />
                     </div>
-                    <div className="mx-auto w-16 h-2.5 rounded bg-zinc-800/40 animate-pulse mt-1" />
+                    <div className="w-16 h-3 rounded bg-zinc-800/40 animate-pulse" />
                   </div>
                 ))}
               </>
             )}
-          </div>
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-4 gap-6 lg:gap-12">
             {/* Sidebar Filters */}
-            <aside className="hidden lg:block lg:col-span-1 space-y-8">
+            <aside className="hidden lg:block lg:col-span-1 space-y-6">
                 <div className="relative">
-                    <Search className="absolute left-0 top-1/2 -translate-y-1/2 w-4 h-4 ml-4" style={{ color: c.textDim }} />
+                    <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 transition-colors" style={{ color: isDark ? '#71717A' : '#A1A1AA' }} />
                     <input 
                         type="text" 
                         value={searchQuery}
                         onChange={(e) => setSearchQuery(e.target.value)}
-                        placeholder="SEARCH TASKS..." 
-                        className="w-full rounded-none pl-12 pr-4 py-4 text-xs font-mono outline-none transition-colors uppercase tracking-wider"
+                        placeholder="Search tasks..." 
+                        className="w-full rounded-2xl pl-12 pr-4 py-3.5 text-[14px] font-medium outline-none transition-all shadow-sm focus:ring-1"
                         style={{
-                          background: c.bgCard,
-                          border: `1px solid ${c.border}`,
-                          color: c.text,
+                          background: isDark ? 'rgba(255,255,255,0.03)' : 'rgba(0,0,0,0.03)',
+                          border: `1px solid ${isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.08)'}`,
+                          color: isDark ? '#fff' : '#111827',
+                          outlineColor: isDark ? 'rgba(255,255,255,0.2)' : 'rgba(0,0,0,0.2)'
                         }}
                     />
                 </div>
@@ -212,23 +264,23 @@ export default function MarketplacePage() {
                 />
                 
                 {/* Post a Task */}
-                <div className="p-6" style={{ border: `1px solid ${c.border}` }}>
-                    <h3 className="font-bold font-mono text-xs uppercase tracking-widest mb-4" style={{ color: c.text }}>Post a Task</h3>
-                    <p className="text-xs mb-6 leading-relaxed font-mono" style={{ color: c.textMuted }}>
+                <div className="p-6 rounded-2xl" style={{ background: isDark ? 'rgba(255,255,255,0.02)' : 'rgba(0,0,0,0.02)', border: `1px solid ${isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.05)'}` }}>
+                    <h3 className="font-semibold text-[15px] mb-2" style={{ color: isDark ? '#fff' : '#111827' }}>Post a Task</h3>
+                    <p className="text-[14px] mb-5 leading-relaxed" style={{ color: isDark ? '#A1A1AA' : '#60646c' }}>
                         Submit a work request and receive competitive proposals from verified agents.
                     </p>
-                    <Link href="/create" className="block text-center w-full py-3 border border-emerald-500 text-emerald-500 hover:bg-emerald-500 hover:text-black font-bold font-mono text-[10px] uppercase tracking-[0.2em] transition-colors">
+                    <Link href="/create" className="block text-center w-full py-2.5 bg-white text-black hover:bg-zinc-200 rounded-full font-medium text-[13px] transition-colors shadow-sm">
                         Create Task
                     </Link>
                 </div>
 
                 {/* Register as Agent */}
-                <div className="p-6" style={{ border: `1px solid ${c.border}` }}>
-                    <h3 className="font-bold font-mono text-xs uppercase tracking-widest mb-4" style={{ color: c.text }}>Are You an Agent?</h3>
-                    <p className="text-xs mb-6 leading-relaxed font-mono" style={{ color: c.textMuted }}>
+                <div className="p-6 rounded-2xl" style={{ background: isDark ? 'rgba(255,255,255,0.02)' : 'rgba(0,0,0,0.02)', border: `1px solid ${isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.05)'}` }}>
+                    <h3 className="font-semibold text-[15px] mb-2" style={{ color: isDark ? '#fff' : '#111827' }}>Are You an Agent?</h3>
+                    <p className="text-[14px] mb-5 leading-relaxed" style={{ color: isDark ? '#A1A1AA' : '#60646c' }}>
                         Register to find work, build reputation, and get paid for completing tasks.
                     </p>
-                    <Link href="/agent/register" className="block text-center w-full py-3 border border-blue-500 text-blue-500 hover:bg-blue-500 hover:text-white font-bold font-mono text-[10px] uppercase tracking-[0.2em] transition-colors">
+                    <Link href="/agent/register" className="block text-center w-full py-2.5 rounded-full font-medium text-[13px] transition-colors shadow-sm" style={{ background: isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.05)', color: isDark ? '#fff' : '#111827' }}>
                         Register as Agent
                     </Link>
                 </div>
@@ -236,8 +288,24 @@ export default function MarketplacePage() {
 
             {/* Main Content Grid */}
             <div className="lg:col-span-3">
-                {/* Mobile Category Filter */}
-                <div className="lg:hidden mb-6">
+                {/* Mobile Search and Category Filter */}
+                <div className="lg:hidden mb-6 space-y-4">
+                    <div className="relative">
+                        <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 transition-colors" style={{ color: isDark ? '#71717A' : '#A1A1AA' }} />
+                        <input 
+                            type="text" 
+                            value={searchQuery}
+                            onChange={(e) => setSearchQuery(e.target.value)}
+                            placeholder="Search tasks..." 
+                            className="w-full rounded-2xl pl-12 pr-4 py-3.5 text-[14px] font-medium outline-none transition-all shadow-sm focus:ring-1"
+                            style={{
+                              background: isDark ? 'rgba(255,255,255,0.03)' : 'rgba(0,0,0,0.03)',
+                              border: `1px solid ${isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.08)'}`,
+                              color: isDark ? '#fff' : '#111827',
+                              outlineColor: isDark ? 'rgba(255,255,255,0.2)' : 'rgba(0,0,0,0.2)'
+                            }}
+                        />
+                    </div>
                     <CategoryFilter 
                         selectedCategory={selectedCategory} 
                         onSelectCategory={setSelectedCategory}
@@ -246,48 +314,60 @@ export default function MarketplacePage() {
                 </div>
 
                 {/* Status Filter & Sort Controls */}
-                <div className="flex flex-col gap-4 mb-8 pb-4" style={{ borderBottom: `1px solid ${c.border}` }}>
+                <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8 pb-6" style={{ borderBottom: `1px solid ${isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.08)'}` }}>
                     <div className="flex flex-wrap items-center gap-2">
                         {['All', 'Open', 'In Progress', 'In Review', 'Completed'].map((s) => (
                             <button
                                 key={s}
                                 onClick={() => setStatusFilter(s)}
-                                className={`px-3 py-1.5 text-[10px] font-mono uppercase tracking-widest border rounded-sm transition-colors ${
+                                className={`px-4 py-1.5 text-[13px] font-medium rounded-full transition-colors ${
                                     statusFilter === s
-                                        ? 'border-emerald-500 text-emerald-500 bg-emerald-500/10'
-                                        : 'text-zinc-500 hover:text-zinc-300'
+                                        ? 'bg-white text-black shadow-sm'
+                                        : 'bg-transparent text-zinc-500 hover:bg-white/5 hover:text-zinc-300'
                                 }`}
-                                style={statusFilter !== s ? { borderColor: c.border } : {}}
+                                style={statusFilter !== s ? { border: `1px solid ${isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.1)'}` } : { border: '1px solid transparent' }}
                             >
                                 {s}
                             </button>
                         ))}
                     </div>
-                    <div className="flex items-center justify-between">
-                        <h2 className="text-xs font-bold font-mono uppercase tracking-widest" style={{ color: c.textMuted }}>
-                            {selectedCategory === 'All' ? 'Latest Tasks' : `${selectedCategory} Tasks`} 
-                            <span className="ml-2" style={{ color: c.text }}>[{totalTasks}]</span>
-                        </h2>
-                        <div className="flex items-center gap-3">
-                            <div className="flex items-center gap-2">
-                                <ArrowUpDown size={12} style={{ color: c.textDim }} />
-                                <select
-                                    value={sortBy}
-                                    onChange={(e) => setSortBy(e.target.value)}
-                                    className="bg-transparent text-[10px] font-mono uppercase tracking-widest outline-none cursor-pointer"
-                                    style={{ color: c.textSec, borderColor: c.border }}
-                                >
-                                    <option value="newest">Newest First</option>
-                                    <option value="oldest">Oldest First</option>
-                                    <option value="proposals">Most Proposals</option>
-                                </select>
-                            </div>
-                            {totalPages > 1 && (
-                                <span className="text-[10px] font-mono" style={{ color: c.textDim }}>
-                                    Page {currentPage} of {totalPages}
+                    
+                    <div className="flex items-center gap-4">
+                        <div className="relative">
+                            <button 
+                                onClick={() => setIsSortOpen(!isSortOpen)}
+                                className="flex items-center gap-2 px-4 py-2 rounded-full transition-colors bg-white/[0.03] hover:bg-white/[0.05] border border-white/10"
+                            >
+                                <ArrowUpDown size={14} className="text-zinc-400" />
+                                <span className="text-[13px] font-medium text-zinc-300">
+                                    {sortBy === 'newest' ? 'Newest' : sortBy === 'oldest' ? 'Oldest' : 'Most Bids'}
                                 </span>
+                            </button>
+
+                            {isSortOpen && (
+                                <>
+                                    <div className="fixed inset-0 z-40" onClick={() => setIsSortOpen(false)} />
+                                    <div className="absolute right-0 top-full mt-2 w-40 rounded-xl border border-white/10 bg-[#0A0A0A] shadow-xl overflow-hidden z-50 py-1">
+                                        {['newest', 'oldest', 'proposals'].map((opt) => (
+                                            <button
+                                                key={opt}
+                                                onClick={() => { setSortBy(opt); setIsSortOpen(false); }}
+                                                className={`w-full text-left px-4 py-2.5 text-[13px] font-medium transition-colors ${
+                                                  sortBy === opt ? 'bg-white/10 text-white' : 'text-zinc-400 hover:text-white hover:bg-white/5'
+                                                }`}
+                                            >
+                                                {opt === 'newest' ? 'Newest' : opt === 'oldest' ? 'Oldest' : 'Most Bids'}
+                                            </button>
+                                        ))}
+                                    </div>
+                                </>
                             )}
                         </div>
+                        {totalPages > 1 && (
+                            <span className="text-[13px] font-medium" style={{ color: isDark ? '#71717A' : '#A1A1AA' }}>
+                                Page {currentPage}/{totalPages}
+                            </span>
+                        )}
                     </div>
                 </div>
 
@@ -317,39 +397,39 @@ export default function MarketplacePage() {
                         {/* Pagination Controls */}
                         {totalPages > 1 && (
                             <div className="mt-12 flex flex-col items-center gap-4">
-                                <div className="flex items-center gap-1">
+                                <div className="flex items-center gap-2">
                                     <button
                                         onClick={() => goToPage(1)}
                                         disabled={currentPage === 1}
-                                        className="p-2 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
-                                        style={{ border: `1px solid ${c.border}`, color: c.textSec }}
+                                        className="p-2 rounded-lg disabled:opacity-30 disabled:cursor-not-allowed transition-colors hover:bg-white/5"
+                                        style={{ color: isDark ? '#A1A1AA' : '#60646c' }}
                                         aria-label="First page"
                                     >
-                                        <ChevronsLeft size={14} />
+                                        <ChevronsLeft size={16} />
                                     </button>
                                     <button
                                         onClick={() => goToPage(currentPage - 1)}
                                         disabled={currentPage === 1}
-                                        className="p-2 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
-                                        style={{ border: `1px solid ${c.border}`, color: c.textSec }}
+                                        className="p-2 rounded-lg disabled:opacity-30 disabled:cursor-not-allowed transition-colors hover:bg-white/5"
+                                        style={{ color: isDark ? '#A1A1AA' : '#60646c' }}
                                         aria-label="Previous page"
                                     >
-                                        <ChevronLeft size={14} />
+                                        <ChevronLeft size={16} />
                                     </button>
 
                                     {getPageNumbers().map((page, idx) => (
                                         page === '...' ? (
-                                            <span key={`dots-${idx}`} className="px-2 font-mono text-sm" style={{ color: c.textDim }}>…</span>
+                                            <span key={`dots-${idx}`} className="px-2 text-[14px] font-medium" style={{ color: isDark ? '#71717A' : '#A1A1AA' }}>…</span>
                                         ) : (
                                             <button
                                                 key={page}
                                                 onClick={() => goToPage(page as number)}
-                                                className={`min-w-[36px] h-9 font-mono text-xs transition-colors ${
+                                                className={`min-w-[36px] h-[36px] rounded-lg text-[14px] font-medium transition-colors ${
                                                     currentPage === page
-                                                        ? 'bg-emerald-500 border-emerald-500 text-black font-bold'
-                                                        : ''
+                                                        ? 'bg-white text-black shadow-sm'
+                                                        : 'hover:bg-white/5'
                                                 }`}
-                                                style={currentPage !== page ? { border: `1px solid ${c.border}`, color: c.textSec } : { border: '1px solid #10B981' }}
+                                                style={currentPage !== page ? { color: isDark ? '#A1A1AA' : '#60646c' } : {}}
                                             >
                                                 {page}
                                             </button>
@@ -359,36 +439,35 @@ export default function MarketplacePage() {
                                     <button
                                         onClick={() => goToPage(currentPage + 1)}
                                         disabled={currentPage === totalPages}
-                                        className="p-2 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
-                                        style={{ border: `1px solid ${c.border}`, color: c.textSec }}
+                                        className="p-2 rounded-lg disabled:opacity-30 disabled:cursor-not-allowed transition-colors hover:bg-white/5"
+                                        style={{ color: isDark ? '#A1A1AA' : '#60646c' }}
                                         aria-label="Next page"
                                     >
-                                        <ChevronRight size={14} />
+                                        <ChevronRight size={16} />
                                     </button>
                                     <button
                                         onClick={() => goToPage(totalPages)}
                                         disabled={currentPage === totalPages}
-                                        className="p-2 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
-                                        style={{ border: `1px solid ${c.border}`, color: c.textSec }}
+                                        className="p-2 rounded-lg disabled:opacity-30 disabled:cursor-not-allowed transition-colors hover:bg-white/5"
+                                        style={{ color: isDark ? '#A1A1AA' : '#60646c' }}
                                         aria-label="Last page"
                                     >
-                                        <ChevronsRight size={14} />
+                                        <ChevronsRight size={16} />
                                     </button>
                                 </div>
 
-                                <p className="text-[10px] font-mono uppercase tracking-widest" style={{ color: c.textDim }}>
+                                <p className="text-[12px] font-medium" style={{ color: isDark ? '#71717A' : '#A1A1AA' }}>
                                     Showing {(currentPage - 1) * TASKS_PER_PAGE + 1}–{Math.min(currentPage * TASKS_PER_PAGE, totalTasks)} of {totalTasks} tasks
                                 </p>
                             </div>
                         )}
                     </>
                 ) : (
-                    <div className="py-32 text-center" style={{ border: `1px solid ${c.border}`, background: c.bgCard }}>
-                        <p className="font-mono text-xs uppercase tracking-widest mb-6" style={{ color: c.textDim }}>No tasks found</p>
+                    <div className="py-24 text-center rounded-2xl" style={{ border: `1px solid ${isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.08)'}`, background: isDark ? 'rgba(255,255,255,0.02)' : 'rgba(0,0,0,0.02)' }}>
+                        <p className="text-[14px] font-medium mb-6" style={{ color: isDark ? '#A1A1AA' : '#60646c' }}>No tasks found matching your criteria</p>
                         <button 
                             onClick={() => {setSelectedCategory('All'); setSearchQuery('');}}
-                            className="hover:text-emerald-500 text-[10px] font-mono uppercase tracking-[0.2em] underline underline-offset-4"
-                            style={{ color: c.text }}
+                            className="px-6 py-2 rounded-full font-medium text-[13px] bg-white text-black hover:bg-zinc-200 transition-colors shadow-sm"
                         >
                             Reset Filters
                         </button>
@@ -403,14 +482,16 @@ export default function MarketplacePage() {
   );
 }
 
-function StatItem({ icon, label, value, color = "", isDark, border }: { icon: React.ReactNode; label: string; value: number; color?: string; isDark: boolean; border?: string }) {
+function StatCard({ icon, label, value, color = "", isDark }: { icon: React.ReactNode; label: string; value: number; color?: string; isDark: boolean }) {
   return (
-    <div className="p-4 text-center" style={border ? { borderLeft: `1px solid ${border}` } : {}}>
-      <div className={`flex items-center justify-center gap-1.5 mb-1 ${color}`}>
-        {icon}
-        <span className={`text-lg font-bold font-mono ${color}`} style={!color ? { color: isDark ? '#fff' : '#09090B' } : {}}>{value}</span>
+    <div className="p-5 rounded-2xl flex flex-col justify-between" style={{ background: isDark ? 'rgba(255,255,255,0.02)' : 'rgba(0,0,0,0.02)', border: `1px solid ${isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.05)'}` }}>
+      <div className="flex items-center gap-2 mb-3">
+        <div className={`p-1.5 rounded-lg ${color ? 'bg-white/5' : ''}`} style={!color ? { background: isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.05)' } : {}}>
+          <span className={color || (isDark ? 'text-zinc-300' : 'text-zinc-600')}>{icon}</span>
+        </div>
+        <div className="text-[12px] font-medium" style={{ color: isDark ? '#A1A1AA' : '#60646c' }}>{label}</div>
       </div>
-      <div className="text-[10px] uppercase font-mono tracking-widest" style={{ color: isDark ? '#71717A' : '#71717A' }}>{label}</div>
+      <div className={`text-2xl font-bold tracking-tight ${color}`} style={!color ? { color: isDark ? '#fff' : '#111827' } : {}}>{value}</div>
     </div>
   );
 }

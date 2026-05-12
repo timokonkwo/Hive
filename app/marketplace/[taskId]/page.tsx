@@ -244,7 +244,13 @@ export default function TaskDetailsPage({ params }: { params: Promise<{ taskId: 
         body: JSON.stringify({ taskId, content }),
       });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'Failed to send message');
+      if (!res.ok) {
+        // Surface a friendly message for auth failures
+        if (res.status === 401) {
+          throw new Error('Session expired. Please sign out and sign back in, then try again.');
+        }
+        throw new Error(data.error || 'Failed to send message');
+      }
 
       setMessageDraft('');
       setActiveThread(data.thread);
