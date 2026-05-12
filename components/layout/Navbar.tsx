@@ -56,7 +56,7 @@ export const Navbar = () => {
       <div className="max-w-7xl mx-auto px-4 md:px-6 h-16 flex items-center justify-between">
         
         {/* Left: Brand */}
-        <div className="flex items-center gap-8">
+        <div className="flex items-center gap-8 shrink-0">
           <Link href="/" className="hover:opacity-80 transition-opacity flex items-center gap-2.5 group">
             <Image 
               src="/images/hive-icon.svg" 
@@ -79,11 +79,9 @@ export const Navbar = () => {
           </div>
         </div>
 
-        {/* Desktop Nav */}
-        <div className="hidden md:flex items-center gap-5 text-sm font-medium">
-
+        {/* Desktop Nav (Flex-centered to prevent collisions) */}
+        <div className="hidden lg:flex flex-1 items-center justify-center gap-4 xl:gap-6 text-[13px] font-medium px-4">
           <NavLink href="/marketplace" label="Marketplace" pathname={pathname} isDark={isDark} />
-          <CreateNavLink pathname={pathname} />
           <NavLink href="/agents" label="Agents" pathname={pathname} isDark={isDark} />
           <NavLink href="/agent/dashboard" label="Agent Hub" pathname={pathname} isDark={isDark} />
           <NavLink href="/docs" label="Docs" pathname={pathname} isDark={isDark} />
@@ -94,58 +92,65 @@ export const Navbar = () => {
           )}
 
           {isAdmin && (
-            <Link href="/admin" className="text-[10px] font-mono font-bold text-emerald-500 hover:bg-emerald-500 hover:text-black transition-colors uppercase tracking-[0.2em] border border-emerald-500 px-3 py-1">
+            <Link href="/admin" className="text-[10px] font-mono font-bold text-emerald-500 hover:bg-emerald-500 hover:text-black transition-colors uppercase tracking-[0.2em] border border-emerald-500 px-3 py-1 rounded-sm">
               Admin
             </Link>
           )}
+        </div>
 
+        {/* Right Actions */}
+        <div className="hidden md:flex items-center gap-3 xl:gap-4 shrink-0 z-10">
+          <Link
+            href="/create"
+            className="inline-flex items-center gap-2 px-5 py-2.5 font-bold font-mono text-[10px] uppercase tracking-[0.2em] transition-all bg-emerald-500 text-black hover:bg-emerald-400 rounded-sm shadow-[0_0_15px_rgba(16,185,129,0.3)] hover:shadow-[0_0_25px_rgba(16,185,129,0.5)]"
+          >
+            <Plus size={14} /> Create Task
+          </Link>
 
           {/* Auth Action */}
           {authenticated ? (
-            <div className="flex items-center gap-4">
+            <div className="flex items-center gap-4 ml-2 pl-4" style={{ borderLeft: `1px solid ${isDark ? '#1A1A1A' : '#E4E4E7'}` }}>
               <Link 
                 href="/dashboard"
                 className="flex items-center gap-3 group cursor-pointer"
               >
-                <div className="text-right hidden lg:block">
+                <div className="text-right hidden xl:block">
                   <div className="text-[10px] font-bold font-mono tracking-widest" style={{ color: isDark ? '#fff' : '#09090B' }}>
                     {displayName}
                   </div>
                 </div>
                 
-                <div className="w-8 h-8 flex items-center justify-center group-hover:border-emerald-500 transition-colors relative" style={{ background: isDark ? '#050505' : '#F4F4F5', border: `1px solid ${isDark ? '#1A1A1A' : '#E4E4E7'}` }}>
+                <div className="w-8 h-8 flex items-center justify-center group-hover:border-emerald-500 transition-colors relative rounded-sm" style={{ background: isDark ? '#050505' : '#F4F4F5', border: `1px solid ${isDark ? '#1A1A1A' : '#E4E4E7'}` }}>
                   <span className="font-mono font-bold text-[10px]" style={{ color: isDark ? '#fff' : '#09090B' }}>{user?.wallet?.address?.[2] || "A"}</span>
                 </div>
               </Link>
 
               <button 
                 onClick={() => logout()}
-                className="p-2 text-zinc-600 hover:text-red-500 transition-colors"
+                className="p-2 text-zinc-500 hover:text-red-500 transition-colors"
                 title="Disconnect"
               >
                 <LogOut size={14} />
               </button>
             </div>
           ) : (
-            <div className="flex items-center gap-6">
-              <button 
-                disabled={!ready}
-                onClick={() => login()} 
-                className={`px-4 py-2 font-bold font-mono text-[10px] uppercase tracking-[0.2em] transition-all flex items-center gap-2 hover:bg-emerald-400 ${!ready ? "opacity-50 cursor-not-allowed" : ""}`}
-                style={{ background: isDark ? '#fff' : '#09090B', color: isDark ? '#000' : '#fff' }}
-              >
-                {!ready ? "Loading..." : "Sign In"}
-              </button>
-            </div>
+            <button 
+              disabled={!ready}
+              onClick={() => login()} 
+              className={`px-5 py-2.5 font-bold font-mono text-[10px] uppercase tracking-[0.2em] transition-all flex items-center gap-2 border rounded-sm hover:bg-zinc-900 ${!ready ? "opacity-50 cursor-not-allowed" : ""}`}
+              style={{ color: isDark ? '#fff' : '#09090B', borderColor: isDark ? '#27272A' : '#E4E4E7' }}
+            >
+              {!ready ? "Loading..." : "Sign In"}
+            </button>
           )}
         </div>
 
         {/* Mobile Actions */}
-        <div className="md:hidden flex items-center gap-2">
+        <div className="md:hidden flex items-center gap-3">
           <Link
             href="/create"
             onClick={() => setIsMenuOpen(false)}
-            className="inline-flex items-center gap-1.5 px-3 py-2 bg-emerald-500 text-black font-bold font-mono text-[10px] uppercase tracking-widest"
+            className="inline-flex items-center gap-1.5 px-3 py-2 bg-emerald-500 text-black font-bold font-mono text-[10px] uppercase tracking-widest rounded-sm"
           >
             <Plus size={13} /> Create
           </Link>
@@ -166,53 +171,48 @@ export const Navbar = () => {
 
       {/* Mobile Menu */}
       {isMenuOpen && (
-        <div className="md:hidden absolute top-[calc(100%)] left-0 w-full border-b p-0 flex flex-col transition-colors duration-300" style={{ background: isDark ? '#000' : '#fff', borderColor: isDark ? '#1A1A1A' : '#E4E4E7' }}>
+        <div className="md:hidden absolute top-[calc(100%)] left-0 w-full border-b p-0 flex flex-col transition-colors duration-300 shadow-2xl" style={{ background: isDark ? '#000' : '#fff', borderColor: isDark ? '#1A1A1A' : '#E4E4E7' }}>
           <div className="p-4 flex justify-between items-center" style={{ borderBottom: `1px solid ${isDark ? '#1A1A1A' : '#E4E4E7'}` }}>
-            <span className="text-[10px] font-mono uppercase tracking-widest" style={{ color: isDark ? '#71717A' : '#A1A1AA' }}>MENU</span>
+            <span className="text-[10px] font-mono uppercase tracking-widest" style={{ color: isDark ? '#71717A' : '#A1A1AA' }}>NAVIGATION</span>
+            {authenticated && (
+               <span className="text-[10px] font-mono font-bold" style={{ color: isDark ? '#fff' : '#000' }}>{displayName}</span>
+            )}
           </div>
 
-          {authenticated ? (
-            <div className="p-4 space-y-4">
-              <div className="space-y-2">
-                <MobileNavLink href="/create" icon={Plus} label="Create Task" isDark={isDark} onClick={() => setIsMenuOpen(false)} primary />
-                <MobileNavLink href="/dashboard" icon={Activity} label="Dashboard" isDark={isDark} onClick={() => setIsMenuOpen(false)} />
-                <MobileNavLink href="/marketplace" icon={Briefcase} label="Marketplace" isDark={isDark} onClick={() => setIsMenuOpen(false)} />
-                <MobileNavLink href="/agents" icon={Trophy} label="Agents" isDark={isDark} onClick={() => setIsMenuOpen(false)} />
-                <MobileNavLink href="/agent/dashboard" icon={Bot} label="Agent Hub" isDark={isDark} onClick={() => setIsMenuOpen(false)} />
-                <MobileNavLink href="/docs" icon={Book} label="Docs" isDark={isDark} onClick={() => setIsMenuOpen(false)} />
-                <MobileNavLink href="/token" icon={Coins} label="Token" isDark={isDark} onClick={() => setIsMenuOpen(false)} />
-                <MobileNavLink href="/roadmap" icon={Map} label="Roadmap" isDark={isDark} onClick={() => setIsMenuOpen(false)} />
-              </div>
-
-              <div className="h-[1px]" style={{ background: isDark ? '#1A1A1A' : '#E4E4E7' }}></div>
-
-              <button 
-                onClick={() => logout()} 
-                className="w-full text-left px-4 py-3 text-red-500 hover:bg-red-500/10 flex items-center gap-3 transition-all"
-              >
-                <LogOut size={14} /> 
-                <span className="font-mono text-[10px] uppercase tracking-widest font-bold">Disconnect</span>
-              </button>
-            </div>
-          ) : (
-            <div className="p-6 flex flex-col gap-4">
-              <MobileNavLink href="/create" icon={Plus} label="Create Task" isDark={isDark} onClick={() => setIsMenuOpen(false)} primary />
-              <MobileNavLink href="/marketplace" icon={Briefcase} label="Marketplace" isDark={isDark} onClick={() => setIsMenuOpen(false)} />
-              <MobileNavLink href="/agents" icon={Trophy} label="Agents" isDark={isDark} onClick={() => setIsMenuOpen(false)} />
-              <MobileNavLink href="/agent/dashboard" icon={Bot} label="Agent Hub" isDark={isDark} onClick={() => setIsMenuOpen(false)} />
-              <MobileNavLink href="/docs" icon={Book} label="Docs" isDark={isDark} onClick={() => setIsMenuOpen(false)} />
-              <MobileNavLink href="/token" icon={Coins} label="Token" isDark={isDark} onClick={() => setIsMenuOpen(false)} />
-              <MobileNavLink href="/roadmap" icon={Map} label="Roadmap" isDark={isDark} onClick={() => setIsMenuOpen(false)} />
-              <button 
-                disabled={!ready}
-                onClick={() => login()} 
-                className={`w-full text-center px-5 py-3 font-bold font-mono text-[10px] uppercase tracking-[0.2em] hover:bg-emerald-400 transition-colors ${!ready ? "opacity-50" : ""}`}
-                style={{ background: isDark ? '#fff' : '#09090B', color: isDark ? '#000' : '#fff' }}
-              >
-                {ready ? "Sign In" : "Loading..."}
-              </button>
-            </div>
-          )}
+          <div className="p-2 space-y-1">
+             {authenticated && (
+                 <MobileNavLink href="/dashboard" icon={Activity} label="Dashboard" isDark={isDark} onClick={() => setIsMenuOpen(false)} />
+             )}
+             <MobileNavLink href="/marketplace" icon={Briefcase} label="Marketplace" isDark={isDark} onClick={() => setIsMenuOpen(false)} />
+             <MobileNavLink href="/agents" icon={Trophy} label="Agents" isDark={isDark} onClick={() => setIsMenuOpen(false)} />
+             <MobileNavLink href="/agent/dashboard" icon={Bot} label="Agent Hub" isDark={isDark} onClick={() => setIsMenuOpen(false)} />
+             <MobileNavLink href="/docs" icon={Book} label="Docs" isDark={isDark} onClick={() => setIsMenuOpen(false)} />
+             <MobileNavLink href="/token" icon={Coins} label="Token" isDark={isDark} onClick={() => setIsMenuOpen(false)} />
+             
+             {authenticated ? (
+                <>
+                  <div className="h-[1px] my-2" style={{ background: isDark ? '#1A1A1A' : '#E4E4E7' }}></div>
+                  <button 
+                    onClick={() => logout()} 
+                    className="w-full text-left px-4 py-3 text-red-500 hover:bg-red-500/10 flex items-center gap-3 transition-all rounded-sm"
+                  >
+                    <LogOut size={14} /> 
+                    <span className="font-mono text-[10px] uppercase tracking-widest font-bold">Disconnect</span>
+                  </button>
+                </>
+             ) : (
+                <div className="p-2 mt-2 border-t" style={{ borderColor: isDark ? '#1A1A1A' : '#E4E4E7' }}>
+                  <button 
+                    disabled={!ready}
+                    onClick={() => login()} 
+                    className={`w-full text-center px-5 py-3 font-bold font-mono text-[10px] uppercase tracking-[0.2em] border transition-colors rounded-sm hover:bg-zinc-900 ${!ready ? "opacity-50" : ""}`}
+                    style={{ color: isDark ? '#fff' : '#09090B', borderColor: isDark ? '#27272A' : '#E4E4E7' }}
+                  >
+                    {ready ? "Sign In" : "Loading..."}
+                  </button>
+                </div>
+             )}
+          </div>
         </div>
       )}
     </nav>
@@ -235,17 +235,7 @@ function NavLink({ href, label, pathname, isDark }: { href: string; label: strin
 }
 
 function CreateNavLink({ pathname }: { pathname: string }) {
-  const isActive = pathname === "/create";
-  return (
-    <Link
-      href="/create"
-      className={`inline-flex items-center gap-2 px-3 py-2 font-bold font-mono text-[10px] uppercase tracking-[0.2em] transition-colors ${
-        isActive ? "bg-emerald-500 text-black" : "bg-white text-black hover:bg-emerald-400"
-      }`}
-    >
-      <Plus size={12} /> Create
-    </Link>
-  );
+  return null; // Deprecated inline button, moved to far right action group
 }
 
 const MobileNavLink = ({
