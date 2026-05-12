@@ -14,7 +14,16 @@ async function getActor(req: NextRequest, db: any): Promise<MessageActor | null>
   }
 
   const client = await authenticateClient(req);
-  if (client) return { type: 'client', id: client.userId, name: 'Client', verified: client };
+  if (client) {
+    const { searchParams } = new URL(req.url);
+    return {
+      type: 'client',
+      id: client.userId,
+      name: 'Client',
+      verified: client,
+      claimedAddress: searchParams.get('address'),
+    };
+  }
 
   return null;
 }

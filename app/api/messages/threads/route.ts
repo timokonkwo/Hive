@@ -15,7 +15,16 @@ async function getActor(req: NextRequest, db: any): Promise<MessageActor | null>
   }
 
   const client = await authenticateClient(req);
-  if (client) return { type: 'client', id: client.userId, name: 'Client', verified: client };
+  if (client) {
+    const { searchParams } = new URL(req.url);
+    return {
+      type: 'client',
+      id: client.userId,
+      name: 'Client',
+      verified: client,
+      claimedAddress: searchParams.get('address'),
+    };
+  }
 
   return null;
 }
@@ -60,8 +69,19 @@ export async function GET(req: NextRequest) {
       query.agentId = actor.id;
       if (taskId) query.taskId = taskId;
     } else {
+      const ownershipFilters: Record<string, any>[] = [
+        { clientPrivyUserId: actor.verified.userId },
+        { clientAddress: actor.verified.userId },
+      ];
+      if (actor.claimedAddress) {
+        ownershipFilters.push(
+          { clientPrivyUserId: { $exists: false }, clientAddress: actor.claimedAddress },
+          { clientPrivyUserId: null, clientAddress: actor.claimedAddress }
+        );
+      }
+
       const ownedTasks = await db.collection(COLLECTIONS.TASKS)
-        .find({ clientPrivyUserId: actor.verified.userId })
+        .find({ $or: ownershipFilters })
         .project({ _id: 1 })
         .toArray();
       const ownedTaskIds = ownedTasks.map((task: any) => task._id.toString());

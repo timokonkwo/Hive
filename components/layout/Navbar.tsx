@@ -4,10 +4,9 @@ import React from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { usePathname } from "next/navigation";
-import { Menu, X, Book, Activity, Trophy, Rss, LogOut, Briefcase, Plus, Sun, Moon, Bot, Map, Coins } from "lucide-react";
+import { X, Book, Activity, Trophy, LogOut, Briefcase, Plus, Bot, Map, Coins } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { useAuthFetch } from "@/hooks/useAuthFetch";
-import { useTheme } from "@/components/providers/ThemeProvider";
 
 export const Navbar = () => {
   const [isMenuOpen, setIsMenuOpen] = React.useState(false);
@@ -16,7 +15,6 @@ export const Navbar = () => {
   const pathname = usePathname();
   const { user, login, logout, ready, authenticated } = useAuth();
   const authFetch = useAuthFetch();
-  const { theme, toggleTheme } = useTheme();
 
   // Display: wallet address for wallet users, email for email/Google users
   const rawAddress = user?.wallet?.address || "";
@@ -82,15 +80,14 @@ export const Navbar = () => {
         </div>
 
         {/* Desktop Nav */}
-        <div className="hidden md:flex items-center gap-6 text-sm font-medium">
-          
+        <div className="hidden md:flex items-center gap-5 text-sm font-medium">
+
           <NavLink href="/marketplace" label="Marketplace" pathname={pathname} isDark={isDark} />
+          <CreateNavLink pathname={pathname} />
           <NavLink href="/agents" label="Agents" pathname={pathname} isDark={isDark} />
-          <NavLink href="/create" label="Create" pathname={pathname} isDark={isDark} />
-          <NavLink href="/docs" label="Docs" pathname={pathname} isDark={isDark} />
-          <NavLink href="/roadmap" label="Roadmap" pathname={pathname} isDark={isDark} />
-          <NavLink href="/token" label="Token" pathname={pathname} isDark={isDark} />
           <NavLink href="/agent/dashboard" label="Agent Hub" pathname={pathname} isDark={isDark} />
+          <NavLink href="/docs" label="Docs" pathname={pathname} isDark={isDark} />
+          <NavLink href="/token" label="Token" pathname={pathname} isDark={isDark} />
 
           {authenticated && (
             <NavLink href="/dashboard" label="Dashboard" pathname={pathname} isDark={isDark} />
@@ -143,9 +140,16 @@ export const Navbar = () => {
           )}
         </div>
 
-        {/* Mobile: Menu Only */}
+        {/* Mobile Actions */}
         <div className="md:hidden flex items-center gap-2">
-          <button 
+          <Link
+            href="/create"
+            onClick={() => setIsMenuOpen(false)}
+            className="inline-flex items-center gap-1.5 px-3 py-2 bg-emerald-500 text-black font-bold font-mono text-[10px] uppercase tracking-widest"
+          >
+            <Plus size={13} /> Create
+          </Link>
+          <button
             onClick={() => setIsMenuOpen(!isMenuOpen)}
             className="p-2 hover:opacity-70 transition-opacity"
             style={{ color: isDark ? '#fff' : '#09090B' }}
@@ -170,14 +174,14 @@ export const Navbar = () => {
           {authenticated ? (
             <div className="p-4 space-y-4">
               <div className="space-y-2">
-                <MobileNavLink href="/marketplace" icon={Briefcase} label="Marketplace" isDark={isDark} />
-                <MobileNavLink href="/agents" icon={Trophy} label="Agents" isDark={isDark} />
-                <MobileNavLink href="/create" icon={Plus} label="Create Task" isDark={isDark} />
-                <MobileNavLink href="/dashboard" icon={Activity} label="Dashboard" isDark={isDark} />
-                <MobileNavLink href="/agent/dashboard" icon={Bot} label="Agent Hub" isDark={isDark} />
-                <MobileNavLink href="/docs" icon={Book} label="Docs" isDark={isDark} />
-                <MobileNavLink href="/roadmap" icon={Map} label="Roadmap" isDark={isDark} />
-                <MobileNavLink href="/token" icon={Coins} label="Token" isDark={isDark} />
+                <MobileNavLink href="/create" icon={Plus} label="Create Task" isDark={isDark} onClick={() => setIsMenuOpen(false)} primary />
+                <MobileNavLink href="/dashboard" icon={Activity} label="Dashboard" isDark={isDark} onClick={() => setIsMenuOpen(false)} />
+                <MobileNavLink href="/marketplace" icon={Briefcase} label="Marketplace" isDark={isDark} onClick={() => setIsMenuOpen(false)} />
+                <MobileNavLink href="/agents" icon={Trophy} label="Agents" isDark={isDark} onClick={() => setIsMenuOpen(false)} />
+                <MobileNavLink href="/agent/dashboard" icon={Bot} label="Agent Hub" isDark={isDark} onClick={() => setIsMenuOpen(false)} />
+                <MobileNavLink href="/docs" icon={Book} label="Docs" isDark={isDark} onClick={() => setIsMenuOpen(false)} />
+                <MobileNavLink href="/token" icon={Coins} label="Token" isDark={isDark} onClick={() => setIsMenuOpen(false)} />
+                <MobileNavLink href="/roadmap" icon={Map} label="Roadmap" isDark={isDark} onClick={() => setIsMenuOpen(false)} />
               </div>
 
               <div className="h-[1px]" style={{ background: isDark ? '#1A1A1A' : '#E4E4E7' }}></div>
@@ -192,24 +196,13 @@ export const Navbar = () => {
             </div>
           ) : (
             <div className="p-6 flex flex-col gap-4">
-              <Link href="/marketplace" className="flex items-center justify-between p-3 transition-all" style={{ color: isDark ? '#A1A1AA' : '#52525B', borderBottom: `1px solid ${isDark ? '#1A1A1A' : '#E4E4E7'}` }}>
-                <span className="font-mono text-[10px] uppercase tracking-widest">Marketplace</span> 
-              </Link>
-              <Link href="/agents" className="flex items-center justify-between p-3 transition-all" style={{ color: isDark ? '#A1A1AA' : '#52525B', borderBottom: `1px solid ${isDark ? '#1A1A1A' : '#E4E4E7'}` }}>
-                <span className="font-mono text-[10px] uppercase tracking-widest">Agents</span> 
-              </Link>
-              <Link href="/docs" className="flex items-center justify-between p-3 transition-all" style={{ color: isDark ? '#A1A1AA' : '#52525B', borderBottom: `1px solid ${isDark ? '#1A1A1A' : '#E4E4E7'}` }}>
-                <span className="font-mono text-[10px] uppercase tracking-widest">Docs</span> 
-              </Link>
-              <Link href="/roadmap" className="flex items-center justify-between p-3 transition-all" style={{ color: isDark ? '#A1A1AA' : '#52525B', borderBottom: `1px solid ${isDark ? '#1A1A1A' : '#E4E4E7'}` }}>
-                <span className="font-mono text-[10px] uppercase tracking-widest">Roadmap</span> 
-              </Link>
-              <Link href="/token" className="flex items-center justify-between p-3 transition-all" style={{ color: isDark ? '#A1A1AA' : '#52525B', borderBottom: `1px solid ${isDark ? '#1A1A1A' : '#E4E4E7'}` }}>
-                <span className="font-mono text-[10px] uppercase tracking-widest">Token</span> 
-              </Link>
-              <Link href="/agent/dashboard" className="flex items-center justify-between p-3 transition-all" style={{ color: isDark ? '#A1A1AA' : '#52525B', borderBottom: `1px solid ${isDark ? '#1A1A1A' : '#E4E4E7'}` }}>
-                <span className="font-mono text-[10px] uppercase tracking-widest">Agent Hub</span> 
-              </Link>
+              <MobileNavLink href="/create" icon={Plus} label="Create Task" isDark={isDark} onClick={() => setIsMenuOpen(false)} primary />
+              <MobileNavLink href="/marketplace" icon={Briefcase} label="Marketplace" isDark={isDark} onClick={() => setIsMenuOpen(false)} />
+              <MobileNavLink href="/agents" icon={Trophy} label="Agents" isDark={isDark} onClick={() => setIsMenuOpen(false)} />
+              <MobileNavLink href="/agent/dashboard" icon={Bot} label="Agent Hub" isDark={isDark} onClick={() => setIsMenuOpen(false)} />
+              <MobileNavLink href="/docs" icon={Book} label="Docs" isDark={isDark} onClick={() => setIsMenuOpen(false)} />
+              <MobileNavLink href="/token" icon={Coins} label="Token" isDark={isDark} onClick={() => setIsMenuOpen(false)} />
+              <MobileNavLink href="/roadmap" icon={Map} label="Roadmap" isDark={isDark} onClick={() => setIsMenuOpen(false)} />
               <button 
                 disabled={!ready}
                 onClick={() => login()} 
@@ -241,9 +234,44 @@ function NavLink({ href, label, pathname, isDark }: { href: string; label: strin
   );
 }
 
-const MobileNavLink = ({ href, icon: Icon, label, isDark }: { href: string; icon: React.ElementType; label: string; isDark: boolean }) => (
-  <Link href={href} className="block">
-    <div className="flex items-center gap-3 px-4 py-3 hover:bg-white/5 border-l-2 border-transparent hover:border-emerald-500 transition-all group" style={{ color: isDark ? '#A1A1AA' : '#52525B' }}>
+function CreateNavLink({ pathname }: { pathname: string }) {
+  const isActive = pathname === "/create";
+  return (
+    <Link
+      href="/create"
+      className={`inline-flex items-center gap-2 px-3 py-2 font-bold font-mono text-[10px] uppercase tracking-[0.2em] transition-colors ${
+        isActive ? "bg-emerald-500 text-black" : "bg-white text-black hover:bg-emerald-400"
+      }`}
+    >
+      <Plus size={12} /> Create
+    </Link>
+  );
+}
+
+const MobileNavLink = ({
+  href,
+  icon: Icon,
+  label,
+  isDark,
+  onClick,
+  primary = false,
+}: {
+  href: string;
+  icon: React.ElementType;
+  label: string;
+  isDark: boolean;
+  onClick?: () => void;
+  primary?: boolean;
+}) => (
+  <Link href={href} className="block" onClick={onClick}>
+    <div
+      className={`flex items-center gap-3 px-4 py-3 border-l-2 transition-all group ${
+        primary
+          ? 'bg-emerald-500/10 border-emerald-500 text-emerald-400'
+          : 'hover:bg-white/5 border-transparent hover:border-emerald-500'
+      }`}
+      style={{ color: primary ? undefined : (isDark ? '#A1A1AA' : '#52525B') }}
+    >
       <Icon size={16} className="group-hover:text-emerald-400 transition-colors" />
       <span className="font-mono text-xs uppercase tracking-wider">{label}</span>
     </div>

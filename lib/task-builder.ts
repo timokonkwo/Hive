@@ -12,6 +12,23 @@ const CATEGORY_KEYWORDS: Array<{ category: string; keywords: string[] }> = [
   { category: 'Security', keywords: ['audit', 'security', 'vulnerability', 'pentest', 'threat'] },
 ];
 
+const FILLER_WORDS = new Set([
+  'with',
+  'that',
+  'from',
+  'this',
+  'have',
+  'need',
+  'into',
+  'your',
+  'using',
+  'please',
+  'create',
+  'build',
+  'make',
+  'help',
+]);
+
 function cleanText(value: unknown, maxLength: number): string {
   return typeof value === 'string' ? value.trim().replace(/\s+/g, ' ').slice(0, maxLength) : '';
 }
@@ -69,7 +86,7 @@ function inferTags(prompt: string, category: string): string[] {
     .toLowerCase()
     .replace(/[^a-z0-9\s-]/g, ' ')
     .split(/\s+/)
-    .filter((word) => word.length > 3 && !['with', 'that', 'from', 'this', 'have', 'need', 'into', 'your', 'using'].includes(word));
+    .filter((word) => word.length > 3 && !FILLER_WORDS.has(word));
 
   return Array.from(new Set([category, ...words.slice(0, 5)]));
 }
@@ -118,6 +135,33 @@ function defaultRubric(category: string): string[] {
   return common;
 }
 
+function fallbackDescription(prompt: string, category: string): string {
+  return [
+    `I need help with a ${category.toLowerCase()} task based on the brief below.`,
+    '',
+    '## Brief',
+    prompt,
+    '',
+    '## Goal',
+    'Turn the brief into a complete, review-ready deliverable that can be evaluated against the requirements and acceptance rubric.',
+  ].join('\n');
+}
+
+function fallbackRequirements(prompt: string, acceptanceRubric: string[]): string {
+  return [
+    '## Scope',
+    prompt,
+    '',
+    '## Requirements',
+    '- Clarify any assumptions in the final response.',
+    '- Provide a complete deliverable, not only advice or a partial outline.',
+    '- Keep the work organized so it can be reviewed quickly.',
+    '',
+    '## Acceptance Criteria',
+    ...acceptanceRubric.map((item) => `- ${item}`),
+  ].join('\n');
+}
+
 export function buildTaskDraft(input: {
   prompt: string;
   category?: string;
@@ -132,9 +176,9 @@ export function buildTaskDraft(input: {
 
   return {
     title,
-    description: prompt,
+    description: fallbackDescription(prompt, category),
     category,
-    requirements: `Scope: ${prompt}\n\nExpected review criteria:\n${acceptanceRubric.map((item) => `- ${item}`).join('\n')}`,
+    requirements: fallbackRequirements(prompt, acceptanceRubric),
     tags: inferTags(prompt, category),
     budget: inferBudget(prompt, cleanText(input.budget, 80)),
     deliverableSpecs: [
