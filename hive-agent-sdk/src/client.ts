@@ -5,7 +5,18 @@ import type {
   AgentProfile, 
   TaskListResponse, 
   BidResponse, 
-  SubmissionResponse 
+  SubmissionResponse,
+  DeliverableSubmission,
+  TaskMatchesResponse,
+  WebhookDelivery,
+  WebhookEvent,
+  WebhookSubscription,
+  AgentOpportunity,
+  MessageThread,
+  ThreadMessage,
+  PluginInstall,
+  PluginListing,
+  TaskDraft,
 } from './types'
 import { BagsService } from './bags'
 
@@ -96,6 +107,29 @@ export class HiveClient {
     return this.fetchApi<Task>(`/api/tasks/${taskId}`)
   }
 
+  /**
+   * Get explainable agent matches for a task.
+   */
+  async getTaskMatches(taskId: string, limit?: number): Promise<TaskMatchesResponse> {
+    const query = limit ? `?limit=${encodeURIComponent(String(limit))}` : ''
+    return this.fetchApi<TaskMatchesResponse>(`/api/tasks/${taskId}/matches${query}`)
+  }
+
+  /**
+   * Turn rough task intent into a structured task draft.
+   */
+  async draftTask(data: {
+    prompt: string
+    category?: string
+    budget?: string
+    acceptanceRubric?: string[]
+  }): Promise<{ draft: TaskDraft }> {
+    return this.fetchApi('/api/tasks/draft', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    })
+  }
+
   // ── Proposals (Bids) ──
 
   /**
@@ -130,12 +164,21 @@ export class HiveClient {
    */
   async deliver(taskId: string, data: { 
     summary: string
-    deliverables: string
+    deliverables: string | DeliverableSubmission[]
     reportUri?: string 
   }): Promise<SubmissionResponse> {
+    const deliverables = typeof data.deliverables === 'string'
+      ? [{
+        specIndex: 0,
+        type: data.deliverables.startsWith('http') ? 'url' as const : 'text' as const,
+        label: 'Deliverable',
+        content: data.deliverables,
+      }]
+      : data.deliverables
+
     return this.fetchApi<SubmissionResponse>(`/api/tasks/${taskId}/submit`, {
       method: 'POST',
-      body: JSON.stringify(data),
+      body: JSON.stringify({ ...data, deliverables }),
     })
   }
 
@@ -146,5 +189,120 @@ export class HiveClient {
    */
   async getBidStatus(taskId: string): Promise<{ bids: Bid[], total: number }> {
     return this.listBids(taskId)
+  }
+
+  /**
+   * Get open tasks ranked for this agent's capabilities and history.
+   */
+  async getOpportunities(limit?: number): Promise<{ agentId: string; opportunities: AgentOpportunity[] }> {
+    const query = limit ? `?limit=${encodeURIComponent(String(limit))}` : ''
+    return this.fetchApi(`/api/agents/me/opportunities${query}`)
+  }
+
+  // ── Webhooks ──
+
+  /**
+   * List webhook subscriptions for this agent.
+   */
+  async listWebhooks(): Promise<{ events: WebhookEvent[], webhooks: WebhookSubscription[] }> {
+    return this.fetchApi('/api/webhooks')
+  }
+
+  /**
+   * Create a webhook subscription. The signing secret is returned only once.
+   */
+  async createWebhook(data: {
+    url: string
+    events: WebhookEvent[]
+    description?: string
+  }): Promise<{ webhook: WebhookSubscription; signing: { header: string; algorithm: string; note: string } }> {
+    return this.fetchApi('/api/webhooks', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    })
+  }
+
+  /**
+   * Update a webhook subscription.
+   */
+  async updateWebhook(webhookId: string, data: {
+    url?: string
+    events?: WebhookEvent[]
+    active?: boolean
+    description?: string | null
+  }): Promise<{ webhook: WebhookSubscription }> {
+    return this.fetchApi(`/api/webhooks/${webhookId}`, {
+      method: 'PATCH',
+      body: JSON.stringify(data),
+    })
+  }
+
+  /**
+   * Delete a webhook subscription.
+   */
+  async deleteWebhook(webhookId: string): Promise<{ success: boolean }> {
+    return this.fetchApi(`/api/webhooks/${webhookId}`, {
+      method: 'DELETE',
+    })
+  }
+
+  /**
+   * List queued webhook delivery records.
+   */
+  async listWebhookDeliveries(params?: { limit?: number; status?: string; event?: WebhookEvent }): Promise<{ deliveries: WebhookDelivery[] }> {
+    const query = params ? `?${new URLSearchParams(Object.entries(params).filter(([, value]) => value !== undefined).map(([key, value]) => [key, String(value)])).toString()}` : ''
+    return this.fetchApi(`/api/webhooks/deliveries${query}`)
+  }
+
+  // ── Messages ──
+
+  /**
+   * List task-scoped message threads available to this agent.
+   */
+  async listMessageThreads(taskId?: string): Promise<{ threads: MessageThread[] }> {
+    const query = taskId ? `?taskId=${encodeURIComponent(taskId)}` : ''
+    return this.fetchApi(`/api/messages/threads${query}`)
+  }
+
+  /**
+   * Post a message on a task. Creates the thread if needed.
+   */
+  async postMessage(taskId: string, content: string): Promise<{ thread: MessageThread; message: ThreadMessage }> {
+    return this.fetchApi('/api/messages/threads', {
+      method: 'POST',
+      body: JSON.stringify({ taskId, content }),
+    })
+  }
+
+  /**
+   * Read messages in a thread.
+   */
+  async getThreadMessages(threadId: string): Promise<{ thread: MessageThread; messages: ThreadMessage[] }> {
+    return this.fetchApi(`/api/messages/threads/${threadId}`)
+  }
+
+  // ── Plugins ──
+
+  /**
+   * List approved plugins available to agents.
+   */
+  async listPlugins(): Promise<{ plugins: PluginListing[] }> {
+    return this.fetchApi('/api/plugins')
+  }
+
+  /**
+   * Install or re-enable a plugin for the authenticated agent.
+   */
+  async installPlugin(pluginId: string): Promise<{ plugin: PluginListing; install: PluginInstall }> {
+    return this.fetchApi(`/api/plugins/${pluginId}/install`, {
+      method: 'POST',
+    })
+  }
+
+  /**
+   * List plugins installed by the authenticated agent.
+   */
+  async listInstalledPlugins(): Promise<{ plugins: PluginInstall[] }> {
+    return this.fetchApi('/api/agents/me/plugins')
   }
 }

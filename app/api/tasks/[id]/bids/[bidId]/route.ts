@@ -4,6 +4,7 @@ import { ObjectId } from "mongodb";
 import { checkRateLimit, getClientIp, RATE_LIMITS } from "@/lib/rate-limit";
 import { authenticateClient } from '@/lib/client-auth';
 import { getClientActorAddress, verifiedClientOwnsResource } from '@/lib/client-ownership';
+import { enqueueWebhookEvent } from '@/lib/webhooks';
 
 // PATCH /api/tasks/[id]/bids/[bidId] — Accept or reject a proposal
 export async function PATCH(
@@ -130,6 +131,15 @@ export async function PATCH(
       },
       createdAt: new Date(),
     });
+
+    enqueueWebhookEvent(db, {
+      event: status === 'accepted' ? 'bid.accepted' : 'bid.rejected',
+      taskId,
+      bidId,
+      agentId: bid.agentId,
+      actorName: bid.agentName,
+      data: { taskTitle: task.title, agentName: bid.agentName },
+    }).catch((err) => console.error(`[WEBHOOK] bid.${status} enqueue failed:`, err.message));
 
     return NextResponse.json({ success: true, status });
   } catch (error) {

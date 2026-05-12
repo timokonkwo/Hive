@@ -1,11 +1,11 @@
 "use client";
 
-import { use, useState, useEffect } from "react";
+import { use, useState, useEffect, useCallback } from "react";
 import { Navbar } from "@/components/layout/Navbar";
 import { Footer } from "@/components/layout/Footer";
 import { useAuth } from "@/hooks/useAuth";
 import { useAuthFetch } from "@/hooks/useAuthFetch";
-import { ArrowLeft, Clock, Coins, CheckCircle, X, Loader2, ChevronDown, ChevronUp, UserCheck, XCircle, ExternalLink, BadgeCheck, Rocket, Copy, Star, MessageSquare, AlertTriangle, Download } from "lucide-react";
+import { ArrowLeft, Clock, Coins, CheckCircle, X, Loader2, ChevronDown, ChevronUp, UserCheck, XCircle, ExternalLink, BadgeCheck, Rocket, Copy, Star, MessageSquare, AlertTriangle, Download, Brain, Send } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
@@ -27,6 +27,15 @@ export default function TaskDetailsPage({ params }: { params: Promise<{ taskId: 
   const [submission, setSubmission] = useState<any>(null);
   const [completingTask, setCompletingTask] = useState(false);
   const [isRegisteredAgent, setIsRegisteredAgent] = useState<boolean | null>(null);
+  const [matches, setMatches] = useState<any[]>([]);
+  const [matchesLoading, setMatchesLoading] = useState(false);
+  const [agentApiKey, setAgentApiKey] = useState('');
+  const [messageThreads, setMessageThreads] = useState<any[]>([]);
+  const [activeThread, setActiveThread] = useState<any>(null);
+  const [threadMessages, setThreadMessages] = useState<any[]>([]);
+  const [messageDraft, setMessageDraft] = useState('');
+  const [messagesLoading, setMessagesLoading] = useState(false);
+  const [sendingMessage, setSendingMessage] = useState(false);
 
   // Payment flow state
   const [showPaymentModal, setShowPaymentModal] = useState(false);
@@ -56,7 +65,19 @@ export default function TaskDetailsPage({ params }: { params: Promise<{ taskId: 
   ];
 
   const userAddress = user?.wallet?.address?.toLowerCase();
-  const isTaskPoster = task?.clientAddress?.toLowerCase() === userAddress;
+  const userPrivyId = user?.id?.toLowerCase();
+  const isTaskPoster = !!task && (
+    task.clientAddress?.toLowerCase() === userAddress ||
+    task.clientPrivyUserId?.toLowerCase() === userPrivyId
+  );
+
+  useEffect(() => {
+    try {
+      setAgentApiKey(sessionStorage.getItem('hive_agent_key') || '');
+    } catch {
+      setAgentApiKey('');
+    }
+  }, []);
 
   // Fetch task + bids from API
   useEffect(() => {
@@ -85,6 +106,31 @@ export default function TaskDetailsPage({ params }: { params: Promise<{ taskId: 
     }
     fetchData();
   }, [taskId]);
+
+  // Fetch explainable Smart Matching results for open tasks.
+  useEffect(() => {
+    if (!task || task.status !== 'Open') {
+      setMatches([]);
+      return;
+    }
+
+    async function fetchMatches() {
+      setMatchesLoading(true);
+      try {
+        const res = await fetch(`/api/tasks/${taskId}/matches?limit=5`);
+        if (res.ok) {
+          const data = await res.json();
+          setMatches(data.matches || []);
+        }
+      } catch (err) {
+        console.error("[TaskDetails] Failed to fetch matches:", err);
+      } finally {
+        setMatchesLoading(false);
+      }
+    }
+
+    fetchMatches();
+  }, [task, taskId]);
 
   // Fetch submission only if the user is the task poster
   useEffect(() => {
@@ -116,6 +162,88 @@ export default function TaskDetailsPage({ params }: { params: Promise<{ taskId: 
     // Default to allowing the bid form to show — auth is validated server-side on submission
     setIsRegisteredAgent(true);
   }, [userAddress, isTaskPoster]);
+
+  const messageRequest = useCallback(async (path: string, options: RequestInit = {}) => {
+    if (agentApiKey && !isTaskPoster) {
+      return fetch(path, {
+        ...options,
+        headers: {
+          ...(options.headers || {}),
+          'x-hive-api-key': agentApiKey,
+        },
+      });
+    }
+
+    const separator = path.includes('?') ? '&' : '?';
+    const clientPath = userAddress ? `${path}${separator}address=${encodeURIComponent(userAddress)}` : path;
+    return authFetch(clientPath, options);
+  }, [agentApiKey, authFetch, isTaskPoster, userAddress]);
+
+  const loadMessages = useCallback(async () => {
+    if (!task || (!isTaskPoster && !agentApiKey)) return;
+    setMessagesLoading(true);
+    try {
+      const threadsRes = await messageRequest(`/api/messages/threads?taskId=${taskId}`);
+      if (!threadsRes.ok) {
+        setMessageThreads([]);
+        setActiveThread(null);
+        setThreadMessages([]);
+        return;
+      }
+      const threadsData = await threadsRes.json();
+      const threads = threadsData.threads || [];
+      setMessageThreads(threads);
+      const thread = threads[0] || null;
+      setActiveThread(thread);
+
+      if (thread?.id) {
+        const messagesRes = await messageRequest(`/api/messages/threads/${thread.id}`);
+        if (messagesRes.ok) {
+          const messagesData = await messagesRes.json();
+          setThreadMessages(messagesData.messages || []);
+        }
+      } else {
+        setThreadMessages([]);
+      }
+    } catch (err) {
+      console.error("[TaskDetails] Failed to load messages:", err);
+    } finally {
+      setMessagesLoading(false);
+    }
+  }, [agentApiKey, isTaskPoster, messageRequest, task, taskId]);
+
+  useEffect(() => {
+    loadMessages();
+  }, [loadMessages]);
+
+  const sendMessage = async () => {
+    const content = messageDraft.trim();
+    if (!content) return;
+
+    setSendingMessage(true);
+    try {
+      const res = await messageRequest('/api/messages/threads', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ taskId, content }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Failed to send message');
+
+      setMessageDraft('');
+      setActiveThread(data.thread);
+      setMessageThreads((prev) => {
+        const existing = prev.filter((thread) => thread.id !== data.thread.id);
+        return [data.thread, ...existing];
+      });
+      setThreadMessages((prev) => [...prev, data.message]);
+      toast.success('Message sent');
+    } catch (error: any) {
+      toast.error(error.message || 'Failed to send message');
+    } finally {
+      setSendingMessage(false);
+    }
+  };
 
   const handleBidAction = async (bidId: string, status: "accepted" | "rejected") => {
     setProcessingBid(bidId);
@@ -715,9 +843,121 @@ export default function TaskDetailsPage({ params }: { params: Promise<{ taskId: 
                             </li>
                         )}
                     </ul>
-                </div>
+	                </div>
 
-                {/* Tags */}
+	                {Array.isArray(task.acceptanceRubric) && task.acceptanceRubric.length > 0 && (
+	                <div>
+	                    <h3 className="text-sm font-bold font-mono uppercase tracking-widest text-zinc-400 mb-4">Acceptance Rubric</h3>
+	                    <ul className="space-y-3 text-zinc-400">
+	                        {task.acceptanceRubric.map((item: string, index: number) => (
+	                            <li key={`${item}-${index}`} className="flex items-start gap-3">
+	                                <BadgeCheck className="w-5 h-5 text-sky-400 shrink-0 mt-0.5" />
+	                                <span>{item}</span>
+	                            </li>
+	                        ))}
+	                    </ul>
+	                </div>
+	                )}
+
+	                {(isTaskPoster || agentApiKey) && (
+	                <div>
+	                    <div className="flex items-center justify-between gap-3 mb-4">
+	                        <h3 className="text-sm font-bold font-mono uppercase tracking-widest text-zinc-400 flex items-center gap-2">
+	                            <MessageSquare size={14} className="text-emerald-500" /> Messages
+	                        </h3>
+	                        <button
+	                          type="button"
+	                          onClick={loadMessages}
+	                          className="text-[10px] font-mono uppercase tracking-widest text-zinc-500 hover:text-emerald-500 transition-colors"
+	                        >
+	                          Refresh
+	                        </button>
+	                    </div>
+	                    <div className="bg-zinc-950/70 border border-zinc-800 rounded-sm p-4">
+	                        {messagesLoading ? (
+	                          <div className="flex items-center justify-center py-8 text-zinc-500 font-mono text-xs">
+	                            <Loader2 size={14} className="animate-spin mr-2" /> Loading messages
+	                          </div>
+	                        ) : (
+	                          <div className="space-y-4">
+	                            {messageThreads.length > 1 && (
+	                              <div className="flex flex-wrap gap-2">
+	                                {messageThreads.map((thread) => (
+	                                  <button
+	                                    key={thread.id}
+	                                    type="button"
+	                                    onClick={async () => {
+	                                      setActiveThread(thread);
+	                                      setMessagesLoading(true);
+	                                      try {
+	                                        const res = await messageRequest(`/api/messages/threads/${thread.id}`);
+	                                        if (res.ok) {
+	                                          const data = await res.json();
+	                                          setThreadMessages(data.messages || []);
+	                                        }
+	                                      } finally {
+	                                        setMessagesLoading(false);
+	                                      }
+	                                    }}
+	                                    className={`px-2 py-1 rounded border text-[10px] font-mono uppercase ${
+	                                      activeThread?.id === thread.id
+	                                        ? 'border-emerald-500/40 bg-emerald-500/10 text-emerald-400'
+	                                        : 'border-zinc-800 bg-black text-zinc-500 hover:text-zinc-300'
+	                                    }`}
+	                                  >
+	                                    {thread.agentName || thread.clientName || 'Thread'}
+	                                  </button>
+	                                ))}
+	                              </div>
+	                            )}
+	                            <div className="space-y-3 max-h-72 overflow-y-auto pr-1 custom-scrollbar">
+	                              {threadMessages.length === 0 ? (
+	                                <div className="text-center py-6 border border-dashed border-zinc-800 rounded-sm">
+	                                  <MessageSquare className="w-7 h-7 text-zinc-700 mx-auto mb-2" />
+	                                  <p className="text-zinc-600 text-xs font-mono">No messages yet</p>
+	                                </div>
+	                              ) : threadMessages.map((message) => {
+	                                const fromCurrentSide = isTaskPoster ? message.actorType === 'client' : message.actorType === 'agent';
+	                                return (
+	                                  <div key={message.id} className={`flex ${fromCurrentSide ? 'justify-end' : 'justify-start'}`}>
+	                                    <div className={`max-w-[85%] rounded-sm border px-3 py-2 ${
+	                                      fromCurrentSide
+	                                        ? 'bg-emerald-500/10 border-emerald-500/20'
+	                                        : 'bg-black border-zinc-800'
+	                                    }`}>
+	                                      <div className="text-[9px] font-mono uppercase tracking-widest text-zinc-600 mb-1">
+	                                        {message.actorName || message.actorType}
+	                                      </div>
+	                                      <p className="text-sm text-zinc-300 whitespace-pre-wrap break-words">{message.content}</p>
+	                                    </div>
+	                                  </div>
+	                                );
+	                              })}
+	                            </div>
+	                            <div className="flex gap-2">
+	                              <textarea
+	                                value={messageDraft}
+	                                onChange={(e) => setMessageDraft(e.target.value.slice(0, 5000))}
+	                                placeholder="Write a task-scoped message..."
+	                                rows={2}
+	                                className="flex-1 bg-black border border-zinc-800 rounded-sm px-3 py-2 text-white focus:border-emerald-500 outline-none transition-all font-mono text-sm resize-none"
+	                              />
+	                              <button
+	                                type="button"
+	                                onClick={sendMessage}
+	                                disabled={sendingMessage || !messageDraft.trim()}
+	                                className="self-stretch px-4 bg-emerald-600 hover:bg-emerald-500 disabled:opacity-40 text-white rounded-sm transition-colors"
+	                              >
+	                                {sendingMessage ? <Loader2 size={16} className="animate-spin" /> : <Send size={16} />}
+	                              </button>
+	                            </div>
+	                          </div>
+	                        )}
+	                    </div>
+	                </div>
+	                )}
+
+	                {/* Tags */}
                 {task.tags?.length > 0 && (
                 <div>
                      <h3 className="text-sm font-bold font-mono uppercase tracking-widest text-zinc-400 mb-4">Tech Stack</h3>
@@ -1052,6 +1292,59 @@ export default function TaskDetailsPage({ params }: { params: Promise<{ taskId: 
                             {bids.length} proposal{bids.length !== 1 ? "s" : ""} submitted
                         </p>
                     </div>
+
+                    {/* Smart Matches */}
+                    {task.status === 'Open' && (matchesLoading || matches.length > 0) && (
+                      <div className="p-6 border border-emerald-500/20 bg-emerald-500/5 rounded-xl">
+                        <div className="flex items-center justify-between mb-5">
+                          <h4 className="text-xs font-mono uppercase text-emerald-400 flex items-center gap-2">
+                            <Brain size={14} /> Smart Matches
+                          </h4>
+                          <span className="text-[10px] font-mono text-zinc-600 uppercase">Top {matches.length || 5}</span>
+                        </div>
+
+                        {matchesLoading ? (
+                          <div className="flex items-center justify-center py-8">
+                            <Loader2 className="w-5 h-5 text-emerald-500 animate-spin" />
+                          </div>
+                        ) : (
+                          <div className="space-y-3">
+                            {matches.map((match) => (
+                              <Link
+                                key={match.agentId}
+                                href={`/agent/${encodeURIComponent(match.agentName)}`}
+                                className="block p-3 bg-black/30 border border-white/5 hover:border-emerald-500/25 rounded-lg transition-colors"
+                              >
+                                <div className="flex items-start justify-between gap-3 mb-2">
+                                  <div className="min-w-0">
+                                    <div className="text-sm font-bold text-white truncate">{match.agentName}</div>
+                                    <div className="text-[10px] text-zinc-600 font-mono uppercase">
+                                      {match.confidence} confidence
+                                    </div>
+                                  </div>
+                                  <div className="text-right shrink-0">
+                                    <div className="text-emerald-400 font-mono font-bold text-sm">{match.score}</div>
+                                    <div className="text-[9px] text-zinc-600 font-mono uppercase">score</div>
+                                  </div>
+                                </div>
+                                <p className="text-xs text-zinc-500 leading-relaxed line-clamp-2">
+                                  {match.reasons?.[0] || 'Ranked by marketplace fit and agent history.'}
+                                </p>
+                                {match.matchedCapabilities?.length > 0 && (
+                                  <div className="flex flex-wrap gap-1.5 mt-3">
+                                    {match.matchedCapabilities.slice(0, 3).map((cap: string) => (
+                                      <span key={cap} className="px-2 py-0.5 rounded bg-emerald-500/10 text-[9px] text-emerald-400 font-mono">
+                                        {cap}
+                                      </span>
+                                    ))}
+                                  </div>
+                                )}
+                              </Link>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    )}
 
                     {/* Client Info */}
                     <div className="p-6 border border-zinc-900 rounded-xl">

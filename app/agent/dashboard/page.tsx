@@ -4,9 +4,9 @@ import React, { useState, useCallback, useEffect } from "react";
 import { Navbar } from "@/components/layout/Navbar";
 import { Footer } from "@/components/layout/Footer";
 import {
-  Wallet, Shield, Loader2, Key, ExternalLink, Copy,
-  DollarSign, CheckCircle, AlertTriangle, Bot, RefreshCw, BarChart3, Coins, RotateCw, ArrowLeft, ImagePlus, X
-} from "lucide-react";
+	  Wallet, Shield, Loader2, Key, ExternalLink, Copy,
+	  DollarSign, CheckCircle, AlertTriangle, Bot, RefreshCw, BarChart3, Coins, RotateCw, ArrowLeft, ImagePlus, X, Bell, Trash2, Plug
+	} from "lucide-react";
 import { toast } from "sonner";
 import { useRouter } from "next/navigation";
 
@@ -41,6 +41,75 @@ interface Payment {
   completedAt: string | null;
 }
 
+type WebhookEvent =
+  | 'task.created'
+  | 'bid.submitted'
+  | 'bid.accepted'
+  | 'bid.rejected'
+  | 'work.submitted'
+  | 'task.completed'
+  | 'payment.sent';
+
+interface WebhookSubscription {
+  id: string;
+  url: string;
+  events: WebhookEvent[];
+  active: boolean;
+  description: string | null;
+  createdAt: string;
+}
+
+interface WebhookDelivery {
+  id: string;
+  event: WebhookEvent;
+  url: string;
+  status: 'pending' | 'sending' | 'delivered' | 'failed';
+  attempts: number;
+  lastError: string | null;
+  createdAt: string;
+}
+
+interface AgentOpportunity {
+  taskId: string;
+  title: string;
+  category: string;
+  budget: string;
+  proposalsCount: number;
+  score: number;
+  confidence: 'high' | 'medium' | 'low';
+  matchedCapabilities: string[];
+  reasons: string[];
+  url: string;
+}
+
+interface PluginListing {
+  id: string;
+  name: string;
+  description: string;
+  category: string;
+  capabilities: string[];
+  authType: 'api_key' | 'oauth' | 'none';
+  verifiedPublisher: boolean;
+  installCount?: number;
+}
+
+interface PluginInstall {
+  pluginId: string;
+  pluginName?: string;
+  enabled: boolean;
+  capabilities?: string[];
+}
+
+const WEBHOOK_EVENTS: WebhookEvent[] = [
+  'task.created',
+  'bid.submitted',
+  'bid.accepted',
+  'bid.rejected',
+  'work.submitted',
+  'task.completed',
+  'payment.sent',
+];
+
 export default function AgentDashboardPage() {
   const router = useRouter();
   const [apiKey, setApiKey] = useState("");
@@ -51,6 +120,22 @@ export default function AgentDashboardPage() {
   const [payments, setPayments] = useState<Payment[]>([]);
   const [paymentSummary, setPaymentSummary] = useState<any>(null);
   const [error, setError] = useState("");
+  const [webhooks, setWebhooks] = useState<WebhookSubscription[]>([]);
+  const [webhookDeliveries, setWebhookDeliveries] = useState<WebhookDelivery[]>([]);
+  const [webhookLoading, setWebhookLoading] = useState(false);
+  const [opportunities, setOpportunities] = useState<AgentOpportunity[]>([]);
+  const [opportunitiesLoading, setOpportunitiesLoading] = useState(false);
+  const [pluginCatalog, setPluginCatalog] = useState<PluginListing[]>([]);
+  const [installedPlugins, setInstalledPlugins] = useState<PluginInstall[]>([]);
+  const [pluginsLoading, setPluginsLoading] = useState(false);
+  const [installingPlugin, setInstallingPlugin] = useState<string | null>(null);
+  const [creatingWebhook, setCreatingWebhook] = useState(false);
+  const [newWebhookSecret, setNewWebhookSecret] = useState<string | null>(null);
+  const [webhookForm, setWebhookForm] = useState({
+    url: "",
+    description: "",
+    events: ['bid.accepted', 'work.submitted', 'payment.sent'] as WebhookEvent[],
+  });
 
   // PIN setup flow
   const [needsPinSetup, setNeedsPinSetup] = useState(false);
@@ -104,8 +189,37 @@ export default function AgentDashboardPage() {
               setPayments(pd.payments || []);
               setPaymentSummary(pd.summary || null);
             }
-            if (profileData.agent?.solanaAddress) {
-              fetchBalances(profileData.agent.solanaAddress);
+            const [webhooksRes, deliveriesRes] = await Promise.all([
+              fetch('/api/webhooks', { headers: { 'x-hive-api-key': savedKey } }),
+              fetch('/api/webhooks/deliveries?limit=8', { headers: { 'x-hive-api-key': savedKey } }),
+            ]);
+            if (webhooksRes.ok) {
+              const wh = await webhooksRes.json();
+              setWebhooks(wh.webhooks || []);
+            }
+            if (deliveriesRes.ok) {
+              const deliveries = await deliveriesRes.json();
+              setWebhookDeliveries(deliveries.deliveries || []);
+            }
+	            const opportunitiesRes = await fetch('/api/agents/me/opportunities?limit=5', { headers: { 'x-hive-api-key': savedKey } });
+	            if (opportunitiesRes.ok) {
+	              const opportunitiesData = await opportunitiesRes.json();
+	              setOpportunities(opportunitiesData.opportunities || []);
+	            }
+	            const [pluginsRes, installedPluginsRes] = await Promise.all([
+	              fetch('/api/plugins'),
+	              fetch('/api/agents/me/plugins', { headers: { 'x-hive-api-key': savedKey } }),
+	            ]);
+	            if (pluginsRes.ok) {
+	              const pluginsData = await pluginsRes.json();
+	              setPluginCatalog(pluginsData.plugins || []);
+	            }
+	            if (installedPluginsRes.ok) {
+	              const installedData = await installedPluginsRes.json();
+	              setInstalledPlugins(installedData.plugins || []);
+	            }
+	            if (profileData.agent?.solanaAddress) {
+	              fetchBalances(profileData.agent.solanaAddress);
             }
           } else {
             // Key expired or invalid — clear it
@@ -131,6 +245,12 @@ export default function AgentDashboardPage() {
     setError('');
     setSolBalance(null);
     setUsdcBalance(null);
+    setWebhooks([]);
+    setWebhookDeliveries([]);
+    setOpportunities([]);
+    setPluginCatalog([]);
+    setInstalledPlugins([]);
+    setNewWebhookSecret(null);
   };
 
   const copyToClipboard = (text: string) => {
@@ -208,6 +328,189 @@ export default function AgentDashboardPage() {
     } catch { setUsdcBalance("0.00"); }
   }, []);
 
+  const loadWebhooks = useCallback(async (key = apiKey) => {
+    if (!key) return;
+    setWebhookLoading(true);
+    try {
+      const [webhooksRes, deliveriesRes] = await Promise.all([
+        fetch('/api/webhooks', { headers: { 'x-hive-api-key': key } }),
+        fetch('/api/webhooks/deliveries?limit=8', { headers: { 'x-hive-api-key': key } }),
+      ]);
+
+      if (webhooksRes.ok) {
+        const data = await webhooksRes.json();
+        setWebhooks(data.webhooks || []);
+      }
+
+      if (deliveriesRes.ok) {
+        const data = await deliveriesRes.json();
+        setWebhookDeliveries(data.deliveries || []);
+      }
+    } catch (err) {
+      console.error('Webhook load error:', err);
+    } finally {
+      setWebhookLoading(false);
+    }
+  }, [apiKey]);
+
+  const loadOpportunities = useCallback(async (key = apiKey) => {
+    if (!key) return;
+    setOpportunitiesLoading(true);
+    try {
+      const res = await fetch('/api/agents/me/opportunities?limit=5', {
+        headers: { 'x-hive-api-key': key },
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setOpportunities(data.opportunities || []);
+      }
+    } catch (err) {
+      console.error('Opportunities load error:', err);
+    } finally {
+      setOpportunitiesLoading(false);
+    }
+  }, [apiKey]);
+
+  const loadPlugins = useCallback(async (key = apiKey) => {
+    if (!key) return;
+    setPluginsLoading(true);
+    try {
+      const [catalogRes, installedRes] = await Promise.all([
+        fetch('/api/plugins'),
+        fetch('/api/agents/me/plugins', { headers: { 'x-hive-api-key': key } }),
+      ]);
+      if (catalogRes.ok) {
+        const data = await catalogRes.json();
+        setPluginCatalog(data.plugins || []);
+      }
+      if (installedRes.ok) {
+        const data = await installedRes.json();
+        setInstalledPlugins(data.plugins || []);
+      }
+    } catch (err) {
+      console.error('Plugins load error:', err);
+    } finally {
+      setPluginsLoading(false);
+    }
+  }, [apiKey]);
+
+  const installPlugin = async (pluginId: string) => {
+    setInstallingPlugin(pluginId);
+    try {
+      const res = await fetch(`/api/plugins/${pluginId}/install`, {
+        method: 'POST',
+        headers: { 'x-hive-api-key': apiKey },
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Failed to install plugin');
+      toast.success('Plugin installed');
+      await loadPlugins();
+    } catch (err: any) {
+      toast.error(err.message || 'Failed to install plugin');
+    } finally {
+      setInstallingPlugin(null);
+    }
+  };
+
+  const toggleWebhookEvent = (event: WebhookEvent) => {
+    setWebhookForm((prev) => ({
+      ...prev,
+      events: prev.events.includes(event)
+        ? prev.events.filter((item) => item !== event)
+        : [...prev.events, event],
+    }));
+  };
+
+  const webhookHostname = (url: string) => {
+    try {
+      return new URL(url).hostname;
+    } catch {
+      return url;
+    }
+  };
+
+  const createWebhook = async () => {
+    if (!webhookForm.url.trim()) {
+      toast.error('Webhook URL is required');
+      return;
+    }
+    if (webhookForm.events.length === 0) {
+      toast.error('Select at least one event');
+      return;
+    }
+
+    setCreatingWebhook(true);
+    try {
+      const res = await fetch('/api/webhooks', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-hive-api-key': apiKey,
+        },
+        body: JSON.stringify({
+          url: webhookForm.url.trim(),
+          events: webhookForm.events,
+          description: webhookForm.description.trim() || undefined,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.error || 'Failed to create webhook');
+      }
+
+      setNewWebhookSecret(data.webhook.secret);
+      setWebhookForm({
+        url: '',
+        description: '',
+        events: ['bid.accepted', 'work.submitted', 'payment.sent'],
+      });
+      toast.success('Webhook created');
+      await loadWebhooks();
+    } catch (err: any) {
+      toast.error(err.message || 'Failed to create webhook');
+    } finally {
+      setCreatingWebhook(false);
+    }
+  };
+
+  const updateWebhookActive = async (webhookId: string, active: boolean) => {
+    try {
+      const res = await fetch(`/api/webhooks/${webhookId}`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-hive-api-key': apiKey,
+        },
+        body: JSON.stringify({ active }),
+      });
+      if (!res.ok) {
+        const data = await res.json();
+        throw new Error(data.error || 'Failed to update webhook');
+      }
+      setWebhooks((prev) => prev.map((webhook) => webhook.id === webhookId ? { ...webhook, active } : webhook));
+      toast.success(active ? 'Webhook enabled' : 'Webhook paused');
+    } catch (err: any) {
+      toast.error(err.message || 'Failed to update webhook');
+    }
+  };
+
+  const deleteWebhook = async (webhookId: string) => {
+    try {
+      const res = await fetch(`/api/webhooks/${webhookId}`, {
+        method: 'DELETE',
+        headers: { 'x-hive-api-key': apiKey },
+      });
+      if (!res.ok) {
+        const data = await res.json();
+        throw new Error(data.error || 'Failed to delete webhook');
+      }
+      setWebhooks((prev) => prev.filter((webhook) => webhook.id !== webhookId));
+      toast.success('Webhook deleted');
+    } catch (err: any) {
+      toast.error(err.message || 'Failed to delete webhook');
+    }
+  };
+
   const loadDashboard = async () => {
     if (!apiKey.startsWith("hive_sk_")) {
       setError("Invalid API key format. Must start with hive_sk_");
@@ -271,6 +574,10 @@ export default function AgentDashboardPage() {
         setPayments(paymentsData.payments || []);
         setPaymentSummary(paymentsData.summary || null);
       }
+
+      await loadWebhooks();
+      await loadOpportunities();
+      await loadPlugins();
 
       // Fetch Solana balance if address set
       if (agent?.solanaAddress) {
@@ -1099,6 +1406,270 @@ export default function AgentDashboardPage() {
                     <div className="text-[10px] text-zinc-500 font-mono uppercase mb-1">Active Bids</div>
                     <div className="text-2xl font-black font-mono text-white">{stats?.activeBids || 0}</div>
                   </div>
+                </div>
+
+                {/* Opportunities */}
+                <div className="bg-zinc-900/30 border border-zinc-800 rounded-lg p-6">
+                  <div className="flex items-center justify-between mb-4">
+                    <h3 className="text-sm font-bold font-mono uppercase tracking-widest text-zinc-400 flex items-center gap-2">
+                      <BarChart3 size={14} className="text-emerald-500" /> Opportunities
+                    </h3>
+                    <button
+                      onClick={() => loadOpportunities()}
+                      className="text-[10px] font-mono uppercase tracking-widest text-zinc-500 hover:text-emerald-500 transition-colors flex items-center gap-1"
+                    >
+                      {opportunitiesLoading ? <Loader2 size={10} className="animate-spin" /> : <RefreshCw size={10} />} Refresh
+                    </button>
+                  </div>
+
+                  {opportunities.length === 0 ? (
+                    <div className="text-center py-8">
+                      <BarChart3 className="w-8 h-8 text-zinc-700 mx-auto mb-3" />
+                      <p className="text-zinc-600 text-xs font-mono">No ranked opportunities yet</p>
+                      <p className="text-zinc-700 text-[10px] font-mono mt-1">Open tasks matching your capabilities show here</p>
+                    </div>
+                  ) : (
+                    <div className="space-y-2">
+                      {opportunities.map((opportunity) => (
+                        <a
+                          key={opportunity.taskId}
+                          href={opportunity.url}
+                          className="block p-3 bg-black/30 border border-zinc-800/50 rounded hover:border-emerald-500/25 transition-colors"
+                        >
+                          <div className="flex items-start justify-between gap-3 mb-2">
+                            <div className="min-w-0">
+                              <div className="text-xs font-mono text-white truncate">{opportunity.title}</div>
+                              <div className="text-[10px] text-zinc-600 font-mono">
+                                {opportunity.category} · {opportunity.budget} · {opportunity.proposalsCount} proposal{opportunity.proposalsCount === 1 ? '' : 's'}
+                              </div>
+                            </div>
+                            <div className="shrink-0 text-right">
+                              <div className="text-emerald-400 font-mono font-bold text-sm">{opportunity.score}</div>
+                              <div className="text-[8px] text-zinc-600 font-mono uppercase">{opportunity.confidence}</div>
+                            </div>
+                          </div>
+                          <p className="text-[10px] text-zinc-500 line-clamp-2">{opportunity.reasons[0]}</p>
+                        </a>
+                      ))}
+                    </div>
+                  )}
+	                </div>
+
+	                {/* Plugins */}
+	                <div className="bg-zinc-900/30 border border-zinc-800 rounded-lg p-6">
+	                  <div className="flex items-center justify-between mb-4">
+	                    <h3 className="text-sm font-bold font-mono uppercase tracking-widest text-zinc-400 flex items-center gap-2">
+	                      <Plug size={14} className="text-violet-400" /> Plugins
+	                    </h3>
+	                    <button
+	                      onClick={() => loadPlugins()}
+	                      className="text-[10px] font-mono uppercase tracking-widest text-zinc-500 hover:text-violet-400 transition-colors flex items-center gap-1"
+	                    >
+	                      {pluginsLoading ? <Loader2 size={10} className="animate-spin" /> : <RefreshCw size={10} />} Refresh
+	                    </button>
+	                  </div>
+
+	                  {pluginCatalog.length === 0 ? (
+	                    <div className="text-center py-8">
+	                      <Plug className="w-8 h-8 text-zinc-700 mx-auto mb-3" />
+	                      <p className="text-zinc-600 text-xs font-mono">No approved plugins yet</p>
+	                    </div>
+	                  ) : (
+	                    <div className="space-y-2">
+	                      {pluginCatalog.map((plugin) => {
+	                        const installed = installedPlugins.some((install) => install.pluginId === plugin.id && install.enabled !== false);
+	                        return (
+	                          <div key={plugin.id} className="p-3 bg-black/30 border border-zinc-800/50 rounded">
+	                            <div className="flex items-start justify-between gap-3">
+	                              <div className="min-w-0">
+	                                <div className="flex items-center gap-2 mb-1">
+	                                  <div className="text-xs font-mono text-white truncate">{plugin.name}</div>
+	                                  {plugin.verifiedPublisher && (
+	                                    <span className="text-[8px] font-mono uppercase bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 px-1.5 py-0.5 rounded">
+	                                      Verified
+	                                    </span>
+	                                  )}
+	                                </div>
+	                                <p className="text-[10px] text-zinc-500 line-clamp-2 mb-2">{plugin.description}</p>
+	                                <div className="flex flex-wrap gap-1">
+	                                  <span className="px-1.5 py-0.5 bg-zinc-900 text-zinc-500 rounded text-[8px] font-mono uppercase">
+	                                    {plugin.category}
+	                                  </span>
+	                                  {plugin.capabilities.slice(0, 3).map((capability) => (
+	                                    <span key={capability} className="px-1.5 py-0.5 bg-violet-500/10 text-violet-300 rounded text-[8px] font-mono">
+	                                      {capability}
+	                                    </span>
+	                                  ))}
+	                                </div>
+	                              </div>
+	                              <button
+	                                onClick={() => installPlugin(plugin.id)}
+	                                disabled={installed || installingPlugin === plugin.id}
+	                                className={`shrink-0 px-3 py-1.5 rounded text-[9px] font-mono uppercase border transition-colors ${
+	                                  installed
+	                                    ? 'border-emerald-500/30 bg-emerald-500/10 text-emerald-400'
+	                                    : 'border-violet-500/30 bg-violet-500/10 text-violet-300 hover:bg-violet-500/20'
+	                                } disabled:opacity-70`}
+	                              >
+	                                {installingPlugin === plugin.id ? 'Installing' : installed ? 'Installed' : 'Install'}
+	                              </button>
+	                            </div>
+	                          </div>
+	                        );
+	                      })}
+	                    </div>
+	                  )}
+	                </div>
+
+	                {/* Webhooks */}
+	                <div className="bg-zinc-900/30 border border-zinc-800 rounded-lg p-6">
+                  <div className="flex items-center justify-between mb-4">
+                    <h3 className="text-sm font-bold font-mono uppercase tracking-widest text-zinc-400 flex items-center gap-2">
+                      <Bell size={14} className="text-blue-400" /> Webhooks
+                    </h3>
+                    <button
+                      onClick={() => loadWebhooks()}
+                      className="text-[10px] font-mono uppercase tracking-widest text-zinc-500 hover:text-blue-400 transition-colors flex items-center gap-1"
+                    >
+                      {webhookLoading ? <Loader2 size={10} className="animate-spin" /> : <RefreshCw size={10} />} Refresh
+                    </button>
+                  </div>
+
+                  {newWebhookSecret && (
+                    <div className="mb-4 bg-emerald-500/5 border border-emerald-500/20 p-3 rounded">
+                      <div className="flex items-center justify-between gap-3 mb-2">
+                        <p className="text-emerald-400 text-[11px] font-mono font-bold">Signing secret created</p>
+                        <button
+                          onClick={() => setNewWebhookSecret(null)}
+                          className="text-zinc-600 hover:text-zinc-300"
+                        >
+                          <X size={12} />
+                        </button>
+                      </div>
+                      <p className="text-amber-400 text-[10px] font-mono mb-2">Save this secret now. It is only shown once.</p>
+                      <div className="bg-black border border-zinc-700 rounded p-2 flex items-center gap-2">
+                        <code className="flex-1 text-[10px] font-mono text-emerald-400 break-all">{newWebhookSecret}</code>
+                        <button
+                          onClick={() => copyToClipboard(newWebhookSecret)}
+                          className="shrink-0 p-1.5 bg-zinc-800 hover:bg-zinc-700 text-zinc-400 rounded transition-colors"
+                        >
+                          <Copy size={12} />
+                        </button>
+                      </div>
+                    </div>
+                  )}
+
+                  <div className="space-y-3 mb-5">
+                    <input
+                      type="url"
+                      value={webhookForm.url}
+                      onChange={(e) => setWebhookForm((prev) => ({ ...prev, url: e.target.value }))}
+                      placeholder="https://your-agent.com/hive/webhook"
+                      className="w-full bg-black border border-zinc-800 rounded-sm px-3 py-2.5 text-white text-xs font-mono outline-none focus:border-blue-500 transition-colors"
+                    />
+                    <input
+                      type="text"
+                      value={webhookForm.description}
+                      onChange={(e) => setWebhookForm((prev) => ({ ...prev, description: e.target.value }))}
+                      placeholder="Description (optional)"
+                      className="w-full bg-black border border-zinc-800 rounded-sm px-3 py-2.5 text-white text-xs font-mono outline-none focus:border-blue-500 transition-colors"
+                    />
+                    <div className="grid grid-cols-2 gap-2">
+                      {WEBHOOK_EVENTS.map((event) => (
+                        <button
+                          key={event}
+                          type="button"
+                          onClick={() => toggleWebhookEvent(event)}
+                          className={`px-2 py-1.5 border rounded text-[9px] font-mono uppercase transition-colors ${
+                            webhookForm.events.includes(event)
+                              ? 'border-blue-500/40 bg-blue-500/10 text-blue-300'
+                              : 'border-zinc-800 bg-black/30 text-zinc-600 hover:text-zinc-400'
+                          }`}
+                        >
+                          {event}
+                        </button>
+                      ))}
+                    </div>
+                    <button
+                      onClick={createWebhook}
+                      disabled={creatingWebhook || !webhookForm.url.trim() || webhookForm.events.length === 0}
+                      className="w-full py-2.5 bg-blue-600 hover:bg-blue-500 text-white font-bold font-mono text-[10px] uppercase tracking-widest rounded-sm transition-colors disabled:opacity-40 flex items-center justify-center gap-2"
+                    >
+                      {creatingWebhook ? <Loader2 size={12} className="animate-spin" /> : <Bell size={12} />}
+                      {creatingWebhook ? 'Creating...' : 'Create Webhook'}
+                    </button>
+                  </div>
+
+                  <div className="space-y-2">
+                    {webhooks.length === 0 ? (
+                      <div className="text-center py-5 border border-dashed border-zinc-800 rounded">
+                        <p className="text-zinc-600 text-xs font-mono">No webhooks configured</p>
+                      </div>
+                    ) : webhooks.map((webhook) => (
+                      <div key={webhook.id} className="p-3 bg-black/30 border border-zinc-800/50 rounded">
+                        <div className="flex items-start justify-between gap-3 mb-2">
+                          <div className="min-w-0">
+                            <div className="text-xs font-mono text-white truncate">{webhook.description || webhookHostname(webhook.url)}</div>
+                            <div className="text-[10px] text-zinc-600 font-mono truncate">{webhook.url}</div>
+                          </div>
+                          <div className="flex items-center gap-2 shrink-0">
+                            <button
+                              onClick={() => updateWebhookActive(webhook.id, !webhook.active)}
+                              className={`px-2 py-1 rounded text-[9px] font-mono uppercase border transition-colors ${
+                                webhook.active
+                                  ? 'border-emerald-500/30 bg-emerald-500/10 text-emerald-400'
+                                  : 'border-zinc-700 bg-zinc-900 text-zinc-500'
+                              }`}
+                            >
+                              {webhook.active ? 'Active' : 'Paused'}
+                            </button>
+                            <button
+                              onClick={() => deleteWebhook(webhook.id)}
+                              className="p-1.5 text-zinc-600 hover:text-red-400 transition-colors"
+                            >
+                              <Trash2 size={12} />
+                            </button>
+                          </div>
+                        </div>
+                        <div className="flex flex-wrap gap-1.5">
+                          {webhook.events.slice(0, 4).map((event) => (
+                            <span key={event} className="px-1.5 py-0.5 bg-zinc-900 text-zinc-500 rounded text-[8px] font-mono">
+                              {event}
+                            </span>
+                          ))}
+                          {webhook.events.length > 4 && (
+                            <span className="px-1.5 py-0.5 bg-zinc-900 text-zinc-600 rounded text-[8px] font-mono">
+                              +{webhook.events.length - 4}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+
+                  {webhookDeliveries.length > 0 && (
+                    <div className="mt-5 pt-4 border-t border-zinc-800">
+                      <h4 className="text-[10px] font-mono uppercase tracking-widest text-zinc-500 mb-3">Recent Deliveries</h4>
+                      <div className="space-y-1.5">
+                        {webhookDeliveries.map((delivery) => (
+                          <div key={delivery.id} className="flex items-center justify-between gap-3 text-[10px] font-mono">
+                            <span className="text-zinc-500 truncate">{delivery.event}</span>
+                            <span className={`shrink-0 uppercase ${
+                              delivery.status === 'delivered'
+                                ? 'text-emerald-400'
+                                : delivery.status === 'failed'
+                                  ? 'text-red-400'
+                                  : delivery.status === 'sending'
+                                    ? 'text-blue-400'
+                                    : 'text-amber-400'
+                            }`}>
+                              {delivery.status}
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
                 </div>
 
                 {/* Payment History */}

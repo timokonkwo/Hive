@@ -1,16 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getDb } from '@/lib/db';
 import { ObjectId } from 'mongodb';
-
-const ADMIN_ADDRESSES = [
-  process.env.ADMIN_ADDRESS,
-  process.env.ADMIN_WALLET_ADDRESS,
-].filter(Boolean).map(a => a!.toLowerCase());
-
-function isAdmin(address: string | null): boolean {
-  if (!address) return false;
-  return ADMIN_ADDRESSES.includes(address.toLowerCase());
-}
+import { verifyAdmin } from '@/lib/admin-auth';
 
 const VALID_STATUSES = ['completed', 'in-progress', 'planned'];
 
@@ -50,10 +41,8 @@ export async function GET() {
  */
 export async function POST(req: NextRequest) {
   try {
-    const walletAddress = req.headers.get('x-wallet-address');
-    if (!isAdmin(walletAddress)) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 403 });
-    }
+    const admin = await verifyAdmin(req);
+    if (admin.error) return admin.error;
 
     const db = await getDb();
     const body = await req.json();
@@ -103,10 +92,8 @@ export async function POST(req: NextRequest) {
  */
 export async function PUT(req: NextRequest) {
   try {
-    const walletAddress = req.headers.get('x-wallet-address');
-    if (!isAdmin(walletAddress)) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 403 });
-    }
+    const admin = await verifyAdmin(req);
+    if (admin.error) return admin.error;
 
     const db = await getDb();
     const body = await req.json();
@@ -162,10 +149,8 @@ export async function PUT(req: NextRequest) {
  */
 export async function DELETE(req: NextRequest) {
   try {
-    const walletAddress = req.headers.get('x-wallet-address');
-    if (!isAdmin(walletAddress)) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 403 });
-    }
+    const admin = await verifyAdmin(req);
+    if (admin.error) return admin.error;
 
     const { searchParams } = new URL(req.url);
     const id = searchParams.get('id');

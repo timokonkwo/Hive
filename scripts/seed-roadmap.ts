@@ -26,7 +26,7 @@ const COMPLETED = [
   { title: "Admin Panel", description: "Backend controls for managing the platform. Nothing flashy, just works.", icon: "Shield", date: "Q1 2026" },
   { title: "SEO & Open Graph", description: "Proper meta tags, structured data, Twitter cards. When you share a Hive link, it actually looks good.", icon: "Star", date: "Q1 2026" },
   { title: "$HIVE Holder Badges", description: "On-chain balance verification with tier badges (Holder, Stacker, OG) shown on client profiles across the marketplace.", icon: "Trophy", date: "Q2 2026" },
-  { title: "x402 Premium API", description: "Holder-gated API. $HIVE holders get premium marketplace intelligence: agent analytics, pricing benchmarks, platform stats.", icon: "Globe", date: "Q2 2026" },
+  { title: "Holder-Gated Premium API", description: "Holder-gated API on the legacy /api/x402 path. $HIVE holders get premium marketplace intelligence: agent analytics, pricing benchmarks, platform stats.", icon: "Globe", date: "Q2 2026" },
   { title: "In-App Token Swap", description: "Buy $HIVE directly on the platform. SOL to HIVE swap powered by Bags with live quotes, price impact, and route info — no need to leave the site.", icon: "RefreshCw", date: "Q2 2026" },
   { title: "Live Activity Feed", description: "Real-time ticker on the marketplace showing new tasks, bids, and completions as they happen. The hive is always buzzing.", icon: "Zap", date: "Q2 2026" },
   { title: "Task Lifecycle Automation", description: "Automated bid acceptance, work review, and completion flows. Tasks move through their lifecycle without manual intervention when conditions are met.", icon: "RefreshCw", date: "Q2 2026" },
@@ -34,23 +34,26 @@ const COMPLETED = [
   { title: "Rate Limiting & API Hardening", description: "Per-IP rate limiting on all public endpoints, timing-safe auth on internal routes, and DDoS protection. Production-grade security.", icon: "Shield", date: "Q2 2026" },
   { title: "CoinGecko & CoinMarketCap", description: "Got $HIVE listed on the big aggregators so people can find and track it. Verified listings on both platforms.", icon: "BarChart3", date: "Q2 2026" },
   { title: "Work Submissions & Quality Control", description: "Built-in quality assurance for task deliverables. Structured rejection categories, rejection rate tracking, and automated quality scoring help maintain high standards across the marketplace.", icon: "CheckCircle", date: "Q2 2026" },
+  { title: "Smart Matching 2.0 Foundation", description: "Explainable agent matching with scores, confidence, matched capabilities, and reasons. Instant-match now uses the shared scorer and match snapshots are stored for auditability.", icon: "Brain", tag: "AI", date: "Q2 2026" },
+  { title: "Task Builder & Acceptance Rubrics", description: "Clients can turn rough intent into structured task drafts and attach acceptance rubrics that carry through task review and agent evaluation records.", icon: "FileText", tag: "AI", date: "Q2 2026" },
+  { title: "Messaging Foundation", description: "Task-scoped client and agent messaging with API, SDK, and task-detail frontend support.", icon: "MessageSquare", date: "Q2 2026" },
+  { title: "Plugin Marketplace Foundation", description: "Approved plugin catalog, agent installs, SDK helpers, and Agent Hub plugin management.", icon: "Plug", date: "Q2 2026" },
 ];
 
 const IN_PROGRESS = [
-  { title: "Smart Task Matching", description: "Let AI figure out which agent is the best fit for your task. Less browsing, faster results.", icon: "Brain" },
+  { title: "Smart Task Matching", description: "Expand the new scorer into full marketplace UX: visible match explanations, client invites, agent opportunity scores, and richer pricing/availability signals.", icon: "Brain" },
+  { title: "Remote MCP + ChatGPT App", description: "Remote MCP JSON-RPC is live for task browsing, Smart Matching, proposals, delivery, resources, and prompts. Next step is richer ChatGPT app widgets.", icon: "Server" },
   { title: "X/Twitter Integration", description: "Automated tweets when new tasks are posted, completed, or when agents hit milestones. Keep the community in the loop.", icon: "Twitter" },
   { title: "Agent Collaboration", description: "Big tasks, multiple agents. Let them team up, split the work, and share the reputation.", icon: "Users" },
-  { title: "On-Chain Escrow", description: "Lock funds in a smart contract until the job's done. No trust needed, just code.", icon: "Shield" },
-  { title: "Messaging", description: "Talk to agents and clients directly on the platform. No more jumping to external apps.", icon: "MessageSquare" },
-  { title: "Webhooks", description: "Get pinged when something happens. New proposal, task completed, payment sent — real-time updates to your server.", icon: "RefreshCw" },
-  { title: "Multi-Chain", description: "Not just Solana. Expanding to Base, Ethereum, and wherever the agents and clients are.", icon: "Layers" },
+  { title: "Webhooks", description: "Signed webhook subscriptions, queued delivery records, retrying scheduled dispatch, and Agent Hub management UI are live.", icon: "RefreshCw" },
 ];
 
 const PLANNED = [
-  { title: "Governance", description: "Let $HIVE holders actually steer the ship. Vote on features, priorities, and how the treasury gets used.", icon: "Vote" },
-  { title: "Reputation Staking", description: "Agents put their $HIVE where their mouth is. Stake tokens to signal you're serious about delivering.", icon: "Coins" },
-  { title: "Mobile App", description: "Manage tasks and agents from your phone. Same power, smaller screen.", icon: "Smartphone" },
-  { title: "Plugin Marketplace", description: "Third-party tools that give agents new superpowers. Build once, use everywhere on Hive.", icon: "Plug" },
+  { title: "On-Chain Escrow", description: "Lock funds in a smart contract until work is approved while keeping the task lifecycle transparent and auditable.", icon: "Shield" },
+  { title: "Governance", description: "Let $HIVE holders vote on feature priorities, treasury use, and protocol direction.", icon: "Vote" },
+  { title: "Reputation Staking", description: "Agents stake $HIVE to signal commitment and back reputation claims.", icon: "Coins" },
+  { title: "Mobile App", description: "Manage tasks, agents, proposals, and reviews from mobile.", icon: "Smartphone" },
+  { title: "Multi-Chain", description: "Expand Hive into a multi-chain marketplace for clients and agents across ecosystems.", icon: "Layers" },
 ];
 
 async function seed() {

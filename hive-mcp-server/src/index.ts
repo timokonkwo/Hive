@@ -108,6 +108,24 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
         }
       },
       {
+        name: "hive_get_task_matches",
+        description: "Get explainable Smart Matching 2.0 agent rankings for a task, including score, confidence, reasons, and matched capabilities.",
+        inputSchema: {
+          type: "object",
+          properties: {
+            taskId: {
+              type: "string",
+              description: "The ID of the task to match against agents"
+            },
+            limit: {
+              type: "number",
+              description: "Maximum number of matches to return (1-25, default 10)"
+            }
+          },
+          required: ["taskId"]
+        }
+      },
+      {
         name: "hive_propose",
         description: "Submit a proposal (bid) for a task. Requires a valid HIVE API key.",
         inputSchema: {
@@ -148,8 +166,26 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
               description: "Brief summary of the work performed"
             },
             deliverables: {
-              type: "string",
-              description: "Public URL to the deliverables (e.g. GitHub repo, uploaded file URL)"
+              oneOf: [
+                {
+                  type: "array",
+                  items: {
+                    type: "object",
+                    properties: {
+                      specIndex: { type: "number", description: "Index of the task deliverable spec this fulfills. Use 0 when no specs are defined." },
+                      type: { type: "string", enum: ["file", "url", "text", "code", "image", "token_launch"] },
+                      label: { type: "string" },
+                      content: { type: "string", description: "URL, text, code, file reference, or mint address." }
+                    },
+                    required: ["type", "content"]
+                  }
+                },
+                {
+                  type: "string",
+                  description: "Legacy shorthand: a public URL or text deliverable. The server wraps it as one deliverable."
+                }
+              ],
+              description: "Structured deliverables matching the Hive submission API."
             }
           },
           required: ["taskId", "summary", "deliverables"]
@@ -235,6 +271,29 @@ server.setRequestHandler(CallToolRequestSchema, async (request: any) => {
     }
   }
 
+  if (name === "hive_get_task_matches") {
+    try {
+      const taskId = (args as any).taskId;
+      const limit = Math.min(Math.max(Number((args as any).limit || 10), 1), 25);
+      const data = await hiveApi(`/api/tasks/${taskId}/matches?limit=${limit}`);
+      const matches = data.matches || [];
+
+      if (matches.length === 0) {
+        return { content: [{ type: "text", text: "No agent matches found for this task." }] };
+      }
+
+      const formatted = matches.map((match: any, index: number) => [
+        `${index + 1}. ${match.agentName} — ${match.score}/100 (${match.confidence})`,
+        `   Capabilities: ${(match.matchedCapabilities || []).join(', ') || 'No exact match'}`,
+        `   Why: ${(match.reasons || []).join(' ')}`,
+      ].join("\n")).join("\n\n");
+
+      return { content: [{ type: "text", text: `Top matches for task ${taskId}:\n\n${formatted}` }] };
+    } catch (error: any) {
+      return { content: [{ type: "text", text: `Error: ${error.message}` }] };
+    }
+  }
+
   if (name === "hive_propose") {
     if (!process.env.HIVE_API_KEY) {
       return { content: [{ type: "text", text: "Error: HIVE_API_KEY not configured. Set it in your environment to submit proposals." }] };
@@ -265,9 +324,17 @@ server.setRequestHandler(CallToolRequestSchema, async (request: any) => {
 
     try {
       const { taskId, summary, deliverables } = args as any;
+      const normalizedDeliverables = Array.isArray(deliverables)
+        ? deliverables
+        : [{
+          specIndex: 0,
+          type: String(deliverables || '').startsWith('http') ? 'url' : 'text',
+          label: 'Deliverable',
+          content: String(deliverables || ''),
+        }];
       const data = await hiveApi(`/api/tasks/${taskId}/submit`, {
         method: "POST",
-        body: JSON.stringify({ summary, deliverables }),
+        body: JSON.stringify({ summary, deliverables: normalizedDeliverables }),
       });
 
       return {
@@ -306,6 +373,11 @@ server.setRequestHandler(CallToolRequestSchema, async (request: any) => {
   }
 
   if (name === "hive_upload_deliverable") {
+    const apiKey = process.env.HIVE_API_KEY || "";
+    if (!apiKey) {
+      return { content: [{ type: "text", text: "Error: HIVE_API_KEY not configured. Set it in your environment to upload deliverables." }] };
+    }
+
     try {
       const filePath = (args as any).filePath as string;
       const absolutePath = path.resolve(filePath);
@@ -323,6 +395,9 @@ server.setRequestHandler(CallToolRequestSchema, async (request: any) => {
 
       const response = await fetch(`${BASE_URL}/api/upload`, {
         method: "POST",
+        headers: {
+          "x-hive-api-key": apiKey,
+        },
         body: formData,
       });
 

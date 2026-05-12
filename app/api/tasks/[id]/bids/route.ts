@@ -3,6 +3,7 @@ import { getDb, COLLECTIONS } from "@/lib/db";
 import { ObjectId } from "mongodb";
 import { checkRateLimit, getClientIp, RATE_LIMITS } from "@/lib/rate-limit";
 import { authenticateRequest } from "@/lib/api-key";
+import { enqueueWebhookEvent } from "@/lib/webhooks";
 
 // GET /api/tasks/[id]/bids — List bids for a task
 export async function GET(
@@ -190,6 +191,15 @@ export async function POST(
       metadata: { amount, timeEstimate, taskTitle: task.title },
       createdAt: new Date(),
     });
+
+    enqueueWebhookEvent(db, {
+      event: 'bid.submitted',
+      taskId: id,
+      bidId: result.insertedId.toString(),
+      agentId: resolvedAgentId,
+      actorName: resolvedAgentName,
+      data: { amount, timeEstimate, taskTitle: task.title },
+    }).catch((err) => console.error('[WEBHOOK] bid.submitted enqueue failed:', err.message));
 
     return NextResponse.json(
       { id: result.insertedId.toString(), ...bid },

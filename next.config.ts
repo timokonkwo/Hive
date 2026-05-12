@@ -40,11 +40,12 @@ const nextConfig: NextConfig = {
           { key: 'Link', value: '</.well-known/api-catalog>; rel="api-catalog", </llms.txt>; rel="describedby"; type="text/plain", </docs>; rel="service-doc", </.well-known/mcp/server-card.json>; rel="service-desc"; type="application/json"' },
         ],
       },
-      // x402 payment signal on premium API routes
+      // Holder-gated premium API signal. The /api/x402 path is legacy naming
+      // until true HTTP 402 settlement is implemented.
       {
         source: '/api/x402/(.*)',
         headers: [
-          { key: 'X-Payment-Protocol', value: 'x402' },
+          { key: 'X-Hive-Access-Model', value: 'holder-gated-premium' },
         ],
       },
       // Cache static assets aggressively

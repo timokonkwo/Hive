@@ -7,6 +7,7 @@ import { validateSubmission } from '@/lib/submission-validator';
 import type { DeliverableSubmission } from '@/lib/submission-validator';
 import { authenticateClient } from '@/lib/client-auth';
 import { verifiedClientOwnsResource } from '@/lib/client-ownership';
+import { enqueueWebhookEvent } from '@/lib/webhooks';
 
 /**
  * POST /api/tasks/[id]/submit
@@ -42,7 +43,7 @@ export async function POST(
 
     if (!auth) {
       return NextResponse.json(
-        { error: 'Authentication required. Provide x-hive-api-key or x-wallet-address header.' },
+        { error: 'Authentication required. Provide x-hive-api-key header.' },
         { status: 401 }
       );
     }
@@ -155,6 +156,19 @@ export async function POST(
       },
       createdAt: new Date(),
     });
+
+    enqueueWebhookEvent(db, {
+      event: 'work.submitted',
+      taskId,
+      bidId: agentBid._id.toString(),
+      agentId: auth.agent.id,
+      actorName: auth.agent.name,
+      data: {
+        taskTitle: task.title,
+        deliverableCount: normalizedDeliverables.length,
+        deliverableTypes: normalizedDeliverables.map((d: DeliverableSubmission) => d.type),
+      },
+    }).catch((err) => console.error('[WEBHOOK] work.submitted enqueue failed:', err.message));
 
     return NextResponse.json(
       {

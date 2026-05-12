@@ -6,7 +6,8 @@ import { useAuthFetch } from "@/hooks/useAuthFetch";
 import { useRouter, useSearchParams } from "next/navigation";
 import { 
   Shield, ArrowLeft, Loader2, Code, FileText, Cpu, PenTool, CheckCircle, 
-  Search, Megaphone, Palette, Languages, Scale, Briefcase, Rocket, Bot, Zap
+  Search, Megaphone, Palette, Languages, Scale, Briefcase, Rocket, Bot, Zap,
+  WandSparkles, Plus, Trash2
 } from "lucide-react";
 import Link from "next/link";
 import { toast } from "sonner";
@@ -49,6 +50,8 @@ function CreateTaskContent() {
   const [isPending, setIsPending] = useState(false);
   const [isSuccess, setIsSuccess] = useState(false);
   const [instantMatch, setInstantMatch] = useState(false);
+  const [draftPrompt, setDraftPrompt] = useState("");
+  const [draftingTask, setDraftingTask] = useState(false);
 
   // Token Launch config
   const [tokenConfig, setTokenConfig] = useState<{
@@ -89,6 +92,9 @@ function CreateTaskContent() {
         budget: `$${formData.budget} USDC`,
         clientAddress: walletAddress,
         clientName: `${walletAddress.slice(0, 6)}...${walletAddress.slice(-4)}`,
+        acceptanceRubric: (formData.acceptanceRubric || [])
+          .map((item: string) => item.trim())
+          .filter(Boolean),
       };
 
       // Add tokenConfig for Token Launch tasks only if user provided preferences
@@ -164,21 +170,84 @@ function CreateTaskContent() {
   const STORAGE_KEY = 'hive_create_task_draft';
 
   // Restore draft from sessionStorage on mount
-  const getInitialFormData = (): Partial<TaskMetadata> & { budget: string; requirements?: string } => {
-    if (typeof window === 'undefined') return { category: 'Development', tags: [], budget: '', requirements: '' };
+  const getInitialFormData = (): Partial<TaskMetadata> & { budget: string; requirements?: string; acceptanceRubric?: string[] } => {
+    if (typeof window === 'undefined') return { category: 'Development', tags: [], budget: '', requirements: '', acceptanceRubric: [] };
     try {
       const saved = sessionStorage.getItem(STORAGE_KEY);
       if (saved) {
         const parsed = JSON.parse(saved);
-        return parsed.formData || { category: 'Development', tags: [], budget: '', requirements: '' };
+	        return parsed.formData || { category: 'Development', tags: [], budget: '', requirements: '', acceptanceRubric: [] };
       }
     } catch {}
-    return { category: 'Development', tags: [], budget: '', requirements: '' };
+    return { category: 'Development', tags: [], budget: '', requirements: '', acceptanceRubric: [] };
   };
 
 
   const [step, setStep] = useState<1 | 2 | 3>(1);
-  const [formData, setFormData] = useState<Partial<TaskMetadata> & { budget: string; requirements?: string }>(getInitialFormData);
+  const [formData, setFormData] = useState<Partial<TaskMetadata> & { budget: string; requirements?: string; acceptanceRubric?: string[] }>(getInitialFormData);
+
+  const applyTaskDraft = async () => {
+    if (draftPrompt.trim().length < 20) {
+      toast.error("Describe the task in at least 20 characters");
+      return;
+    }
+
+    setDraftingTask(true);
+    try {
+      const res = await fetch('/api/tasks/draft', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          prompt: draftPrompt.trim(),
+          category: formData.category,
+          budget: formData.budget ? `$${formData.budget} USDC` : undefined,
+          acceptanceRubric: formData.acceptanceRubric,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Failed to draft task");
+
+      const draft = data.draft;
+      const budgetNumber = String(draft.budget || '').match(/([\d.]+)/)?.[1] || formData.budget || '';
+      setFormData((prev) => ({
+        ...prev,
+        title: draft.title,
+        description: draft.description,
+        category: draft.category,
+        requirements: draft.requirements,
+        tags: draft.tags || [],
+        budget: budgetNumber,
+        acceptanceRubric: draft.acceptanceRubric || [],
+      }));
+      toast.success("Task draft applied");
+    } catch (error: any) {
+      toast.error(error.message || "Failed to draft task");
+    } finally {
+      setDraftingTask(false);
+    }
+  };
+
+  const updateRubricItem = (index: number, value: string) => {
+    const next = [...(formData.acceptanceRubric || [])];
+    next[index] = value;
+    setFormData({ ...formData, acceptanceRubric: next });
+  };
+
+  const addRubricItem = () => {
+    const current = formData.acceptanceRubric || [];
+    if (current.length >= 8) {
+      toast.error("Acceptance rubric can include up to 8 items");
+      return;
+    }
+    setFormData({ ...formData, acceptanceRubric: [...current, ""] });
+  };
+
+  const removeRubricItem = (index: number) => {
+    setFormData({
+      ...formData,
+      acceptanceRubric: (formData.acceptanceRubric || []).filter((_, itemIndex) => itemIndex !== index),
+    });
+  };
 
   // Persist form data (not step) to sessionStorage for auth recovery
   useEffect(() => {
@@ -302,11 +371,40 @@ function CreateTaskContent() {
                   {formData.category === 'Token Launch'
                     ? 'Tell the agent what kind of token you want. They will handle the rest.'
                     : 'Describe the work required in detail.'}
-                </p>
+	                </p>
 
-                <div className="space-y-6">
+	                <div className="space-y-6">
+	                    <div className="bg-zinc-950/80 border border-zinc-800 p-4 rounded-sm">
+	                        <div className="flex items-start gap-3">
+	                            <WandSparkles size={16} className="text-emerald-500 shrink-0 mt-0.5" />
+	                            <div className="flex-1 space-y-3">
+	                                <div>
+	                                    <h4 className="text-white font-mono font-bold text-xs uppercase mb-1">Task Builder</h4>
+	                                    <p className="text-zinc-500 text-[11px] leading-relaxed">
+	                                      Paste rough intent and Hive will structure the title, scope, tags, budget, and acceptance rubric.
+	                                    </p>
+	                                </div>
+	                                <textarea
+	                                  value={draftPrompt}
+	                                  onChange={(e) => setDraftPrompt(e.target.value)}
+	                                  placeholder="e.g. I need a report comparing AI customer support tools for a SaaS startup..."
+	                                  rows={3}
+	                                  className="w-full bg-black border border-zinc-800 rounded-sm px-3 py-2.5 text-white focus:border-emerald-500 outline-none transition-all font-mono text-xs resize-none"
+	                                />
+	                                <button
+	                                  type="button"
+	                                  onClick={applyTaskDraft}
+	                                  disabled={draftingTask || draftPrompt.trim().length < 20}
+	                                  className="inline-flex items-center gap-2 px-4 py-2 bg-emerald-600 hover:bg-emerald-500 disabled:opacity-40 text-white font-bold font-mono text-[10px] uppercase tracking-widest rounded-sm transition-colors"
+	                                >
+	                                  {draftingTask ? <Loader2 size={12} className="animate-spin" /> : <WandSparkles size={12} />}
+	                                  {draftingTask ? "Drafting..." : "Build Draft"}
+	                                </button>
+	                            </div>
+	                        </div>
+	                    </div>
 
-                    {/* Token Launch: Bags info */}
+	                    {/* Token Launch: Bags info */}
                     {formData.category === 'Token Launch' && (
                       <div className="bg-violet-500/10 border border-violet-500/20 p-4 rounded-sm">
                         <div className="flex items-start gap-3">
@@ -425,10 +523,51 @@ function CreateTaskContent() {
                                  rows={4}
                                  className="w-full bg-black border border-zinc-800 rounded-sm px-4 py-3 text-white focus:border-emerald-500 outline-none transition-all font-mono text-sm resize-none"
                             />
-                        </div>
+	                        </div>
 
-                        <div>
-                            <label className="block text-xs font-bold font-mono text-zinc-500 mb-2 uppercase tracking-widest">Reference Material (Optional)</label>
+	                        <div>
+	                            <div className="flex items-center justify-between gap-3 mb-2">
+	                              <label className="block text-xs font-bold font-mono text-zinc-500 uppercase tracking-widest">Acceptance Rubric</label>
+	                              <button
+	                                type="button"
+	                                onClick={addRubricItem}
+	                                className="inline-flex items-center gap-1 text-[10px] font-mono uppercase tracking-widest text-emerald-500 hover:text-emerald-400"
+	                              >
+	                                <Plus size={10} /> Add
+	                              </button>
+	                            </div>
+	                            <div className="space-y-2">
+	                              {(formData.acceptanceRubric || []).length === 0 && (
+	                                <button
+	                                  type="button"
+	                                  onClick={addRubricItem}
+	                                  className="w-full text-left bg-black border border-dashed border-zinc-800 rounded-sm px-4 py-3 text-zinc-600 hover:text-zinc-400 hover:border-zinc-700 transition-colors font-mono text-xs"
+	                                >
+	                                  Add the criteria you will use to approve the work.
+	                                </button>
+	                              )}
+	                              {(formData.acceptanceRubric || []).map((item, index) => (
+	                                <div key={index} className="flex items-center gap-2">
+	                                  <input
+	                                    value={item}
+	                                    onChange={(e) => updateRubricItem(index, e.target.value.slice(0, 180))}
+	                                    placeholder={`Criterion ${index + 1}`}
+	                                    className="flex-1 bg-black border border-zinc-800 rounded-sm px-4 py-3 text-white focus:border-emerald-500 outline-none transition-all font-mono text-sm"
+	                                  />
+	                                  <button
+	                                    type="button"
+	                                    onClick={() => removeRubricItem(index)}
+	                                    className="p-3 bg-zinc-900 border border-zinc-800 text-zinc-500 hover:text-red-400 hover:border-red-500/30 rounded-sm transition-colors"
+	                                  >
+	                                    <Trash2 size={14} />
+	                                  </button>
+	                                </div>
+	                              ))}
+	                            </div>
+	                        </div>
+
+	                        <div>
+	                            <label className="block text-xs font-bold font-mono text-zinc-500 mb-2 uppercase tracking-widest">Reference Material (Optional)</label>
                             <div className="flex gap-2">
                                  <div className="bg-zinc-900 border border-zinc-800 px-3 py-3 text-zinc-500">
                                     <FileText size={16} />
