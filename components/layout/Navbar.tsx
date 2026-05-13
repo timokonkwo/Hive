@@ -51,7 +51,7 @@ export const Navbar = () => {
   }, [user?.wallet?.address]);
 
   return (
-    <nav className="fixed top-0 left-0 right-0 z-50 border-b transition-colors duration-300" style={{ background: isDark ? '#000000' : '#FFFFFF', borderColor: isDark ? '#1A1A1A' : '#E4E4E7' }}>
+    <nav className="fixed top-0 left-0 right-0 z-50 backdrop-blur-xl transition-colors duration-300" style={{ background: isDark ? 'rgba(0, 0, 0, 0.65)' : 'rgba(255, 255, 255, 0.8)', borderBottom: `1px solid ${isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.08)'}` }}>
       
       <div className="max-w-7xl mx-auto px-4 md:px-6 h-16 flex items-center justify-between">
         
@@ -66,17 +66,8 @@ export const Navbar = () => {
               className="w-7 h-7"
               priority
             />
-            <span className="font-bold font-mono text-lg tracking-wider" style={{ color: isDark ? '#fff' : '#09090B' }}>HIVE</span>
+            <span className="font-bold text-lg tracking-tight" style={{ color: isDark ? '#fff' : '#09090B' }}>Hive</span>
           </Link>
-          
-          <div className="hidden md:flex items-center gap-4 pl-6 h-8" style={{ borderLeftWidth: 1, borderColor: isDark ? '#1A1A1A' : '#E4E4E7' }}>
-            <div className="flex items-center gap-2">
-              <div className="w-1.5 h-1.5 bg-emerald-500 rounded-full"></div>
-              <span className="text-[10px] font-mono uppercase tracking-widest" style={{ color: isDark ? '#71717A' : '#A1A1AA' }}>
-                LIVE
-              </span>
-            </div>
-          </div>
         </div>
 
         {/* Desktop Nav (Flex-centered to prevent collisions) */}
@@ -92,7 +83,7 @@ export const Navbar = () => {
           )}
 
           {isAdmin && (
-            <Link href="/admin" className="text-[10px] font-mono font-bold text-emerald-500 hover:bg-emerald-500 hover:text-black transition-colors uppercase tracking-[0.2em] border border-emerald-500 px-3 py-1 rounded-sm">
+            <Link href="/admin" className="text-[12px] font-medium text-emerald-400 hover:text-emerald-300 transition-colors px-3 py-1 bg-emerald-500/10 rounded-full">
               Admin
             </Link>
           )}
@@ -102,43 +93,43 @@ export const Navbar = () => {
         <div className="hidden md:flex items-center gap-3 xl:gap-4 shrink-0 z-10">
           <Link
             href="/create"
-            className="inline-flex items-center gap-2 px-5 py-2.5 font-bold font-mono text-[10px] uppercase tracking-[0.2em] transition-all bg-emerald-500 text-black hover:bg-emerald-400 rounded-sm shadow-[0_0_15px_rgba(16,185,129,0.3)] hover:shadow-[0_0_25px_rgba(16,185,129,0.5)]"
+            className="inline-flex items-center gap-1.5 px-4 py-2 font-medium text-[13px] transition-all bg-white text-black hover:bg-zinc-200 rounded-full shadow-sm"
           >
-            <Plus size={14} /> Create Task
+            <Plus size={16} /> Create Task
           </Link>
 
           {/* Auth Action */}
           {authenticated ? (
-            <div className="flex items-center gap-4 ml-2 pl-4" style={{ borderLeft: `1px solid ${isDark ? '#1A1A1A' : '#E4E4E7'}` }}>
+            <div className="flex items-center gap-3 ml-1 pl-4" style={{ borderLeft: `1px solid ${isDark ? '#27272A' : '#E4E4E7'}` }}>
               <Link 
                 href="/dashboard"
-                className="flex items-center gap-3 group cursor-pointer"
+                className="flex items-center gap-2 group cursor-pointer hover:bg-white/5 px-2 py-1.5 rounded-full transition-colors"
               >
                 <div className="text-right hidden xl:block">
-                  <div className="text-[10px] font-bold font-mono tracking-widest" style={{ color: isDark ? '#fff' : '#09090B' }}>
+                  <div className="text-[13px] font-medium" style={{ color: isDark ? '#fff' : '#09090B' }}>
                     {displayName}
                   </div>
                 </div>
                 
-                <div className="w-8 h-8 flex items-center justify-center group-hover:border-emerald-500 transition-colors relative rounded-sm" style={{ background: isDark ? '#050505' : '#F4F4F5', border: `1px solid ${isDark ? '#1A1A1A' : '#E4E4E7'}` }}>
-                  <span className="font-mono font-bold text-[10px]" style={{ color: isDark ? '#fff' : '#09090B' }}>{user?.wallet?.address?.[2] || "A"}</span>
+                <div className="w-7 h-7 flex items-center justify-center transition-colors relative rounded-full" style={{ background: isDark ? '#111' : '#F4F4F5', border: `1px solid ${isDark ? '#333' : '#E4E4E7'}` }}>
+                  <span className="font-medium text-[11px]" style={{ color: isDark ? '#fff' : '#09090B' }}>{user?.wallet?.address?.[2] || "A"}</span>
                 </div>
               </Link>
 
               <button 
                 onClick={() => logout()}
-                className="p-2 text-zinc-500 hover:text-red-500 transition-colors"
+                className="w-8 h-8 flex items-center justify-center rounded-full text-zinc-500 hover:text-white hover:bg-zinc-800 transition-colors"
                 title="Disconnect"
               >
-                <LogOut size={14} />
+                <LogOut size={16} />
               </button>
             </div>
           ) : (
             <button 
               disabled={!ready}
               onClick={() => login()} 
-              className={`px-5 py-2.5 font-bold font-mono text-[10px] uppercase tracking-[0.2em] transition-all flex items-center gap-2 border rounded-sm hover:bg-zinc-900 ${!ready ? "opacity-50 cursor-not-allowed" : ""}`}
-              style={{ color: isDark ? '#fff' : '#09090B', borderColor: isDark ? '#27272A' : '#E4E4E7' }}
+              className={`px-4 py-2 font-medium text-[13px] transition-all flex items-center gap-2 border rounded-full hover:bg-white/5 ${!ready ? "opacity-50 cursor-not-allowed" : ""}`}
+              style={{ color: isDark ? '#fff' : '#09090B', borderColor: isDark ? '#333' : '#E4E4E7' }}
             >
               {!ready ? "Loading..." : "Sign In"}
             </button>
@@ -150,9 +141,9 @@ export const Navbar = () => {
           <Link
             href="/create"
             onClick={() => setIsMenuOpen(false)}
-            className="inline-flex items-center gap-1.5 px-3 py-2 bg-emerald-500 text-black font-bold font-mono text-[10px] uppercase tracking-widest rounded-sm"
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-white text-black font-medium text-[12px] rounded-full"
           >
-            <Plus size={13} /> Create
+            <Plus size={14} /> Create
           </Link>
           <button
             onClick={() => setIsMenuOpen(!isMenuOpen)}
@@ -171,11 +162,11 @@ export const Navbar = () => {
 
       {/* Mobile Menu */}
       {isMenuOpen && (
-        <div className="md:hidden absolute top-[calc(100%)] left-0 w-full border-b p-0 flex flex-col transition-colors duration-300 shadow-2xl" style={{ background: isDark ? '#000' : '#fff', borderColor: isDark ? '#1A1A1A' : '#E4E4E7' }}>
-          <div className="p-4 flex justify-between items-center" style={{ borderBottom: `1px solid ${isDark ? '#1A1A1A' : '#E4E4E7'}` }}>
-            <span className="text-[10px] font-mono uppercase tracking-widest" style={{ color: isDark ? '#71717A' : '#A1A1AA' }}>NAVIGATION</span>
+        <div className="md:hidden absolute top-[calc(100%)] left-0 w-full border-b p-0 flex flex-col backdrop-blur-2xl transition-colors duration-300 shadow-2xl" style={{ background: isDark ? 'rgba(0,0,0,0.85)' : 'rgba(255,255,255,0.95)', borderColor: isDark ? '#27272A' : '#E4E4E7' }}>
+          <div className="p-4 flex justify-between items-center" style={{ borderBottom: `1px solid ${isDark ? '#27272A' : '#E4E4E7'}` }}>
+            <span className="text-[12px] font-medium text-zinc-500">Navigation</span>
             {authenticated && (
-               <span className="text-[10px] font-mono font-bold" style={{ color: isDark ? '#fff' : '#000' }}>{displayName}</span>
+               <span className="text-[12px] font-medium" style={{ color: isDark ? '#fff' : '#000' }}>{displayName}</span>
             )}
           </div>
 
@@ -191,22 +182,22 @@ export const Navbar = () => {
              
              {authenticated ? (
                 <>
-                  <div className="h-[1px] my-2" style={{ background: isDark ? '#1A1A1A' : '#E4E4E7' }}></div>
+                  <div className="h-[1px] my-2" style={{ background: isDark ? '#27272A' : '#E4E4E7' }}></div>
                   <button 
                     onClick={() => logout()} 
-                    className="w-full text-left px-4 py-3 text-red-500 hover:bg-red-500/10 flex items-center gap-3 transition-all rounded-sm"
+                    className="w-full text-left px-4 py-3 text-red-400 hover:bg-white/5 flex items-center gap-3 transition-all rounded-lg"
                   >
-                    <LogOut size={14} /> 
-                    <span className="font-mono text-[10px] uppercase tracking-widest font-bold">Disconnect</span>
+                    <LogOut size={18} /> 
+                    <span className="font-medium text-[14px]">Disconnect</span>
                   </button>
                 </>
              ) : (
-                <div className="p-2 mt-2 border-t" style={{ borderColor: isDark ? '#1A1A1A' : '#E4E4E7' }}>
+                <div className="p-2 mt-2 border-t" style={{ borderColor: isDark ? '#27272A' : '#E4E4E7' }}>
                   <button 
                     disabled={!ready}
                     onClick={() => login()} 
-                    className={`w-full text-center px-5 py-3 font-bold font-mono text-[10px] uppercase tracking-[0.2em] border transition-colors rounded-sm hover:bg-zinc-900 ${!ready ? "opacity-50" : ""}`}
-                    style={{ color: isDark ? '#fff' : '#09090B', borderColor: isDark ? '#27272A' : '#E4E4E7' }}
+                    className={`w-full text-center px-5 py-3 font-medium text-[14px] border transition-colors rounded-full hover:bg-white/5 ${!ready ? "opacity-50" : ""}`}
+                    style={{ color: isDark ? '#fff' : '#09090B', borderColor: isDark ? '#333' : '#E4E4E7' }}
                   >
                     {ready ? "Sign In" : "Loading..."}
                   </button>
@@ -224,10 +215,10 @@ function NavLink({ href, label, pathname, isDark }: { href: string; label: strin
   return (
     <Link
       href={href}
-      className={`text-[10px] font-mono font-bold uppercase tracking-[0.2em] transition-colors ${
-        isActive ? "text-emerald-500" : ""
+      className={`text-[14px] font-medium transition-colors ${
+        isActive ? "text-white" : ""
       }`}
-      style={{ color: isActive ? undefined : (isDark ? '#71717A' : '#71717A') }}
+      style={{ color: isActive ? undefined : (isDark ? '#A1A1AA' : '#71717A') }}
     >
       {label}
     </Link>
@@ -255,15 +246,14 @@ const MobileNavLink = ({
 }) => (
   <Link href={href} className="block" onClick={onClick}>
     <div
-      className={`flex items-center gap-3 px-4 py-3 border-l-2 transition-all group ${
+      className={`flex items-center gap-3 px-4 py-3 rounded-lg transition-all group ${
         primary
-          ? 'bg-emerald-500/10 border-emerald-500 text-emerald-400'
-          : 'hover:bg-white/5 border-transparent hover:border-emerald-500'
+          ? 'bg-white text-black'
+          : 'hover:bg-white/5 text-zinc-400 hover:text-white'
       }`}
-      style={{ color: primary ? undefined : (isDark ? '#A1A1AA' : '#52525B') }}
     >
-      <Icon size={16} className="group-hover:text-emerald-400 transition-colors" />
-      <span className="font-mono text-xs uppercase tracking-wider">{label}</span>
+      <Icon size={18} className="transition-colors" />
+      <span className="font-medium text-[14px]">{label}</span>
     </div>
   </Link>
 );

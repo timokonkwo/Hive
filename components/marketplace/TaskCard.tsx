@@ -19,24 +19,24 @@ interface TaskCardProps {
 }
 
 const CATEGORY_CONFIG: Record<TaskCategory, { color: string; icon: any }> = {
-  Security: { color: "text-emerald-500", icon: Shield },
-  Development: { color: "text-blue-500", icon: Code },
-  Analysis: { color: "text-purple-500", icon: Cpu },
-  Content: { color: "text-pink-500", icon: PenTool },
-  Design: { color: "text-orange-500", icon: Layout },
-  Research: { color: "text-indigo-500", icon: Search },
-  Social: { color: "text-red-500", icon: Megaphone },
-  Legal: { color: "text-yellow-600", icon: Scale },
-  Translation: { color: "text-cyan-500", icon: Languages },
-  'Token Launch': { color: "text-violet-500", icon: Rocket },
-  Other: { color: "text-gray-500", icon: Briefcase },
+  Security: { color: "text-zinc-400", icon: Shield },
+  Development: { color: "text-zinc-400", icon: Code },
+  Analysis: { color: "text-zinc-400", icon: Cpu },
+  Content: { color: "text-zinc-400", icon: PenTool },
+  Design: { color: "text-zinc-400", icon: Layout },
+  Research: { color: "text-zinc-400", icon: Search },
+  Social: { color: "text-zinc-400", icon: Megaphone },
+  Legal: { color: "text-zinc-400", icon: Scale },
+  Translation: { color: "text-zinc-400", icon: Languages },
+  'Token Launch': { color: "text-zinc-400", icon: Rocket },
+  Other: { color: "text-zinc-400", icon: Briefcase },
 };
 
 const STATUS_CONFIG: Record<string, { label: string; color: string; bg: string; border: string; icon?: any }> = {
-  Open: { label: "Open", color: "text-emerald-600", bg: "bg-emerald-500/10", border: "border-emerald-500/20" },
-  "In Progress": { label: "In Progress", color: "text-blue-600", bg: "bg-blue-500/10", border: "border-blue-500/20" },
-  "In Review": { label: "In Review", color: "text-amber-600", bg: "bg-amber-500/10", border: "border-amber-500/20", icon: Clock },
-  Completed: { label: "Completed", color: "text-green-600", bg: "bg-green-500/10", border: "border-green-500/20", icon: BadgeCheck },
+  Open: { label: "Open", color: "text-emerald-400", bg: "bg-emerald-500/10", border: "border-emerald-500/20" },
+  "In Progress": { label: "In Progress", color: "text-zinc-300", bg: "bg-white/5", border: "border-white/10" },
+  "In Review": { label: "In Review", color: "text-zinc-400", bg: "bg-white/5", border: "border-white/10", icon: Clock },
+  Completed: { label: "Completed", color: "text-zinc-500", bg: "bg-transparent", border: "border-white/5", icon: BadgeCheck },
 };
 
 export function TaskCard({ id, title, description, category, budget, postedTime, status, proposalsCount, clientAddress }: TaskCardProps) {
@@ -49,20 +49,20 @@ export function TaskCard({ id, title, description, category, budget, postedTime,
   const isCompleted = status === "Completed";
 
   return (
-    <Link href={`/marketplace/${id}`} className="group transition-colors p-6 md:p-8 flex flex-col h-full relative cursor-pointer block" style={{
-      background: isDark ? '#050505' : '#FFFFFF',
-      border: `1px solid ${isCompleted ? (isDark ? 'rgba(34,197,94,0.1)' : 'rgba(34,197,94,0.15)') : (isDark ? '#1A1A1A' : '#E4E4E7')}`,
+    <Link href={`/marketplace/${id}`} className="group transition-all p-6 md:p-8 flex flex-col h-full relative cursor-pointer block rounded-2xl shadow-sm hover:shadow-md hover:-translate-y-1" style={{
+      background: isDark ? 'rgba(255,255,255,0.02)' : '#FFFFFF',
+      border: `1px solid ${isCompleted ? (isDark ? 'rgba(34,197,94,0.1)' : 'rgba(34,197,94,0.15)') : (isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.08)')}`,
       opacity: isCompleted ? 0.7 : 1,
     }}>
       
       {/* Header: Category + Status */}
       <div className="flex justify-between items-start mb-6">
-        <span className={`text-[10px] font-mono uppercase tracking-widest ${config.color} flex items-center gap-2`}>
-           <CategoryIcon size={12} /> {category}
+        <span className={`text-[12px] font-medium ${config.color} flex items-center gap-1.5`}>
+           <CategoryIcon size={14} /> {category}
         </span>
         <div className="flex items-center gap-2">
-          <span className={`px-2 py-0.5 rounded-full ${statusConf.bg} border ${statusConf.border} text-[9px] font-bold font-mono uppercase ${statusConf.color} flex items-center gap-1`}>
-            {StatusIcon && <StatusIcon size={9} />}
+          <span className={`px-2.5 py-1 rounded-full ${statusConf.bg} border ${statusConf.border} text-[11px] font-medium ${statusConf.color} flex items-center gap-1.5`}>
+            {StatusIcon && <StatusIcon size={12} />}
             {statusConf.label}
           </span>
         </div>
@@ -70,30 +70,30 @@ export function TaskCard({ id, title, description, category, budget, postedTime,
 
       {/* Content */}
       <div className="mb-8 flex-1">
-        <h3 className="text-lg md:text-xl font-bold mb-3 tracking-tight transition-colors group-hover:text-emerald-500" style={{
-          color: isCompleted ? (isDark ? '#71717A' : '#A1A1AA') : (isDark ? '#fff' : '#09090B')
+        <h3 className="text-[18px] font-semibold mb-3 tracking-tight transition-colors group-hover:text-emerald-400" style={{
+          color: isCompleted ? (isDark ? '#71717A' : '#A1A1AA') : (isDark ? '#fff' : '#111827')
         }}>
              {title}
         </h3>
-        <p className="text-xs leading-relaxed font-mono line-clamp-5" style={{ color: isDark ? '#52525B' : '#71717A' }}>
+        <p className="text-[14px] leading-relaxed line-clamp-4" style={{ color: isDark ? '#A1A1AA' : '#60646c' }}>
           {description}
         </p>
       </div>
 
       {/* Footer Details */}
-      <div className="flex items-center justify-between pt-6" style={{ borderTop: `1px solid ${isDark ? '#1A1A1A' : '#E4E4E7'}` }}>
-         <div className="flex items-center gap-2">
-            <span className="text-[10px] font-mono uppercase" style={{ color: isDark ? '#3F3F46' : '#A1A1AA' }}>BUDGET</span>
-            <span className="text-xs font-mono" style={{ color: isDark ? '#fff' : '#09090B' }}>{budget}</span>
-            {clientAddress && <HolderBadge wallet={clientAddress} compact />}
+      <div className="flex flex-wrap gap-4 items-center justify-between pt-5" style={{ borderTop: `1px solid ${isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.08)'}` }}>
+         <div className="flex items-center gap-2 bg-white/5 px-3 py-1.5 rounded-lg" style={{ background: isDark ? 'rgba(255,255,255,0.03)' : 'rgba(0,0,0,0.03)' }}>
+            <span className="text-[11px] font-medium" style={{ color: isDark ? '#71717A' : '#A1A1AA' }}>Budget</span>
+            <span className="text-[13px] font-semibold" style={{ color: isDark ? '#fff' : '#111827' }}>{budget}</span>
+            {clientAddress && <div className="ml-1"><HolderBadge wallet={clientAddress} compact /></div>}
          </div>
 
-         <div className="flex items-center gap-3">
-            <div className="flex items-center gap-2">
-               <span className="text-[10px] font-mono uppercase" style={{ color: isDark ? '#3F3F46' : '#A1A1AA' }}>BIDS</span>
-               <span className="text-xs font-mono" style={{ color: isDark ? '#fff' : '#09090B' }}>{proposalsCount}</span>
+         <div className="flex items-center gap-4">
+            <div className="flex items-center gap-1.5">
+               <span className="text-[11px] font-medium" style={{ color: isDark ? '#71717A' : '#A1A1AA' }}>Bids</span>
+               <span className="text-[13px] font-medium" style={{ color: isDark ? '#fff' : '#111827' }}>{proposalsCount}</span>
             </div>
-            <span className="text-[10px] font-mono uppercase" style={{ color: isDark ? '#3F3F46' : '#A1A1AA' }}>{postedTime}</span>
+            <span className="text-[12px] font-medium" style={{ color: isDark ? '#71717A' : '#A1A1AA' }}>{postedTime}</span>
          </div>
       </div>
     </Link>

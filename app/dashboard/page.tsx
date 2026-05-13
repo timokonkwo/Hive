@@ -237,14 +237,14 @@ export default function DashboardPage() {
         <main className="min-h-screen text-white flex items-center justify-center">
           <div className="text-center max-w-md">
             <Briefcase className="w-16 h-16 text-zinc-700 mx-auto mb-6" />
-            <h1 className="text-2xl font-bold mb-2 font-mono uppercase tracking-widest">Dashboard</h1>
-            <p className="text-zinc-500 mb-8 font-mono text-sm leading-relaxed">
+            <h1 className="text-[28px] font-bold mb-3 tracking-tight">Dashboard</h1>
+            <p className="text-zinc-500 mb-8 text-[15px] leading-relaxed">
               Sign in to view your posted tasks, track proposals, and manage your work.
             </p>
             <button
               onClick={login}
               disabled={!ready}
-              className="bg-emerald-500 hover:bg-emerald-400 text-black px-8 py-3 font-bold font-mono uppercase tracking-widest transition-colors disabled:opacity-50"
+              className="bg-white hover:bg-zinc-200 text-black px-8 py-3.5 font-semibold rounded-full transition-all disabled:opacity-50 text-[15px] shadow-sm hover:scale-[0.98]"
             >
               {ready ? "Sign In" : "Loading..."}
             </button>
@@ -268,21 +268,33 @@ export default function DashboardPage() {
   const stats = data?.stats || {};
 
   return (
-    <div className="min-h-screen text-white font-sans pt-24 pb-12 px-4 md:px-8 max-w-7xl mx-auto">
+    <div className="min-h-screen text-white font-sans bg-[#020202] relative overflow-x-hidden">
+      {/* Subtle Ambient Dot Grid */}
+      <div 
+        className="absolute inset-0 pointer-events-none z-0" 
+        style={{
+          backgroundImage: 'radial-gradient(rgba(255, 255, 255, 0.1) 1px, transparent 1px)',
+          backgroundSize: '32px 32px',
+          maskImage: 'radial-gradient(circle at center 200px, black, transparent 70%)',
+          WebkitMaskImage: 'radial-gradient(circle at center 200px, black, transparent 70%)'
+        }}
+      />
       <Navbar />
+
+      <div className="pt-24 pb-12 px-4 md:px-8 max-w-7xl mx-auto relative z-10">
 
       {/* Header */}
       <div className="mb-8">
-        <button onClick={() => router.back()} className="inline-flex items-center gap-2 text-sm text-zinc-500 hover:text-white transition-colors mb-4 group font-mono uppercase tracking-wider">
-          <div className="p-1 rounded-full border border-zinc-800 group-hover:border-white/30 transition-colors">
-            <ChevronRight size={12} className="rotate-180" />
+        <button onClick={() => router.back()} className="inline-flex items-center gap-2 text-[13px] font-medium text-zinc-500 hover:text-white transition-colors mb-6 group">
+          <div className="p-1.5 rounded-full bg-white/5 group-hover:bg-white/10 transition-colors">
+            <ChevronRight size={14} className="rotate-180" />
           </div>
           Back
         </button>
-        <h1 className="text-3xl font-bold font-mono uppercase tracking-tighter mb-2 flex items-center gap-3">
-          <Briefcase className="text-emerald-500" /> My Dashboard
+        <h1 className="text-[36px] md:text-[42px] font-bold tracking-tight mb-2 flex items-center gap-3" style={{ letterSpacing: '-0.02em' }}>
+          <Briefcase className="text-emerald-500 w-8 h-8" /> My Dashboard
         </h1>
-        <p className="text-zinc-500 text-sm font-mono flex items-center gap-2">
+        <p className="text-zinc-500 text-[15px] font-medium flex items-center gap-2">
           {profile?.name || `${address.slice(0, 6)}...${address.slice(-4)}`}
           <HolderBadge wallet={solanaAddress || address} />
         </p>
@@ -292,17 +304,17 @@ export default function DashboardPage() {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
         
         {/* Profile Card */}
-        <div className="bg-zinc-900/30 border border-zinc-800 rounded-lg p-6">
-          <div className="flex items-center justify-between mb-4">
-            <h3 className="text-sm font-bold font-mono uppercase tracking-widest text-zinc-400 flex items-center gap-2">
-              <User size={14} className="text-emerald-500" /> Profile
+        <div className="bg-white/[0.02] border border-white/5 rounded-2xl p-6 shadow-sm">
+          <div className="flex items-center justify-between mb-6">
+            <h3 className="text-[14px] font-semibold tracking-wide text-zinc-400 flex items-center gap-2">
+              <User size={16} className="text-emerald-500" /> Profile
             </h3>
             {!editingProfile ? (
               <button
                 onClick={() => setEditingProfile(true)}
-                className="text-[10px] font-mono uppercase tracking-widest text-zinc-500 hover:text-emerald-500 transition-colors flex items-center gap-1"
+                className="text-[12px] font-medium text-zinc-500 hover:text-emerald-500 transition-colors flex items-center gap-1.5"
               >
-                <Edit3 size={10} /> Edit
+                <Edit3 size={12} /> Edit
               </button>
             ) : (
               <div className="flex items-center gap-2">
@@ -414,22 +426,22 @@ export default function DashboardPage() {
         </div>
 
         {/* Payment Wallet Card */}
-        <div className="bg-zinc-900/30 border border-zinc-800 rounded-lg p-6">
-          <div className="flex items-center justify-between mb-2">
-            <h3 className="text-sm font-bold font-mono uppercase tracking-widest text-zinc-400 flex items-center gap-2">
-              <Wallet size={14} className="text-emerald-500" /> Payment Wallet
+        <div className="bg-white/[0.02] border border-white/5 rounded-2xl p-6 shadow-sm">
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="text-[14px] font-semibold tracking-wide text-zinc-400 flex items-center gap-2">
+              <Wallet size={16} className="text-emerald-500" /> Payment Wallet
             </h3>
             {solanaAddress && (
               <button
                 onClick={fetchBalances}
                 disabled={walletLoading}
-                className="text-[10px] font-mono uppercase tracking-widest text-zinc-500 hover:text-emerald-500 transition-colors"
+                className="text-[12px] font-medium text-zinc-500 hover:text-emerald-500 transition-colors"
               >
                 {walletLoading ? "Loading..." : "Refresh"}
               </button>
             )}
           </div>
-          <p className="text-[10px] text-zinc-600 font-mono mb-4">Your Solana wallet for payments.</p>
+          <p className="text-[12px] text-zinc-500 mb-6 font-medium">Your Solana wallet for payments.</p>
 
           {/* Connected Solana Wallet */}
           {solanaAddress ? (
@@ -547,16 +559,16 @@ export default function DashboardPage() {
         </div>
 
         {/* Holder Status Card */}
-        <div className="bg-zinc-900/30 border border-zinc-800 rounded-lg p-6">
-          <div className="flex items-center justify-between mb-4">
-            <h3 className="text-sm font-bold font-mono uppercase tracking-widest text-zinc-400 flex items-center gap-2">
-              <Coins size={14} className="text-emerald-500" /> Holder Status
+        <div className="bg-white/[0.02] border border-white/5 rounded-2xl p-6 shadow-sm">
+          <div className="flex items-center justify-between mb-6">
+            <h3 className="text-[14px] font-semibold tracking-wide text-zinc-400 flex items-center gap-2">
+              <Coins size={16} className="text-emerald-500" /> Holder Status
             </h3>
             <Link
               href="/token"
-              className="text-[10px] font-mono uppercase tracking-widest text-zinc-500 hover:text-emerald-500 transition-colors flex items-center gap-1"
+              className="text-[12px] font-medium text-zinc-500 hover:text-emerald-500 transition-colors flex items-center gap-1.5"
             >
-              Details <ChevronRight size={10} />
+              Details <ChevronRight size={12} />
             </Link>
           </div>
 
@@ -634,7 +646,7 @@ export default function DashboardPage() {
       </div>
 
       {/* Tabs */}
-      <div className="flex border-b border-zinc-800 mb-8 gap-1">
+      <div className="flex items-center gap-2 mb-8 border-b border-white/5 pb-4">
         <TabButton
           active={activeTab === "posted"}
           onClick={() => setActiveTab("posted")}
@@ -655,15 +667,15 @@ export default function DashboardPage() {
           {data?.postedTasks?.length > 0 ? (
             data.postedTasks.map((task: any) => (
               <Link key={task.id} href={`/marketplace/${task.id}`} className="block">
-                <div className="p-5 bg-zinc-900/30 border border-zinc-800 rounded-lg hover:border-zinc-700 transition-colors group">
+                <div className="p-6 bg-white/[0.02] border border-white/5 rounded-2xl hover:border-emerald-500/30 transition-all duration-300 shadow-sm hover:shadow-md hover:-translate-y-1 group">
                   <div className="flex items-start justify-between">
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-3 mb-2">
-                        <h3 className="font-bold text-white group-hover:text-emerald-400 transition-colors">{task.title}</h3>
+                        <h3 className="font-semibold text-[16px] text-white group-hover:text-emerald-400 transition-colors">{task.title}</h3>
                         <StatusBadge status={task.status} />
                       </div>
-                      <p className="text-sm text-zinc-500 line-clamp-3">{task.description}</p>
-                      <div className="flex items-center gap-4 mt-3 text-xs text-zinc-600 font-mono">
+                      <p className="text-[14px] text-zinc-400 line-clamp-2 leading-relaxed">{task.description}</p>
+                      <div className="flex items-center gap-4 mt-4 text-[13px] text-zinc-500 font-medium">
                         <span>{task.category}</span>
                         <span>•</span>
                         <span>Budget: {task.budget || "Negotiable"}</span>
@@ -671,23 +683,23 @@ export default function DashboardPage() {
                         <span>{task.proposalsCount || 0} proposals</span>
                       </div>
                     </div>
-                    <div className="flex items-center gap-2 shrink-0 ml-4">
+                    <div className="flex items-center gap-3 shrink-0 ml-4">
                       {task.status === "Completed" && !task.hasReview && (
-                        <span className="px-3 py-1.5 bg-amber-500/10 border border-amber-500/30 text-amber-400 text-[10px] font-mono uppercase tracking-wider rounded-sm hover:bg-amber-500/20 transition-colors">
+                        <span className="px-4 py-2 bg-amber-500/10 border border-amber-500/20 text-amber-400 text-[12px] font-semibold rounded-full hover:bg-amber-500/20 transition-colors">
                           Leave Review
                         </span>
                       )}
                       {task.status === "Completed" && task.hasReview && (
-                        <span className="px-3 py-1.5 bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 text-[10px] font-mono uppercase tracking-wider rounded-sm">
+                        <span className="px-4 py-2 bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-[12px] font-semibold rounded-full">
                           Reviewed ✓
                         </span>
                       )}
                       {(task.status === "In Review" || task.status === "WorkSubmitted") && (
-                        <span className="px-3 py-1.5 bg-amber-500/10 border border-amber-500/30 text-amber-400 text-[10px] font-mono uppercase tracking-wider rounded-sm hover:bg-amber-500/20 transition-colors">
+                        <span className="px-4 py-2 bg-amber-500/10 border border-amber-500/20 text-amber-400 text-[12px] font-semibold rounded-full hover:bg-amber-500/20 transition-colors">
                           Review Work
                         </span>
                       )}
-                      <ChevronRight className="text-zinc-700 group-hover:text-white transition-colors mt-1" size={16} />
+                      <ChevronRight className="text-zinc-600 group-hover:text-white transition-colors" size={20} />
                     </div>
                   </div>
                 </div>
@@ -708,44 +720,44 @@ export default function DashboardPage() {
         <div className="space-y-4">
           {data?.incomingProposals?.length > 0 ? (
             data.incomingProposals.map((bid: any) => (
-              <div key={bid.id} className="p-5 bg-zinc-900/30 border border-zinc-800 rounded-lg">
+              <div key={bid.id} className="p-6 bg-white/[0.02] border border-white/5 rounded-2xl shadow-sm transition-all">
                 <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
                   <div className="flex-1">
-                    <div className="flex items-center gap-3 mb-2">
-                      <div className="w-8 h-8 rounded-full bg-zinc-800 flex items-center justify-center text-zinc-400 font-bold text-xs">
+                    <div className="flex items-center gap-3 mb-3">
+                      <div className="w-10 h-10 rounded-full bg-white/10 flex items-center justify-center text-zinc-300 font-bold text-[14px]">
                         {(bid.agentName || "AG").substring(0, 2).toUpperCase()}
                       </div>
                       <div>
-                        <span className="font-bold text-white">{bid.agentName}</span>
+                        <span className="font-semibold text-[16px] text-white block mb-0.5">{bid.agentName}</span>
                         <StatusBadge status={bid.status} />
                       </div>
                     </div>
-                    <p className="text-xs text-zinc-500 mb-1">
-                      On: <Link href={`/marketplace/${bid.taskId}`} className="text-emerald-500 hover:underline">{bid.taskTitle}</Link>
+                    <p className="text-[13px] text-zinc-500 mb-2 font-medium">
+                      On: <Link href={`/marketplace/${bid.taskId}`} className="text-emerald-400 hover:underline">{bid.taskTitle}</Link>
                     </p>
-                    <p className="text-sm text-zinc-400 line-clamp-2">{bid.coverLetter}</p>
-                    <div className="flex items-center gap-4 mt-2 text-xs text-zinc-600 font-mono">
-                      <span>Amount: {bid.amount}</span>
+                    <p className="text-[14px] text-zinc-400 line-clamp-2 leading-relaxed">{bid.coverLetter}</p>
+                    <div className="flex items-center gap-4 mt-3 text-[13px] text-zinc-500 font-medium">
+                      <span>Amount: <span className="text-zinc-300">{bid.amount}</span></span>
                       <span>•</span>
                       <span>{bid.timeEstimate}</span>
                     </div>
                   </div>
 
                   {bid.status === "Pending" && (
-                    <div className="flex items-center gap-2 shrink-0">
+                    <div className="flex items-center gap-3 shrink-0">
                       <button
                         onClick={() => handleBidAction(bid.taskId, bid.id, "rejected")}
                         disabled={!!processingBid}
-                        className="px-3 py-2 border border-red-500/30 text-red-500 hover:bg-red-500/10 rounded text-xs font-bold font-mono uppercase transition-all disabled:opacity-50"
+                        className="px-6 py-2.5 border border-red-500/20 text-red-500 hover:bg-red-500/10 rounded-full text-[14px] font-semibold transition-all disabled:opacity-50"
                       >
                         Reject
                       </button>
                       <button
                         onClick={() => handleBidAction(bid.taskId, bid.id, "accepted")}
                         disabled={!!processingBid}
-                        className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded text-xs font-bold font-mono uppercase transition-all disabled:opacity-50 flex items-center gap-1"
+                        className="px-6 py-2.5 bg-emerald-500 hover:bg-emerald-400 text-black rounded-full text-[14px] font-semibold transition-all shadow-[0_0_15px_rgba(16,185,129,0.3)] disabled:opacity-50 flex items-center gap-2"
                       >
-                        {processingBid === bid.id ? <Loader2 size={12} className="animate-spin" /> : <CheckCircle size={12} />}
+                        {processingBid === bid.id ? <Loader2 size={16} className="animate-spin" /> : <CheckCircle size={16} />}
                         Accept
                       </button>
                     </div>
@@ -764,16 +776,17 @@ export default function DashboardPage() {
         </div>
       )}
     </div>
+    </div>
   );
 }
 
 // ── Sub-components ──
 
-function StatCard({ label, value, icon, color = "text-emerald-500" }: { label: string; value: number; icon: React.ReactNode; color?: string }) {
+function StatCard({ label, value, icon, color = "text-emerald-400" }: { label: string; value: number; icon: React.ReactNode; color?: string }) {
   return (
-    <div className="bg-zinc-900/30 border border-zinc-800 p-4 rounded-lg">
-      <div className={`flex items-center gap-2 ${color} mb-1`}>{icon}<span className="text-[10px] text-zinc-500 uppercase font-mono">{label}</span></div>
-      <div className="text-2xl font-bold font-mono text-white">{value}</div>
+    <div className="bg-white/[0.02] border border-white/5 p-6 rounded-2xl shadow-sm">
+      <div className={`flex items-center gap-2 ${color} mb-3 font-semibold`}>{icon}<span className="text-[13px] tracking-wide">{label}</span></div>
+      <div className="text-[32px] font-bold text-white tracking-tight">{value}</div>
     </div>
   );
 }
@@ -782,29 +795,29 @@ function TabButton({ active, onClick, label, count }: { active: boolean; onClick
   return (
     <button
       onClick={onClick}
-      className={`px-4 py-3 text-xs font-mono uppercase tracking-widest transition-colors border-b-2 ${
-        active ? "border-emerald-500 text-white" : "border-transparent text-zinc-500 hover:text-zinc-300"
+      className={`px-6 py-2.5 text-[14px] font-medium rounded-full transition-all shadow-sm ${
+        active ? "bg-white text-black" : "bg-white/5 text-zinc-400 hover:text-white hover:bg-white/10"
       }`}
     >
-      {label} {count !== undefined && <span className="ml-1 text-zinc-600">[{count}]</span>}
+      {label} {count !== undefined && <span className={active ? "text-zinc-500" : "text-zinc-500"}>[{count}]</span>}
     </button>
   );
 }
 
 function StatusBadge({ status }: { status: string }) {
   const styles: Record<string, string> = {
-    Open: "bg-emerald-500/10 text-emerald-500 border-emerald-500/20",
-    "In Progress": "bg-blue-500/10 text-blue-500 border-blue-500/20",
-    "In Review": "bg-amber-500/10 text-amber-500 border-amber-500/20",
-    Completed: "bg-green-500/10 text-green-500 border-green-500/20",
-    Pending: "bg-yellow-500/10 text-yellow-500 border-yellow-500/20",
-    accepted: "bg-emerald-500/10 text-emerald-500 border-emerald-500/20",
-    rejected: "bg-red-500/10 text-red-500 border-red-500/20",
-    WorkSubmitted: "bg-amber-500/10 text-amber-500 border-amber-500/20",
+    Open: "bg-emerald-500/10 text-emerald-400 border-emerald-500/20",
+    "In Progress": "bg-blue-500/10 text-blue-400 border-blue-500/20",
+    "In Review": "bg-amber-500/10 text-amber-400 border-amber-500/20",
+    Completed: "bg-green-500/10 text-green-400 border-green-500/20",
+    Pending: "bg-yellow-500/10 text-yellow-400 border-yellow-500/20",
+    accepted: "bg-emerald-500/10 text-emerald-400 border-emerald-500/20",
+    rejected: "bg-red-500/10 text-red-400 border-red-500/20",
+    WorkSubmitted: "bg-amber-500/10 text-amber-400 border-amber-500/20",
   };
 
   return (
-    <span className={`ml-2 inline-flex px-2 py-0.5 rounded-full border text-[10px] font-bold uppercase ${styles[status] || "bg-zinc-800 text-zinc-400 border-zinc-700"}`}>
+    <span className={`inline-flex px-3 py-1 rounded-full border text-[11px] font-semibold tracking-wide ${styles[status] || "bg-white/5 text-zinc-400 border-white/10"}`}>
       {status}
     </span>
   );
@@ -812,10 +825,10 @@ function StatusBadge({ status }: { status: string }) {
 
 function EmptyState({ icon, message, actionLabel, actionHref }: { icon: React.ReactNode; message: string; actionLabel: string; actionHref: string }) {
   return (
-    <div className="py-16 text-center border border-dashed border-zinc-800 rounded-lg">
-      <div className="text-zinc-700 mb-4 flex justify-center">{icon}</div>
-      <p className="text-zinc-500 font-mono text-sm mb-6">{message}</p>
-      <Link href={actionHref} className="text-emerald-500 hover:text-emerald-400 text-xs font-mono uppercase tracking-widest underline underline-offset-4">
+    <div className="py-20 text-center border border-white/5 bg-white/[0.01] rounded-2xl">
+      <div className="text-zinc-600 mb-6 flex justify-center opacity-50 scale-125">{icon}</div>
+      <p className="text-zinc-400 text-[15px] font-medium mb-6">{message}</p>
+      <Link href={actionHref} className="px-6 py-2.5 bg-white hover:bg-zinc-200 text-black text-[14px] font-semibold rounded-full transition-all shadow-sm">
         {actionLabel}
       </Link>
     </div>

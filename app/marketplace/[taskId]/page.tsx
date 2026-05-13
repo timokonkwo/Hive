@@ -67,9 +67,11 @@ export default function TaskDetailsPage({ params }: { params: Promise<{ taskId: 
 
   const userAddress = user?.wallet?.address?.toLowerCase();
   const userPrivyId = user?.id?.toLowerCase();
+  const sameIdentity = (left?: string | null, right?: string | null) =>
+    !!left && !!right && left.toLowerCase() === right.toLowerCase();
   const isTaskPoster = !!task && (
-    task.clientAddress?.toLowerCase() === userAddress ||
-    task.clientPrivyUserId?.toLowerCase() === userPrivyId
+    sameIdentity(task.clientAddress, userAddress) ||
+    sameIdentity(task.clientPrivyUserId, userPrivyId)
   );
 
   useEffect(() => {
@@ -180,7 +182,7 @@ export default function TaskDetailsPage({ params }: { params: Promise<{ taskId: 
   }, [userAddress, isTaskPoster]);
 
   const messageRequest = useCallback(async (path: string, options: RequestInit = {}) => {
-    if (agentApiKey && !isTaskPoster) {
+    if (agentApiKey && agentHasProposed && !isTaskPoster) {
       return fetch(path, {
         ...options,
         headers: {
@@ -193,7 +195,7 @@ export default function TaskDetailsPage({ params }: { params: Promise<{ taskId: 
     const separator = path.includes('?') ? '&' : '?';
     const clientPath = userAddress ? `${path}${separator}address=${encodeURIComponent(userAddress)}` : path;
     return authFetch(clientPath, options);
-  }, [agentApiKey, authFetch, isTaskPoster, userAddress]);
+  }, [agentApiKey, agentHasProposed, authFetch, isTaskPoster, userAddress]);
 
   const loadMessages = useCallback(async () => {
     if (!task || !canUseMessages) return;
@@ -232,19 +234,37 @@ export default function TaskDetailsPage({ params }: { params: Promise<{ taskId: 
     loadMessages();
   }, [loadMessages]);
 
+  useEffect(() => {
+    if (canUseMessages) return;
+    setMessageThreads([]);
+    setActiveThread(null);
+    setThreadMessages([]);
+    setMessageDraft('');
+  }, [canUseMessages]);
+
   const sendMessage = async () => {
     const content = messageDraft.trim();
     if (!content) return;
+    if (!canUseMessages) {
+      toast.error('Messages are only available to the task owner and agents who proposed on this task.');
+      return;
+    }
 
     setSendingMessage(true);
     try {
       const res = await messageRequest('/api/messages/threads', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ taskId, content }),
+        body: JSON.stringify({ taskId, threadId: activeThread?.id, content }),
       });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'Failed to send message');
+      if (!res.ok) {
+        // Surface a friendly message for auth failures
+        if (res.status === 401) {
+          throw new Error('Session expired. Please sign out and sign back in, then try again.');
+        }
+        throw new Error(data.error || 'Failed to send message');
+      }
 
       setMessageDraft('');
       setActiveThread(data.thread);
@@ -875,7 +895,7 @@ export default function TaskDetailsPage({ params }: { params: Promise<{ taskId: 
 	                </div>
 	                )}
 
-	                {(canUseMessages || agentApiKey) && (
+	                {canUseMessages && (
 	                <div>
 	                    <div className="flex items-center justify-between gap-3 mb-4">
 	                        <h3 className="text-sm font-bold font-mono uppercase tracking-widest text-zinc-400 flex items-center gap-2">

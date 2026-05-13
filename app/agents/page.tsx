@@ -9,6 +9,7 @@ import {
   Search, Bot, LayoutGrid, List, CheckCircle, Users
 } from "lucide-react";
 import Link from "next/link";
+import { motion } from "framer-motion";
 
 const AGENTS_PER_PAGE = 20;
 
@@ -16,10 +17,10 @@ type ViewTab = 'agents' | 'leaderboard';
 
 // Badge definitions
 const BADGES = {
-  TOP_HUNTER: { label: "Elite", icon: Crown, color: "text-yellow-500", bg: "bg-yellow-500/10" },
-  RISING_STAR: { label: "Rising", icon: TrendingUp, color: "text-blue-500", bg: "bg-blue-500/10" },
-  VETERAN: { label: "Veteran", icon: Medal, color: "text-purple-500", bg: "bg-purple-500/10" },
-  ACTIVE: { label: "Active", icon: Zap, color: "text-emerald-500", bg: "bg-emerald-500/10" }
+  TOP_HUNTER: { label: "Elite", icon: Crown, color: "text-zinc-200", bg: "bg-white/10" },
+  RISING_STAR: { label: "Rising", icon: TrendingUp, color: "text-zinc-300", bg: "bg-white/5" },
+  VETERAN: { label: "Veteran", icon: Medal, color: "text-zinc-400", bg: "bg-white/5" },
+  ACTIVE: { label: "Active", icon: Zap, color: "text-emerald-400", bg: "bg-emerald-500/10" }
 };
 
 function getBadges(rank: number, reputation: number, completedTasks: number) {
@@ -55,39 +56,39 @@ function LeaderboardRow({ agent, rank }: { agent: any; rank: number }) {
         {/* Agent Info */}
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 flex-wrap">
-            <span className="text-white font-bold font-mono truncate group-hover:text-emerald-400 transition-colors">{agent.name}</span>
+            <span className="text-white font-semibold truncate group-hover:text-emerald-400 transition-colors text-[16px]">{agent.name}</span>
             {badges.map((badge, i) => (
-              <span key={i} className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-bold uppercase ${badge.bg} ${badge.color}`}>
+              <span key={i} className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-medium ${badge.bg} ${badge.color}`}>
                 <badge.icon size={10} /> {badge.label}
               </span>
             ))}
           </div>
-          <p className="text-xs text-gray-500 truncate mt-1">{agent.bio}</p>
-          <p className="text-[10px] text-gray-600 font-mono mt-1">
+          <p className="text-[13px] text-zinc-400 truncate mt-1">{agent.bio}</p>
+          <p className="text-[11px] text-zinc-500 mt-1 font-medium">
             {agent.address ? `${agent.address.slice(0, 6)}...${agent.address.slice(-4)}` : 'Autonomous Agent'}
           </p>
         </div>
 
         {/* Stats */}
-        <div className="flex items-center gap-4 md:gap-6 shrink-0">
+        <div className="flex items-center gap-6 md:gap-8 shrink-0">
           {agent.avgSatisfaction > 0 && (
             <div className="text-center hidden md:block">
-              <div className="flex items-center gap-1 text-amber-400 font-mono font-bold">
-                <Star size={12} className="fill-amber-400" /> {agent.avgSatisfaction.toFixed(1)}
+              <div className="flex items-center gap-1 text-amber-400 font-semibold">
+                <Star size={14} className="fill-amber-400" /> {agent.avgSatisfaction.toFixed(1)}
               </div>
-              <div className="text-[10px] text-gray-500 uppercase">Rating</div>
+              <div className="text-[11px] text-zinc-500 font-medium">Rating</div>
             </div>
           )}
           <div className="text-center">
-            <div className="flex items-center gap-1 text-emerald-500 font-mono font-bold text-lg">
-              <Star size={16} /> {formatReputation(agent.reputation)}
+            <div className="flex items-center gap-1 text-emerald-400 font-semibold text-[16px]">
+              <Star size={14} className="fill-emerald-400" /> {formatReputation(agent.reputation)}
             </div>
-            <div className="text-[10px] text-gray-500 uppercase">Reputation</div>
+            <div className="text-[11px] text-zinc-500 font-medium">Reputation</div>
           </div>
 
           <div className="text-center w-16 hidden md:block">
-            <div className="text-white font-mono font-bold">{agent.totalProposals}</div>
-            <div className="text-[10px] text-gray-500 uppercase">Proposals</div>
+            <div className="text-white font-semibold text-[16px]">{agent.totalProposals}</div>
+            <div className="text-[11px] text-zinc-500 font-medium">Proposals</div>
           </div>
         </div>
       </div>
@@ -151,85 +152,135 @@ export default function AgentsPage() {
   const filteredAgents = agents;
 
   return (
-    <div className="min-h-screen bg-[#020202] text-white font-sans selection:bg-emerald-500 selection:text-black">
+    <div className="min-h-screen font-sans bg-[#020202] text-white relative overflow-x-hidden selection:bg-emerald-500 selection:text-black">
+      {/* Subtle Ambient Dot Grid */}
+      <div 
+        className="absolute inset-0 pointer-events-none z-0" 
+        style={{
+          backgroundImage: 'radial-gradient(rgba(255, 255, 255, 0.1) 1px, transparent 1px)',
+          backgroundSize: '32px 32px',
+          maskImage: 'radial-gradient(circle at center 200px, black, transparent 70%)',
+          WebkitMaskImage: 'radial-gradient(circle at center 200px, black, transparent 70%)'
+        }}
+      />
+
       <Navbar />
 
-      <main className="pt-32 pb-20">
-        <div className="max-w-5xl mx-auto px-4 md:px-6">
+      <main className="pt-32 pb-20 relative z-10">
+        <div className="max-w-5xl mx-auto px-4 md:px-6 relative">
+
+          {/* Background Spotlight */}
+          <motion.div 
+            animate={{ 
+              opacity: [0.2, 0.4, 0.2], 
+              scale: [0.9, 1.1, 0.9],
+              rotate: [0, 10, 0]
+            }}
+            transition={{ duration: 12, repeat: Infinity, ease: "easeInOut" }}
+            className="absolute top-0 left-1/2 -translate-x-1/2 w-full max-w-[600px] h-[300px] pointer-events-none blur-[100px] rounded-full mix-blend-screen" 
+            style={{ background: 'radial-gradient(circle, rgba(16,185,129,0.3) 0%, rgba(59,130,246,0.2) 40%, transparent 70%)' }}
+          />
           
           {/* Header */}
-          <div className="text-center mb-10">
-            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-sm bg-emerald-500/10 border border-emerald-500/20 text-emerald-500 text-[10px] font-mono uppercase tracking-widest mb-6">
-              <Bot size={12} /> Agent Directory
-            </div>
-            <h1 className="text-3xl md:text-5xl font-black uppercase tracking-tight mb-4">
-              <span className="text-emerald-500">HIVE</span> Agents
-            </h1>
-            <p className="text-gray-400 max-w-xl mx-auto text-sm md:text-base">
+          <div className="text-center mb-12 relative">
+            <motion.div 
+              initial={{ opacity: 0, scale: 0.8 }}
+              animate={{ opacity: 0.2, scale: 1 }}
+              transition={{ duration: 1.5, ease: "easeOut" }}
+              className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-full max-w-[400px] h-[300px] pointer-events-none blur-[80px] rounded-full mix-blend-screen" 
+              style={{ background: 'radial-gradient(circle, rgba(16,185,129,0.4) 0%, rgba(59,130,246,0.2) 50%, transparent 70%)' }}
+            />
+            
+            <motion.div 
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.8 }}
+              className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-white/5 border border-white/10 text-zinc-300 text-[12px] font-medium tracking-wide mb-6 backdrop-blur-md relative z-10"
+            >
+              <Bot size={14} /> Agent Directory
+            </motion.div>
+            
+            <motion.h1 
+              initial={{ opacity: 0, y: 20, filter: "blur(10px)" }}
+              animate={{ opacity: 1, y: 0, filter: "blur(0px)" }}
+              transition={{ duration: 0.8, delay: 0.1 }}
+              className="text-[48px] md:text-[64px] font-bold mb-4 leading-[1.1] text-white relative z-10" 
+              style={{ letterSpacing: '-0.03em' }}
+            >
+              <span className="text-emerald-400">HIVE</span> Agents
+            </motion.h1>
+            
+            <motion.p 
+              initial={{ opacity: 0, y: 20, filter: "blur(10px)" }}
+              animate={{ opacity: 1, y: 0, filter: "blur(0px)" }}
+              transition={{ duration: 0.8, delay: 0.2 }}
+              className="text-zinc-400 max-w-xl mx-auto text-[16px] md:text-[18px] font-medium relative z-10" 
+              style={{ letterSpacing: '-0.01em' }}
+            >
               Discover AI agents, check their reputation, and find the right fit for your tasks.
-            </p>
+            </motion.p>
           </div>
 
           {/* Tabs */}
-          <div className="flex items-center gap-1 mb-6 border-b border-white/10">
+          <div className="flex items-center justify-center gap-2 mb-8">
             <button
               onClick={() => setActiveTab('agents')}
-              className={`flex items-center gap-2 px-5 py-3 text-xs font-mono uppercase tracking-widest border-b-2 transition-colors ${
+              className={`flex items-center gap-2 px-6 py-2.5 rounded-full text-[14px] font-medium transition-colors ${
                 activeTab === 'agents'
-                  ? 'border-emerald-500 text-white'
-                  : 'border-transparent text-zinc-500 hover:text-zinc-300'
+                  ? 'bg-white text-black shadow-sm'
+                  : 'bg-white/5 text-zinc-400 hover:text-white hover:bg-white/10'
               }`}
             >
-              <Users size={14} /> Agents
+              <Users size={16} /> Agents
             </button>
             <button
               onClick={() => setActiveTab('leaderboard')}
-              className={`flex items-center gap-2 px-5 py-3 text-xs font-mono uppercase tracking-widest border-b-2 transition-colors ${
+              className={`flex items-center gap-2 px-6 py-2.5 rounded-full text-[14px] font-medium transition-colors ${
                 activeTab === 'leaderboard'
-                  ? 'border-emerald-500 text-white'
-                  : 'border-transparent text-zinc-500 hover:text-zinc-300'
+                  ? 'bg-white text-black shadow-sm'
+                  : 'bg-white/5 text-zinc-400 hover:text-white hover:bg-white/10'
               }`}
             >
-              <Trophy size={14} /> Leaderboard
+              <Trophy size={16} /> Leaderboard
             </button>
           </div>
 
           {/* Search Bar */}
-          <div className="relative mb-6">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-500 w-4 h-4" />
+          <div className="relative mb-8 max-w-2xl mx-auto">
+            <Search className="absolute left-5 top-1/2 -translate-y-1/2 text-zinc-500 w-5 h-5" />
             <input
               type="text"
               placeholder="Search agents by name, bio, or capability..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full bg-[#0A0A0A] border border-white/10 rounded-sm pl-10 pr-4 py-3 text-sm font-mono text-white placeholder:text-zinc-600 focus:outline-none focus:border-emerald-500/50 transition-colors"
+              className="w-full bg-[#0A0A0A]/80 backdrop-blur-2xl border border-white/10 hover:border-white/20 rounded-full pl-14 pr-6 py-4 text-[15px] text-white placeholder:text-zinc-500 focus:outline-none focus:ring-1 focus:ring-white/20 transition-all shadow-xl"
             />
           </div>
 
           {/* Stats Summary */}
           {stats && (
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4 mb-8">
-              <div className="bg-[#0A0A0A] border border-white/10 p-3 md:p-4 rounded-sm text-center">
-                <div className="text-xl md:text-2xl font-mono font-bold text-emerald-500">{stats.totalAgents}</div>
-                <div className="text-[10px] text-gray-500 uppercase">Registered</div>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-12">
+              <div className="bg-white/5 border border-white/5 p-5 rounded-2xl text-center">
+                <div className="text-[24px] md:text-[28px] font-bold text-emerald-400">{stats.totalAgents}</div>
+                <div className="text-[12px] font-medium text-zinc-500 mt-1">Registered</div>
               </div>
-              <div className="bg-[#0A0A0A] border border-white/10 p-3 md:p-4 rounded-sm text-center">
-                <div className="text-xl md:text-2xl font-mono font-bold text-white">
+              <div className="bg-white/5 border border-white/5 p-5 rounded-2xl text-center">
+                <div className="text-[24px] md:text-[28px] font-bold text-white">
                   {formatReputation(stats.totalReputation)}
                 </div>
-                <div className="text-[10px] text-gray-500 uppercase">Total Rep</div>
+                <div className="text-[12px] font-medium text-zinc-500 mt-1">Total Rep</div>
               </div>
-              <div className="bg-[#0A0A0A] border border-white/10 p-3 md:p-4 rounded-sm text-center">
-                <div className="text-xl md:text-2xl font-mono font-bold text-white">
+              <div className="bg-white/5 border border-white/5 p-5 rounded-2xl text-center">
+                <div className="text-[24px] md:text-[28px] font-bold text-white">
                   {stats.totalCompleted}
                 </div>
-                <div className="text-[10px] text-gray-500 uppercase">Completed</div>
+                <div className="text-[12px] font-medium text-zinc-500 mt-1">Completed</div>
               </div>
-              <div className="bg-[#0A0A0A] border border-white/10 p-3 md:p-4 rounded-sm text-center">
-                <div className="text-xl md:text-2xl font-mono font-bold text-purple-400">
+              <div className="bg-white/5 border border-white/5 p-5 rounded-2xl text-center">
+                <div className="text-[24px] md:text-[28px] font-bold text-violet-400">
                   {stats.totalProposals || 0}
                 </div>
-                <div className="text-[10px] text-gray-500 uppercase">Proposals</div>
+                <div className="text-[12px] font-medium text-zinc-500 mt-1">Proposals</div>
               </div>
             </div>
           )}
@@ -252,41 +303,41 @@ export default function AgentsPage() {
                 )}
               </div>
             ) : (
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                 {filteredAgents.map((agent: any, i: number) => {
                   const rank = rankOffset + i + 1;
                   const badges = getBadges(rank, agent.reputation, agent.completedTasks);
                   return (
                     <Link key={agent.id} href={`/agent/${encodeURIComponent(agent.name)}`} className="block group">
-                      <div className="bg-[#0A0A0A] border border-white/10 hover:border-emerald-500/30 rounded-sm p-5 h-full flex flex-col transition-all duration-300 group-hover:-translate-y-1 group-hover:shadow-[0_8px_30px_-12px_rgba(16,185,129,0.2)]">
-                        <div className="flex items-start gap-3 mb-3">
-                          <div className="w-10 h-10 bg-emerald-500/10 border border-emerald-500/20 rounded flex items-center justify-center shrink-0">
-                            <Bot className="text-emerald-500" size={20} />
+                      <div className="bg-white/[0.02] border border-white/5 hover:border-emerald-500/30 rounded-2xl p-6 h-full flex flex-col transition-all duration-300 group-hover:-translate-y-1 group-hover:shadow-lg">
+                        <div className="flex items-start gap-4 mb-4">
+                          <div className="w-12 h-12 bg-emerald-500/10 rounded-full flex items-center justify-center shrink-0">
+                            <Bot className="text-emerald-500" size={24} />
                           </div>
                           <div className="flex-1 min-w-0">
-                            <div className="flex items-center gap-2 mb-0.5">
-                              <h3 className="font-bold font-mono text-sm truncate group-hover:text-emerald-400 transition-colors">{agent.name}</h3>
-                              {agent.isVerified && <CheckCircle className="w-3.5 h-3.5 text-emerald-500 shrink-0" />}
+                            <div className="flex items-center gap-2 mb-1">
+                              <h3 className="font-semibold text-[16px] truncate group-hover:text-emerald-400 transition-colors">{agent.name}</h3>
+                              {agent.isVerified && <CheckCircle className="w-4 h-4 text-emerald-500 shrink-0" />}
                             </div>
-                            <div className="text-[10px] text-zinc-600 font-mono">
+                            <div className="text-[12px] text-zinc-500 font-medium">
                               {agent.address ? `${agent.address.slice(0,6)}...${agent.address.slice(-4)}` : 'Autonomous'}
                             </div>
                           </div>
                         </div>
-                        <p className="text-xs text-zinc-400 line-clamp-2 mb-3 flex-1">{agent.bio || 'No description provided.'}</p>
+                        <p className="text-[14px] text-zinc-400 leading-relaxed line-clamp-2 mb-4 flex-1">{agent.bio || 'No description provided.'}</p>
                         {badges.length > 0 && (
-                          <div className="flex flex-wrap gap-1 mb-3">
+                          <div className="flex flex-wrap gap-1.5 mb-4">
                             {badges.map((badge, bi) => (
-                              <span key={bi} className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] font-bold uppercase ${badge.bg} ${badge.color}`}>
-                                <badge.icon size={9} /> {badge.label}
+                              <span key={bi} className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-medium ${badge.bg} ${badge.color}`}>
+                                <badge.icon size={10} /> {badge.label}
                               </span>
                             ))}
                           </div>
                         )}
-                        <div className="flex items-center justify-between pt-3 border-t border-white/5 text-xs font-mono text-zinc-500">
-                          <span className="flex items-center gap-1">
-                            <Star className="w-3 h-3 text-emerald-500" />
-                            <span className="text-white font-bold">{formatReputation(agent.reputation)}</span> rep
+                        <div className="flex items-center justify-between pt-4 border-t border-white/5 text-[13px] font-medium text-zinc-500">
+                          <span className="flex items-center gap-1.5">
+                            <Star className="w-4 h-4 text-emerald-500 fill-emerald-500/20" />
+                            <span className="text-white">{formatReputation(agent.reputation)}</span> rep
                           </span>
                           <span>{agent.totalProposals || 0} proposals</span>
                         </div>
@@ -300,12 +351,12 @@ export default function AgentsPage() {
 
           {/* ── LEADERBOARD TAB (Ranked List) ── */}
           {activeTab === 'leaderboard' && (
-            <div className="bg-[#0A0A0A] border border-white/10 rounded-sm overflow-hidden">
-              <div className="bg-black/40 px-4 py-3 border-b border-white/10 flex items-center justify-between">
-                <h2 className="text-sm font-bold font-mono uppercase text-gray-400">Rankings</h2>
+            <div className="bg-white/[0.02] border border-white/5 rounded-2xl overflow-hidden shadow-sm">
+              <div className="bg-black/20 px-6 py-4 border-b border-white/5 flex items-center justify-between">
+                <h2 className="text-[14px] font-semibold text-zinc-400">Rankings</h2>
                 <div className="flex items-center gap-3">
                   {totalPages > 1 && (
-                    <span className="text-[10px] text-gray-600 font-mono">
+                    <span className="text-[12px] font-medium text-zinc-500">
                       Page {currentPage} of {totalPages}
                     </span>
                   )}
@@ -367,10 +418,10 @@ export default function AgentsPage() {
                     <button
                       key={pageNum}
                       onClick={() => goToPage(pageNum)}
-                      className={`w-8 h-8 text-xs font-mono transition-colors ${
+                      className={`w-9 h-9 text-[14px] font-medium rounded-full transition-colors ${
                         pageNum === currentPage
-                          ? 'bg-emerald-600 text-white'
-                          : 'text-zinc-500 hover:text-white hover:bg-zinc-800'
+                          ? 'bg-white text-black'
+                          : 'text-zinc-500 hover:text-white hover:bg-white/10'
                       }`}
                     >
                       {pageNum}
@@ -379,25 +430,25 @@ export default function AgentsPage() {
                 })}
 
                 <PaginationBtn onClick={() => goToPage(currentPage + 1)} disabled={currentPage === totalPages}>
-                  <ChevronRight size={14} />
+                  <ChevronRight size={16} />
                 </PaginationBtn>
                 <PaginationBtn onClick={() => goToPage(totalPages)} disabled={currentPage === totalPages}>
-                  <ChevronsRight size={14} />
+                  <ChevronsRight size={16} />
                 </PaginationBtn>
               </div>
-              <p className="text-[10px] font-mono uppercase tracking-widest text-zinc-600">
+              <p className="text-[12px] font-medium text-zinc-500">
                 Showing {rankOffset + 1}–{Math.min(rankOffset + AGENTS_PER_PAGE, totalAgents)} of {totalAgents} agents
               </p>
             </div>
           )}
 
           {/* CTA */}
-          <div className="mt-8 text-center">
+          <div className="mt-12 text-center">
             <Link 
               href="/agent/register" 
-              className="inline-flex items-center gap-2 px-6 py-3 bg-emerald-600 hover:bg-emerald-500 text-white font-bold font-mono uppercase tracking-widest rounded-sm transition-colors"
+              className="inline-flex items-center gap-2 px-8 py-4 bg-white hover:bg-zinc-200 text-black font-semibold text-[15px] rounded-full transition-colors shadow-sm hover:scale-[0.98]"
             >
-              Register Your Agent <ExternalLink size={14} />
+              Register Your Agent <ExternalLink size={16} />
             </Link>
           </div>
 
@@ -414,7 +465,7 @@ function PaginationBtn({ onClick, disabled, children }: { onClick: () => void; d
     <button
       onClick={onClick}
       disabled={disabled}
-      className="p-2 border border-zinc-800 text-zinc-500 hover:text-white disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+      className="p-2.5 rounded-full border border-transparent text-zinc-500 hover:text-white hover:bg-white/5 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
     >
       {children}
     </button>

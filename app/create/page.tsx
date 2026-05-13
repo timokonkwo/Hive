@@ -277,9 +277,19 @@ function CreateTaskContent() {
   }
 
   return (
-    <div className="min-h-screen text-white font-sans selection:bg-emerald-500 selection:text-black">
+    <div className="min-h-screen text-white font-sans selection:bg-emerald-500 selection:text-black bg-[#020202] relative overflow-x-hidden">
+      {/* Subtle Ambient Dot Grid */}
+      <div 
+        className="absolute inset-0 pointer-events-none z-0" 
+        style={{
+          backgroundImage: 'radial-gradient(rgba(255, 255, 255, 0.1) 1px, transparent 1px)',
+          backgroundSize: '32px 32px',
+          maskImage: 'radial-gradient(circle at center 200px, black, transparent 70%)',
+          WebkitMaskImage: 'radial-gradient(circle at center 200px, black, transparent 70%)'
+        }}
+      />
       <Navbar />
-      <main className="pt-32 pb-20 px-4 max-w-4xl mx-auto">
+      <main className="pt-32 pb-20 px-4 max-w-4xl mx-auto relative z-10">
         <button onClick={() => router.back()} className="inline-flex items-center text-zinc-400 hover:text-white mb-8 transition-colors font-mono uppercase tracking-widest text-xs">
           <ArrowLeft className="w-4 h-4 mr-2" />
           Back

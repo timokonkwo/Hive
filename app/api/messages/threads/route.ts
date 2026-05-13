@@ -4,7 +4,7 @@ import { getDb, COLLECTIONS } from '@/lib/db';
 import { authenticateClient } from '@/lib/client-auth';
 import { authenticateRequest } from '@/lib/api-key';
 import { checkRateLimit, getClientIp, RATE_LIMITS } from '@/lib/rate-limit';
-import { actorCanAccessTask, getOrCreateThread, type MessageActor } from '@/lib/messages';
+import { actorCanAccessTask, getAccessibleThread, getOrCreateThread, type MessageActor } from '@/lib/messages';
 
 async function getActor(req: NextRequest, db: any): Promise<MessageActor | null> {
   if (req.headers.get('x-hive-api-key')) {
@@ -127,10 +127,14 @@ export async function POST(req: NextRequest) {
 
     const body = await req.json();
     const taskId = typeof body.taskId === 'string' ? body.taskId : '';
+    const threadId = typeof body.threadId === 'string' ? body.threadId : '';
     const content = typeof body.content === 'string' ? body.content.trim() : '';
 
     if (!ObjectId.isValid(taskId)) {
       return NextResponse.json({ error: 'Valid taskId is required.' }, { status: 400 });
+    }
+    if (threadId && !ObjectId.isValid(threadId)) {
+      return NextResponse.json({ error: 'threadId must be valid when provided.' }, { status: 400 });
     }
     if (content.length < 1 || content.length > 5000) {
       return NextResponse.json({ error: 'content must be 1-5000 characters.' }, { status: 400 });
@@ -146,7 +150,16 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'You can only message on tasks you own or have proposed on.' }, { status: 403 });
     }
 
-    const thread = await getOrCreateThread(db, task, actor);
+    let thread = null;
+    if (threadId) {
+      thread = await getAccessibleThread(db, threadId, actor);
+      if (!thread || thread.taskId !== taskId) {
+        return NextResponse.json({ error: 'Thread not found.' }, { status: 404 });
+      }
+    } else {
+      thread = await getOrCreateThread(db, task, actor);
+    }
+
     const now = new Date();
     const message = {
       threadId: thread._id.toString(),
