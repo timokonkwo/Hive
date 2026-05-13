@@ -45,7 +45,7 @@ function TypewriterText({ text }: { text: string }) {
       <motion.span
         animate={{ opacity: [1, 0, 1] }}
         transition={{ duration: 0.8, repeat: Infinity, ease: "linear" }}
-        className="inline-block w-1 md:w-2 h-[40px] md:h-[70px] bg-zinc-500 ml-1 md:ml-2"
+        className="inline-block w-1 md:w-2 h-[40px] md:h-[70px] bg-emerald-500 ml-1 md:ml-2"
         style={{ verticalAlign: 'middle' }}
       />
     </span>
@@ -159,16 +159,54 @@ export default function MarketplacePage() {
 
   return (
     <div className="min-h-screen font-sans relative overflow-x-hidden bg-[#020202]">
-      {/* Subtle Ambient Dot Grid */}
-      <div 
-        className="absolute inset-0 pointer-events-none z-0" 
-        style={{
-          backgroundImage: 'radial-gradient(rgba(255, 255, 255, 0.1) 1px, transparent 1px)',
-          backgroundSize: '32px 32px',
-          maskImage: 'radial-gradient(circle at center 200px, black, transparent 70%)',
-          WebkitMaskImage: 'radial-gradient(circle at center 200px, black, transparent 70%)'
-        }}
-      />
+      {/* Animated Agentic Background */}
+      <div className="absolute inset-0 pointer-events-none z-0 overflow-hidden">
+        {/* Dynamic grid */}
+        <motion.div 
+          animate={{
+            backgroundPosition: ['0px 0px', '40px 40px']
+          }}
+          transition={{ duration: 4, repeat: Infinity, ease: "linear" }}
+          className="absolute inset-0 opacity-[0.15]" 
+          style={{
+            backgroundImage: 'linear-gradient(rgba(16, 185, 129, 0.3) 1px, transparent 1px), linear-gradient(90deg, rgba(16, 185, 129, 0.3) 1px, transparent 1px)',
+            backgroundSize: '40px 40px',
+            maskImage: 'radial-gradient(ellipse at 50% 30%, black 10%, transparent 70%)',
+            WebkitMaskImage: 'radial-gradient(ellipse at 50% 30%, black 10%, transparent 70%)'
+          }}
+        />
+        
+        {/* Floating animated orbs */}
+        <motion.div
+          animate={{
+            x: [0, 100, -50, 0],
+            y: [0, -50, 80, 0],
+            scale: [1, 1.2, 0.9, 1],
+            opacity: [0.1, 0.25, 0.1]
+          }}
+          transition={{ duration: 20, repeat: Infinity, ease: "easeInOut" }}
+          className="absolute top-[15%] left-[20%] w-[400px] h-[400px] bg-emerald-500/20 rounded-full blur-[100px]"
+        />
+        <motion.div
+          animate={{
+            x: [0, -120, 60, 0],
+            y: [0, 80, -40, 0],
+            scale: [1, 1.5, 0.8, 1],
+            opacity: [0.1, 0.2, 0.1]
+          }}
+          transition={{ duration: 25, repeat: Infinity, ease: "easeInOut", delay: 2 }}
+          className="absolute top-[35%] right-[15%] w-[500px] h-[500px] bg-blue-500/10 rounded-full blur-[120px]"
+        />
+        
+        {/* Scanning line effect */}
+        <motion.div
+          animate={{
+            y: ['-100%', '1000%']
+          }}
+          transition={{ duration: 12, repeat: Infinity, ease: "linear" }}
+          className="absolute top-0 left-0 w-full h-[1px] bg-gradient-to-r from-transparent via-emerald-500/40 to-transparent shadow-[0_0_20px_rgba(16,185,129,0.3)] opacity-50"
+        />
+      </div>
 
       <Navbar />
 
@@ -177,22 +215,22 @@ export default function MarketplacePage() {
         {/* Hero Section */}
         <div className="flex flex-col items-center text-center mb-10 pt-16 relative">
           
-          {/* Subtle Theatrical Background Glow (Stripe / Apple Inspired) */}
+          {/* Subtle Theatrical Background Glow */}
           <motion.div 
             animate={{ 
-              opacity: [0.2, 0.4, 0.2], 
-              scale: [0.9, 1.1, 0.9],
-              rotate: [0, 10, 0]
+              opacity: [0.15, 0.35, 0.15], 
+              scale: [0.9, 1.05, 0.9],
+              rotate: [0, 5, 0]
             }}
-            transition={{ duration: 12, repeat: Infinity, ease: "easeInOut" }}
-            className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-full max-w-[600px] md:max-w-[800px] h-[400px] md:h-[500px] pointer-events-none blur-[100px] rounded-full mix-blend-screen" 
-            style={{ background: 'radial-gradient(circle, rgba(16,185,129,0.3) 0%, rgba(59,130,246,0.2) 40%, transparent 70%)' }}
+            transition={{ duration: 15, repeat: Infinity, ease: "easeInOut" }}
+            className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-full max-w-[600px] md:max-w-[800px] h-[400px] md:h-[500px] pointer-events-none blur-[120px] rounded-full mix-blend-screen" 
+            style={{ background: 'radial-gradient(circle, rgba(16,185,129,0.25) 0%, rgba(16,185,129,0.1) 40%, transparent 70%)' }}
           />
 
           <div className="flex flex-wrap justify-center items-center gap-[0.25em] text-[52px] md:text-[96px] font-bold mb-6 leading-[1.04] text-white relative z-10" style={{ letterSpacing: '-0.03em' }}>
             <span>Work,</span>
             
-            <span className="text-zinc-500 font-bold">
+            <span className="text-emerald-500 font-bold">
               <TypewriterText text="automated." />
             </span>
           </div>
@@ -269,7 +307,7 @@ export default function MarketplacePage() {
                     <p className="text-[14px] mb-5 leading-relaxed" style={{ color: isDark ? '#A1A1AA' : '#60646c' }}>
                         Submit a work request and receive competitive proposals from verified agents.
                     </p>
-                    <Link href="/create" className="block text-center w-full py-2.5 bg-white text-black hover:bg-zinc-200 rounded-full font-medium text-[13px] transition-colors shadow-sm">
+                    <Link href="/create" className="block text-center w-full py-2.5 bg-emerald-500 hover:bg-emerald-400 text-black rounded-full font-medium text-[13px] transition-colors shadow-[0_0_15px_rgba(16,185,129,0.2)] hover:shadow-[0_0_20px_rgba(16,185,129,0.4)]">
                         Create Task
                     </Link>
                 </div>
@@ -322,7 +360,7 @@ export default function MarketplacePage() {
                                 onClick={() => setStatusFilter(s)}
                                 className={`px-4 py-1.5 text-[13px] font-medium rounded-full transition-colors ${
                                     statusFilter === s
-                                        ? 'bg-white text-black shadow-sm'
+                                        ? 'bg-emerald-500 text-black shadow-sm shadow-emerald-500/20'
                                         : 'bg-transparent text-zinc-500 hover:bg-white/5 hover:text-zinc-300'
                                 }`}
                                 style={statusFilter !== s ? { border: `1px solid ${isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.1)'}` } : { border: '1px solid transparent' }}
