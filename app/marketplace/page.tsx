@@ -11,6 +11,7 @@ import { Search, Loader2, Users, FileText, CheckCircle, Zap, ChevronLeft, Chevro
 import Link from "next/link";
 import { useTheme } from "@/components/providers/ThemeProvider";
 import { motion } from "framer-motion";
+import { InteractiveBackground } from "@/components/marketplace/InteractiveBackground";
 
 const TASKS_PER_PAGE = 12;
 
@@ -159,54 +160,7 @@ export default function MarketplacePage() {
 
   return (
     <div className="min-h-screen font-sans relative overflow-x-hidden bg-[#020202]">
-      {/* Animated Agentic Background */}
-      <div className="absolute inset-0 pointer-events-none z-0 overflow-hidden">
-        {/* Dynamic grid */}
-        <motion.div 
-          animate={{
-            backgroundPosition: ['0px 0px', '40px 40px']
-          }}
-          transition={{ duration: 4, repeat: Infinity, ease: "linear" }}
-          className="absolute inset-0 opacity-[0.15]" 
-          style={{
-            backgroundImage: 'linear-gradient(rgba(16, 185, 129, 0.3) 1px, transparent 1px), linear-gradient(90deg, rgba(16, 185, 129, 0.3) 1px, transparent 1px)',
-            backgroundSize: '40px 40px',
-            maskImage: 'radial-gradient(ellipse at 50% 30%, black 10%, transparent 70%)',
-            WebkitMaskImage: 'radial-gradient(ellipse at 50% 30%, black 10%, transparent 70%)'
-          }}
-        />
-        
-        {/* Floating animated orbs */}
-        <motion.div
-          animate={{
-            x: [0, 100, -50, 0],
-            y: [0, -50, 80, 0],
-            scale: [1, 1.2, 0.9, 1],
-            opacity: [0.1, 0.25, 0.1]
-          }}
-          transition={{ duration: 20, repeat: Infinity, ease: "easeInOut" }}
-          className="absolute top-[15%] left-[20%] w-[400px] h-[400px] bg-emerald-500/20 rounded-full blur-[100px]"
-        />
-        <motion.div
-          animate={{
-            x: [0, -120, 60, 0],
-            y: [0, 80, -40, 0],
-            scale: [1, 1.5, 0.8, 1],
-            opacity: [0.1, 0.2, 0.1]
-          }}
-          transition={{ duration: 25, repeat: Infinity, ease: "easeInOut", delay: 2 }}
-          className="absolute top-[35%] right-[15%] w-[500px] h-[500px] bg-blue-500/10 rounded-full blur-[120px]"
-        />
-        
-        {/* Scanning line effect */}
-        <motion.div
-          animate={{
-            y: ['-100%', '1000%']
-          }}
-          transition={{ duration: 12, repeat: Infinity, ease: "linear" }}
-          className="absolute top-0 left-0 w-full h-[1px] bg-gradient-to-r from-transparent via-emerald-500/40 to-transparent shadow-[0_0_20px_rgba(16,185,129,0.3)] opacity-50"
-        />
-      </div>
+      <InteractiveBackground />
 
       <Navbar />
 
@@ -227,12 +181,11 @@ export default function MarketplacePage() {
             style={{ background: 'radial-gradient(circle, rgba(16,185,129,0.25) 0%, rgba(16,185,129,0.1) 40%, transparent 70%)' }}
           />
 
-          <div className="flex flex-wrap justify-center items-center gap-[0.25em] text-[52px] md:text-[96px] font-bold mb-6 leading-[1.04] text-white relative z-10" style={{ letterSpacing: '-0.03em' }}>
-            <span>Work,</span>
-            
-            <span className="text-emerald-500 font-bold">
+          <div className="text-[48px] sm:text-[64px] md:text-[96px] font-bold mb-6 leading-[1.1] text-white relative z-10" style={{ letterSpacing: '-0.03em' }}>
+            <div className="block md:inline-block md:mr-[0.25em]">Work,</div>
+            <div className="block md:inline-block text-emerald-500 font-bold h-[1.2em] md:h-auto">
               <TypewriterText text="automated." />
-            </span>
+            </div>
           </div>
 
           <motion.p 
