@@ -6,11 +6,39 @@
  * Fallback: gemini-1.5-flash (stable, for when 2.5 is overloaded)
  */
 
-// Model configs with their correct API versions
-const PRIMARY = { id: 'gemini-2.5-flash', base: 'https://generativelanguage.googleapis.com/v1beta/models' };
-const FALLBACK = { id: 'gemini-1.5-flash', base: 'https://generativelanguage.googleapis.com/v1/models' };
+// Model configs with their correct API versions.
+// The stable v1 endpoint used by gemini-1.5-flash rejects system_instruction,
+// so prompts are folded into contents for models that do not support it.
+const PRIMARY = {
+  id: 'gemini-2.5-flash',
+  base: 'https://generativelanguage.googleapis.com/v1beta/models',
+  supportsSystemInstruction: true,
+};
+const FALLBACK = {
+  id: 'gemini-1.5-flash',
+  base: 'https://generativelanguage.googleapis.com/v1/models',
+  supportsSystemInstruction: false,
+};
 
 export type GeminiModel = 'fast' | 'thinking';
+
+type GeminiGenerationConfig = {
+  temperature: number;
+  maxOutputTokens: number;
+  topP: number;
+  thinkingConfig?: { thinkingBudget: number };
+};
+
+type GeminiRequestPayload = {
+  contents: Array<{
+    role: 'user';
+    parts: Array<{ text: string }>;
+  }>;
+  generationConfig: GeminiGenerationConfig;
+  system_instruction?: {
+    parts: Array<{ text: string }>;
+  };
+};
 
 /**
  * Generate text using Google Gemini.
@@ -36,10 +64,19 @@ export async function generateWithGemini(
 
   for (const currentModel of models) {
     try {
-      const result = await callGemini(apiKey, currentModel.id, currentModel.base, systemPrompt, userPrompt, model);
+      const result = await callGemini(
+        apiKey,
+        currentModel.id,
+        currentModel.base,
+        currentModel.supportsSystemInstruction,
+        systemPrompt,
+        userPrompt,
+        model
+      );
       return result;
-    } catch (err: any) {
-      const isOverloaded = err.message?.includes('503') || err.message?.includes('429');
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : String(err);
+      const isOverloaded = message.includes('503') || message.includes('429');
       const isLastModel = currentModel === FALLBACK;
 
       if (isOverloaded && !isLastModel) {
@@ -60,6 +97,7 @@ async function callGemini(
   apiKey: string,
   modelId: string,
   apiBase: string,
+  supportsSystemInstruction: boolean,
   systemPrompt: string,
   userPrompt: string,
   mode: GeminiModel
@@ -68,7 +106,7 @@ async function callGemini(
   const TIMEOUT_MS = 20000; // 20s for any model
 
   // Build generation config
-  const generationConfig: Record<string, any> = {
+  const generationConfig: GeminiGenerationConfig = {
     temperature: 0.7,
     maxOutputTokens: 8192,
     topP: 0.9,
@@ -81,24 +119,31 @@ async function callGemini(
 
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), TIMEOUT_MS);
+  const requestPrompt = supportsSystemInstruction
+    ? userPrompt
+    : `SYSTEM INSTRUCTIONS:\n${systemPrompt}\n\nUSER REQUEST:\n${userPrompt}`;
+  const payload: GeminiRequestPayload = {
+    contents: [
+      {
+        role: 'user',
+        parts: [{ text: requestPrompt }],
+      },
+    ],
+    generationConfig,
+  };
+
+  if (supportsSystemInstruction) {
+    payload.system_instruction = {
+      parts: [{ text: systemPrompt }],
+    };
+  }
 
   try {
     const response = await fetch(`${apiUrl}?key=${apiKey}`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       signal: controller.signal,
-      body: JSON.stringify({
-        system_instruction: {
-          parts: [{ text: systemPrompt }],
-        },
-        contents: [
-          {
-            role: 'user',
-            parts: [{ text: userPrompt }],
-          },
-        ],
-        generationConfig,
-      }),
+      body: JSON.stringify(payload),
     });
 
     clearTimeout(timeout);
@@ -107,7 +152,7 @@ async function callGemini(
       const errorText = await response.text();
       const status = response.status;
       console.error(`[GEMINI] ${modelId} error:`, status, errorText.slice(0, 200));
-      throw new Error(`Gemini API error: ${status}`);
+      throw new Error(`Gemini API error: ${status} (${modelId})`);
     }
 
     const data = await response.json();
@@ -120,11 +165,11 @@ async function callGemini(
 
     console.log(`[GEMINI] ${modelId} responded (${text.length} chars)`);
     return text;
-  } catch (err: any) {
+  } catch (err: unknown) {
     clearTimeout(timeout);
-    if (err.name === 'AbortError') {
+    if (err instanceof Error && err.name === 'AbortError') {
       console.warn(`[GEMINI] ${modelId} timed out after ${TIMEOUT_MS}ms`);
-      throw new Error(`Gemini API error: 503`); // Treat timeout as overloaded for fallback
+      throw new Error(`Gemini API error: 503 (${modelId})`); // Treat timeout as overloaded for fallback
     }
     throw err;
   }
