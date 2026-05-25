@@ -3,21 +3,19 @@
  * 
  * Provides text generation via Google Gemini models.
  * Primary: gemini-2.5-flash (with thinkingBudget:0 for fast mode)
- * Fallback: gemini-1.5-flash (stable, for when 2.5 is overloaded)
+ * Fallback: gemini-2.5-flash-lite (lower-latency fallback for overloads)
  */
 
 // Model configs with their correct API versions.
-// The stable v1 endpoint used by gemini-1.5-flash rejects system_instruction,
-// so prompts are folded into contents for models that do not support it.
 const PRIMARY = {
   id: 'gemini-2.5-flash',
   base: 'https://generativelanguage.googleapis.com/v1beta/models',
   supportsSystemInstruction: true,
 };
 const FALLBACK = {
-  id: 'gemini-1.5-flash',
-  base: 'https://generativelanguage.googleapis.com/v1/models',
-  supportsSystemInstruction: false,
+  id: 'gemini-2.5-flash-lite',
+  base: 'https://generativelanguage.googleapis.com/v1beta/models',
+  supportsSystemInstruction: true,
 };
 
 export type GeminiModel = 'fast' | 'thinking';
