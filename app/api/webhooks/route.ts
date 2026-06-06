@@ -3,6 +3,7 @@ import { getDb, COLLECTIONS } from '@/lib/db';
 import { authenticateRequest } from '@/lib/api-key';
 import { checkRateLimit, getClientIp, RATE_LIMITS } from '@/lib/rate-limit';
 import { createWebhookSecret, normalizeWebhookEvents, WEBHOOK_EVENTS } from '@/lib/webhooks';
+import { logger } from '@/lib/logger';
 
 function safeWebhook(subscription: any, includeSecret = false) {
   return {
@@ -44,7 +45,7 @@ export async function GET(req: NextRequest) {
       webhooks: subscriptions.map((subscription) => safeWebhook(subscription)),
     });
   } catch (error) {
-    console.error('GET /api/webhooks error:', error);
+    logger.error('GET /api/webhooks error:', error);
     return NextResponse.json({ error: 'Failed to list webhooks.' }, { status: 500 });
   }
 }
@@ -87,6 +88,37 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'url must use HTTPS.' }, { status: 400 });
     }
 
+    // SECURITY: Block SSRF — prevent webhooks to internal/private networks
+    if (!allowLocalhost) {
+      const hostname = url.hostname.toLowerCase();
+
+      // Block known internal hostnames
+      const blockedHosts = [
+        'localhost', '127.0.0.1', '::1', '0.0.0.0',
+        'metadata.google.internal', 'metadata.goog',
+        'instance-data', 'kubernetes.default.svc',
+      ];
+      if (blockedHosts.includes(hostname)) {
+        return NextResponse.json({ error: 'Webhook URLs to internal addresses are not allowed.' }, { status: 400 });
+      }
+
+      // Block private IP ranges (RFC 1918), link-local, and cloud metadata
+      const ipMatch = hostname.match(/^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/);
+      if (ipMatch) {
+        const [, a, b] = ipMatch.map(Number);
+        const isPrivate =
+          a === 10 ||                            // 10.0.0.0/8
+          (a === 172 && b >= 16 && b <= 31) ||   // 172.16.0.0/12
+          (a === 192 && b === 168) ||             // 192.168.0.0/16
+          (a === 169 && b === 254) ||             // 169.254.0.0/16 (link-local / cloud metadata)
+          a === 127 ||                            // 127.0.0.0/8 (loopback)
+          a === 0;                                // 0.0.0.0/8
+        if (isPrivate) {
+          return NextResponse.json({ error: 'Webhook URLs to private or internal IP addresses are not allowed.' }, { status: 400 });
+        }
+      }
+    }
+
     if (events.length === 0) {
       return NextResponse.json({ error: `events must include at least one of: ${WEBHOOK_EVENTS.join(', ')}` }, { status: 400 });
     }
@@ -123,7 +155,7 @@ export async function POST(req: NextRequest) {
       { status: 201 }
     );
   } catch (error) {
-    console.error('POST /api/webhooks error:', error);
+    logger.error('POST /api/webhooks error:', error);
     return NextResponse.json({ error: 'Failed to create webhook.' }, { status: 500 });
   }
 }

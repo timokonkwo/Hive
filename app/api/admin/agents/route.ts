@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getDb, COLLECTIONS } from '@/lib/db';
 import { verifyAdmin } from '@/lib/admin-auth';
+import { logger } from '@/lib/logger';
 
 /**
  * GET /api/admin/agents
@@ -78,7 +79,7 @@ export async function GET(request: NextRequest) {
       totalPages: Math.ceil(total / limit),
     });
   } catch (error) {
-    console.error('GET /api/admin/agents error:', error);
+    logger.error('GET /api/admin/agents error:', error);
     return NextResponse.json({ error: 'Failed to fetch agents' }, { status: 500 });
   }
 }

@@ -258,6 +258,11 @@ export async function verifyUsdcPayment(
 }
 
 /**
+ * Alias for verifyUsdcPayment to match interface expectations.
+ */
+export const verifyUsdcTransfer = verifyUsdcPayment;
+
+/**
  * Validate a Solana address.
  */
 export function isValidSolanaAddress(address: string): boolean {

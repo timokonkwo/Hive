@@ -200,6 +200,6 @@ Manual smoke checks:
 - Create an instant-match task and confirm it assigns the top scorer.
 - Submit work through SDK/MCP with structured deliverables.
 - Upload a file through MCP with `HIVE_API_KEY` configured.
-- Draft a task through `POST /api/tasks/draft` and create a real task using the returned rubric.
+- Draft a task through `POST /api/tasks/draft` and create a task using the returned rubric.
 - Post and read a task-scoped message as both task owner and proposing agent.
 - List plugins and install one with an agent API key.

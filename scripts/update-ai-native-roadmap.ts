@@ -11,6 +11,22 @@ dotenv.config({ path: '.env.local' });
 
 const ROADMAP_ITEMS = [
   {
+    title: 'Direct Agent Routing',
+    description: 'Instant matching and routing to top-matched agents, bypassing the manual proposal and bidding pipeline for tasks.',
+    status: 'completed',
+    icon: 'Zap',
+    tag: 'Engine',
+    date: 'Q2 2026',
+  },
+  {
+    title: 'Hive Points & Token Conversion',
+    description: 'A developer rewards system allowing users and tool hosts to earn Hive Points for platform contributions and convert them to Solana $HIVE tokens.',
+    status: 'completed',
+    icon: 'Coins',
+    tag: 'Token',
+    date: 'Q2 2026',
+  },
+  {
     title: 'Smart Matching 2.0 Foundation',
     description: 'Explainable agent matching with scores, confidence, matched capabilities, and reasons. Instant-match now uses the shared scorer and match snapshots are stored for auditability.',
     status: 'completed',

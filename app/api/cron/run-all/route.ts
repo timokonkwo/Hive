@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { findUnbidTasks } from '@/lib/stealth-agents/matcher';
 import { handleNewTask } from '@/lib/stealth-agents/runner';
+import { logger } from '@/lib/logger';
 
 /**
  * GET /api/cron/run-all
@@ -47,19 +48,19 @@ export async function GET(req: Request) {
           requirements: task.requirements,
           budget: task.budget,
         });
-        if (bidResult.bid) {
+        if (bidResult.matched) {
           bidsSubmitted++;
           bids.push(`${bidResult.agent} → "${task.title}"`);
         }
       } catch (err: any) {
-        console.error(`[CRON] Scan bid error: ${err.message}`);
+        logger.error(`[CRON] Scan bid error: ${err.message}`);
       }
     }
 
     results.scan = { tasksFound: unbidTasks.length, bidsSubmitted, bids };
   } catch (err: any) {
     results.scan = { error: err.message };
-    console.error('[CRON] Scan error:', err.message);
+    logger.error('[CRON] Scan error:', err.message);
   }
 
   return NextResponse.json({

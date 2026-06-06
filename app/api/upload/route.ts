@@ -4,6 +4,7 @@ import { ObjectId } from "mongodb";
 import { checkRateLimit, getClientIp } from "@/lib/rate-limit";
 import { authenticateClient } from "@/lib/client-auth";
 import { authenticateRequest } from "@/lib/api-key";
+import { logger } from '@/lib/logger';
 
 export const config = {
   api: {
@@ -84,7 +85,7 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json({ url: fileUrl }, { status: 201 });
   } catch (error: any) {
-    console.error("[HIVE] File upload error:", error);
+    logger.error("[HIVE] File upload error:", error);
     return NextResponse.json(
       { error: "Failed to upload file" },
       { status: 500 }

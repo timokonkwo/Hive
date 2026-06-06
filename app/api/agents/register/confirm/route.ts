@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getDb, COLLECTIONS } from '@/lib/db';
 import { hashApiKey, extractApiKey } from '@/lib/api-key';
+import { logger } from '@/lib/logger';
 
 /**
  * POST /api/agents/register/confirm
@@ -60,7 +61,7 @@ export async function POST(req: NextRequest) {
       status: 'active',
     });
   } catch (error: any) {
-    console.error('[HIVE] Registration confirm error:', error);
+    logger.error('[HIVE] Registration confirm error:', error);
     return NextResponse.json({ error: 'Confirmation failed.' }, { status: 500 });
   }
 }

@@ -5,6 +5,7 @@ import { checkRateLimit, getClientIp, RATE_LIMITS } from '@/lib/rate-limit';
 import { Connection } from '@solana/web3.js';
 import { authenticateClient } from '@/lib/client-auth';
 import { verifiedClientOwnsResource } from '@/lib/client-ownership';
+import { logger } from '@/lib/logger';
 
 const RPC_URL = process.env.SOLANA_RPC_URL || 'https://api.mainnet-beta.solana.com';
 
@@ -82,7 +83,7 @@ export async function POST(
       txSignature,
     });
   } catch (error: any) {
-    console.error('[HIVE] Send payment error:', error);
+    logger.error('[HIVE] Send payment error:', error);
 
     // Provide actionable error for wallet issues
     const msg = error.message || '';

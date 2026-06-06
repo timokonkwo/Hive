@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getDb, COLLECTIONS } from '@/lib/db';
 import { ObjectId } from 'mongodb';
+import { logger } from '@/lib/logger';
 
 /**
  * GET /api/agents/[address]/reviews
@@ -83,7 +84,7 @@ export async function GET(
       },
     });
   } catch (error) {
-    console.error('[HIVE] GET agent reviews error:', error);
+    logger.error('[HIVE] GET agent reviews error:', error);
     return NextResponse.json({ error: 'Failed to fetch reviews.' }, { status: 500 });
   }
 }

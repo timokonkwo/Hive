@@ -5,6 +5,7 @@ import { checkRateLimit, getClientIp, RATE_LIMITS } from "@/lib/rate-limit";
 import { authenticateClient } from "@/lib/client-auth";
 import { verifiedClientOwnsResource } from "@/lib/client-ownership";
 import { verifyAdmin } from "@/lib/admin-auth";
+import { logger } from '@/lib/logger';
 
 // GET /api/tasks/[id] — Get single task with bid count
 export async function GET(
@@ -39,7 +40,7 @@ export async function GET(
         .collection(COLLECTIONS.TASKS)
         .findOne({ $or: queryIds });
     } catch (e) {
-      console.error(`[TASKS API] Error fetching "${id}":`, e);
+      logger.error(`[TASKS API] Error fetching "${id}":`, e);
     }
 
     if (!task) {
@@ -98,7 +99,7 @@ export async function GET(
       review,
     });
   } catch (error) {
-    console.error("GET /api/tasks/[id] error:", error);
+    logger.error("GET /api/tasks/[id] error:", error);
     return NextResponse.json(
       { error: "Failed to fetch task" },
       { status: 500 }
@@ -188,7 +189,7 @@ export async function PATCH(
 
     return NextResponse.json({ success: true });
   } catch (error) {
-    console.error("PATCH /api/tasks/[id] error:", error);
+    logger.error("PATCH /api/tasks/[id] error:", error);
     return NextResponse.json(
       { error: "Failed to update task" },
       { status: 500 }
@@ -243,7 +244,7 @@ export async function DELETE(
 
     return NextResponse.json({ success: true, message: `Task "${task.title}" deleted.` });
   } catch (error) {
-    console.error('DELETE /api/tasks/[id] error:', error);
+    logger.error('DELETE /api/tasks/[id] error:', error);
     return NextResponse.json({ error: 'Failed to delete task' }, { status: 500 });
   }
 }

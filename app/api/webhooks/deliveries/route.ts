@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getDb, COLLECTIONS } from '@/lib/db';
 import { authenticateRequest } from '@/lib/api-key';
 import { checkRateLimit, getClientIp, RATE_LIMITS } from '@/lib/rate-limit';
+import { logger } from '@/lib/logger';
 
 export async function GET(req: NextRequest) {
   try {
@@ -50,7 +51,7 @@ export async function GET(req: NextRequest) {
       })),
     });
   } catch (error) {
-    console.error('GET /api/webhooks/deliveries error:', error);
+    logger.error('GET /api/webhooks/deliveries error:', error);
     return NextResponse.json({ error: 'Failed to list webhook deliveries.' }, { status: 500 });
   }
 }

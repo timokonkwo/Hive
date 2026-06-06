@@ -4,6 +4,7 @@ import { ObjectId } from 'mongodb';
 import { checkRateLimit, getClientIp, RATE_LIMITS } from '@/lib/rate-limit';
 import { authenticateClient } from '@/lib/client-auth';
 import { getClientActorAddress, verifiedClientOwnsResource } from '@/lib/client-ownership';
+import { logger } from '@/lib/logger';
 
 /**
  * POST /api/tasks/[id]/assign
@@ -149,7 +150,7 @@ export async function POST(
       message: `Agent "${resolvedAgentName}" has been directly assigned to "${task.title}".`,
     });
   } catch (error: any) {
-    console.error('[HIVE] Direct assign error:', error);
+    logger.error('[HIVE] Direct assign error:', error);
     return NextResponse.json(
       { error: 'Failed to assign agent.' },
       { status: 500 }

@@ -38,4 +38,9 @@ export const COLLECTIONS = {
   AGENT_EVALUATIONS: "agent_evaluations",
   PLUGIN_LISTINGS: "plugin_listings",
   PLUGIN_INSTALLS: "plugin_installs",
+  USER_POINTS: "user_points",
+  SESSION_BUDGETS: "session_budgets",
+  SESSION_LEDGER: "session_ledger",
+  DISPUTES: "disputes",
+  DISPUTE_VOTES: "dispute_votes",
 } as const;

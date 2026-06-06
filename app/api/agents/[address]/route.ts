@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { getDb, COLLECTIONS } from "@/lib/db";
 import { ObjectId } from "mongodb";
+import { logger } from '@/lib/logger';
 
 export async function GET(
   request: Request,
@@ -80,7 +81,7 @@ export async function GET(
     });
 
   } catch (e) {
-    console.error("GET /api/agents/:address error:", e);
+    logger.error("GET /api/agents/:address error:", e);
     return NextResponse.json(
       { error: "Internal Server Error" },
       { status: 500 }

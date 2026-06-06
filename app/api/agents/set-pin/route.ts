@@ -3,6 +3,7 @@ import { getDb, COLLECTIONS } from '@/lib/db';
 import { extractApiKey, hashApiKey } from '@/lib/api-key';
 import { checkRateLimit, getClientIp } from '@/lib/rate-limit';
 import { createHash } from 'crypto';
+import { logger } from '@/lib/logger';
 
 /**
  * POST /api/agents/set-pin
@@ -87,7 +88,7 @@ export async function POST(req: NextRequest) {
         : 'Owner PIN set successfully. You will need this PIN to access the dashboard.',
     });
   } catch (error: any) {
-    console.error('[HIVE] Set PIN error:', error);
+    logger.error('[HIVE] Set PIN error:', error);
     return NextResponse.json({ error: 'Failed to set PIN.' }, { status: 500 });
   }
 }

@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { createAgentBagsClient } from '@/lib/bags-agent';
 import { getDb, COLLECTIONS } from '@/lib/db';
+import { logger } from '@/lib/logger';
 
 /**
  * GET /api/cron/claim-agent-fees
@@ -36,21 +37,61 @@ export async function GET(req: Request) {
     const balanceBefore = await bags.getBalance();
     results.balanceBefore = parseFloat(balanceBefore.toFixed(4));
 
-    // For now, log the balance — actual fee claiming requires
-    // iterating over all token mints and calling claim transactions.
-    // This will be expanded once tokens are launched and there are fees to claim.
-    //
-    // The claim flow:
-    // 1. Get all claimable positions for the agent launch wallet
-    // 2. For each position with claimable > threshold (0.001 SOL)
-    // 3. Generate + sign + broadcast claim tx
-    // 4. Log claimed amount
-    //
-    // This is a placeholder that logs stats. The actual claiming will use
-    // sdk.fee.getAllClaimablePositions() and sdk.fee.getClaimTransaction()
-    // which are already implemented in the main BagsClient.
+    // Fetch all active claimable positions for the agent launch wallet
+    const positions = await bags.getClaimablePositions().catch((err) => {
+      logger.error('[CRON-FEES] Failed to fetch claimable positions:', err.message);
+      return [];
+    });
+
+    results.positionsFound = positions.length;
+    results.claimsExecuted = [];
 
     const db = await getDb();
+    const connection = bags.connection;
+    const walletPubKey = bags.keypair.publicKey;
+
+    // Iterate over positions and claim fees
+    for (const position of positions) {
+      const claimableAmount = position.claimableAmount || 0;
+      // Skip if claimable amount is below a threshold to save transaction fees
+      if (claimableAmount < 1000000) continue; // 0.001 SOL / USDC threshold
+
+      try {
+        const baseMintStr = position.baseMint?.toBase58();
+        logger.info(`[CRON-FEES] Claiming fees for mint ${baseMintStr} (${claimableAmount} raw);...`);
+
+        // Generate claim transaction instructions from Bags SDK
+        const txs = await bags.sdk.fee.getClaimTransaction(walletPubKey, position);
+
+        for (const tx of txs) {
+          // Fetch blockhash, sign and broadcast
+          const { blockhash } = await connection.getLatestBlockhash('confirmed');
+          tx.recentBlockhash = blockhash;
+          tx.feePayer = walletPubKey;
+          tx.sign(bags.keypair);
+
+          const sig = await connection.sendRawTransaction(tx.serialize(), {
+            skipPreflight: true,
+            maxRetries: 3
+          });
+
+          const latestBlockhash = await connection.getLatestBlockhash('confirmed');
+          await connection.confirmTransaction({
+            signature: sig,
+            blockhash: latestBlockhash.blockhash,
+            lastValidBlockHeight: latestBlockhash.lastValidBlockHeight
+          }, 'confirmed');
+
+          results.claimsExecuted.push({
+            mint: baseMintStr,
+            amountRaw: claimableAmount,
+            signature: sig
+          });
+        }
+      } catch (claimErr: any) {
+        logger.error(`[CRON-FEES] Failed to claim for position:`, claimErr.message);
+      }
+    }
 
     // Count total launched tokens
     const totalTokens = await db.collection(COLLECTIONS.AGENTS).countDocuments({
@@ -59,10 +100,14 @@ export async function GET(req: Request) {
     });
 
     results.totalTokenizedAgents = totalTokens;
-    results.balanceAfter = results.balanceBefore; // Will differ once claiming is active
-    results.message = totalTokens > 0
-      ? `${totalTokens} tokenized agents. Partner fee claiming ready.`
-      : 'No tokenized agents yet. Nothing to claim.';
+    
+    // Get wallet balance after claiming
+    const balanceAfter = await bags.getBalance();
+    results.balanceAfter = parseFloat(balanceAfter.toFixed(4));
+    
+    results.message = results.claimsExecuted.length > 0
+      ? `Successfully executed ${results.claimsExecuted.length} claims. Balance: ${results.balanceAfter} SOL.`
+      : 'No claimable positions met the fee claiming threshold.';
 
     // Log the cron run
     await db.collection(COLLECTIONS.ACTIVITY).insertOne({
@@ -75,7 +120,7 @@ export async function GET(req: Request) {
     });
   } catch (err: any) {
     results.error = err.message;
-    console.error('[CRON-FEES] Agent fee claim error:', err.message);
+    logger.error('[CRON-FEES] Agent fee claim error:', err.message);
   }
 
   return NextResponse.json({

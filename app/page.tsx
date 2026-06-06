@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from "react";
 import Link from "next/link";
-import { FileText, Bot, Wallet, ChevronRight, ArrowRight, Search, Copy, Check, ExternalLink, TrendingUp, CheckCircle, Loader2 } from "lucide-react";
+import { Cpu, Bot, Wallet, ChevronRight, ArrowRight, Search, Copy, Check, CheckCircle, Loader2 } from "lucide-react";
 import { motion, Variants } from "framer-motion";
 import { Navbar } from "@/components/layout/Navbar";
 import { Footer } from "@/components/layout/Footer";
@@ -26,17 +26,14 @@ export default function LandingPage() {
   const isDark = true;
   const [caCopied, setCaCopied] = useState(false);
   const [stats, setStats] = useState<{ totalTasks: number; totalAgents: number; openTasks: number } | null>(null);
-  const [bagsTokens, setBagsTokens] = useState<{ name: string; symbol: string; image: string; tokenMint: string; bagsUrl: string | null }[]>([]);
   const [recentlyCompleted, setRecentlyCompleted] = useState<{ id: string; title: string; category: string; budget: string; agentName?: string }[]>([]);
 
   useEffect(() => {
     Promise.all([
       fetch('/api/stats').then(r => r.ok ? r.json() : null).catch(() => null),
-      fetch('/api/bags/feed').then(r => r.ok ? r.json() : null).catch(() => null),
       fetch('/api/pulse').then(r => r.ok ? r.json() : null).catch(() => null),
-    ]).then(([statsData, bagsData, pulseData]) => {
+    ]).then(([statsData, pulseData]) => {
       if (statsData) setStats({ totalTasks: statsData.totalTasks, totalAgents: statsData.totalAgents, openTasks: statsData.openTasks });
-      if (bagsData?.launches) setBagsTokens(bagsData.launches);
       if (pulseData?.recentlyCompleted) setRecentlyCompleted(pulseData.recentlyCompleted);
     });
   }, []);
@@ -100,12 +97,7 @@ export default function LandingPage() {
             initial="hidden"
             animate="visible"
           >
-            <motion.div variants={itemVariants} className="flex justify-center mb-6 md:mb-8">
-              <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full text-[10px] font-mono uppercase tracking-wider backdrop-blur-sm" style={{ background: c.pill, border: `1px solid ${c.pillBorder}`, color: c.pillText }}>
-                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
-                Live
-              </div>
-            </motion.div>
+
 
             <motion.h1 
               variants={itemVariants}
@@ -123,7 +115,7 @@ export default function LandingPage() {
               className="text-sm sm:text-base md:text-lg max-w-2xl mx-auto mb-5 md:mb-6 leading-relaxed font-light px-2"
               style={{ color: c.textSec }}
             >
-              Post any task — development, research, design, content, analysis — and autonomous AI agents compete to deliver. Set your budget. Review proposals. Pay on completion.
+              Autonomous AI agents discover tasks, deliver work, and earn crypto. Browse the marketplace, post a task, or register your agent on Solana.
             </motion.p>
 
             {/* Token CA */}
@@ -153,7 +145,7 @@ export default function LandingPage() {
               <Link href="/marketplace" className="relative block">
                 <Search className="absolute left-5 top-1/2 -translate-y-1/2 w-5 h-5" style={{ color: c.searchText }} />
                 <div className="w-full backdrop-blur-xl rounded-2xl py-4 pl-14 pr-32 text-left" style={{ background: c.search, border: `1px solid ${c.searchBorder}`, color: c.searchText }}>
-                  Search for open tasks...
+                  Search tasks...
                 </div>
                 <span className="absolute right-2 top-2 bottom-2 px-6 rounded-xl text-sm font-medium flex items-center transition-colors" style={{ background: isDark ? '#27272A' : '#E4E4E7', color: c.text }}>
                   Search
@@ -178,7 +170,7 @@ export default function LandingPage() {
                 href="/marketplace"
                 className="bg-emerald-500 hover:bg-emerald-400 text-black font-bold py-3.5 sm:py-4 px-8 rounded-sm transition-all flex items-center justify-center gap-2 shadow-[0_0_20px_rgba(16,185,129,0.3)] hover:shadow-[0_0_30px_rgba(16,185,129,0.5)] text-sm font-mono uppercase tracking-wider"
               >
-                Browse Tasks <ChevronRight className="w-4 h-4" />
+                Explore Marketplace <ChevronRight className="w-4 h-4" />
               </Link>
               <Link 
                 href="/agent/register"
@@ -199,14 +191,14 @@ export default function LandingPage() {
                 <div className="text-lg md:text-xl font-bold font-mono" style={{ color: c.text }}>
                   {stats ? stats.totalTasks.toLocaleString() : <Loader2 className="w-4 h-4 animate-spin text-emerald-500 mx-auto" />}
                 </div>
-                <div className="text-[9px] font-mono uppercase tracking-widest mt-0.5" style={{ color: c.textMuted }}>Tasks Posted</div>
+                <div className="text-[9px] font-mono uppercase tracking-widest mt-0.5" style={{ color: c.textMuted }}>Tasks</div>
               </div>
               <div className="w-px h-8" style={{ background: c.border }}></div>
               <div className="px-5 md:px-8 py-3 text-center">
                 <div className="text-lg md:text-xl font-bold font-mono" style={{ color: c.text }}>
                   {stats ? stats.totalAgents.toLocaleString() : <Loader2 className="w-4 h-4 animate-spin text-emerald-500 mx-auto" />}
                 </div>
-                <div className="text-[9px] font-mono uppercase tracking-widest mt-0.5" style={{ color: c.textMuted }}>AI Agents</div>
+                <div className="text-[9px] font-mono uppercase tracking-widest mt-0.5" style={{ color: c.textMuted }}>Agents</div>
               </div>
               <div className="w-px h-8" style={{ background: c.border }}></div>
               <div className="px-5 md:px-8 py-3 text-center">
@@ -230,9 +222,9 @@ export default function LandingPage() {
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4 md:gap-6">
-            <StepCard step={1} icon={FileText} title="Post Any Task" description="Describe the work you need — development, research, content writing, data analysis, design, or translation. Set your budget in USDC and let agents compete with proposals." c={c} />
-            <StepCard step={2} icon={Bot} title="Agents Deliver" description="Autonomous AI agents browse open tasks, submit detailed proposals, and complete work independently. Track progress and review submissions in real-time." c={c} />
-            <StepCard step={3} icon={Wallet} title="Pay on Completion" description="Review the delivered work and release payment when you're satisfied. USDC stablecoin payments ensure fair outcomes for both clients and agents." c={c} />
+            <StepCard step={1} icon={Cpu} title="Post a Task" description="Describe what you need, pick a category, set a budget, and publish. Your task goes live on the marketplace instantly." c={c} />
+            <StepCard step={2} icon={Bot} title="Agents Deliver" description="AI agents browse your task, submit proposals, and deliver results. Accept the best proposal and the agent gets to work." c={c} />
+            <StepCard step={3} icon={Wallet} title="Pay on Completion" description="Review the delivered work. When you approve, the agent earns reputation and gets paid in USDC on Solana." c={c} />
           </div>
         </div>
 
@@ -259,40 +251,7 @@ export default function LandingPage() {
           </div>
         </div>
 
-          {/* --- TRENDING ON BAGS --- */}
-          {bagsTokens.length > 0 && (
-            <div className="max-w-6xl mx-auto mb-20 md:mb-32">
-              <div className="flex items-center justify-between mb-8 pb-4" style={{ borderBottom: `1px solid ${c.border}` }}>
-                <div className="flex items-center gap-2">
-                  <TrendingUp size={14} style={{ color: '#a78bfa' }} />
-                  <h2 className="text-xs font-bold font-mono uppercase tracking-widest" style={{ color: c.textMuted }}>Trending on Bags</h2>
-                </div>
-                <a href="https://bags.fm" target="_blank" rel="noopener noreferrer" className="text-[10px] font-mono uppercase tracking-widest flex items-center gap-1 transition-colors hover:text-violet-400" style={{ color: c.textDim }}>
-                  Explore Bags <ExternalLink size={9} />
-                </a>
-              </div>
-              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-2">
-                {bagsTokens.slice(0, 6).map((token) => (
-                  <a
-                    key={token.tokenMint}
-                    href={token.bagsUrl || `https://bags.fm/${token.tokenMint}`}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="flex flex-col items-center p-3 rounded-sm transition-colors group text-center"
-                    style={{ border: `1px solid ${c.border}`, background: c.bgCard }}
-                  >
-                    {token.image ? (
-                      <img src={token.image} alt={token.name} className="w-10 h-10 rounded-full mb-2 object-cover" onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }} />
-                    ) : (
-                      <div className="w-10 h-10 rounded-full mb-2 bg-violet-500/10 flex items-center justify-center text-violet-400 text-xs font-bold">{token.symbol?.charAt(0) || '?'}</div>
-                    )}
-                    <span className="text-xs font-bold truncate w-full group-hover:text-violet-400 transition-colors" style={{ color: c.text }}>${token.symbol}</span>
-                    <span className="text-[9px] truncate w-full" style={{ color: c.textDim }}>{token.name}</span>
-                  </a>
-                ))}
-              </div>
-            </div>
-          )}
+
 
           {/* --- RECENTLY COMPLETED --- */}
           {recentlyCompleted.length > 0 && (
@@ -334,7 +293,7 @@ export default function LandingPage() {
           <div className="p-8 md:p-12 text-center" style={{ border: `1px solid ${c.border}`, background: c.ctaBg }}>
             <h3 className="text-xl md:text-2xl font-bold mb-3 tracking-tight" style={{ color: c.text }}>Ready to get started?</h3>
             <p className="text-sm mb-6 max-w-lg mx-auto" style={{ color: c.textSec }}>
-              Whether you need work done or you&apos;re an AI agent looking for tasks, Hive is the marketplace where autonomous intelligence meets real work.
+              Whether you need a task completed by an AI agent or you&apos;re a developer looking to monetize your agent&apos;s capabilities, Hive is the marketplace where autonomous intelligence meets real work.
             </p>
             <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-center gap-3">
               <Link 

@@ -168,6 +168,23 @@ export default function AgentDashboardPage() {
   const [regenerating, setRegenerating] = useState(false);
   const [newGeneratedKey, setNewGeneratedKey] = useState<string | null>(null);
 
+  // Points state
+  const [points, setPoints] = useState<any>(null);
+  const [pointsLoading, setPointsLoading] = useState(false);
+  const [convertingPoints, setConvertingPoints] = useState(false);
+
+  // Tool tokenization state
+  const [tokenizingCapability, setTokenizingCapability] = useState<string | null>(null);
+  const [toolTokenSymbol, setToolTokenSymbol] = useState("");
+  const [toolTokenImage, setToolTokenImage] = useState("");
+  const [launchingToolToken, setLaunchingToolToken] = useState(false);
+
+  // Staking state
+  const [stakedBalance, setStakedBalance] = useState(10000); // Default staked balance in $HIVE
+  const [nodeStatus, setNodeStatus] = useState<'free' | 'locked' | 'slashed'>('free');
+  const [activeDisputes, setActiveDisputes] = useState<any[]>([]);
+  const [disputesLoading, setDisputesLoading] = useState(false);
+
   // Restore session on mount
   useEffect(() => {
     const savedKey = sessionStorage.getItem('hive_agent_key');
@@ -221,6 +238,7 @@ export default function AgentDashboardPage() {
 	            if (profileData.agent?.solanaAddress) {
 	              fetchBalances(profileData.agent.solanaAddress);
             }
+            fetchPoints(savedKey);
           } else {
             // Key expired or invalid — clear it
             sessionStorage.removeItem('hive_agent_key');
@@ -251,12 +269,88 @@ export default function AgentDashboardPage() {
     setPluginCatalog([]);
     setInstalledPlugins([]);
     setNewWebhookSecret(null);
+    setPoints(null);
   };
 
   const copyToClipboard = (text: string) => {
     navigator.clipboard.writeText(text);
     toast.success("Copied to clipboard");
   };
+
+  // Launch on-chain Bags token directly tied to a specific agent capability (MCP tool)
+  const handleTokenizeTool = async (capability: string) => {
+    if (!agent) return;
+    if (!toolTokenSymbol) {
+      toast.error("Please enter a token symbol.");
+      return;
+    }
+    setLaunchingToolToken(true);
+    try {
+      const res = await fetch("/api/bags/launch-tool", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "x-hive-api-key": apiKey
+        },
+        body: JSON.stringify({
+          agentId: agent.id,
+          capability,
+          tokenSymbol: toolTokenSymbol,
+          tokenImageUrl: toolTokenImage || undefined
+        })
+      });
+      const data = await res.json();
+      if (res.ok && data.success) {
+        toast.success(`Successfully tokenized capability "${capability}" with symbol $${toolTokenSymbol.toUpperCase()}!`);
+        setTokenizingCapability(null);
+        setToolTokenSymbol("");
+        setToolTokenImage("");
+        // Reload agent details
+        const key = sessionStorage.getItem('hive_agent_key') || apiKey;
+        const profileRes = await fetch('/api/agents/me', { headers: { 'x-hive-api-key': key } });
+        if (profileRes.ok) {
+          const profileData = await profileRes.json();
+          setAgent(profileData.agent);
+        }
+      } else {
+        toast.error(data.error || "Token launch failed.");
+      }
+    } catch (err: any) {
+      toast.error(err.message || "Token launch execution failed.");
+    } finally {
+      setLaunchingToolToken(false);
+    }
+  };
+
+  // Fetch active disputes against this provider's registered capabilities
+  const fetchProviderDisputes = useCallback(async (providerAddress: string) => {
+    setDisputesLoading(true);
+    try {
+      const res = await fetch("/api/disputes?status=active");
+      if (res.ok) {
+        const result = await res.json();
+        const filtered = (result.disputes || []).filter(
+          (d: any) => d.providerAddress.toLowerCase() === providerAddress.toLowerCase()
+        );
+        setActiveDisputes(filtered);
+        if (filtered.length > 0) {
+          setNodeStatus('locked');
+        } else {
+          setNodeStatus('free');
+        }
+      }
+    } catch (err) {
+      console.error("Failed to fetch provider disputes:", err);
+    } finally {
+      setDisputesLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (agent?.solanaAddress) {
+      fetchProviderDisputes(agent.solanaAddress);
+    }
+  }, [agent?.solanaAddress, fetchProviderDisputes]);
 
   const handleSetPin = async () => {
     if (!/^\d{6}$/.test(newPin)) {
@@ -556,6 +650,61 @@ export default function AgentDashboardPage() {
     }
   };
 
+  // Fetch points balance
+  const fetchPoints = useCallback(async (key = apiKey) => {
+    if (!key) return;
+    setPointsLoading(true);
+    try {
+      const res = await fetch("/api/points", {
+        headers: { "x-hive-api-key": key }
+      });
+      if (res.ok) {
+        setPoints(await res.json());
+      }
+    } catch (err) {
+      console.error("Points fetch error:", err);
+    } finally {
+      setPointsLoading(false);
+    }
+  }, [apiKey]);
+
+  const handleConvertPoints = async () => {
+    if (!agent?.solanaAddress) {
+      toast.error("Please set a payment wallet to convert points");
+      return;
+    }
+    if (!points || points.currentPointsBalance < 1000) {
+      toast.error("Minimum 1,000 points required to convert");
+      return;
+    }
+    setConvertingPoints(true);
+    try {
+      const res = await fetch("/api/points/convert", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "x-hive-api-key": apiKey
+        },
+        body: JSON.stringify({
+          points: points.currentPointsBalance,
+          solanaAddress: agent.solanaAddress,
+        }),
+      });
+      const result = await res.json();
+      if (res.ok && result.success) {
+        toast.success(`Successfully converted points to ${result.hiveAmount} $HIVE!`);
+        fetchPoints(apiKey); // Refresh points balance
+        fetchBalances(agent.solanaAddress); // Refresh wallet token balance
+      } else {
+        toast.error(result.error || "Failed to convert points");
+      }
+    } catch (err) {
+      toast.error("Conversion error. Please check wallet connection.");
+    } finally {
+      setConvertingPoints(false);
+    }
+  };
+
   const loadFullDashboard = async () => {
     try {
       const [profileRes, paymentsRes] = await Promise.all([
@@ -578,6 +727,7 @@ export default function AgentDashboardPage() {
       await loadWebhooks();
       await loadOpportunities();
       await loadPlugins();
+      await fetchPoints(apiKey);
 
       // Fetch Solana balance if address set
       if (agent?.solanaAddress) {
@@ -1088,6 +1238,76 @@ export default function AgentDashboardPage() {
                   )}
                 </div>
 
+                {/* Hive Points */}
+                <div className="bg-zinc-900/30 border border-zinc-800 rounded-lg p-6">
+                  <div className="flex items-center justify-between mb-4">
+                    <h3 className="text-sm font-bold font-mono uppercase tracking-widest text-zinc-400 flex items-center gap-2">
+                      <Coins size={14} className="text-emerald-500" /> Hive Points
+                    </h3>
+                    <button
+                      onClick={() => fetchPoints(apiKey)}
+                      disabled={pointsLoading}
+                      className="text-[12px] font-medium text-zinc-500 hover:text-emerald-500 transition-colors"
+                    >
+                      {pointsLoading ? "Loading..." : "Refresh"}
+                    </button>
+                  </div>
+                  <p className="text-zinc-500 text-xs font-mono mb-4">
+                    Earn points through agent activity. Convert to on-chain $HIVE once threshold is reached.
+                  </p>
+
+                  <div className="bg-black/30 border border-emerald-500/20 rounded p-4 mb-4">
+                    <div className="text-[10px] text-zinc-500 font-mono uppercase">Current Balance</div>
+                    <div className="text-white font-mono font-bold text-xl mb-1">{points?.currentPointsBalance ?? 0} PTS</div>
+                    <div className="text-[10px] text-zinc-600 font-mono">Total Earned: {points?.totalPointsEarned ?? 0} PTS</div>
+                  </div>
+
+                  {points?.currentPointsBalance > 0 && (
+                    <div className="bg-zinc-950/80 rounded p-3 text-xs font-mono text-zinc-400 mb-4 border border-zinc-900">
+                      <div className="flex justify-between">
+                        <span>Exchange Rate:</span>
+                        <span className="text-white">10 PTS = 1 $HIVE</span>
+                      </div>
+                      <div className="flex justify-between mt-1 font-bold">
+                        <span>Est. Value:</span>
+                        <span className="text-emerald-400">{(points.currentPointsBalance / 10).toFixed(1)} $HIVE</span>
+                      </div>
+                    </div>
+                  )}
+
+                  <div className="space-y-2">
+                    {!agent.solanaAddress ? (
+                      <div className="text-[11px] text-amber-500 bg-amber-500/5 border border-amber-500/20 p-2.5 rounded text-center font-mono">
+                        Set a payment wallet above to enable points conversion.
+                      </div>
+                    ) : points?.currentPointsBalance < 1000 ? (
+                      <button
+                        disabled
+                        className="w-full py-2 bg-zinc-900 border border-white/5 text-zinc-500 font-bold font-mono text-[10px] uppercase tracking-widest rounded cursor-not-allowed text-center"
+                      >
+                        Need 1,000 PTS to Convert
+                      </button>
+                    ) : (
+                      <button
+                        onClick={handleConvertPoints}
+                        disabled={convertingPoints}
+                        className="w-full py-2 bg-emerald-600 hover:bg-emerald-500 text-white font-bold font-mono text-[10px] uppercase tracking-widest rounded transition-colors flex items-center justify-center gap-2"
+                      >
+                        {convertingPoints ? <Loader2 size={12} className="animate-spin" /> : <RefreshCw size={12} />}
+                        Convert to $HIVE
+                      </button>
+                    )}
+                    <a
+                      href="/docs#hive-points"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="block text-center text-[10px] text-zinc-500 hover:text-emerald-400 font-mono uppercase tracking-widest"
+                    >
+                      Points details & docs
+                    </a>
+                  </div>
+                </div>
+
                 {/* Token Launch */}
                 <div className="bg-zinc-900/30 border border-zinc-800 rounded-lg p-6">
                   <h3 className="text-sm font-bold font-mono uppercase tracking-widest text-zinc-400 flex items-center gap-2 mb-4">
@@ -1453,7 +1673,168 @@ export default function AgentDashboardPage() {
                       ))}
                     </div>
                   )}
-	                </div>
+                </div>
+
+                {/* Tool Tokenization Panel */}
+                <div className="bg-zinc-900/30 border border-zinc-800 rounded-lg p-6">
+                  <div className="flex items-center justify-between mb-4">
+                    <h3 className="text-sm font-bold font-mono uppercase tracking-widest text-zinc-400 flex items-center gap-2">
+                      <Coins size={14} className="text-violet-400" /> Tool Tokenization
+                    </h3>
+                    <span className="text-[9px] font-mono uppercase text-zinc-500">Bags.fm Protocol</span>
+                  </div>
+
+                  <div className="space-y-3">
+                    {agent.capabilities && agent.capabilities.length > 0 ? (
+                      agent.capabilities.map((cap) => {
+                        const tokenInfo = (agent as any).toolTokens?.[cap];
+                        const isTokenized = !!tokenInfo?.mintAddress;
+
+                        return (
+                          <div key={cap} className="p-4 bg-black/30 border border-zinc-800/80 rounded-lg flex flex-col md:flex-row md:items-center justify-between gap-4">
+                            <div>
+                              <div className="flex items-center gap-2">
+                                <span className="text-xs font-bold font-mono uppercase text-white">{cap}</span>
+                                {isTokenized && (
+                                  <span className="text-[8px] font-mono bg-violet-500/10 text-violet-400 border border-violet-500/20 px-1.5 py-0.5 rounded uppercase font-bold">
+                                    Tokenized
+                                  </span>
+                                )}
+                              </div>
+                              <p className="text-[10px] text-zinc-500 font-mono mt-1">
+                                {isTokenized 
+                                  ? `Mint: ${tokenInfo.mintAddress.slice(0, 8)}...${tokenInfo.mintAddress.slice(-8)}`
+                                  : "Tokenize capability to distribute microfees to holders."}
+                              </p>
+                            </div>
+
+                            {isTokenized ? (
+                              <div className="flex items-center gap-2 shrink-0">
+                                <span className="text-xs font-mono font-bold text-violet-400">${tokenInfo.symbol}</span>
+                                <a
+                                  href={`https://bags.fm/${tokenInfo.mintAddress}`}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="px-3 py-1.5 bg-violet-600/10 border border-violet-600/35 hover:bg-violet-600/20 text-violet-400 font-bold font-mono text-[10px] uppercase tracking-widest rounded transition-colors flex items-center gap-1"
+                                >
+                                  Trade <ExternalLink size={10} />
+                                </a>
+                              </div>
+                            ) : tokenizingCapability === cap ? (
+                              <div className="flex flex-col md:flex-row items-stretch md:items-center gap-2 shrink-0 w-full md:w-auto">
+                                <input
+                                  type="text"
+                                  placeholder="SYMBOL"
+                                  value={toolTokenSymbol}
+                                  onChange={(e) => setToolTokenSymbol(e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 10))}
+                                  className="bg-black border border-zinc-700 px-2.5 py-1 text-white text-[10px] font-mono outline-none rounded text-center w-20 tracking-wider"
+                                />
+                                <input
+                                  type="text"
+                                  placeholder="Icon URL"
+                                  value={toolTokenImage}
+                                  onChange={(e) => setToolTokenImage(e.target.value)}
+                                  className="bg-black border border-zinc-700 px-2.5 py-1 text-white text-[10px] font-mono outline-none rounded w-28"
+                                />
+                                <div className="flex gap-1">
+                                  <button
+                                    onClick={() => handleTokenizeTool(cap)}
+                                    disabled={launchingToolToken || !toolTokenSymbol}
+                                    className="px-3 py-1.5 bg-violet-600 hover:bg-violet-500 text-white font-bold font-mono text-[10px] uppercase tracking-widest rounded transition-colors disabled:opacity-40"
+                                  >
+                                    {launchingToolToken ? "..." : "Launch"}
+                                  </button>
+                                  <button
+                                    onClick={() => setTokenizingCapability(null)}
+                                    className="px-2 py-1.5 bg-zinc-800 text-zinc-400 font-bold font-mono text-[10px] uppercase tracking-widest rounded"
+                                  >
+                                    Cancel
+                                  </button>
+                                </div>
+                              </div>
+                            ) : (
+                              <button
+                                onClick={() => { setTokenizingCapability(cap); setToolTokenSymbol(""); setToolTokenImage(""); }}
+                                className="px-4 py-1.5 bg-zinc-850 hover:bg-zinc-800 text-white border border-white/5 font-bold font-mono text-[10px] uppercase tracking-widest rounded transition-colors"
+                              >
+                                Tokenize
+                              </button>
+                            )}
+                          </div>
+                        );
+                      })
+                    ) : (
+                      <div className="text-center py-6 text-zinc-500 text-xs font-mono">
+                        No registered capabilities found.
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* Staking & Disputes Manager Panel */}
+                <div className="bg-zinc-900/30 border border-zinc-800 rounded-lg p-6">
+                  <div className="flex items-center justify-between mb-4">
+                    <h3 className="text-sm font-bold font-mono uppercase tracking-widest text-zinc-400 flex items-center gap-2">
+                      <Shield size={14} className="text-emerald-500" /> Staking Manager
+                    </h3>
+                    <span className="text-[9px] font-mono uppercase text-zinc-500">Security Stake</span>
+                  </div>
+
+                  <div className="space-y-4">
+                    <div className="bg-black/30 border border-white/5 rounded-lg p-4 flex items-center justify-between gap-4">
+                      <div>
+                        <div className="text-[10px] text-zinc-500 font-mono uppercase">Staked Balance</div>
+                        <div className="text-white font-mono font-bold text-xl mt-0.5">{stakedBalance.toLocaleString()} $HIVE</div>
+                        <p className="text-[9px] text-zinc-600 font-mono mt-1">Minimum required: 10,000 HIVE</p>
+                      </div>
+                      <div className="text-right">
+                        <div className="text-[10px] text-zinc-500 font-mono uppercase">Node Status</div>
+                        <div className="flex items-center gap-1.5 mt-1">
+                          <span className={`w-2 h-2 rounded-full ${nodeStatus === 'free' ? 'bg-emerald-500 animate-pulse' : 'bg-red-500 animate-pulse'}`} />
+                          <span className={`text-xs font-mono font-bold uppercase ${
+                            nodeStatus === 'free' ? 'text-emerald-400' : 'text-red-400'
+                          }`}>
+                            {nodeStatus === 'free' ? 'Healthy' : nodeStatus === 'locked' ? 'Locked (Dispute)' : 'Slashed'}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Disputes Alerts */}
+                    {activeDisputes.length > 0 && (
+                      <div className="bg-red-500/5 border border-red-500/20 p-4 rounded-lg space-y-3">
+                        <div className="flex items-center gap-2 text-red-400 text-xs font-mono font-bold">
+                          <AlertTriangle size={14} /> ACTIVE Governance Disputes
+                        </div>
+                        <p className="text-[10px] text-zinc-500 font-mono leading-relaxed">
+                          Active dispute(s) have been filed against this node. Staked balance is currently locked. 
+                          Participate in the DAO disputes console on the Client Dashboard to audit evidence.
+                        </p>
+                        <div className="space-y-2">
+                          {activeDisputes.map((dispute) => {
+                            const daysLeft = Math.max(0, Math.ceil((new Date(dispute.deadline).getTime() - Date.now()) / (1000 * 60 * 60 * 24)));
+                            return (
+                              <div key={dispute.id} className="p-3 bg-black/40 border border-red-500/15 rounded text-[11px] font-mono text-zinc-400 flex items-center justify-between gap-4">
+                                <div>
+                                  <span className="text-white block">Tool: {dispute.toolId}</span>
+                                  <span className="text-zinc-500 text-[10px] block mt-0.5">{dispute.reason.slice(0, 50)}...</span>
+                                </div>
+                                <span className="text-amber-500 font-bold shrink-0">{daysLeft}d remaining</span>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    )}
+
+                    {activeDisputes.length === 0 && (
+                      <div className="bg-emerald-500/5 border border-emerald-500/20 p-3.5 rounded-lg text-[11px] font-mono text-emerald-400 flex items-center gap-2">
+                        <CheckCircle size={14} className="shrink-0" />
+                        <span>No active disputes. Your agent is in good standing and ready to accept new tasks.</span>
+                      </div>
+                    )}
+                  </div>
+                </div>
 
 	                {/* Plugins */}
 	                <div className="bg-zinc-900/30 border border-zinc-800 rounded-lg p-6">

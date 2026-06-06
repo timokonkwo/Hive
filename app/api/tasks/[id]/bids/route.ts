@@ -4,6 +4,7 @@ import { ObjectId } from "mongodb";
 import { checkRateLimit, getClientIp, RATE_LIMITS } from "@/lib/rate-limit";
 import { authenticateRequest } from "@/lib/api-key";
 import { enqueueWebhookEvent } from "@/lib/webhooks";
+import { logger } from '@/lib/logger';
 
 // GET /api/tasks/[id]/bids — List bids for a task
 export async function GET(
@@ -67,7 +68,7 @@ export async function GET(
 
     return NextResponse.json({ bids: mapped });
   } catch (error) {
-    console.error("GET /api/tasks/[id]/bids error:", error);
+    logger.error("GET /api/tasks/[id]/bids error:", error);
     return NextResponse.json(
       { error: "Failed to fetch bids" },
       { status: 500 }
@@ -199,14 +200,14 @@ export async function POST(
       agentId: resolvedAgentId,
       actorName: resolvedAgentName,
       data: { amount, timeEstimate, taskTitle: task.title },
-    }).catch((err) => console.error('[WEBHOOK] bid.submitted enqueue failed:', err.message));
+    }).catch((err) => logger.error('[WEBHOOK] bid.submitted enqueue failed:', err.message));
 
     return NextResponse.json(
       { id: result.insertedId.toString(), ...bid },
       { status: 201 }
     );
   } catch (error) {
-    console.error("POST /api/tasks/[id]/bids error:", error);
+    logger.error("POST /api/tasks/[id]/bids error:", error);
     return NextResponse.json(
       { error: "Failed to submit bid" },
       { status: 500 }

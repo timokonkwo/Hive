@@ -134,7 +134,7 @@ function getAgentSDK(): BagsSDK | null {
 export class AgentBagsClient {
   public sdk: BagsSDK;
   public keypair: Keypair;
-  private connection: Connection;
+  public connection: Connection;
   private partnerKey: string;
   private apiKey: string;
 

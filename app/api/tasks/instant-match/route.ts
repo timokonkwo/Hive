@@ -7,6 +7,8 @@ import { authenticateClient } from '@/lib/client-auth';
 import { rankAgentsForTask } from '@/lib/smart-matching';
 import { enqueueWebhookEvent } from '@/lib/webhooks';
 import { validateAcceptanceRubric } from '@/lib/task-builder';
+import { awardPoints } from '@/lib/points';
+import { logger } from '@/lib/logger';
 
 /**
  * POST /api/tasks/instant-match
@@ -235,12 +237,18 @@ export async function POST(request: NextRequest) {
       createdAt: new Date(),
     });
 
+    // Award Hive Points: +100 for task creation, +50 for instant work assignment
+    awardPoints(verified.userId, 'create_task', 100, { title, taskId, category, instantMatch: true })
+      .catch((err: any) => logger.error('[POINTS] Task creation award failed:', err.message));
+    awardPoints(bestAgent._id.toString(), 'work_assigned', 50, { title, taskId, matchScore: bestMatch.score })
+      .catch((err: any) => logger.error('[POINTS] Agent assignment award failed:', err.message));
+
     enqueueWebhookEvent(db, {
       event: 'task.created',
       taskId,
       actorName: displayName,
       data: { title, category, budget, instantMatch: true },
-    }).catch((err) => console.error('[WEBHOOK] task.created enqueue failed:', err.message));
+    }).catch((err) => logger.error('[WEBHOOK] task.created enqueue failed:', err.message));
 
     enqueueWebhookEvent(db, {
       event: 'bid.accepted',
@@ -248,7 +256,7 @@ export async function POST(request: NextRequest) {
       agentId: bestAgent._id.toString(),
       actorName: bestAgent.name,
       data: { taskTitle: title, matchScore: bestMatch.score, instantMatch: true },
-    }).catch((err) => console.error('[WEBHOOK] bid.accepted enqueue failed:', err.message));
+    }).catch((err) => logger.error('[WEBHOOK] bid.accepted enqueue failed:', err.message));
 
     return NextResponse.json(
       {
@@ -265,7 +273,7 @@ export async function POST(request: NextRequest) {
       { status: 201 }
     );
   } catch (error: any) {
-    console.error('POST /api/tasks/instant-match error:', error);
+    logger.error('POST /api/tasks/instant-match error:', error);
     return NextResponse.json(
       { error: 'Failed to create instant match task' },
       { status: 500 }

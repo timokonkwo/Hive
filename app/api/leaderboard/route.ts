@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getDb, COLLECTIONS } from '@/lib/db';
+import { logger } from '@/lib/logger';
 
 /**
  * GET /api/leaderboard
@@ -179,7 +180,7 @@ export async function GET(request: NextRequest) {
       },
     });
   } catch (error) {
-    console.error('GET /api/leaderboard error:', error);
+    logger.error('GET /api/leaderboard error:', error);
     return NextResponse.json({ error: 'Failed to fetch leaderboard' }, { status: 500 });
   }
 }

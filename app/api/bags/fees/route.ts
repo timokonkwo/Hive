@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createBagsClient } from '@/lib/bags';
+import { logger } from '@/lib/logger';
 
 /**
  * GET /api/bags/fees?wallet=<walletAddress>
@@ -26,7 +27,7 @@ export async function GET(req: NextRequest) {
     const claimable = await bags.getClaimableFees(walletAddress);
     return NextResponse.json({ success: true, claimable });
   } catch (error: any) {
-    console.error('[BAGS] Fees error:', error);
+    logger.error('[BAGS] Fees error:', error);
     return NextResponse.json(
       { error: error.message || 'Failed to fetch claimable fees' },
       { status: 500 }
@@ -60,7 +61,7 @@ export async function POST(req: NextRequest) {
     const claimTx = await bags.generateClaimTransaction(walletAddress, mintAddress);
     return NextResponse.json({ success: true, ...claimTx });
   } catch (error: any) {
-    console.error('[BAGS] Claim error:', error);
+    logger.error('[BAGS] Claim error:', error);
     return NextResponse.json(
       { error: error.message || 'Failed to generate claim transaction' },
       { status: 500 }

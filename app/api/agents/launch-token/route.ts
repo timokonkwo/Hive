@@ -4,6 +4,7 @@ import { authenticateRequest } from '@/lib/api-key';
 import { checkRateLimit, getClientIp, RATE_LIMITS } from '@/lib/rate-limit';
 import { createAgentBagsClient, validateTokenSymbol } from '@/lib/bags-agent';
 import { ObjectId } from 'mongodb';
+import { logger } from '@/lib/logger';
 
 /**
  * POST /api/agents/launch-token
@@ -124,7 +125,7 @@ export async function POST(req: NextRequest) {
     }
 
     // Execute launch inline
-    console.log(`[OWNER-LAUNCH] Launching token for ${agent.name} ($${symbolToUse})...`);
+    logger.info(`[OWNER-LAUNCH] Launching token for ${agent.name} ($${symbolToUse});...`);
 
     const launchResult = await bags.launchAgentToken({
       agentName: agent.name,
@@ -185,7 +186,7 @@ export async function POST(req: NextRequest) {
         createdAt: new Date(),
       });
 
-      console.log(`[OWNER-LAUNCH] ${agent.name} launched: ${launchResult.mintAddress}`);
+      logger.info(`[OWNER-LAUNCH] ${agent.name} launched: ${launchResult.mintAddress}`);
 
       return NextResponse.json({
         success: true,
@@ -201,11 +202,11 @@ export async function POST(req: NextRequest) {
         { $set: { tokenLaunchStatus: 'failed', tokenLaunchError: launchResult.error || 'Unknown error', updatedAt: new Date() } }
       );
 
-      console.error(`[OWNER-LAUNCH] ${agent.name} failed: ${launchResult.error}`);
+      logger.error(`[OWNER-LAUNCH] ${agent.name} failed: ${launchResult.error}`);
       return NextResponse.json({ error: launchResult.error || 'Token launch failed' }, { status: 500 });
     }
   } catch (error: any) {
-    console.error('[OWNER-LAUNCH] Error:', error);
+    logger.error('[OWNER-LAUNCH] Error:', error);
     return NextResponse.json({ error: "Token launch failed." }, { status: 500 });
   }
 }

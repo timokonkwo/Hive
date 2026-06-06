@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getDb, COLLECTIONS } from '@/lib/db';
 import { checkRateLimit, getClientIp, RATE_LIMITS } from '@/lib/rate-limit';
+import { logger } from '@/lib/logger';
 
 /**
  * GET /api/agents/referral?code=ref_axiom_abc123...
@@ -49,7 +50,7 @@ export async function GET(req: NextRequest) {
       },
     });
   } catch (error: any) {
-    console.error('[REFERRAL] Validation error:', error);
+    logger.error('[REFERRAL] Validation error:', error);
     return NextResponse.json({ error: 'Referral validation failed' }, { status: 500 });
   }
 }

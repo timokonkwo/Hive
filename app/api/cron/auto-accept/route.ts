@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { autoAcceptStaleBids } from '@/lib/cron/auto-accept';
 import { autoCompleteStaleReviews } from '@/lib/cron/auto-complete';
+import { logger } from '@/lib/logger';
 
 /**
  * GET /api/cron/auto-accept
@@ -38,7 +39,7 @@ export async function GET(req: NextRequest) {
       timestamp: new Date().toISOString(),
     });
   } catch (error: any) {
-    console.error('[CRON] Auto-accept/complete error:', error);
+    logger.error('[CRON] Auto-accept/complete error:', error);
     return NextResponse.json(
       { error: 'Cron job failed' },
       { status: 500 }

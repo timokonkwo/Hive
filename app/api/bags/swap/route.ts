@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { checkRateLimit, getClientIp, RATE_LIMITS } from '@/lib/rate-limit';
+import { logger } from '@/lib/logger';
 
 const BAGS_API_BASE = 'https://public-api-v2.bags.fm/api/v1';
 
@@ -67,7 +68,7 @@ export async function POST(req: NextRequest) {
 
     if (!res.ok) {
       const errText = await res.text();
-      console.error('[BAGS] Swap error:', res.status, errText.slice(0, 500));
+      logger.error('[BAGS] Swap error:', res.status, errText.slice(0, 500));
       let errorMessage = 'Failed to create swap transaction';
       try {
         const errJson = JSON.parse(errText);
@@ -82,7 +83,7 @@ export async function POST(req: NextRequest) {
     const data = await res.json();
     return NextResponse.json(data);
   } catch (error: any) {
-    console.error('[BAGS] Swap request failed:', error.message);
+    logger.error('[BAGS] Swap request failed:', error.message);
     return NextResponse.json({ error: 'Swap request failed' }, { status: 500 });
   }
 }

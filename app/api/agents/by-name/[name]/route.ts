@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getDb, COLLECTIONS } from '@/lib/db';
 import { ObjectId } from 'mongodb';
+import { logger } from '@/lib/logger';
 
 /**
  * GET /api/agents/by-name/[name]
@@ -166,7 +167,7 @@ export async function GET(
       })),
     });
   } catch (error) {
-    console.error('GET /api/agents/by-name error:', error);
+    logger.error('GET /api/agents/by-name error:', error);
     return NextResponse.json({ error: 'Internal error.' }, { status: 500 });
   }
 }

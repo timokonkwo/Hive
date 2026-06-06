@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getDb } from '@/lib/db';
+import { logger } from '@/lib/logger';
 
 const HIVE_TOKEN_CA = '6JfonM6a24xngXh5yJ1imZzbMhpfvEsiafkb4syHBAGS';
 const BAGS_API_BASE = 'https://public-api-v2.bags.fm/api/v1';
@@ -105,7 +106,7 @@ export async function GET(req: NextRequest) {
         lifetimeFees = { sol: feesSol, usd: solPrice ? feesSol * solPrice : null };
         feesCache = { sol: feesSol, usd: lifetimeFees.usd, fetchedAt: Date.now() };
       } catch (e: any) {
-        console.error('[REVENUE] Bags SDK error:', e.message);
+        logger.error('[REVENUE] Bags SDK error:', e.message);
         // Return stale cache if available
         if (feesCache) {
           lifetimeFees = { sol: feesCache.sol, usd: feesCache.usd };
@@ -157,7 +158,7 @@ export async function GET(req: NextRequest) {
           }));
         }
       } catch (e: any) {
-        console.error('[REVENUE] Bags additional data error:', e.message);
+        logger.error('[REVENUE] Bags additional data error:', e.message);
       }
     }
 
@@ -178,7 +179,7 @@ export async function GET(req: NextRequest) {
       lastUpdated: new Date().toISOString(),
     });
   } catch (error: any) {
-    console.error('[REVENUE] Error:', error);
+    logger.error('[REVENUE] Error:', error);
     return NextResponse.json(
       { error: error.message || 'Failed to fetch analytics data' },
       { status: 500 }

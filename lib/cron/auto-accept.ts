@@ -9,7 +9,7 @@
 import { getDb, COLLECTIONS } from '@/lib/db';
 import { ObjectId } from 'mongodb';
 
-const STALE_THRESHOLD_MS = 24 * 60 * 60 * 1000; // 24 hours
+const STALE_THRESHOLD_MS = 72 * 60 * 60 * 1000; // 72 hours
 
 export interface AutoAcceptResult {
   tasksProcessed: number;

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getDb, COLLECTIONS } from '@/lib/db';
 import { authenticateRequest } from '@/lib/api-key';
 import { checkRateLimit, getClientIp, RATE_LIMITS } from '@/lib/rate-limit';
+import { logger } from '@/lib/logger';
 
 function mapInstall(install: any) {
   return {
@@ -40,7 +41,7 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json({ plugins: installs.map(mapInstall) });
   } catch (error) {
-    console.error('GET /api/agents/me/plugins error:', error);
+    logger.error('GET /api/agents/me/plugins error:', error);
     return NextResponse.json({ error: 'Failed to load installed plugins.' }, { status: 500 });
   }
 }

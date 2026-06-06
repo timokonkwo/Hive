@@ -1,5 +1,6 @@
 import { GoogleSpreadsheet } from 'google-spreadsheet';
 import { JWT } from 'google-auth-library';
+import { logger } from '@/lib/logger';
 
 // Config variables
 const GOOGLE_SERVICE_ACCOUNT_EMAIL = process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL;
@@ -10,7 +11,7 @@ const getPrivateKey = () => {
     try {
         const key = process.env.GOOGLE_PRIVATE_KEY;
         if (!key) {
-            console.warn('[GOOGLE SHEETS] GOOGLE_PRIVATE_KEY is undefined');
+            logger.warn('GOOGLE_PRIVATE_KEY is undefined', { tag: 'GOOGLE SHEETS' });
             return undefined;
         }
         
@@ -33,17 +34,17 @@ const getPrivateKey = () => {
 
         // Check for common issues
         if (!cleanKey.includes('-----BEGIN PRIVATE KEY-----')) {
-            console.error('[GOOGLE SHEETS] Private key is missing "-----BEGIN PRIVATE KEY-----"');
-            console.error('[GOOGLE SHEETS] Key start:', cleanKey.slice(0, 20)); // Safe log
+            logger.error('Private key is missing "-----BEGIN PRIVATE KEY-----"', { tag: 'GOOGLE SHEETS' });
+            logger.error('Key start', { tag: 'GOOGLE SHEETS', keyStart: cleanKey.slice(0, 20) });
             return undefined;
         }
         
         // Log key stats for debugging
-        console.log('[GOOGLE SHEETS] Key sanitized. Length:', cleanKey.length);
+        logger.info('Key sanitized', { tag: 'GOOGLE SHEETS', length: cleanKey.length });
         
         return cleanKey;
     } catch (e) {
-        console.error('[GOOGLE SHEETS] Error processing private key:', e);
+        logger.error('Error processing private key', { tag: 'GOOGLE SHEETS', error: (e as Error).message });
         return undefined;
     }
 };
@@ -54,13 +55,13 @@ const GOOGLE_PRIVATE_KEY = getPrivateKey();
 export async function appendToSheet(data: { email: string; date: string }) {
   // If credentials are missing, log and return (development mode / fallback)
   if (!GOOGLE_SERVICE_ACCOUNT_EMAIL || !GOOGLE_PRIVATE_KEY || !GOOGLE_SHEET_ID) {
-    console.warn('[GOOGLE SHEETS] Missing credentials. Skipping sheet append.');
+    logger.warn('Missing credentials. Skipping sheet append.', { tag: 'GOOGLE SHEETS' });
     // Check specific missing creds for debugging
-    if (!GOOGLE_SERVICE_ACCOUNT_EMAIL) console.warn('Missing: GOOGLE_SERVICE_ACCOUNT_EMAIL');
-    if (!GOOGLE_PRIVATE_KEY) console.warn('Missing: GOOGLE_PRIVATE_KEY');
-    if (!GOOGLE_SHEET_ID) console.warn('Missing: GOOGLE_SHEET_ID');
+    if (!GOOGLE_SERVICE_ACCOUNT_EMAIL) logger.warn('Missing: GOOGLE_SERVICE_ACCOUNT_EMAIL', { tag: 'GOOGLE SHEETS' });
+    if (!GOOGLE_PRIVATE_KEY) logger.warn('Missing: GOOGLE_PRIVATE_KEY', { tag: 'GOOGLE SHEETS' });
+    if (!GOOGLE_SHEET_ID) logger.warn('Missing: GOOGLE_SHEET_ID', { tag: 'GOOGLE SHEETS' });
     
-    console.log('[GOOGLE SHEETS] Data to append:', data);
+    logger.info('Data to append', { tag: 'GOOGLE SHEETS', data });
     return false;
   }
 
@@ -84,7 +85,7 @@ export async function appendToSheet(data: { email: string; date: string }) {
         await sheet.loadHeaderRow();
     } catch (e) {
         // If loading header row fails or is empty, we set it
-        console.log('[GOOGLE SHEETS] Sheet is empty. Adding headers...');
+        logger.info('Sheet is empty. Adding headers...', { tag: 'GOOGLE SHEETS' });
         await sheet.setHeaderRow(['Email', 'Date']);
     }
 
@@ -95,9 +96,9 @@ export async function appendToSheet(data: { email: string; date: string }) {
 
     return true;
   } catch (error: any) {
-    console.error('[GOOGLE SHEETS] Error appending to sheet:', error.message);
+    logger.error('Error appending to sheet', { tag: 'GOOGLE SHEETS', error: error.message });
     if (error.message.includes('DECODER routines')) {
-        console.error('[GOOGLE SHEETS] Hint: Your private key format seems incorrect. Ensure it includes "-----BEGIN PRIVATE KEY-----" and newlines are correct.');
+        logger.error('Hint: Your private key format seems incorrect. Ensure it includes "-----BEGIN PRIVATE KEY-----" and newlines are correct.', { tag: 'GOOGLE SHEETS' });
     }
     return false;
   }

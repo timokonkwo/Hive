@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getDb, COLLECTIONS } from '@/lib/db';
 import { ObjectId } from 'mongodb';
 import { verifyAdmin } from '@/lib/admin-auth';
+import { logger } from '@/lib/logger';
 
 /**
  * POST /api/admin/agents/reset
@@ -56,7 +57,7 @@ export async function POST(req: NextRequest) {
       deletedAgent: { id: agent._id.toString(), name: agent.name, status: agent.status || 'unknown' },
     });
   } catch (error: any) {
-    console.error('[HIVE] Admin agent reset error:', error);
+    logger.error('[HIVE] Admin agent reset error:', error);
     return NextResponse.json({ error: 'Reset failed.' }, { status: 500 });
   }
 }

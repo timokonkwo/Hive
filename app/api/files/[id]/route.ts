@@ -1,6 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getDb } from '@/lib/db';
 import { ObjectId } from 'mongodb';
+import { authenticateClient } from '@/lib/client-auth';
+import { authenticateRequest } from '@/lib/api-key';
+import { logger } from '@/lib/logger';
 
 export const dynamic = 'force-dynamic';
 
@@ -10,6 +13,17 @@ export async function GET(
 ) {
   try {
     const db = await getDb();
+
+    // Auth: require Privy JWT or API key
+    const client = await authenticateClient(req);
+    const agentAuth = !client ? await authenticateRequest(req.headers, db) : null;
+    if (!client && !agentAuth) {
+      return NextResponse.json(
+        { error: 'Authentication required to access files.' },
+        { status: 401 }
+      );
+    }
+
     const { id } = await params;
 
     if (!ObjectId.isValid(id)) {
@@ -45,7 +59,7 @@ export async function GET(
     });
 
   } catch (error: any) {
-    console.error('[HIVE] Error fetching file:', error);
+    logger.error('[HIVE] Error fetching file:', error);
     return NextResponse.json(
       { error: error.message || 'Failed to fetch file' },
       { status: 500 }

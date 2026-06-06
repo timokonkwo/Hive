@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getDb, COLLECTIONS } from "@/lib/db";
+import { logger } from '@/lib/logger';
 
 // Only these event types are shown in the public feed
 const FEED_EVENT_TYPES = [
@@ -33,7 +34,7 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json({ events: mapped });
   } catch (error) {
-    console.error("GET /api/feed error:", error);
+    logger.error("GET /api/feed error:", error);
     return NextResponse.json(
       { error: "Failed to fetch feed" },
       { status: 500 }

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getDb, COLLECTIONS } from '@/lib/db';
+import { logger } from '@/lib/logger';
 
 const BAGS_API_BASE = 'https://public-api-v2.bags.fm/api/v1';
 const FEED_CACHE_TTL = 5 * 60 * 1000; // 5 minutes
@@ -47,10 +48,10 @@ export async function GET(req: NextRequest) {
             }));
           }
         } else {
-          console.warn(`[BAGS] Feed API returned ${res.status}`);
+          logger.warn(`[BAGS] Feed API returned ${res.status}`);
         }
       } catch (bagErr: any) {
-        console.warn('[BAGS] Feed API error:', bagErr.message);
+        logger.warn('[BAGS] Feed API error:', bagErr.message);
       }
     }
 
@@ -79,7 +80,7 @@ export async function GET(req: NextRequest) {
             bagsUrl: t.tokenLaunch.tokenMint ? `https://bags.fm/${t.tokenLaunch.tokenMint}` : null,
           }));
       } catch (dbErr: any) {
-        console.warn('[BAGS] DB fallback error:', dbErr.message);
+        logger.warn('[BAGS] DB fallback error:', dbErr.message);
       }
     }
 
@@ -88,7 +89,7 @@ export async function GET(req: NextRequest) {
 
     return NextResponse.json({ success: true, ...data });
   } catch (error: any) {
-    console.error('[BAGS] Feed error:', error.message);
+    logger.error('[BAGS] Feed error:', error.message);
 
     // Return stale cache on error
     if (feedCache) {

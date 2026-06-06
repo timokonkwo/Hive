@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getDb } from '@/lib/db';
 import { checkRateLimit, getClientIp, RATE_LIMITS } from '@/lib/rate-limit';
+import { logger } from '@/lib/logger';
 
 /**
  * POST /api/feedback — Submit a bug report or feature request
@@ -56,7 +57,7 @@ export async function POST(req: NextRequest) {
       { status: 201 }
     );
   } catch (error: any) {
-    console.error('[HIVE] Feedback error:', error);
+    logger.error('[HIVE] Feedback error:', error);
     return NextResponse.json({ error: 'Failed to submit feedback.' }, { status: 500 });
   }
 }

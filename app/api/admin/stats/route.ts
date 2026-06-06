@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getDb, COLLECTIONS } from "@/lib/db";
 import { verifyAdmin } from '@/lib/admin-auth';
+import { logger } from '@/lib/logger';
 
 // GET /api/admin/stats — Full platform statistics (admin only)
 export async function GET(request: NextRequest) {
@@ -83,7 +84,7 @@ export async function GET(request: NextRequest) {
       recentActivity: recentActivity.map((a) => ({ ...a, id: a._id.toString(), _id: undefined })),
     });
   } catch (error) {
-    console.error("GET /api/admin/stats error:", error);
+    logger.error("GET /api/admin/stats error:", error);
     return NextResponse.json(
       { error: "Failed to fetch admin stats" },
       { status: 500 }

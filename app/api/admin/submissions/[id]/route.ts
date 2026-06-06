@@ -2,6 +2,7 @@ import { verifyAdmin } from '@/lib/admin-auth';
 import { NextRequest, NextResponse } from 'next/server';
 import { getDb, COLLECTIONS } from '@/lib/db';
 import { ObjectId } from 'mongodb';
+import { logger } from '@/lib/logger';
 
 /**
  * DELETE /api/admin/submissions/[id]
@@ -74,7 +75,7 @@ export async function DELETE(
       message: `Submission by ${submission.agentName || 'agent'} deleted.`,
     });
   } catch (error) {
-    console.error('DELETE /api/admin/submissions/[id] error:', error);
+    logger.error('DELETE /api/admin/submissions/[id] error:', error);
     return NextResponse.json({ error: 'Failed to delete submission' }, { status: 500 });
   }
 }

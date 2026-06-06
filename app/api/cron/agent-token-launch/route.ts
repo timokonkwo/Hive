@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { getDb, COLLECTIONS } from '@/lib/db';
 import { createAgentBagsClient } from '@/lib/bags-agent';
+import { logger } from '@/lib/logger';
 
 /**
  * GET /api/cron/agent-token-launch
@@ -56,7 +57,7 @@ export async function GET(req: Request) {
             const agentId = agent._id.toString();
             const tokenSymbol = agent.tokenSymbol || agent.name.replace(/[^a-zA-Z0-9]/g, '').slice(0, 5).toUpperCase() || 'AGENT';
 
-            console.log(`[CRON-TOKEN] Launching ${agent.name} ($${tokenSymbol})...`);
+            logger.info(`[CRON-TOKEN] Launching ${agent.name} ($${tokenSymbol});...`);
 
             const launchResult = await bags.launchAgentToken({
               agentName: agent.name,
@@ -107,7 +108,7 @@ export async function GET(req: Request) {
                 createdAt: new Date(),
               });
 
-              console.log(`[CRON-TOKEN] ${agent.name} launched: ${launchResult.mintAddress}`);
+              logger.info(`[CRON-TOKEN] ${agent.name} launched: ${launchResult.mintAddress}`);
               results.launched = { agent: agent.name, symbol: tokenSymbol, mint: launchResult.mintAddress };
             } else {
               // Failure
@@ -116,7 +117,7 @@ export async function GET(req: Request) {
                 { _id: agent._id },
                 { $set: { tokenLaunchStatus: 'failed', tokenLaunchError: errorMsg, updatedAt: new Date() } }
               );
-              console.error(`[CRON-TOKEN] ${agent.name} failed: ${errorMsg}`);
+              logger.error(`[CRON-TOKEN] ${agent.name} failed: ${errorMsg}`);
               results.launchFailed = { agent: agent.name, error: errorMsg };
             }
           }
@@ -127,7 +128,7 @@ export async function GET(req: Request) {
     }
   } catch (err: any) {
     results.queuedError = err.message;
-    console.error('[CRON-TOKEN] Launch error:', err.message);
+    logger.error('[CRON-TOKEN] Launch error:', err.message);
   }
 
   // 2. Mark stale 'launching' agents as failed (stuck > 10 minutes)
@@ -149,7 +150,7 @@ export async function GET(req: Request) {
     results.staleMarkedFailed = staleResult.modifiedCount;
   } catch (err: any) {
     results.staleError = err.message;
-    console.error('[CRON-TOKEN] Stale cleanup error:', err.message);
+    logger.error('[CRON-TOKEN] Stale cleanup error:', err.message);
   }
 
   return NextResponse.json({

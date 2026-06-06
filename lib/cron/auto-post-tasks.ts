@@ -8,6 +8,7 @@
 
 import { getDb, COLLECTIONS } from '@/lib/db';
 import { generateWithGemini } from '@/lib/stealth-agents/gemini';
+import { rankAgentsForTask } from '@/lib/smart-matching';
 
 // Client pool for scheduled task creation
 const CLIENT_POOL = [
@@ -445,18 +446,17 @@ export async function autoPostTasks(): Promise<AutoPostResult> {
   const db = await getDb();
   const result: AutoPostResult = { tasksCreated: 0, taskIds: [], agentBids: [], errors: [] };
 
-  // Guard: max 2 auto-posted tasks per day
-  const todayStart = new Date();
-  todayStart.setUTCHours(0, 0, 0, 0);
-  const autoPostedToday = await db
+  // Guard: max 1 auto-posted task every 3 days (72 hours)
+  const seventyTwoHoursAgo = new Date(Date.now() - 72 * 60 * 60 * 1000);
+  const autoPostedRecently = await db
     .collection(COLLECTIONS.TASKS)
     .countDocuments({
       clientAddress: { $regex: /^did:privy:cl_/ },
-      createdAt: { $gte: todayStart },
+      createdAt: { $gte: seventyTwoHoursAgo },
     });
 
-  if (autoPostedToday >= 2) {
-    console.log(`[AUTO-POST] Already posted ${autoPostedToday} tasks today, skipping`);
+  if (autoPostedRecently >= 1) {
+    console.log(`[AUTO-POST] Already posted ${autoPostedRecently} tasks in the last 72 hours, skipping`);
     return result;
   }
 
@@ -483,7 +483,7 @@ export async function autoPostTasks(): Promise<AutoPostResult> {
 
     const client = CLIENT_POOL[Math.floor(Math.random() * CLIENT_POOL.length)];
 
-    // Budget weighted toward $1: 50% → $1, 15% → $0.50, 35% → $1-$3
+    // Budget weighted toward $1: 50% -> $1, 15% -> $0.50, 35% -> $1-$3
     const roll = Math.random();
     let budgetAmount: number;
     if (roll < 0.50) {
@@ -495,6 +495,23 @@ export async function autoPostTasks(): Promise<AutoPostResult> {
     }
     const budget = `$${budgetAmount} USDC`;
 
+    // ─── Direct Routing: instant match to best agent ───
+    const matches = await rankAgentsForTask(
+      db,
+      {
+        title: generated.title,
+        description: generated.description,
+        category: generated.resolvedCategory,
+        requirements: '',
+        tags: generated.tags,
+        budget,
+        budgetAmount,
+      },
+      { limit: 5 }
+    );
+
+    const bestMatch = matches.length > 0 ? matches[0] : null;
+
     const task = {
       title: generated.title,
       description: generated.description,
@@ -503,12 +520,17 @@ export async function autoPostTasks(): Promise<AutoPostResult> {
       requirements: '',
       budget,
       budgetAmount,
-      status: 'Open',
+      status: bestMatch ? 'In Progress' : 'Open',
       clientAddress: client.address,
       clientName: client.name,
-      proposalsCount: 0,
+      assignedAgent: bestMatch?.agent?.name || null,
+      assignedAgentId: bestMatch?.agentId || null,
+      proposalsCount: bestMatch ? 1 : 0,
       tokenConfig: null,
       deliverableSpecs: getDeliverableSpecs(generated.resolvedCategory),
+      instantMatch: !!bestMatch,
+      matchScore: bestMatch?.score || null,
+      matchConfidence: bestMatch?.confidence || null,
       createdAt: new Date(),
       updatedAt: new Date(),
     };
@@ -517,7 +539,42 @@ export async function autoPostTasks(): Promise<AutoPostResult> {
     const taskId = insertResult.insertedId.toString();
     result.taskIds.push(taskId);
 
-    // Log activity
+    // Create auto-accepted routing record if matched
+    if (bestMatch) {
+      const bid = {
+        taskId,
+        agentId: bestMatch.agentId,
+        agentName: bestMatch.agent.name,
+        agentAddress: bestMatch.agent.solanaAddress || null,
+        amount: budget,
+        timeEstimate: '2-4 days',
+        coverLetter: `Matched automatically by Hive with ${bestMatch.confidence} confidence (${bestMatch.score}/100). ${bestMatch.reasons.join(' ')}`,
+        status: 'accepted',
+        autoMatched: true,
+        matchScore: bestMatch.score,
+        matchReasons: bestMatch.reasons,
+        createdAt: new Date(),
+      };
+
+      await db.collection(COLLECTIONS.BIDS).insertOne(bid);
+      result.agentBids.push(`${bestMatch.agent.name} (${bestMatch.score}/100)`);
+
+      // Log match activity
+      await db.collection(COLLECTIONS.ACTIVITY).insertOne({
+        type: 'BidAccepted',
+        taskId: insertResult.insertedId,
+        actorName: bestMatch.agent.name,
+        metadata: {
+          taskTitle: generated.title,
+          agentName: bestMatch.agent.name,
+          agentId: bestMatch.agentId,
+          autoMatched: true,
+        },
+        createdAt: new Date(),
+      });
+    }
+
+    // Log task creation activity
     await db.collection(COLLECTIONS.ACTIVITY).insertOne({
       type: 'TaskCreated',
       taskId: insertResult.insertedId,
@@ -527,12 +584,14 @@ export async function autoPostTasks(): Promise<AutoPostResult> {
         title: generated.title,
         category: generated.resolvedCategory,
         budget,
+        instantMatch: !!bestMatch,
       },
       createdAt: new Date(),
     });
 
     result.tasksCreated++;
-    console.log(`[AUTO-POST] Created "${generated.title}" [${generated.resolvedCategory}] by ${client.name} ($${budgetAmount} USDC)`);
+    const matchInfo = bestMatch ? ` -> instant matched to ${bestMatch.agent.name} (${bestMatch.score}/100)` : ' (no match, posted as Open)';
+    console.log(`[AUTO-POST] Created "${generated.title}" [${generated.resolvedCategory}] by ${client.name} ($${budgetAmount} USDC)${matchInfo}`);
   } catch (error: any) {
     result.errors.push(`Task generation error: ${error.message}`);
     console.error(`[AUTO-POST] Error:`, error.message);

@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { getDb, COLLECTIONS } from "@/lib/db";
+import { logger } from '@/lib/logger';
 
 // GET /api/stats — Platform-wide statistics
 export async function GET() {
@@ -23,7 +24,7 @@ export async function GET() {
       totalProposals,
     });
   } catch (error) {
-    console.error("GET /api/stats error:", error);
+    logger.error("GET /api/stats error:", error);
     return NextResponse.json(
       { error: "Failed to fetch stats" },
       { status: 500 }

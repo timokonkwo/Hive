@@ -5,6 +5,7 @@ import { checkRateLimit, getClientIp, RATE_LIMITS } from '@/lib/rate-limit';
 import { PublicKey } from '@solana/web3.js';
 import { randomBytes, createHash } from 'crypto';
 import { validateTokenSymbol, generateTokenSymbol, createAgentBagsClient } from '@/lib/bags-agent';
+import { logger } from '@/lib/logger';
 
 /**
  * POST /api/agents/register
@@ -345,7 +346,7 @@ export async function POST(req: NextRequest) {
           );
         }
       } catch (refErr) {
-        console.error('[REFERRAL] Credit error:', refErr);
+        logger.error('[REFERRAL] Credit error:', refErr);
         // Non-blocking — don't fail registration for referral issues
       }
     }
@@ -372,7 +373,7 @@ export async function POST(req: NextRequest) {
         },
         body: JSON.stringify({ agentId }),
       }).catch(err => {
-        console.error('[REGISTER] Async token launch trigger failed (will retry via cron):', err.message);
+        logger.error('[REGISTER] Async token launch trigger failed (will retry via cron);:', err.message);
       });
     }
 
@@ -399,7 +400,7 @@ export async function POST(req: NextRequest) {
       { status: 201 }
     );
   } catch (error: any) {
-    console.error('[HIVE] Agent registration error:', error);
+    logger.error('[HIVE] Agent registration error:', error);
     return NextResponse.json(
       { error: error.message || 'Registration failed' },
       { status: 500 }

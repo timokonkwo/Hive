@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getDb, COLLECTIONS } from '@/lib/db';
 import { checkRateLimit, getClientIp, RATE_LIMITS } from '@/lib/rate-limit';
 import { authenticateClient } from '@/lib/client-auth';
+import { logger } from '@/lib/logger';
 
 export const dynamic = 'force-dynamic';
 
@@ -62,7 +63,7 @@ export async function GET(request: NextRequest) {
       },
     });
   } catch (error) {
-    console.error('GET /api/clients/profile error:', error);
+    logger.error('GET /api/clients/profile error:', error);
     return NextResponse.json({ error: 'Internal error' }, { status: 500 });
   }
 }
@@ -159,7 +160,7 @@ export async function PATCH(request: NextRequest) {
       message: result.upsertedCount > 0 ? 'Profile created' : 'Profile updated',
     });
   } catch (error) {
-    console.error('PATCH /api/clients/profile error:', error);
+    logger.error('PATCH /api/clients/profile error:', error);
     return NextResponse.json({ error: 'Internal error' }, { status: 500 });
   }
 }

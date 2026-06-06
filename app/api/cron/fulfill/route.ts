@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { fulfillAcceptedBids } from '@/lib/stealth-agents/fulfiller';
+import { logger } from '@/lib/logger';
 
 /**
  * GET /api/cron/fulfill
@@ -24,14 +25,14 @@ export async function GET(req: Request) {
   }
 
   try {
-    console.log('[FULFILL] Starting fulfillment run');
+    logger.info('[FULFILL] Starting fulfillment run');
     await fulfillAcceptedBids();
     return NextResponse.json({
       success: true,
       timestamp: new Date().toISOString(),
     });
   } catch (err: any) {
-    console.error('[FULFILL] Error:', err.message);
+    logger.error('[FULFILL] Error:', err.message);
     return NextResponse.json({
       success: false,
       error: err.message,

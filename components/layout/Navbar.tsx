@@ -143,7 +143,7 @@ export const Navbar = () => {
             onClick={() => setIsMenuOpen(false)}
             className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-white text-black font-medium text-[12px] rounded-full"
           >
-            <Plus size={14} /> Create
+            <Plus size={14} /> Task
           </Link>
           <button
             onClick={() => setIsMenuOpen(!isMenuOpen)}
