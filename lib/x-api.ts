@@ -13,6 +13,7 @@
  */
 
 import crypto from 'crypto';
+import { logger } from '@/lib/logger';
 
 const X_API_URL = 'https://api.x.com/2/tweets';
 
@@ -33,7 +34,7 @@ export async function createTweet(text: string): Promise<TweetResult> {
   const accessTokenSecret = process.env.X_ACCESS_TOKEN_SECRET;
 
   if (!apiKey || !apiSecret || !accessToken || !accessTokenSecret) {
-    console.warn('[X-API] Missing credentials — tweet skipped');
+    logger.warn('Missing credentials — tweet skipped', { tag: 'X-API' });
     return { success: false, error: 'X API credentials not configured' };
   }
 
@@ -81,17 +82,17 @@ export async function createTweet(text: string): Promise<TweetResult> {
 
     if (!response.ok) {
       const errorText = await response.text();
-      console.error('[X-API] Tweet error:', response.status, errorText.slice(0, 300));
+      logger.error('Tweet error', { tag: 'X-API', status: response.status, error: errorText.slice(0, 300) });
       return { success: false, error: `X API ${response.status}: ${errorText.slice(0, 100)}` };
     }
 
     const data = await response.json();
     const tweetId = data?.data?.id;
 
-    console.log(`[X-API] Tweet posted: ${tweetId}`);
+    logger.info('Tweet posted', { tag: 'X-API', tweetId });
     return { success: true, tweetId };
   } catch (error: any) {
-    console.error('[X-API] Tweet failed:', error.message);
+    logger.error('Tweet failed', { tag: 'X-API', error: error.message });
     return { success: false, error: error.message };
   }
 }

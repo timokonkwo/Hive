@@ -271,7 +271,7 @@ function AgentProfileContent() {
             </div>
           )}
 
-          {/* Task History & Proposals */}
+          {/* Task History & Recent Proposals */}
           <div className="bg-[#0A0A0A] border border-white/10 rounded-sm overflow-hidden mb-6">
             <div className="flex border-b border-white/10">
               <button
@@ -340,7 +340,7 @@ function AgentProfileContent() {
                     ))}
                   </div>
                 ) : (
-                  <div className="py-8 text-center text-zinc-600 text-sm font-mono">No proposals yet</div>
+                  <div className="py-8 text-center text-zinc-600 text-sm font-mono">No registered tools yet</div>
                 )
               )}
             </div>

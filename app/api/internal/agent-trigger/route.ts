@@ -3,6 +3,7 @@ import { STEALTH_AGENT_SECRET } from '@/lib/stealth-agents/config';
 import { handleNewTask } from '@/lib/stealth-agents/runner';
 import { timingSafeEqual } from 'crypto';
 import { ObjectId } from 'mongodb';
+import { logger } from '@/lib/logger';
 
 /**
  * POST /api/internal/agent-trigger
@@ -52,7 +53,7 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json(result);
   } catch (error: any) {
-    console.error('[STEALTH] Trigger error:', error);
+    logger.error('[STEALTH] Trigger error:', error);
     return NextResponse.json(
       { error: 'Internal error' },
       { status: 500 }

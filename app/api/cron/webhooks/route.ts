@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getDb } from '@/lib/db';
 import { dispatchQueuedWebhooks } from '@/lib/webhook-dispatcher';
+import { logger } from '@/lib/logger';
 
 /**
  * GET /api/cron/webhooks
@@ -34,7 +35,7 @@ export async function GET(req: NextRequest) {
       timestamp: new Date().toISOString(),
     });
   } catch (error: any) {
-    console.error('[CRON] Webhook dispatch error:', error);
+    logger.error('[CRON] Webhook dispatch error:', error);
     return NextResponse.json({ error: 'Webhook dispatch failed' }, { status: 500 });
   }
 }

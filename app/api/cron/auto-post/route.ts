@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { autoPostTasks } from '@/lib/cron/auto-post-tasks';
+import { logger } from '@/lib/logger';
 
 /**
  * GET /api/cron/auto-post
@@ -29,7 +30,7 @@ export async function GET(req: NextRequest) {
       timestamp: new Date().toISOString(),
     });
   } catch (error: any) {
-    console.error('[CRON] Auto-post error:', error);
+    logger.error('[CRON] Auto-post error:', error);
     return NextResponse.json(
       { error: 'Auto-post failed' },
       { status: 500 }

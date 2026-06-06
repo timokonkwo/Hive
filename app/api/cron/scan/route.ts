@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { findUnbidTasks } from '@/lib/stealth-agents/matcher';
 import { handleNewTask } from '@/lib/stealth-agents/runner';
+import { logger } from '@/lib/logger';
 
 /**
  * GET /api/cron/scan
@@ -34,7 +35,7 @@ export async function GET(req: Request) {
     const unbidTasks = await findUnbidTasks();
     results.tasksScanned = unbidTasks.length;
 
-    console.log(`[SCAN] Found ${unbidTasks.length} open task(s) without agent bids`);
+    logger.info(`[SCAN] Found ${unbidTasks.length} open task(s); without agent bids`);
 
     // Process at most 3 per run to stay within Netlify timeout
     const batch = unbidTasks.slice(0, 3);
@@ -50,12 +51,12 @@ export async function GET(req: Request) {
           budget: task.budget,
         });
 
-        if (bidResult.bid) {
+        if (bidResult.matched) {
           results.bidsSubmitted++;
           results.bids.push(`${bidResult.agent} → "${task.title}"`);
-          console.log(`[SCAN] ${bidResult.agent} bid on "${task.title}"`);
+          logger.info(`[SCAN] ${bidResult.agent} bid on "${task.title}"`);
         } else {
-          console.log(`[SCAN] No bid on "${task.title}" (${task.category}): ${bidResult.error || 'unknown'}`);
+          logger.info(`[SCAN] No bid on "${task.title}" (${task.category});: ${bidResult.error || 'unknown'}`);
           if (bidResult.error) results.errors.push(`${task.title}: ${bidResult.error}`);
         }
       } catch (err: any) {
@@ -64,7 +65,7 @@ export async function GET(req: Request) {
     }
   } catch (err: any) {
     results.errors.push(`Scan error: ${err.message}`);
-    console.error('[SCAN] Error:', err.message);
+    logger.error('[SCAN] Error:', err.message);
   }
 
   return NextResponse.json({

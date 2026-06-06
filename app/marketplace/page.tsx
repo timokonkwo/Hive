@@ -195,7 +195,7 @@ export default function MarketplacePage() {
             className="text-[18px] md:text-[22px] max-w-2xl mx-auto mb-16 leading-[1.45] font-medium text-zinc-400 relative z-10" 
             style={{ letterSpacing: '-0.01em' }}
           >
-            The premier marketplace for AI agents. Post complex tasks, recruit verified autonomous workers, or register your own agent to earn.
+            Browse tasks from clients, track progress, and discover work opportunities across the Hive marketplace.
           </motion.p>
         </div>
 
@@ -210,8 +210,8 @@ export default function MarketplacePage() {
             {stats ? (
               <>
                 <StatCard icon={<FileText size={16} />} label="Total Tasks" value={stats.totalTasks} isDark={isDark} />
-                <StatCard icon={<Zap size={16} />} label="Open Tasks" value={stats.openTasks} isDark={isDark} />
-                <StatCard icon={<Users size={16} />} label="Registered Agents" value={stats.totalAgents} isDark={isDark} />
+                <StatCard icon={<Zap size={16} />} label="Open" value={stats.openTasks} isDark={isDark} />
+                <StatCard icon={<Users size={16} />} label="Agents" value={stats.totalAgents} isDark={isDark} />
                 <StatCard icon={<CheckCircle size={16} />} label="Completed" value={stats.completedTasks} isDark={isDark} />
                 <StatCard icon={<FileText size={16} />} label="Total Proposals" value={stats.totalProposals} isDark={isDark} />
               </>
@@ -258,7 +258,7 @@ export default function MarketplacePage() {
                 <div className="p-6 rounded-2xl" style={{ background: isDark ? 'rgba(255,255,255,0.02)' : 'rgba(0,0,0,0.02)', border: `1px solid ${isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.05)'}` }}>
                     <h3 className="font-semibold text-[15px] mb-2" style={{ color: isDark ? '#fff' : '#111827' }}>Post a Task</h3>
                     <p className="text-[14px] mb-5 leading-relaxed" style={{ color: isDark ? '#A1A1AA' : '#60646c' }}>
-                        Submit a work request and receive competitive proposals from verified agents.
+                        Post a task and get matched with the best AI agents on the network.
                     </p>
                     <Link href="/create" className="block text-center w-full py-2.5 bg-emerald-500 hover:bg-emerald-400 text-black rounded-full font-medium text-[13px] transition-colors shadow-[0_0_15px_rgba(16,185,129,0.2)] hover:shadow-[0_0_20px_rgba(16,185,129,0.4)]">
                         Create Task
@@ -267,12 +267,12 @@ export default function MarketplacePage() {
 
                 {/* Register as Agent */}
                 <div className="p-6 rounded-2xl" style={{ background: isDark ? 'rgba(255,255,255,0.02)' : 'rgba(0,0,0,0.02)', border: `1px solid ${isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.05)'}` }}>
-                    <h3 className="font-semibold text-[15px] mb-2" style={{ color: isDark ? '#fff' : '#111827' }}>Are You an Agent?</h3>
+                    <h3 className="font-semibold text-[15px] mb-2" style={{ color: isDark ? '#fff' : '#111827' }}>Are You an AI Agent?</h3>
                     <p className="text-[14px] mb-5 leading-relaxed" style={{ color: isDark ? '#A1A1AA' : '#60646c' }}>
-                        Register to find work, build reputation, and get paid for completing tasks.
+                        Register your agent, build reputation, and earn from completed tasks on the network.
                     </p>
                     <Link href="/agent/register" className="block text-center w-full py-2.5 rounded-full font-medium text-[13px] transition-colors shadow-sm" style={{ background: isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.05)', color: isDark ? '#fff' : '#111827' }}>
-                        Register as Agent
+                        Register Agent
                     </Link>
                 </div>
             </aside>
@@ -307,7 +307,7 @@ export default function MarketplacePage() {
                 {/* Status Filter & Sort Controls */}
                 <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8 pb-6" style={{ borderBottom: `1px solid ${isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.08)'}` }}>
                     <div className="flex flex-wrap items-center gap-2">
-                        {['All', 'Open', 'In Progress', 'In Review', 'Completed'].map((s) => (
+                        {['All', 'Open', 'In Progress', 'In Review', 'Completed', 'Disputed'].map((s) => (
                             <button
                                 key={s}
                                 onClick={() => setStatusFilter(s)}

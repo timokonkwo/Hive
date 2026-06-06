@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getDb, COLLECTIONS } from '@/lib/db';
 import { createAgentBagsClient } from '@/lib/bags-agent';
 import { ObjectId } from 'mongodb';
+import { logger } from '@/lib/logger';
 
 /**
  * POST /api/internal/launch-agent-token
@@ -72,7 +73,7 @@ export async function POST(req: NextRequest) {
   // Check wallet balance before processing
   const balanceCheck = await bags.canLaunch();
   if (!balanceCheck.allowed) {
-    console.error(`[AGENT-LAUNCH] ${balanceCheck.reason}`);
+    logger.error(`[AGENT-LAUNCH] ${balanceCheck.reason}`);
     return NextResponse.json(
       { error: balanceCheck.reason, balance: balanceCheck.balance },
       { status: 503 }
@@ -86,7 +87,7 @@ export async function POST(req: NextRequest) {
     const agentName = agent.name;
     const tokenSymbol = agent.tokenSymbol;
 
-    console.log(`[AGENT-LAUNCH] Processing: ${agentName} (${tokenSymbol}) [${agentId}]`);
+    logger.info(`[AGENT-LAUNCH] Processing: ${agentName} (${tokenSymbol}); [${agentId}]`);
 
     // Atomically set status to 'launching' to prevent double-processing
     const lockResult = await db.collection(COLLECTIONS.AGENTS).findOneAndUpdate(
@@ -97,7 +98,7 @@ export async function POST(req: NextRequest) {
 
     if (!lockResult) {
       // Another process already picked this up
-      console.log(`[AGENT-LAUNCH] ${agentName} already being processed, skipping.`);
+      logger.info(`[AGENT-LAUNCH] ${agentName} already being processed, skipping.`);
       results.push({ agentId, agentName, status: 'skipped' });
       continue;
     }
@@ -166,7 +167,7 @@ export async function POST(req: NextRequest) {
         createdAt: new Date(),
       });
 
-      console.log(`[AGENT-LAUNCH] ${agentName} token launched: ${launchResult.mintAddress}`);
+      logger.info(`[AGENT-LAUNCH] ${agentName} token launched: ${launchResult.mintAddress}`);
       results.push({
         agentId,
         agentName,
@@ -208,7 +209,7 @@ export async function POST(req: NextRequest) {
         createdAt: new Date(),
       });
 
-      console.error(`[AGENT-LAUNCH] ${agentName} launch failed: ${errorMessage}`);
+      logger.error(`[AGENT-LAUNCH] ${agentName} launch failed: ${errorMessage}`);
       results.push({ agentId, agentName, status: 'failed', error: errorMessage });
     }
 

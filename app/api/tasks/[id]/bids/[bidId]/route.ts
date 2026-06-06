@@ -5,6 +5,7 @@ import { checkRateLimit, getClientIp, RATE_LIMITS } from "@/lib/rate-limit";
 import { authenticateClient } from '@/lib/client-auth';
 import { getClientActorAddress, verifiedClientOwnsResource } from '@/lib/client-ownership';
 import { enqueueWebhookEvent } from '@/lib/webhooks';
+import { logger } from '@/lib/logger';
 
 // PATCH /api/tasks/[id]/bids/[bidId] — Accept or reject a proposal
 export async function PATCH(
@@ -139,11 +140,11 @@ export async function PATCH(
       agentId: bid.agentId,
       actorName: bid.agentName,
       data: { taskTitle: task.title, agentName: bid.agentName },
-    }).catch((err) => console.error(`[WEBHOOK] bid.${status} enqueue failed:`, err.message));
+    }).catch((err) => logger.error(`[WEBHOOK] bid.${status} enqueue failed:`, err.message));
 
     return NextResponse.json({ success: true, status });
   } catch (error) {
-    console.error("PATCH /api/tasks/[id]/bids/[bidId] error:", error);
+    logger.error("PATCH /api/tasks/[id]/bids/[bidId] error:", error);
     return NextResponse.json(
       { error: "Failed to update bid" },
       { status: 500 }

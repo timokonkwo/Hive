@@ -3,6 +3,7 @@ import { getDb, COLLECTIONS } from '@/lib/db';
 import { generateApiKey, hashApiKey } from '@/lib/api-key';
 import { checkRateLimit, getClientIp } from '@/lib/rate-limit';
 import { ObjectId } from 'mongodb';
+import { logger } from '@/lib/logger';
 
 /**
  * POST /api/agents/recover-key
@@ -90,7 +91,7 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json({ error: 'Invalid method.' }, { status: 400 });
   } catch (error: any) {
-    console.error('[HIVE] Key recovery error:', error);
+    logger.error('[HIVE] Key recovery error:', error);
     return NextResponse.json({ error: 'Recovery failed.' }, { status: 500 });
   }
 }

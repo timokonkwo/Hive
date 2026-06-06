@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getDb } from '@/lib/db';
 import { authenticateRequest } from '@/lib/api-key';
 import { checkRateLimit, getClientIp, RATE_LIMITS } from '@/lib/rate-limit';
+import { logger } from '@/lib/logger';
 
 /**
  * GET /api/agents/payments
@@ -76,7 +77,7 @@ export async function GET(req: NextRequest) {
       },
     });
   } catch (error: any) {
-    console.error('[HIVE] /api/agents/payments error:', error);
+    logger.error('[HIVE] /api/agents/payments error:', error);
     return NextResponse.json(
       { error: 'Failed to fetch payments.' },
       { status: 500 }

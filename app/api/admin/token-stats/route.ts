@@ -2,6 +2,7 @@ import { verifyAdmin } from '@/lib/admin-auth';
 import { NextRequest, NextResponse } from 'next/server';
 import { getDb, COLLECTIONS } from '@/lib/db';
 import { createAgentBagsClient } from '@/lib/bags-agent';
+import { logger } from '@/lib/logger';
 
 
 
@@ -347,13 +348,13 @@ export async function POST(req: NextRequest) {
               maxRetries: 3,
             });
             await bags.sdk.state.getConnection().confirmTransaction(sig, 'confirmed');
-            console.log(`[ADMIN-CLAIM] Claimed position ${position.baseMint}: ${sig}`);
+            logger.info(`[ADMIN-CLAIM] Claimed position ${position.baseMint}: ${sig}`);
           }
           claimed++;
         } catch (err: any) {
           failed++;
           errors.push(`${position.baseMint}: ${err.message}`);
-          console.error(`[ADMIN-CLAIM] Failed to claim ${position.baseMint}:`, err.message);
+          logger.error(`[ADMIN-CLAIM] Failed to claim ${position.baseMint}:`, err.message);
         }
       }
 

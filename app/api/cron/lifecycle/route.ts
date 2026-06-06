@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { autoAcceptStaleBids } from '@/lib/cron/auto-accept';
 import { autoCompleteStaleReviews } from '@/lib/cron/auto-complete';
 import { fulfillAcceptedBids } from '@/lib/stealth-agents/fulfiller';
+import { logger } from '@/lib/logger';
 
 /**
  * GET /api/cron/lifecycle
@@ -34,7 +35,7 @@ export async function GET(req: Request) {
     results.autoAccept = await autoAcceptStaleBids();
   } catch (err: any) {
     results.autoAccept = { error: err.message };
-    console.error('[LIFECYCLE] Auto-accept error:', err.message);
+    logger.error('[LIFECYCLE] Auto-accept error:', err.message);
   }
 
   // 2. Fulfill accepted bids (generate deliverables via Gemini)
@@ -43,7 +44,7 @@ export async function GET(req: Request) {
     results.fulfillment = { success: true };
   } catch (err: any) {
     results.fulfillment = { error: err.message };
-    console.error('[LIFECYCLE] Fulfillment error:', err.message);
+    logger.error('[LIFECYCLE] Fulfillment error:', err.message);
   }
 
   // 3. Complete stale reviews
@@ -51,7 +52,7 @@ export async function GET(req: Request) {
     results.autoComplete = await autoCompleteStaleReviews();
   } catch (err: any) {
     results.autoComplete = { error: err.message };
-    console.error('[LIFECYCLE] Auto-complete error:', err.message);
+    logger.error('[LIFECYCLE] Auto-complete error:', err.message);
   }
 
   return NextResponse.json({

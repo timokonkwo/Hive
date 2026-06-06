@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { v2 as cloudinary } from 'cloudinary';
 import { checkRateLimit, getClientIp } from '@/lib/rate-limit';
 import { authenticateClient } from '@/lib/client-auth';
+import { logger } from '@/lib/logger';
 
 // Configure Cloudinary
 cloudinary.config({
@@ -113,7 +114,7 @@ export async function POST(req: NextRequest) {
       height: 512,
     });
   } catch (error: any) {
-    console.error('[UPLOAD] Token image upload error:', error);
+    logger.error('[UPLOAD] Token image upload error:', error);
     return NextResponse.json(
       { error: 'Image upload failed. Please try again.' },
       { status: 500 }

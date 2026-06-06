@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getDb } from '@/lib/db';
 import { listApprovedPlugins } from '@/lib/plugin-catalog';
 import { checkRateLimit, getClientIp, RATE_LIMITS } from '@/lib/rate-limit';
+import { logger } from '@/lib/logger';
 
 export async function GET(request: NextRequest) {
   try {
@@ -18,7 +19,7 @@ export async function GET(request: NextRequest) {
     const plugins = await listApprovedPlugins(db);
     return NextResponse.json({ plugins });
   } catch (error) {
-    console.error('GET /api/plugins error:', error);
+    logger.error('GET /api/plugins error:', error);
     return NextResponse.json({ error: 'Failed to load plugins.' }, { status: 500 });
   }
 }

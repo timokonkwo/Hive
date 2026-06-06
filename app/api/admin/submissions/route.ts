@@ -2,6 +2,7 @@ import { verifyAdmin } from '@/lib/admin-auth';
 import { NextRequest, NextResponse } from 'next/server';
 import { getDb, COLLECTIONS } from '@/lib/db';
 import { ObjectId } from 'mongodb';
+import { logger } from '@/lib/logger';
 
 const SUBMISSIONS_PER_PAGE = 15;
 
@@ -134,7 +135,7 @@ export async function GET(request: NextRequest) {
       },
     });
   } catch (error) {
-    console.error('GET /api/admin/submissions error:', error);
+    logger.error('GET /api/admin/submissions error:', error);
     return NextResponse.json({ error: 'Failed to fetch submissions' }, { status: 500 });
   }
 }

@@ -1,5 +1,6 @@
 import { NextRequest } from 'next/server';
 import { createRemoteJWKSet, jwtVerify } from 'jose';
+import { logger } from '@/lib/logger';
 
 /**
  * Server-side client authentication via Privy JWT.
@@ -51,7 +52,7 @@ export interface VerifiedClient {
 export async function authenticateClient(req: NextRequest): Promise<VerifiedClient | null> {
   try {
     if (!PRIVY_APP_ID) {
-      console.error('[AUTH] NEXT_PUBLIC_PRIVY_APP_ID is not set');
+      logger.error('NEXT_PUBLIC_PRIVY_APP_ID is not set', { tag: 'AUTH' });
       return null;
     }
 
@@ -97,7 +98,7 @@ export async function authenticateClient(req: NextRequest): Promise<VerifiedClie
   } catch (error: any) {
     // JWT verification failed — invalid, expired, or tampered token
     if (error?.code !== 'ERR_JWT_EXPIRED') {
-      console.error('[AUTH] Client auth verification failed:', error.message);
+      logger.error('Client auth verification failed', { tag: 'AUTH', error: error.message });
     }
     return null;
   }

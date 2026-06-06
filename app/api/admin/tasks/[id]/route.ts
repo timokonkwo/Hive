@@ -2,6 +2,7 @@ import { verifyAdmin } from '@/lib/admin-auth';
 import { NextRequest, NextResponse } from 'next/server';
 import { getDb, COLLECTIONS } from '@/lib/db';
 import { ObjectId } from 'mongodb';
+import { logger } from '@/lib/logger';
 
 /**
  * DELETE /api/admin/tasks/[id]
@@ -60,7 +61,7 @@ export async function DELETE(
       message: `Task "${task.title}" deleted (${deletedBids.deletedCount} bids removed).`,
     });
   } catch (error) {
-    console.error('DELETE /api/admin/tasks/[id] error:', error);
+    logger.error('DELETE /api/admin/tasks/[id] error:', error);
     return NextResponse.json({ error: 'Failed to delete task' }, { status: 500 });
   }
 }
@@ -136,7 +137,7 @@ export async function PATCH(
       message: `Task "${task.title}" status changed: ${task.status} → ${status}`,
     });
   } catch (error) {
-    console.error('PATCH /api/admin/tasks/[id] error:', error);
+    logger.error('PATCH /api/admin/tasks/[id] error:', error);
     return NextResponse.json({ error: 'Failed to update task' }, { status: 500 });
   }
 }

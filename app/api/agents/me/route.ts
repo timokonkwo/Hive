@@ -4,6 +4,7 @@ import { authenticateRequest } from '@/lib/api-key';
 import { checkRateLimit, getClientIp, RATE_LIMITS } from '@/lib/rate-limit';
 import { PublicKey } from '@solana/web3.js';
 import { ObjectId } from 'mongodb';
+import { logger } from '@/lib/logger';
 
 /**
  * GET /api/agents/me
@@ -82,7 +83,7 @@ export async function GET(req: NextRequest) {
       authMethod,
     });
   } catch (error: any) {
-    console.error('[HIVE] /api/agents/me error:', error);
+    logger.error('[HIVE] /api/agents/me error:', error);
     return NextResponse.json(
       { error: error.message || 'Failed to fetch profile' },
       { status: 500 }
@@ -228,7 +229,7 @@ export async function PATCH(req: NextRequest) {
       walletLinked: !!walletAddress,
     });
   } catch (error: any) {
-    console.error('[HIVE] PATCH /api/agents/me error:', error);
+    logger.error('[HIVE] PATCH /api/agents/me error:', error);
     return NextResponse.json(
       { error: error.message || 'Failed to update profile' },
       { status: 500 }

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { checkRateLimit, getClientIp, RATE_LIMITS } from '@/lib/rate-limit';
+import { logger } from '@/lib/logger';
 
 const BAGS_API_BASE = 'https://public-api-v2.bags.fm/api/v1';
 const HIVE_MINT = '6JfonM6a24xngXh5yJ1imZzbMhpfvEsiafkb4syHBAGS';
@@ -59,7 +60,7 @@ export async function GET(req: NextRequest) {
 
     if (!res.ok) {
       const errText = await res.text();
-      console.error('[BAGS] Quote error:', res.status, errText.slice(0, 200));
+      logger.error('[BAGS] Quote error:', res.status, errText.slice(0, 200));
       return NextResponse.json(
         { error: 'Failed to fetch quote from Bags' },
         { status: 502 }
@@ -67,10 +68,10 @@ export async function GET(req: NextRequest) {
     }
 
     const data = await res.json();
-    console.log('[BAGS] Quote response keys:', JSON.stringify(Object.keys(data)), 'response keys:', data.response ? JSON.stringify(Object.keys(data.response)) : 'null');
+    logger.info('[BAGS] Quote response keys:', JSON.stringify(Object.keys(data)), 'response keys:', data.response ? JSON.stringify(Object.keys(data.response)) : 'null');
     return NextResponse.json(data);
   } catch (error: any) {
-    console.error('[BAGS] Quote request failed:', error.message);
+    logger.error('[BAGS] Quote request failed:', error.message);
     return NextResponse.json({ error: 'Quote request failed' }, { status: 500 });
   }
 }

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getDb, COLLECTIONS } from '@/lib/db';
+import { logger } from '@/lib/logger';
 
 /**
  * GET /api/agents/check-name?name=X
@@ -30,7 +31,7 @@ export async function GET(request: NextRequest) {
       name: name.trim(),
     });
   } catch (error) {
-    console.error('GET /api/agents/check-name error:', error);
+    logger.error('GET /api/agents/check-name error:', error);
     return NextResponse.json({ error: 'Internal error.' }, { status: 500 });
   }
 }

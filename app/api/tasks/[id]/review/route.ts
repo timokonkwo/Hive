@@ -5,6 +5,7 @@ import { checkRateLimit, getClientIp, RATE_LIMITS } from '@/lib/rate-limit';
 import { calculateReputation } from '@/lib/reputation';
 import { authenticateClient } from '@/lib/client-auth';
 import { getClientActorAddress, verifiedClientOwnsResource } from '@/lib/client-ownership';
+import { logger } from '@/lib/logger';
 
 /**
  * POST /api/tasks/[id]/review
@@ -146,7 +147,7 @@ export async function POST(
         }
       );
     } catch (repErr) {
-      console.error('[HIVE] Reputation update error:', repErr);
+      logger.error('[HIVE] Reputation update error:', repErr);
     }
 
     return NextResponse.json({
@@ -154,7 +155,7 @@ export async function POST(
       message: 'Review submitted successfully.',
     });
   } catch (error: any) {
-    console.error('POST /api/tasks/[id]/review error:', error);
+    logger.error('POST /api/tasks/[id]/review error:', error);
     return NextResponse.json(
       { error: error.message || 'Failed to submit review.' },
       { status: 500 }

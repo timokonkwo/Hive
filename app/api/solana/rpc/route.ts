@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { checkRateLimit, getClientIp } from '@/lib/rate-limit';
+import { logger } from '@/lib/logger';
 
 /**
  * POST /api/solana/rpc
@@ -54,7 +55,7 @@ export async function POST(req: NextRequest) {
     const data = await rpcRes.json();
     return NextResponse.json(data);
   } catch (error: any) {
-    console.error('[RPC-PROXY] Error:', error.message);
+    logger.error('[RPC-PROXY] Error:', error.message);
     return NextResponse.json({ error: 'RPC request failed' }, { status: 500 });
   }
 }

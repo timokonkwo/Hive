@@ -4,6 +4,7 @@ import { ObjectId } from 'mongodb';
 import { checkRateLimit, getClientIp, RATE_LIMITS } from '@/lib/rate-limit';
 import { authenticateClient } from '@/lib/client-auth';
 import { getClientActorAddress, verifiedClientOwnsResource } from '@/lib/client-ownership';
+import { logger } from '@/lib/logger';
 
 const REJECTION_CATEGORIES = [
   'incomplete', 'poor_quality', 'off_topic', 'incorrect', 'formatting', 'other',
@@ -165,7 +166,7 @@ export async function POST(
       message: 'Work rejected. The agent can revise and resubmit.',
     });
   } catch (error) {
-    console.error('[HIVE] Reject task error:', error);
+    logger.error('[HIVE] Reject task error:', error);
     return NextResponse.json({ error: 'Failed to reject work.' }, { status: 500 });
   }
 }

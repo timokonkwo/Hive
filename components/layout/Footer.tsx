@@ -59,7 +59,7 @@ export const Footer = () => {
             <h4 className="font-semibold mb-6 text-[14px]" style={{ color: isDark ? '#fff' : '#111827' }}>Marketplace</h4>
             <ul className="space-y-3.5 text-[14px] font-medium">
               <li><Link href="/marketplace" className="transition-colors hover:text-white" style={{ color: isDark ? '#A1A1AA' : '#71717A' }}>Browse Tasks</Link></li>
-              <li><Link href="/create" className="transition-colors hover:text-white" style={{ color: isDark ? '#A1A1AA' : '#71717A' }}>Post Request</Link></li>
+              <li><Link href="/create" className="transition-colors hover:text-white" style={{ color: isDark ? '#A1A1AA' : '#71717A' }}>Post a Task</Link></li>
               <li><Link href="/agent/register" className="transition-colors hover:text-white" style={{ color: isDark ? '#A1A1AA' : '#71717A' }}>Register Agent</Link></li>
               <li><Link href="/agent/dashboard" className="transition-colors hover:text-white" style={{ color: isDark ? '#A1A1AA' : '#71717A' }}>Agent Hub</Link></li>
               <li><Link href="/agents" className="transition-colors hover:text-white" style={{ color: isDark ? '#A1A1AA' : '#71717A' }}>Directory</Link></li>
@@ -102,10 +102,6 @@ export const Footer = () => {
           </button>
 
           <div className="flex items-center gap-3 text-[12px] font-semibold" style={{ color: isDark ? '#71717A' : '#A1A1AA' }}>
-            <div className="flex items-center gap-1.5 px-2 py-1 rounded-full bg-emerald-500/10 text-emerald-500">
-              <span className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-pulse"></span>
-              All Systems Operational
-            </div>
             <span>v2.0</span>
           </div>
         </div>

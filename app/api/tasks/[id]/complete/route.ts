@@ -7,6 +7,8 @@ import { verifyUsdcPayment } from '@/lib/solana-pay';
 import { authenticateClient } from '@/lib/client-auth';
 import { getClientActorAddress, verifiedClientOwnsResource } from '@/lib/client-ownership';
 import { enqueueWebhookEvent } from '@/lib/webhooks';
+import { awardPoints } from '@/lib/points';
+import { logger } from '@/lib/logger';
 
 // Solana tx signatures are 87-88 characters, base58 encoded
 const TX_SIGNATURE_REGEX = /^[1-9A-HJ-NP-Za-km-z]{87,88}$/;
@@ -320,12 +322,19 @@ export async function POST(
         });
       } catch (e: any) {
         // Duplicate review (unique index on taskId) — ignore
-        if (e?.code !== 11000) console.error('[HIVE] Review insert error:', e);
+        if (e?.code !== 11000) logger.error('[HIVE] Review insert error:', e);
       }
     }
 
     // Recalculate and persist agent reputation
     if (agentId) {
+      // Award 50 Hive Points to the agent for successful task completion (excluding internal simulated agents)
+      const agentDocForPoints = await db.collection(COLLECTIONS.AGENTS).findOne({ _id: new ObjectId(agentId) });
+      if (agentDocForPoints && !agentDocForPoints.isHiveOwned) {
+        awardPoints(agentId, 'task_completion', 50, { taskId, taskTitle: task.title })
+          .catch((err) => logger.error('[POINTS] Failed to award points for task completion:', err.message));
+      }
+
       try {
         // Get all reviews for this agent
         const allReviews = await db.collection('reviews')
@@ -365,7 +374,7 @@ export async function POST(
           }
         );
       } catch (repErr) {
-        console.error('[HIVE] Reputation update error:', repErr);
+        logger.error('[HIVE] Reputation update error:', repErr);
       }
     }
 
@@ -379,7 +388,7 @@ export async function POST(
         paid: paymentVerified,
         paidAmount: paymentVerified ? paymentDetails.paidAmount : null,
       },
-    }).catch((err) => console.error('[WEBHOOK] task.completed enqueue failed:', err.message));
+    }).catch((err) => logger.error('[WEBHOOK] task.completed enqueue failed:', err.message));
 
     if (paymentVerified) {
       enqueueWebhookEvent(db, {
@@ -394,7 +403,7 @@ export async function POST(
           paymentChain: 'solana',
           paymentToken: 'USDC',
         },
-      }).catch((err) => console.error('[WEBHOOK] payment.sent enqueue failed:', err.message));
+      }).catch((err) => logger.error('[WEBHOOK] payment.sent enqueue failed:', err.message));
     }
 
     return NextResponse.json({
@@ -405,7 +414,7 @@ export async function POST(
         : `Task has been marked as Completed.`,
     });
   } catch (error: any) {
-    console.error('[HIVE] Complete task error:', error);
+    logger.error('[HIVE] Complete task error:', error);
     // SECURITY: Don't leak internal error details to client
     return NextResponse.json(
       { error: 'An unexpected error occurred while completing the task.' },

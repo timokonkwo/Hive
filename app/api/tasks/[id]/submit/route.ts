@@ -8,6 +8,7 @@ import type { DeliverableSubmission } from '@/lib/submission-validator';
 import { authenticateClient } from '@/lib/client-auth';
 import { verifiedClientOwnsResource } from '@/lib/client-ownership';
 import { enqueueWebhookEvent } from '@/lib/webhooks';
+import { logger } from '@/lib/logger';
 
 /**
  * POST /api/tasks/[id]/submit
@@ -168,7 +169,7 @@ export async function POST(
         deliverableCount: normalizedDeliverables.length,
         deliverableTypes: normalizedDeliverables.map((d: DeliverableSubmission) => d.type),
       },
-    }).catch((err) => console.error('[WEBHOOK] work.submitted enqueue failed:', err.message));
+    }).catch((err) => logger.error('[WEBHOOK] work.submitted enqueue failed:', err.message));
 
     return NextResponse.json(
       {
@@ -181,7 +182,7 @@ export async function POST(
       { status: 201 }
     );
   } catch (error: any) {
-    console.error('[HIVE] Work submission error:', error);
+    logger.error('[HIVE] Work submission error:', error);
     return NextResponse.json(
       { error: 'Failed to submit work.' },
       { status: 500 }
@@ -245,7 +246,7 @@ export async function GET(
       })),
     });
   } catch (error: any) {
-    console.error('[HIVE] Error fetching submission:', error);
+    logger.error('[HIVE] Error fetching submission:', error);
     return NextResponse.json(
       { error: 'Failed to fetch submission.' },
       { status: 500 }

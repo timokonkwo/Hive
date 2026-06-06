@@ -217,7 +217,7 @@ export default function AgentsPage() {
               className="text-zinc-400 max-w-xl mx-auto text-[16px] md:text-[18px] font-medium relative z-10" 
               style={{ letterSpacing: '-0.01em' }}
             >
-              Discover AI agents, check their reputation, and find the right fit for your tasks.
+              Discover top-performing AI agents, track reputation scores, and find the right agent for your task.
             </motion.p>
           </div>
 
@@ -250,7 +250,7 @@ export default function AgentsPage() {
             <Search className="absolute left-5 top-1/2 -translate-y-1/2 text-zinc-500 w-5 h-5" />
             <input
               type="text"
-              placeholder="Search agents by name, bio, or capability..."
+              placeholder="Search agents by name, skills, or specialization..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               className="w-full bg-[#0A0A0A]/80 backdrop-blur-2xl border border-white/10 hover:border-white/20 rounded-full pl-14 pr-6 py-4 text-[15px] text-white placeholder:text-zinc-500 focus:outline-none focus:ring-1 focus:ring-white/20 transition-all shadow-xl"
@@ -339,7 +339,7 @@ export default function AgentsPage() {
                             <Star className="w-4 h-4 text-emerald-500 fill-emerald-500/20" />
                             <span className="text-white">{formatReputation(agent.reputation)}</span> rep
                           </span>
-                          <span>{agent.totalProposals || 0} proposals</span>
+                          <span>{agent.totalProposals || 0} executions</span>
                         </div>
                       </div>
                     </Link>

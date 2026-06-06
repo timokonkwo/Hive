@@ -1,4 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { getDb, COLLECTIONS } from '@/lib/db';
+import { chargeToolInvocation } from '@/lib/session-wallet';
 
 type JsonRpcRequest = {
   jsonrpc?: string;
@@ -11,10 +13,10 @@ function jsonRpcResult(id: JsonRpcRequest['id'], result: any) {
   return NextResponse.json({ jsonrpc: '2.0', id: id ?? null, result });
 }
 
-function jsonRpcError(id: JsonRpcRequest['id'], code: number, message: string) {
+function jsonRpcError(id: JsonRpcRequest['id'], code: number, message: string, httpStatus?: number) {
   return NextResponse.json(
     { jsonrpc: '2.0', id: id ?? null, error: { code, message } },
-    { status: code === -32601 ? 404 : 400 }
+    { status: httpStatus || (code === -32601 ? 404 : 400) }
   );
 }
 
@@ -27,6 +29,30 @@ function authHeaders(req: NextRequest): Record<string, string> {
   const bearer = req.headers.get('authorization')?.replace(/^Bearer\s+/i, '');
   const key = apiKey || (bearer?.startsWith('hive_sk_') ? bearer : null);
   return key ? { 'x-hive-api-key': key } : {};
+}
+
+/**
+ * Resolve the authenticated client userId from the request.
+ * Checks x-hive-api-key first, then falls back to Privy JWT bearer token.
+ */
+async function resolveClientId(req: NextRequest): Promise<string | null> {
+  const apiKey = req.headers.get('x-hive-api-key');
+  const bearer = req.headers.get('authorization')?.replace(/^Bearer\s+/i, '');
+  const key = apiKey || (bearer?.startsWith('hive_sk_') ? bearer : null);
+
+  if (key) {
+    try {
+      const db = await getDb();
+      const agent = await db.collection(COLLECTIONS.AGENTS).findOne({ apiKey: key });
+      if (agent) return agent.ownerAddress || agent._id.toString();
+    } catch { /* fall through */ }
+  }
+
+  // Fallback: check for Privy user ID passed in custom header
+  const privyUserId = req.headers.get('x-privy-user-id');
+  if (privyUserId) return privyUserId;
+
+  return null;
 }
 
 async function callJson(req: NextRequest, path: string, init: RequestInit = {}) {
@@ -79,22 +105,22 @@ const tools = [
     },
   },
   {
-    name: 'hive_propose',
-    description: 'Submit a proposal on a task. Requires x-hive-api-key.',
+    name: 'hive_route_task',
+    description: 'Create an instant-matched task. The best available agent is assigned automatically. Requires x-hive-api-key.',
     inputSchema: {
       type: 'object',
       properties: {
-        taskId: { type: 'string' },
-        amount: { type: 'number' },
-        coverLetter: { type: 'string' },
-        timeEstimate: { type: 'string' },
+        title: { type: 'string' },
+        description: { type: 'string' },
+        category: { type: 'string' },
+        budget: { type: 'string' },
       },
-      required: ['taskId', 'amount', 'coverLetter'],
+      required: ['title', 'description', 'category'],
     },
   },
   {
     name: 'hive_deliver',
-    description: 'Submit completed work for an accepted task. Requires x-hive-api-key.',
+    description: 'Submit completed work for an assigned task. Requires x-hive-api-key.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -119,6 +145,10 @@ const tools = [
   },
 ];
 
+/**
+ * Execute a built-in Hive tool. These are internal tools that don't
+ * require forwarding to an external provider.
+ */
 async function callTool(req: NextRequest, name: string, args: any) {
   if (name === 'hive_list_tasks') {
     const params = new URLSearchParams();
@@ -140,13 +170,15 @@ async function callTool(req: NextRequest, name: string, args: any) {
     return toolText(JSON.stringify(data, null, 2));
   }
 
-  if (name === 'hive_propose') {
-    const data = await callJson(req, `/api/tasks/${encodeURIComponent(args.taskId)}/bids`, {
+  if (name === 'hive_route_task') {
+    // Use the instant-match endpoint for direct routing
+    const data = await callJson(req, `/api/tasks/instant-match`, {
       method: 'POST',
       body: JSON.stringify({
-        amount: args.amount,
-        coverLetter: args.coverLetter,
-        timeEstimate: args.timeEstimate,
+        title: args.title,
+        description: args.description,
+        category: args.category,
+        budget: args.budget || 'Negotiable',
       }),
     });
     return toolText(JSON.stringify(data, null, 2));
@@ -166,11 +198,73 @@ async function callTool(req: NextRequest, name: string, args: any) {
   throw new Error(`Unknown tool: ${name}`);
 }
 
+/**
+ * Check if the tool name is a registered external provider tool.
+ * If so, resolve the provider endpoint and cost-per-call.
+ */
+async function resolveExternalTool(toolName: string): Promise<{
+  providerEndpoint: string;
+  providerAddress: string;
+  costPerCall: number;
+  agentId: string;
+} | null> {
+  try {
+    const db = await getDb();
+    // Look for an agent that has registered this tool capability
+    const agent = await db.collection(COLLECTIONS.AGENTS).findOne({
+      'registeredTools.name': toolName,
+      status: { $ne: 'suspended' },
+    });
+
+    if (!agent?.registeredTools) return null;
+
+    const tool = agent.registeredTools.find((t: any) => t.name === toolName);
+    if (!tool?.endpoint) return null;
+
+    return {
+      providerEndpoint: tool.endpoint,
+      providerAddress: agent.solanaAddress || '',
+      costPerCall: tool.costPerCall || 0,
+      agentId: agent._id.toString(),
+    };
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Forward a JSON-RPC tools/call request to an external provider endpoint.
+ * Enforces a 5-second timeout.
+ */
+async function forwardToProvider(
+  providerEndpoint: string,
+  rpc: JsonRpcRequest
+): Promise<any> {
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 5000);
+
+  try {
+    const response = await fetch(providerEndpoint, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(rpc),
+      signal: controller.signal,
+    });
+
+    const data = await response.json();
+    return data.result || data;
+  } finally {
+    clearTimeout(timeoutId);
+  }
+}
+
+// ── HTTP Handlers ──
+
 export async function GET(req: NextRequest) {
   const baseUrl = new URL(req.url).origin;
   return NextResponse.json({
-    name: 'Hive Remote MCP',
-    version: '0.1.0',
+    name: 'Hive MCP Gateway',
+    version: '0.2.0',
     endpoint: `${baseUrl}/api/mcp`,
     transport: 'http-json-rpc',
     authentication: {
@@ -194,7 +288,7 @@ export async function POST(req: NextRequest) {
     if (rpc.method === 'initialize') {
       return jsonRpcResult(rpc.id, {
         protocolVersion: '2025-06-18',
-        serverInfo: { name: 'hive-remote-mcp', version: '0.1.0' },
+        serverInfo: { name: 'hive-mcp-gateway', version: '0.2.0' },
         capabilities: { tools: {}, resources: {}, prompts: {} },
       });
     }
@@ -204,15 +298,66 @@ export async function POST(req: NextRequest) {
     }
 
     if (rpc.method === 'tools/call') {
-      const result = await callTool(req, rpc.params?.name, rpc.params?.arguments || {});
+      const toolName = rpc.params?.name;
+      const toolArgs = rpc.params?.arguments || {};
+
+      // Check if this is a registered external provider tool
+      const externalTool = await resolveExternalTool(toolName);
+
+      if (externalTool && externalTool.costPerCall > 0) {
+        // ─── Paid external tool: authenticate + charge + forward ───
+        const clientId = await resolveClientId(req);
+        if (!clientId) {
+          return jsonRpcError(rpc.id, -32001, 'Authentication required. Provide x-hive-api-key or authorization header.', 401);
+        }
+
+        // Charge the client's session wallet
+        const charge = await chargeToolInvocation(
+          clientId,
+          toolName,
+          externalTool.providerAddress,
+          externalTool.costPerCall
+        );
+
+        if (!charge.success) {
+          return jsonRpcError(rpc.id, -32002, charge.error || 'Payment required: insufficient session balance.', 402);
+        }
+
+        // Forward JSON-RPC request to the provider
+        try {
+          const result = await forwardToProvider(externalTool.providerEndpoint, rpc);
+          return jsonRpcResult(rpc.id, result);
+        } catch (fwdError: any) {
+          // Log as potential dispute candidate
+          try {
+            const db = await getDb();
+            await db.collection(COLLECTIONS.ACTIVITY).insertOne({
+              type: 'RoutingFailure',
+              metadata: {
+                toolName,
+                providerAddress: externalTool.providerAddress,
+                clientId,
+                error: fwdError.message,
+                chargedAmount: externalTool.costPerCall,
+              },
+              createdAt: new Date(),
+            });
+          } catch { /* best effort logging */ }
+
+          return jsonRpcError(rpc.id, -32003, `Provider execution failed: ${fwdError.message}`);
+        }
+      }
+
+      // ─── Built-in Hive tool: execute internally ───
+      const result = await callTool(req, toolName, toolArgs);
       return jsonRpcResult(rpc.id, result);
     }
 
     if (rpc.method === 'resources/list') {
       return jsonRpcResult(rpc.id, {
         resources: [
-          { uri: 'hive://config', name: 'Hive Configuration', mimeType: 'application/json' },
-          { uri: 'hive://events', name: 'Hive Webhook Events', mimeType: 'application/json' },
+          { uri: 'hive://config', name: 'Hive Gateway Configuration', mimeType: 'application/json' },
+          { uri: 'hive://events', name: 'Hive Marketplace Events', mimeType: 'application/json' },
         ],
       });
     }
@@ -226,7 +371,7 @@ export async function POST(req: NextRequest) {
       }
       if (uri === 'hive://events') {
         return jsonRpcResult(rpc.id, {
-          contents: [{ uri, mimeType: 'application/json', text: JSON.stringify(['task.created', 'bid.submitted', 'bid.accepted', 'bid.rejected', 'work.submitted', 'task.completed', 'payment.sent'], null, 2) }],
+          contents: [{ uri, mimeType: 'application/json', text: JSON.stringify(['task.routed', 'task.assigned', 'work.submitted', 'task.completed', 'session.charged', 'settlement.batch'], null, 2) }],
         });
       }
       return jsonRpcError(rpc.id, -32602, `Unknown resource: ${uri}`);
@@ -235,7 +380,7 @@ export async function POST(req: NextRequest) {
     if (rpc.method === 'prompts/list') {
       return jsonRpcResult(rpc.id, {
         prompts: [
-          { name: 'draft_proposal', description: 'Draft a strong proposal for a Hive task.' },
+          { name: 'create_task', description: 'Create a task and assign it to the best available agent on the Hive marketplace.' },
           { name: 'task_brief', description: 'Turn rough client intent into a clear Hive task brief.' },
         ],
       });
@@ -243,14 +388,14 @@ export async function POST(req: NextRequest) {
 
     if (rpc.method === 'prompts/get') {
       const name = rpc.params?.name;
-      if (name === 'draft_proposal') {
+      if (name === 'create_task' || name === 'route_task') {
         return jsonRpcResult(rpc.id, {
-          messages: [{ role: 'user', content: { type: 'text', text: 'Draft a concise proposal with approach, timeline, assumptions, and deliverables for this Hive task.' } }],
+          messages: [{ role: 'user', content: { type: 'text', text: 'Create a task for the Hive marketplace. Include a clear title, category, requirements, budget, and deliverable specifications.' } }],
         });
       }
       if (name === 'task_brief') {
         return jsonRpcResult(rpc.id, {
-          messages: [{ role: 'user', content: { type: 'text', text: 'Convert this rough request into a Hive task title, category, requirements, budget guidance, and deliverable specs.' } }],
+          messages: [{ role: 'user', content: { type: 'text', text: 'Convert this rough request into a Hive task brief with title, category, requirements, budget guidance, and deliverable specs.' } }],
         });
       }
       return jsonRpcError(rpc.id, -32602, `Unknown prompt: ${name}`);
@@ -258,6 +403,6 @@ export async function POST(req: NextRequest) {
 
     return jsonRpcError(rpc.id, -32601, `Unknown method: ${rpc.method}`);
   } catch (error: any) {
-    return jsonRpcError(rpc.id, -32000, error.message || 'MCP request failed');
+    return jsonRpcError(rpc.id, -32000, error.message || 'MCP gateway request failed');
   }
 }

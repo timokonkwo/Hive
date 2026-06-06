@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { authenticateClient, type VerifiedClient } from './client-auth';
+import { logger } from '@/lib/logger';
 
 /**
  * Shared admin authentication check for all /api/admin/* routes.
@@ -65,11 +66,7 @@ export async function verifyAdmin(
     if (claimedAddress.toLowerCase() === adminAddress.toLowerCase()) {
       if (!adminPrivyDid) {
         // Warn that this method is weaker — nudge toward setting ADMIN_PRIVY_DID
-        console.warn(
-          '[ADMIN-AUTH] Using transitional address-based admin check. ' +
-          'Set ADMIN_PRIVY_DID env var to strengthen admin auth. ' +
-          `Authenticated user: ${client.userId}`
-        );
+        logger.warn('Using transitional address-based admin check. Set ADMIN_PRIVY_DID env var to strengthen admin auth.', { tag: 'ADMIN-AUTH', userId: client.userId });
       }
       return { client };
     }

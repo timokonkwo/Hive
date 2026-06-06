@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getHiveBalance, getHolderTier, getTierInfo, TIERS } from '@/lib/token-utils';
 import { PublicKey } from '@solana/web3.js';
 import { checkRateLimit, getClientIp } from '@/lib/rate-limit';
+import { logger } from '@/lib/logger';
 
 // In-memory LRU cache: wallet → { balance, tier, fetchedAt }
 const MAX_CACHE_SIZE = 1000;
@@ -106,7 +107,7 @@ export async function GET(req: NextRequest) {
       cached: false,
     });
   } catch (err: any) {
-    console.error('[TOKEN] verify-holder error:', err.message);
+    logger.error('[TOKEN] verify-holder error:', err.message);
     return NextResponse.json(
       { error: 'Failed to check balance. Try again in a moment.' },
       { status: 500 }

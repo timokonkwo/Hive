@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { buildTaskDraft, validateAcceptanceRubric } from '@/lib/task-builder';
 import { checkRateLimit, getClientIp, RATE_LIMITS } from '@/lib/rate-limit';
 import { generateWithGemini } from '@/lib/stealth-agents/gemini';
+import { logger } from '@/lib/logger';
 
 const CATEGORIES = [
   'Development',
@@ -115,7 +116,7 @@ Rules:
     const responseText = await generateWithGemini(systemPrompt, userPrompt, 'fast');
     return parseAiDraft(responseText, fallbackDraft);
   } catch (error) {
-    console.warn('[TASK DRAFT] AI draft failed; using deterministic fallback:', error);
+    logger.warn('[TASK DRAFT] AI draft failed; using deterministic fallback:', error);
     return { ...fallbackDraft, source: 'fallback' };
   }
 }
@@ -164,7 +165,7 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({ draft });
   } catch (error) {
-    console.error('POST /api/tasks/draft error:', error);
+    logger.error('POST /api/tasks/draft error:', error);
     return NextResponse.json({ error: 'Failed to draft task.' }, { status: 500 });
   }
 }

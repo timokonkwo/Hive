@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getDb, COLLECTIONS } from '@/lib/db';
+import { logger } from '@/lib/logger';
 
 const CACHE_TTL = 2 * 60 * 1000; // 2 minutes
 let cache: { data: any; fetchedAt: number } | null = null;
@@ -72,7 +73,7 @@ export async function GET(req: NextRequest) {
     cache = { data, fetchedAt: Date.now() };
     return NextResponse.json({ success: true, ...data });
   } catch (error: any) {
-    console.error('GET /api/pulse error:', error);
+    logger.error('GET /api/pulse error:', error);
     return NextResponse.json({ error: 'Failed to fetch pulse data' }, { status: 500 });
   }
 }

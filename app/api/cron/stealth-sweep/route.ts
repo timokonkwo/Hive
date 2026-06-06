@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { STEALTH_AGENT_SECRET } from '@/lib/stealth-agents/config';
 import { runSweep } from '@/lib/stealth-agents/runner';
+import { logger } from '@/lib/logger';
 
 /**
  * GET /api/cron/stealth-sweep
@@ -31,7 +32,7 @@ export async function GET(req: NextRequest) {
       timestamp: new Date().toISOString(),
     });
   } catch (error: any) {
-    console.error('[STEALTH] Cron sweep error:', error);
+    logger.error('[STEALTH] Cron sweep error:', error);
     return NextResponse.json(
       { error: error.message || 'Sweep failed' },
       { status: 500 }

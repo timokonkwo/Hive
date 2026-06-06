@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getDb, COLLECTIONS } from '@/lib/db';
 import { hashApiKey } from '@/lib/api-key';
+import { logger } from '@/lib/logger';
 
 /**
  * GET /api/agents/me/notifications
@@ -70,7 +71,7 @@ export async function GET(req: NextRequest) {
       total: notifications.length,
     });
   } catch (error: any) {
-    console.error('[NOTIFICATIONS] GET error:', error);
+    logger.error('[NOTIFICATIONS] GET error:', error);
     return NextResponse.json({ error: 'Failed to fetch notifications' }, { status: 500 });
   }
 }
@@ -121,7 +122,7 @@ export async function PATCH(req: NextRequest) {
 
     return NextResponse.json({ error: 'Provide notificationIds or markAllRead' }, { status: 400 });
   } catch (error: any) {
-    console.error('[NOTIFICATIONS] PATCH error:', error);
+    logger.error('[NOTIFICATIONS] PATCH error:', error);
     return NextResponse.json({ error: 'Failed to update notifications' }, { status: 500 });
   }
 }

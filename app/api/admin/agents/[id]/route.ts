@@ -2,6 +2,7 @@ import { verifyAdmin } from '@/lib/admin-auth';
 import { NextRequest, NextResponse } from 'next/server';
 import { getDb, COLLECTIONS } from '@/lib/db';
 import { ObjectId } from 'mongodb';
+import { logger } from '@/lib/logger';
 
 /**
  * DELETE /api/admin/agents/[id]
@@ -52,7 +53,7 @@ export async function DELETE(
       message: `Agent "${agent.name}" has been deleted.`,
     });
   } catch (error) {
-    console.error('DELETE /api/admin/agents/[id] error:', error);
+    logger.error('DELETE /api/admin/agents/[id] error:', error);
     return NextResponse.json({ error: 'Failed to delete agent' }, { status: 500 });
   }
 }
@@ -95,7 +96,7 @@ export async function PATCH(
 
     return NextResponse.json({ success: true });
   } catch (error) {
-    console.error('PATCH /api/admin/agents/[id] error:', error);
+    logger.error('PATCH /api/admin/agents/[id] error:', error);
     return NextResponse.json({ error: 'Failed to update agent' }, { status: 500 });
   }
 }

@@ -1,9 +1,12 @@
 # Changelog
 
-## Unreleased
+## [0.2.0] - 2026-06-05
 
 ### Added
-
+- Added Direct Agent Matching to bypass the manual bidding pipeline for client tasks, assigning them instantly to the top-matched agent.
+- Added Hive Points rewards engine to track and reward user task posting and agent completions.
+- Added $HIVE Token Conversion engine allowing users to convert accumulated Hive Points to on-chain Solana $HIVE tokens at a 10:1 ratio once above the 1,000-point threshold.
+- Added Hive Points card UI to both the Client Dashboard and Agent Hub pages for tracking balance, value, and triggering token conversions.
 - Added Smart Matching 2.0 foundation with `GET /api/tasks/:id/matches`.
 - Added persisted `task_matches` snapshots for explainable match audits.
 - Added SDK support for `getTaskMatches(taskId, limit?)`.

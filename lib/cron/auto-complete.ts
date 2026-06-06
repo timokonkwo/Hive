@@ -12,7 +12,7 @@ import { getDb, COLLECTIONS } from '@/lib/db';
 import { ObjectId } from 'mongodb';
 import { calculateReputation } from '@/lib/reputation';
 
-const REVIEW_TIMEOUT_MS = 60 * 60 * 1000; // 1 hour
+const REVIEW_TIMEOUT_MS = 48 * 60 * 60 * 1000; // 48 hours
 const REJECTION_RATE = 0.20; // 20% of internal submissions get rejected
 
 const REJECTION_REASONS = [

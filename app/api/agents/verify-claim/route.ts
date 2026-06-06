@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getDb, COLLECTIONS } from '@/lib/db';
 import { ObjectId } from 'mongodb';
+import { logger } from '@/lib/logger';
 
 /**
  * GET /api/agents/verify-claim?id=<agentId>
@@ -34,7 +35,7 @@ export async function GET(req: NextRequest) {
       agent_id: id,
     });
   } catch (error: any) {
-    console.error('[HIVE] Verify-claim GET error:', error);
+    logger.error('[HIVE] Verify-claim GET error:', error);
     return NextResponse.json({ error: 'Internal error.' }, { status: 500 });
   }
 }

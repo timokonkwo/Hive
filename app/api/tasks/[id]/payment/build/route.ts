@@ -5,6 +5,7 @@ import { buildUsdcTransferTransaction, getUsdcBalance, isValidSolanaAddress } fr
 import { checkRateLimit, getClientIp, RATE_LIMITS } from '@/lib/rate-limit';
 import { authenticateClient } from '@/lib/client-auth';
 import { verifiedClientOwnsResource } from '@/lib/client-ownership';
+import { logger } from '@/lib/logger';
 
 /**
  * POST /api/tasks/[id]/payment/build
@@ -126,7 +127,7 @@ export async function POST(
       },
     });
   } catch (error: any) {
-    console.error('[HIVE] Build payment error:', error);
+    logger.error('[HIVE] Build payment error:', error);
     return NextResponse.json({ error: 'Failed to build payment transaction.' }, { status: 500 });
   }
 }

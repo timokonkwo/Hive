@@ -7,7 +7,7 @@ import { useAuthFetch } from "@/hooks/useAuthFetch";
 import {
   Loader2, Briefcase, FileText, CheckCircle, Clock, ChevronRight,
   BarChart3, Send, Inbox, Users, Copy, ExternalLink, Wallet,
-  User, Building, Save, Edit3, Check, X, Coins, Lock
+  User, Building, Save, Edit3, Check, X, Coins, Lock, RefreshCw, Shield
 } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -15,7 +15,7 @@ import { toast } from "sonner";
 import { HolderBadge } from "@/components/ui/HolderBadge";
 import { useHolder, type HolderData } from "@/components/providers/HolderContext";
 
-type Tab = "posted" | "proposals" | "incoming";
+type Tab = "posted" | "proposals" | "incoming" | "disputes";
 
 // Solana USDC mint address (mainnet)
 const USDC_MINT_SOLANA = "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v";
@@ -28,6 +28,20 @@ export default function DashboardPage() {
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<Tab>("posted");
   const [processingBid, setProcessingBid] = useState<string | null>(null);
+
+  // Session Wallet state
+  const [sessionBudget, setSessionBudget] = useState<{ depositBalance: number; status: 'active' | 'suspended'; solanaAddress: string } | null>(null);
+  const [sessionHistory, setSessionHistory] = useState<any[]>([]);
+  const [sessionLoading, setSessionLoading] = useState(false);
+  const [showDepositModal, setShowDepositModal] = useState(false);
+  const [showHistoryModal, setShowHistoryModal] = useState(false);
+  const [depositAmount, setDepositAmount] = useState("");
+  const [depositing, setDepositing] = useState(false);
+
+  // DAO Disputes state
+  const [disputes, setDisputes] = useState<any[]>([]);
+  const [disputesLoading, setDisputesLoading] = useState(false);
+  const [votingDisputeId, setVotingDisputeId] = useState<string | null>(null);
 
   // Profile state
   const [profile, setProfile] = useState<any>(null);
@@ -56,7 +70,262 @@ export default function DashboardPage() {
   const solanaAddressLinked = (solanaAccountLinked as any)?.address || null;
   const solanaAddress = profile?.solanaAddress || solanaAddressLinked || null;
 
+  // Points state
+  const [points, setPoints] = useState<any>(null);
+  const [pointsLoading, setPointsLoading] = useState(false);
+  const [convertingPoints, setConvertingPoints] = useState(false);
 
+  // Fetch points balance
+  const fetchPoints = useCallback(async () => {
+    if (!address) return;
+    setPointsLoading(true);
+    try {
+      const res = await fetch("/api/points");
+      if (res.ok) {
+        setPoints(await res.json());
+      }
+    } catch (err) {
+      console.error("Points fetch error:", err);
+    } finally {
+      setPointsLoading(false);
+    }
+  }, [address]);
+
+  useEffect(() => {
+    if (authenticated && address) {
+      fetchPoints();
+    }
+  }, [authenticated, address, fetchPoints]);
+
+  const handleConvertPoints = async () => {
+    if (!solanaAddress) {
+      toast.error("Please connect a Solana wallet to convert points");
+      return;
+    }
+    if (!points || points.currentPointsBalance < 1000) {
+      toast.error("Minimum 1,000 points required to convert");
+      return;
+    }
+    setConvertingPoints(true);
+    try {
+      const res = await fetch("/api/points/convert", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          points: points.currentPointsBalance,
+          solanaAddress: solanaAddress,
+        }),
+      });
+      const result = await res.json();
+      if (res.ok && result.success) {
+        toast.success(`Successfully converted points to ${result.hiveAmount} $HIVE!`);
+        fetchPoints(); // Refresh points balance
+        fetchBalances(); // Refresh wallet token balance
+      } else {
+        toast.error(result.error || "Failed to convert points");
+      }
+    } catch (err) {
+      toast.error("Conversion error. Please check wallet connection.");
+    } finally {
+      setConvertingPoints(false);
+    }
+  };
+
+  // Fetch Session Budget & Ledger data
+  const fetchSessionData = useCallback(async () => {
+    if (!address) return;
+    setSessionLoading(true);
+    try {
+      const res = await fetch("/api/session");
+      if (res.ok) {
+        const result = await res.json();
+        setSessionBudget(result.budget);
+        setSessionHistory(result.history || []);
+      }
+    } catch (err) {
+      console.error("Failed to fetch session data:", err);
+    } finally {
+      setSessionLoading(false);
+    }
+  }, [address]);
+
+  useEffect(() => {
+    if (authenticated && address) {
+      fetchSessionData();
+    }
+  }, [authenticated, address, fetchSessionData]);
+
+  // Handle client-side Solana transaction build, sign, and broadcast to deposit USDC into off-chain session budget
+  const handleDepositSession = async () => {
+    if (!solanaAddress) {
+      toast.error("Please connect your Solana wallet first.");
+      return;
+    }
+    const amountNum = parseFloat(depositAmount);
+    if (isNaN(amountNum) || amountNum <= 0) {
+      toast.error("Please enter a valid deposit amount.");
+      return;
+    }
+
+    setDepositing(true);
+    try {
+      // Get client-side wallet provider
+      const solanaWallet = (window as any).solana
+        || (window as any).phantom?.solana
+        || (window as any).solflare
+        || (window as any).backpack?.solana;
+
+      if (!solanaWallet || !solanaWallet.isConnected) {
+        throw new Error("Solana wallet is not connected. Connect it first.");
+      }
+
+      // Dynamic import to avoid SSR issues
+      const { Connection, PublicKey, Transaction } = await import('@solana/web3.js');
+      const { getAssociatedTokenAddress, createTransferInstruction, createAssociatedTokenAccountInstruction, getAccount, TOKEN_PROGRAM_ID, ASSOCIATED_TOKEN_PROGRAM_ID } = await import('@solana/spl-token');
+
+      const connection = new Connection(process.env.NEXT_PUBLIC_SOLANA_RPC_URL || 'https://api.mainnet-beta.solana.com', 'confirmed');
+      const senderKey = new PublicKey(solanaAddress);
+      const treasuryWallet = new PublicKey('3LQuJTTLX9cjvAhRtnYrGJS3qESp494UCnA9UtCrdura');
+      const usdcMint = new PublicKey('EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v');
+
+      const senderAta = await getAssociatedTokenAddress(usdcMint, senderKey);
+      const recipientAta = await getAssociatedTokenAddress(usdcMint, treasuryWallet);
+
+      const transaction = new Transaction();
+
+      // Check recipient ATA exists
+      try {
+        await getAccount(connection, recipientAta);
+      } catch {
+        transaction.add(
+          createAssociatedTokenAccountInstruction(
+            senderKey,
+            recipientAta,
+            treasuryWallet,
+            usdcMint,
+            TOKEN_PROGRAM_ID,
+            ASSOCIATED_TOKEN_PROGRAM_ID
+          )
+        );
+      }
+
+      // Add transfer
+      const rawAmount = BigInt(Math.round(amountNum * 1_000_000));
+      transaction.add(
+        createTransferInstruction(
+          senderAta,
+          recipientAta,
+          senderKey,
+          rawAmount,
+          [],
+          TOKEN_PROGRAM_ID
+        )
+      );
+
+      // Blockhash & fee payer
+      const { blockhash } = await connection.getLatestBlockhash('confirmed');
+      transaction.recentBlockhash = blockhash;
+      transaction.feePayer = senderKey;
+
+      // Sign and serialize transaction
+      const signedTx = await solanaWallet.signTransaction(transaction);
+      const rawTx = signedTx.serialize();
+      
+      const txSignature = await connection.sendRawTransaction(rawTx, {
+        skipPreflight: false,
+        preflightCommitment: 'confirmed'
+      });
+
+      // Confirm transaction
+      const latestBlockhash = await connection.getLatestBlockhash('confirmed');
+      await connection.confirmTransaction({
+        signature: txSignature,
+        blockhash: latestBlockhash.blockhash,
+        lastValidBlockHeight: latestBlockhash.lastValidBlockHeight
+      }, 'confirmed');
+
+      // Post deposit details to Hive backend for verification
+      const res = await fetch("/api/session/deposit", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          txSignature,
+          solanaAddress,
+          amount: amountNum
+        })
+      });
+
+      const depResult = await res.json();
+      if (res.ok && depResult.success) {
+        toast.success(`Successfully deposited $${amountNum} USDC!`);
+        setShowDepositModal(false);
+        setDepositAmount("");
+        fetchSessionData();
+        fetchBalances(); // Refresh local balance
+      } else {
+        toast.error(depResult.error || "Deposit verification failed. Contact support.");
+      }
+    } catch (err: any) {
+      console.error("Deposit execution error:", err);
+      toast.error(err.message || "Failed to process deposit.");
+    } finally {
+      setDepositing(false);
+    }
+  };
+
+  // Fetch disputes list from backend
+  const fetchDisputes = useCallback(async () => {
+    setDisputesLoading(true);
+    try {
+      const res = await fetch("/api/disputes?status=active");
+      if (res.ok) {
+        const result = await res.json();
+        setDisputes(result.disputes || []);
+      }
+    } catch (err) {
+      console.error("Failed to fetch disputes:", err);
+    } finally {
+      setDisputesLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (activeTab === "disputes") {
+      fetchDisputes();
+    }
+  }, [activeTab, fetchDisputes]);
+
+  // Vote on active disputes using dynamic HIVE balance token weight
+  const handleVoteDispute = async (disputeId: string, vote: 'slash' | 'dismiss') => {
+    if (!solanaAddress) {
+      toast.error("Please connect your Solana wallet to participate in voting.");
+      return;
+    }
+    setVotingDisputeId(disputeId);
+    try {
+      const res = await fetch("/api/disputes/vote", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          disputeId,
+          vote,
+          solanaAddress
+        })
+      });
+      const result = await res.json();
+      if (res.ok && result.success) {
+        toast.success(`Successfully voted to ${vote}!`);
+        fetchDisputes();
+        fetchPoints(); // Refresh points balance
+      } else {
+        toast.error(result.error || "Failed to submit vote.");
+      }
+    } catch (err: any) {
+      toast.error(err.message || "Failed to submit vote.");
+    } finally {
+      setVotingDisputeId(null);
+    }
+  };
 
   // Fetch dashboard data
   useEffect(() => {
@@ -300,8 +569,8 @@ export default function DashboardPage() {
         </p>
       </div>
 
-      {/* Profile + Wallet + Holder Cards */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
+      {/* Profile + Wallet + Holder + Points Cards */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
         
         {/* Profile Card */}
         <div className="bg-white/[0.02] border border-white/5 rounded-2xl p-6 shadow-sm">
@@ -425,137 +694,154 @@ export default function DashboardPage() {
           )}
         </div>
 
-        {/* Payment Wallet Card */}
-        <div className="bg-white/[0.02] border border-white/5 rounded-2xl p-6 shadow-sm">
-          <div className="flex items-center justify-between mb-4">
-            <h3 className="text-[14px] font-semibold tracking-wide text-zinc-400 flex items-center gap-2">
-              <Wallet size={16} className="text-emerald-500" /> Payment Wallet
-            </h3>
-            {solanaAddress && (
-              <button
-                onClick={fetchBalances}
-                disabled={walletLoading}
-                className="text-[12px] font-medium text-zinc-500 hover:text-emerald-500 transition-colors"
-              >
-                {walletLoading ? "Loading..." : "Refresh"}
-              </button>
-            )}
-          </div>
-          <p className="text-[12px] text-zinc-500 mb-6 font-medium">Your Solana wallet for payments.</p>
+        {/* Session Wallet Card */}
+        <div className="bg-white/[0.02] border border-white/5 rounded-2xl p-6 shadow-sm flex flex-col justify-between">
+          <div>
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-[14px] font-semibold tracking-wide text-zinc-400 flex items-center gap-2">
+                <Wallet size={16} className="text-emerald-500" /> Session Wallet
+              </h3>
+              {solanaAddress && (
+                <button
+                  onClick={() => { fetchBalances(); fetchSessionData(); }}
+                  disabled={walletLoading || sessionLoading}
+                  className="text-[12px] font-medium text-zinc-500 hover:text-emerald-500 transition-colors"
+                >
+                  {walletLoading || sessionLoading ? "Loading..." : "Refresh"}
+                </button>
+              )}
+            </div>
+            <p className="text-[12px] text-zinc-500 mb-4 font-medium">Off-chain USDC budget for premium API access and instant task matching.</p>
 
-          {/* Connected Solana Wallet */}
-          {solanaAddress ? (
-            <div className="space-y-3">
-              <div className="bg-black/30 border border-emerald-500/20 rounded p-4">
-                <div className="flex items-center justify-between mb-2">
-                  <div className="flex items-center gap-2">
-                    <div className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse" />
-                    <span className="text-[10px] font-mono uppercase tracking-widest text-emerald-500 font-bold">Solana — Connected</span>
+            {/* Connected Session Wallet */}
+            {solanaAddress ? (
+              <div className="space-y-4">
+                {/* Session Budget State */}
+                <div className="bg-black/30 border border-emerald-500/20 rounded p-4">
+                  <div className="flex items-center justify-between mb-2">
+                    <div className="flex items-center gap-2">
+                      <div className={`w-2 h-2 rounded-full ${sessionBudget?.status === 'active' ? 'bg-emerald-500 animate-pulse' : 'bg-red-500 animate-pulse'}`} />
+                      <span className={`text-[10px] font-mono uppercase tracking-widest font-bold ${sessionBudget?.status === 'active' ? 'text-emerald-400' : 'text-red-400'}`}>
+                        Budget: {sessionBudget?.status === 'active' ? 'Active' : 'Suspended'}
+                      </span>
+                    </div>
+                    <span className="text-[10px] text-zinc-500 font-mono">Session Wallet</span>
                   </div>
-                  <button onClick={() => copyToClipboard(solanaAddress)} className="text-zinc-500 hover:text-white transition-colors">
-                    <Copy size={12} />
+                  <div className="text-white font-mono font-bold text-2xl mb-1">${(sessionBudget?.depositBalance ?? 0.00).toFixed(2)} USDC</div>
+                  <div className="text-[10px] text-zinc-500 font-mono truncate">Wallet: {solanaAddress.slice(0, 4)}...{solanaAddress.slice(-4)}</div>
+                </div>
+
+                {/* Solana Balances preview */}
+                <div className="grid grid-cols-2 gap-3 text-xs font-mono">
+                  <div className="bg-zinc-900/50 rounded p-2">
+                    <div className="text-[9px] text-zinc-600 uppercase">SOL Wallet</div>
+                    <div className="text-zinc-300 font-bold">{solBalance ?? "0.0000"}</div>
+                  </div>
+                  <div className="bg-zinc-900/50 rounded p-2">
+                    <div className="text-[9px] text-zinc-600 uppercase">USDC Wallet</div>
+                    <div className="text-zinc-300 font-bold">{solUsdcBalance ?? "0.00"}</div>
+                  </div>
+                </div>
+
+                {/* Actions */}
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    onClick={() => setShowDepositModal(true)}
+                    className="py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white font-bold font-mono text-[10px] uppercase tracking-widest rounded transition-colors flex items-center justify-center gap-1.5"
+                  >
+                    Deposit USDC
+                  </button>
+                  <button
+                    onClick={() => setShowHistoryModal(true)}
+                    className="py-2.5 bg-zinc-800 hover:bg-zinc-700 text-zinc-400 font-bold font-mono text-[10px] uppercase tracking-widest rounded border border-white/5 transition-colors flex items-center justify-center gap-1.5"
+                  >
+                    Ledger Log
                   </button>
                 </div>
-                <div className="text-xs text-zinc-500 font-mono mb-3 truncate">{solanaAddress}</div>
-                <div className="grid grid-cols-2 gap-3">
-                  <div className="bg-zinc-900/50 rounded p-2">
-                    <div className="text-[10px] text-zinc-600 font-mono uppercase">SOL</div>
-                    <div className="text-white font-mono font-bold">{solBalance ?? "—"}</div>
-                  </div>
-                  <div className="bg-zinc-900/50 rounded p-2">
-                    <div className="text-[10px] text-zinc-600 font-mono uppercase">USDC</div>
-                    <div className="text-white font-mono font-bold">{solUsdcBalance ?? "—"}</div>
-                  </div>
-                </div>
-              </div>
 
-                <div className="bg-emerald-500/5 border border-emerald-500/20 p-3 rounded">
-                <p className="text-emerald-400 text-[11px]">
-                  <strong>✓ Ready to pay agents.</strong>
-                </p>
-              </div>
-
-              <button
-                onClick={async () => {
-                  try {
-                    await fetch("/api/clients/profile", {
-                      method: "PATCH",
-                      headers: { "Content-Type": "application/json" },
-                      body: JSON.stringify({ address, solanaAddress: null }),
-                    });
-                    setProfile({ ...profile, solanaAddress: null });
-                    setSolBalance(null);
-                    setSolUsdcBalance(null);
-                    toast.success("Wallet disconnected");
-                  } catch {
-                    toast.error("Failed to disconnect");
-                  }
-                }}
-                className="w-full text-center text-[10px] text-zinc-600 hover:text-red-400 font-mono uppercase tracking-widest transition-colors py-1"
-              >
-                Disconnect wallet
-              </button>
-            </div>
-          ) : (
-            <div className="space-y-3">
-              <div className="bg-black/30 border border-dashed border-zinc-700 rounded p-6 text-center">
-                <Wallet className="w-8 h-8 text-purple-500 mx-auto mb-3 opacity-50" />
-                <p className="text-zinc-500 text-xs font-mono mb-4">No Solana wallet connected</p>
                 <button
                   onClick={async () => {
                     try {
-                      // Detect any available Solana wallet (Phantom, Solflare, Backpack, Glow, etc.)
-                      const solWallet = (window as any).solana
-                        || (window as any).phantom?.solana
-                        || (window as any).solflare
-                        || (window as any).backpack?.solana;
-                      if (!solWallet) {
-                        toast.error("No Solana wallet found", {
-                          description: "Install a Solana wallet extension (Phantom, Solflare, Backpack, etc.) to connect.",
-                        });
-                        return;
-                      }
-
-                      const response = await solWallet.connect();
-                      const connectedAddress = response.publicKey.toString();
-
-                      // Save to profile
-                      const res = await fetch("/api/clients/profile", {
+                      await fetch("/api/clients/profile", {
                         method: "PATCH",
                         headers: { "Content-Type": "application/json" },
-                        body: JSON.stringify({ address, solanaAddress: connectedAddress }),
+                        body: JSON.stringify({ address, solanaAddress: null }),
                       });
-
-                      if (res.ok) {
-                        setProfile({ ...profile, solanaAddress: connectedAddress });
-                        toast.success("Solana wallet connected!");
-                        fetchBalances();
-                      } else {
-                        const err = await res.json();
-                        toast.error(err.error || "Failed to save wallet");
-                      }
-                    } catch (err: any) {
-                      if (err.message?.includes("User rejected")) {
-                        toast.error("Connection cancelled");
-                      } else {
-                        toast.error("Failed to connect wallet");
-                        console.error("Wallet connect error:", err);
-                      }
+                      setProfile({ ...profile, solanaAddress: null });
+                      setSolBalance(null);
+                      setSolUsdcBalance(null);
+                      setSessionBudget(null);
+                      setSessionHistory([]);
+                      toast.success("Wallet disconnected");
+                    } catch {
+                      toast.error("Failed to disconnect");
                     }
                   }}
-                  className="px-6 py-2.5 bg-purple-600 hover:bg-purple-500 text-white font-bold font-mono text-xs uppercase tracking-widest rounded-lg transition-all flex items-center gap-2 mx-auto shadow-[0_0_15px_rgba(147,51,234,0.2)]"
+                  className="w-full text-center text-[10px] text-zinc-600 hover:text-red-400 font-mono uppercase tracking-widest transition-colors py-1"
                 >
-                  <Wallet size={14} /> Connect Solana Wallet
+                  Disconnect wallet
                 </button>
               </div>
+            ) : (
+              <div className="space-y-3">
+                <div className="bg-black/30 border border-dashed border-zinc-700 rounded p-6 text-center">
+                  <Wallet className="w-8 h-8 text-purple-500 mx-auto mb-3 opacity-50" />
+                  <p className="text-zinc-500 text-xs font-mono mb-4">No Solana wallet connected</p>
+                  <button
+                    onClick={async () => {
+                      try {
+                        const solWallet = (window as any).solana
+                          || (window as any).phantom?.solana
+                          || (window as any).solflare
+                          || (window as any).backpack?.solana;
+                        if (!solWallet) {
+                          toast.error("No Solana wallet found", {
+                            description: "Install a Solana wallet extension (Phantom, Solflare, etc.) to connect.",
+                          });
+                          return;
+                        }
 
-              <div className="bg-amber-500/5 border border-amber-500/20 p-3 rounded">
-                <p className="text-amber-400 text-[11px]">
-                  <strong>Why connect?</strong> To pay agents for completed work, you need a Solana wallet with USDC. Works with Phantom, Solflare, Backpack, and more.
-                </p>
+                        const response = await solWallet.connect();
+                        const connectedAddress = response.publicKey.toString();
+
+                        const res = await fetch("/api/clients/profile", {
+                          method: "PATCH",
+                          headers: { "Content-Type": "application/json" },
+                          body: JSON.stringify({ address, solanaAddress: connectedAddress }),
+                        });
+
+                        if (res.ok) {
+                          setProfile({ ...profile, solanaAddress: connectedAddress });
+                          toast.success("Solana wallet connected!");
+                          fetchBalances();
+                          fetchSessionData();
+                        } else {
+                          const err = await res.json();
+                          toast.error(err.error || "Failed to save wallet");
+                        }
+                      } catch (err: any) {
+                        if (err.message?.includes("User rejected")) {
+                          toast.error("Connection cancelled");
+                        } else {
+                          toast.error("Failed to connect wallet");
+                          console.error("Wallet connect error:", err);
+                        }
+                      }
+                    }}
+                    className="px-6 py-2.5 bg-purple-600 hover:bg-purple-500 text-white font-bold font-mono text-xs uppercase tracking-widest rounded-lg transition-all flex items-center gap-2 mx-auto shadow-[0_0_15px_rgba(147,51,234,0.2)]"
+                  >
+                    <Wallet size={14} /> Connect Solana Wallet
+                  </button>
+                </div>
+
+                <div className="bg-amber-500/5 border border-amber-500/20 p-3 rounded">
+                  <p className="text-amber-400 text-[10px] leading-relaxed font-mono">
+                    <strong>Router Mode:</strong> Connect your wallet to fund your off-chain Session Budget and pay for millisecond agent calls.
+                  </p>
+                </div>
               </div>
-            </div>
-          )}
+            )}
+          </div>
         </div>
 
         {/* Holder Status Card */}
@@ -636,6 +922,74 @@ export default function DashboardPage() {
             </div>
           )}
         </div>
+
+        {/* Hive Points Card */}
+        <div className="bg-white/[0.02] border border-white/5 rounded-2xl p-6 shadow-sm flex flex-col justify-between">
+          <div>
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-[14px] font-semibold tracking-wide text-zinc-400 flex items-center gap-2">
+                <Coins size={16} className="text-emerald-500" /> Hive Points
+              </h3>
+              <button
+                onClick={fetchPoints}
+                disabled={pointsLoading}
+                className="text-[12px] font-medium text-zinc-500 hover:text-emerald-500 transition-colors"
+              >
+                {pointsLoading ? "Loading..." : "Refresh"}
+              </button>
+            </div>
+            <p className="text-[12px] text-zinc-500 mb-4 font-medium">Earn points to convert into $HIVE.</p>
+
+            <div className="bg-black/30 border border-emerald-500/20 rounded p-4 mb-4">
+              <div className="text-[10px] text-zinc-500 font-mono uppercase">Current Balance</div>
+              <div className="text-white font-mono font-bold text-2xl mb-1">{points?.currentPointsBalance ?? 0} PTS</div>
+              <div className="text-[10px] text-zinc-600 font-mono">Total Earned: {points?.totalPointsEarned ?? 0} PTS</div>
+            </div>
+
+            {points?.currentPointsBalance > 0 && (
+              <div className="bg-zinc-900/50 rounded p-3 text-xs font-mono text-zinc-400 mb-4">
+                <div className="flex justify-between">
+                  <span>Exchange Rate:</span>
+                  <span className="text-white">10 PTS = 1 $HIVE</span>
+                </div>
+                <div className="flex justify-between mt-1 font-bold">
+                  <span>Value:</span>
+                  <span className="text-emerald-400">{(points.currentPointsBalance / 10).toFixed(1)} $HIVE</span>
+                </div>
+              </div>
+            )}
+          </div>
+
+          <div className="space-y-2 mt-4">
+            {!solanaAddress ? (
+              <div className="text-[11px] text-amber-500 bg-amber-500/5 border border-amber-500/20 p-2.5 rounded text-center">
+                Connect your Solana wallet above to enable conversions.
+              </div>
+            ) : points?.currentPointsBalance < 1000 ? (
+              <button
+                disabled
+                className="w-full py-2.5 bg-zinc-900 border border-white/5 text-zinc-500 font-bold font-mono text-xs uppercase tracking-widest rounded-lg cursor-not-allowed text-center"
+              >
+                Need 1,000 PTS to Convert
+              </button>
+            ) : (
+              <button
+                onClick={handleConvertPoints}
+                disabled={convertingPoints}
+                className="w-full py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white font-bold font-mono text-xs uppercase tracking-widest rounded-lg transition-colors flex items-center justify-center gap-2"
+              >
+                {convertingPoints ? <Loader2 size={12} className="animate-spin" /> : <RefreshCw size={12} />}
+                Convert to $HIVE
+              </button>
+            )}
+            <Link
+              href="/docs#hive-points"
+              className="block text-center text-[10px] text-zinc-500 hover:text-emerald-400 font-mono uppercase tracking-widest"
+            >
+              How to earn points
+            </Link>
+          </div>
+        </div>
       </div>
 
       {/* Stats Grid */}
@@ -658,6 +1012,11 @@ export default function DashboardPage() {
           onClick={() => setActiveTab("incoming")}
           label="Incoming Proposals"
           count={stats.incomingProposals}
+        />
+        <TabButton
+          active={activeTab === "disputes"}
+          onClick={() => setActiveTab("disputes")}
+          label="DAO Slashing Disputes"
         />
       </div>
 
@@ -742,7 +1101,7 @@ export default function DashboardPage() {
                       <span>{bid.timeEstimate}</span>
                     </div>
                   </div>
-
+ 
                   {bid.status === "Pending" && (
                     <div className="flex items-center gap-3 shrink-0">
                       <button
@@ -773,6 +1132,256 @@ export default function DashboardPage() {
               actionHref="/create"
             />
           )}
+        </div>
+      )}
+
+      {activeTab === "disputes" && (
+        <div className="space-y-6 animate-in fade-in duration-200">
+          <div className="flex items-center justify-between">
+            <div>
+              <h2 className="text-xl font-bold font-mono uppercase tracking-wide">Slashing Disputes</h2>
+              <p className="text-zinc-500 text-xs font-mono mt-1">Staker slashing console. Vote using HIVE token balance weight.</p>
+            </div>
+            <button
+              onClick={fetchDisputes}
+              disabled={disputesLoading}
+              className="px-4 py-2 bg-white/5 hover:bg-white/10 text-zinc-300 rounded-full text-xs font-mono transition-colors"
+            >
+              {disputesLoading ? "Refreshing..." : "Refresh Disputes"}
+            </button>
+          </div>
+
+          {disputesLoading ? (
+            <div className="flex items-center justify-center py-12">
+              <Loader2 className="w-8 h-8 text-emerald-500 animate-spin" />
+            </div>
+          ) : disputes.length > 0 ? (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              {disputes.map((dispute) => {
+                const totalWeight = dispute.votesForSlash + dispute.votesAgainstSlash;
+                const forPercent = totalWeight > 0 ? (dispute.votesForSlash / totalWeight) * 100 : 0;
+                const againstPercent = totalWeight > 0 ? (dispute.votesAgainstSlash / totalWeight) * 100 : 0;
+                const daysLeft = Math.max(0, Math.ceil((new Date(dispute.deadline).getTime() - Date.now()) / (1000 * 60 * 60 * 24)));
+
+                return (
+                  <div key={dispute.id} className="p-6 bg-white/[0.02] border border-white/5 rounded-2xl shadow-sm space-y-4">
+                    <div className="flex items-start justify-between">
+                      <div>
+                        <span className="text-[10px] font-mono bg-red-500/10 text-red-400 border border-red-500/20 px-2.5 py-1 rounded-full uppercase tracking-wider font-bold">
+                          At Risk: {dispute.stakedAmount.toLocaleString()} HIVE
+                        </span>
+                        <h3 className="font-semibold text-lg text-white mt-3">Tool ID: {dispute.toolId}</h3>
+                        <p className="text-[11px] text-zinc-500 font-mono mt-1 truncate max-w-xs">Node: {dispute.providerAddress}</p>
+                      </div>
+                      <div className="text-right">
+                        <span className="text-xs font-mono text-amber-500 font-bold block">{daysLeft} days left</span>
+                        <span className="text-[10px] text-zinc-600 font-mono block mt-0.5">Slot: {dispute.snapshotBlock}</span>
+                      </div>
+                    </div>
+
+                    <p className="text-sm text-zinc-400 leading-relaxed font-sans">{dispute.reason}</p>
+
+                    {/* Evidence link */}
+                    {dispute.evidenceUri && (
+                      <a
+                        href={dispute.evidenceUri}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center gap-1.5 text-xs text-emerald-400 hover:underline font-mono"
+                      >
+                        <ExternalLink size={10} /> View Audit Evidence
+                      </a>
+                    )}
+
+                    {/* Voting weight breakdown */}
+                    <div className="space-y-2 pt-2 border-t border-white/5">
+                      <div className="flex justify-between text-[11px] font-mono text-zinc-500">
+                        <span>Slash: {dispute.votesForSlash.toLocaleString()} HIVE ({forPercent.toFixed(1)}%)</span>
+                        <span>Dismiss: {dispute.votesAgainstSlash.toLocaleString()} HIVE ({againstPercent.toFixed(1)}%)</span>
+                      </div>
+                      <div className="h-2 w-full bg-zinc-900 rounded-full overflow-hidden flex">
+                        <div style={{ width: `${forPercent}%` }} className="bg-red-500 h-full" />
+                        <div style={{ width: `${againstPercent}%` }} className="bg-emerald-500 h-full" />
+                      </div>
+                      <div className="text-right text-[10px] text-zinc-600 font-mono">
+                        Total Voters: {dispute.voteCount}
+                      </div>
+                    </div>
+
+                    {/* Voting actions */}
+                    {new Date() < new Date(dispute.deadline) ? (
+                      <div className="grid grid-cols-2 gap-3 pt-2">
+                        <button
+                          onClick={() => handleVoteDispute(dispute.id, 'slash')}
+                          disabled={votingDisputeId === dispute.id}
+                          className="py-2.5 bg-red-500/10 border border-red-500/20 text-red-400 hover:bg-red-500/20 font-bold font-mono text-xs uppercase tracking-widest rounded-lg transition-colors flex items-center justify-center gap-2"
+                        >
+                          {votingDisputeId === dispute.id && <Loader2 size={12} className="animate-spin" />}
+                          Vote Slash
+                        </button>
+                        <button
+                          onClick={() => handleVoteDispute(dispute.id, 'dismiss')}
+                          disabled={votingDisputeId === dispute.id}
+                          className="py-2.5 bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 hover:bg-emerald-500/20 font-bold font-mono text-xs uppercase tracking-widest rounded-lg transition-colors flex items-center justify-center gap-2"
+                        >
+                          {votingDisputeId === dispute.id && <Loader2 size={12} className="animate-spin" />}
+                          Vote Dismiss
+                        </button>
+                      </div>
+                    ) : (
+                      <div className="text-center py-2.5 text-zinc-500 text-xs font-mono border border-dashed border-white/5 rounded-lg bg-black/10">
+                        Voting has ended. Awaiting settlement.
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          ) : (
+            <div className="py-16 text-center border border-white/5 bg-white/[0.01] rounded-2xl">
+              <Shield className="w-12 h-12 text-zinc-700 mx-auto mb-4 opacity-50" />
+              <h3 className="text-base font-bold font-mono text-white mb-2 uppercase">No Active Disputes</h3>
+              <p className="text-zinc-500 text-sm font-mono">All registered tool providers are currently operating securely.</p>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Deposit Modal */}
+      {showDepositModal && (
+        <div className="fixed inset-0 bg-black/80 backdrop-blur-md flex items-center justify-center z-50 animate-in fade-in duration-300">
+          <div className="bg-zinc-950 border border-zinc-800 p-8 rounded-2xl max-w-md w-full shadow-2xl relative">
+            <button
+              onClick={() => { setShowDepositModal(false); setDepositAmount(""); }}
+              className="absolute top-4 right-4 text-zinc-500 hover:text-white transition-colors"
+            >
+              <X size={20} />
+            </button>
+            <h2 className="text-xl font-bold font-mono mb-2 uppercase tracking-wide">Fund Session Budget</h2>
+            <p className="text-zinc-400 text-xs mb-6 font-mono leading-relaxed">
+              Deposit USDC from your connected wallet to your off-chain session balance. 
+              Authorized tool execution will deduct microfees directly from this balance.
+            </p>
+
+            <div className="space-y-4">
+              <div>
+                <label className="block text-[10px] font-bold font-mono text-zinc-500 mb-2 uppercase tracking-widest">Amount to Deposit</label>
+                <div className="relative">
+                  <input
+                    type="number"
+                    step="0.01"
+                    min="0.10"
+                    placeholder="10.00"
+                    value={depositAmount}
+                    onChange={(e) => setDepositAmount(e.target.value)}
+                    className="w-full bg-black border border-zinc-800 rounded-sm pl-8 pr-16 py-3.5 text-white focus:ring-1 focus:ring-emerald-500 focus:border-emerald-500 outline-none transition-all font-mono text-lg font-bold"
+                  />
+                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-500 font-bold font-mono">$</span>
+                  <span className="absolute right-3 top-1/2 -translate-y-1/2 text-zinc-500 font-bold font-mono">USDC</span>
+                </div>
+                <div className="flex justify-between text-[10px] text-zinc-500 font-mono mt-2">
+                  <span>Wallet Balance: {solUsdcBalance ?? "0.00"} USDC</span>
+                  <span>Minimum: $0.10</span>
+                </div>
+              </div>
+
+              <div className="bg-zinc-900 border border-zinc-800/80 p-4 rounded-lg text-xs font-mono text-zinc-400 space-y-2">
+                <div className="flex justify-between">
+                  <span>Vault Address:</span>
+                  <span className="text-white">3LQu...dura</span>
+                </div>
+                <div className="flex justify-between">
+                  <span>Settlement Latency:</span>
+                  <span className="text-emerald-400">Millisecond (Instant)</span>
+                </div>
+                <div className="flex justify-between">
+                  <span>Protocol Fee:</span>
+                  <span className="text-white">0.00%</span>
+                </div>
+              </div>
+
+              <button
+                onClick={handleDepositSession}
+                disabled={depositing || !depositAmount || parseFloat(depositAmount) <= 0}
+                className="w-full py-3.5 bg-emerald-600 hover:bg-emerald-500 text-white font-bold font-mono text-xs uppercase tracking-widest rounded-lg transition-colors disabled:opacity-40 flex items-center justify-center gap-2 animate-pulse"
+              >
+                {depositing ? <Loader2 size={14} className="animate-spin" /> : <Wallet size={14} />}
+                {depositing ? "Processing Deposit..." : "Deposit USDC"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* History Modal */}
+      {showHistoryModal && (
+        <div className="fixed inset-0 bg-black/80 backdrop-blur-md flex items-center justify-center z-50 animate-in fade-in duration-300">
+          <div className="bg-zinc-950 border border-zinc-800 p-8 rounded-2xl max-w-2xl w-full shadow-2xl relative max-h-[80vh] flex flex-col">
+            <button
+              onClick={() => setShowHistoryModal(false)}
+              className="absolute top-4 right-4 text-zinc-500 hover:text-white transition-colors"
+            >
+              <X size={20} />
+            </button>
+            <h2 className="text-xl font-bold font-mono mb-2 uppercase tracking-wide">Session Ledger Log</h2>
+            <p className="text-zinc-400 text-xs mb-6 font-mono">
+              The sliding log of deposits and tool invocations recorded against your session budget.
+            </p>
+
+            <div className="flex-1 overflow-y-auto pr-1 space-y-3 custom-scrollbar">
+              {sessionHistory.length > 0 ? (
+                <div className="border border-white/5 rounded-xl overflow-hidden font-mono text-xs">
+                  <div className="grid grid-cols-12 bg-black/40 p-3 text-zinc-500 font-bold border-b border-white/5">
+                    <div className="col-span-3">Time</div>
+                    <div className="col-span-3">Type</div>
+                    <div className="col-span-4">Tool / Signature</div>
+                    <div className="col-span-2 text-right">Amount</div>
+                  </div>
+                  {sessionHistory.map((item) => {
+                    const dateStr = new Date(item.timestamp).toLocaleDateString(undefined, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+                    const isDeposit = item.type === 'deposit';
+                    const displayText = isDeposit 
+                      ? `${item.settlementTxSignature?.slice(0, 4)}...${item.settlementTxSignature?.slice(-4)}`
+                      : item.toolId;
+
+                    return (
+                      <div key={item.id} className="grid grid-cols-12 p-3 border-b border-white/5 hover:bg-white/[0.01] items-center text-zinc-400">
+                        <div className="col-span-3 text-zinc-500">{dateStr}</div>
+                        <div className="col-span-3">
+                          <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase ${
+                            isDeposit ? 'bg-emerald-500/10 text-emerald-400' : 'bg-blue-500/10 text-blue-400'
+                          }`}>
+                            {item.type}
+                          </span>
+                        </div>
+                        <div className="col-span-4 truncate text-zinc-300">
+                          {isDeposit && item.settlementTxSignature ? (
+                            <a
+                              href={`https://solscan.io/tx/${item.settlementTxSignature}`}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="hover:underline flex items-center gap-1 text-zinc-400 hover:text-white"
+                            >
+                              {displayText} <ExternalLink size={10} />
+                            </a>
+                          ) : (
+                            displayText
+                          )}
+                        </div>
+                        <div className={`col-span-2 text-right font-bold ${isDeposit ? 'text-emerald-400' : 'text-red-400'}`}>
+                          {isDeposit ? `+$${item.amount.toFixed(2)}` : `-$${item.cost.toFixed(2)}`}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              ) : (
+                <div className="py-12 text-center text-zinc-500 text-xs font-mono">
+                  No execution logs recorded yet. Fund your balance to start.
+                </div>
+              )}
+            </div>
+          </div>
         </div>
       )}
     </div>

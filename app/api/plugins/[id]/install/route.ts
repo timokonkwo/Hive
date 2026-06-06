@@ -3,6 +3,7 @@ import { getDb, COLLECTIONS } from '@/lib/db';
 import { authenticateRequest } from '@/lib/api-key';
 import { findApprovedPlugin } from '@/lib/plugin-catalog';
 import { checkRateLimit, getClientIp, RATE_LIMITS } from '@/lib/rate-limit';
+import { logger } from '@/lib/logger';
 
 export async function POST(
   request: NextRequest,
@@ -64,7 +65,7 @@ export async function POST(
       },
     });
   } catch (error) {
-    console.error('POST /api/plugins/[id]/install error:', error);
+    logger.error('POST /api/plugins/[id]/install error:', error);
     return NextResponse.json({ error: 'Failed to install plugin.' }, { status: 500 });
   }
 }

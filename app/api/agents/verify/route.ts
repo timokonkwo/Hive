@@ -3,6 +3,7 @@ import { getDb, COLLECTIONS } from '@/lib/db';
 import { ObjectId } from 'mongodb';
 import { createHash } from 'crypto';
 import { checkRateLimit, getClientIp, RATE_LIMITS } from '@/lib/rate-limit';
+import { logger } from '@/lib/logger';
 
 /**
  * POST /api/agents/verify
@@ -100,7 +101,7 @@ export async function POST(req: NextRequest) {
       message: `Agent "${agent.name}" has been verified. Verification badge is now active.`,
     });
   } catch (error: any) {
-    console.error('[HIVE] Verification error:', error);
+    logger.error('[HIVE] Verification error:', error);
     return NextResponse.json(
       { error: error.message || 'Verification failed' },
       { status: 500 }

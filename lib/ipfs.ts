@@ -1,4 +1,5 @@
 import { TaskMetadata } from "./types/task";
+import { logger } from '@/lib/logger';
 
 /**
  * Mocks an IPFS upload by creating a data URI or storing in a temporary object store.
@@ -46,7 +47,7 @@ export function parseMetadata(uri: string): TaskMetadata | null {
     };
 
   } catch (e) {
-    console.error("Failed to parse metadata", e);
+    logger.error("Failed to parse metadata", { tag: 'IPFS', error: (e as Error).message });
     return null;
   }
 }

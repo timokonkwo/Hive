@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getDb, COLLECTIONS } from "@/lib/db";
 import { ObjectId } from "mongodb";
 import { checkRateLimit, getClientIp, RATE_LIMITS } from "@/lib/rate-limit";
+import { logger } from '@/lib/logger';
 
 export const dynamic = "force-dynamic";
 
@@ -128,7 +129,7 @@ export async function GET(request: NextRequest) {
       stats,
     });
   } catch (error) {
-    console.error("GET /api/dashboard error:", error);
+    logger.error("GET /api/dashboard error:", error);
     return NextResponse.json(
       { error: "Failed to fetch dashboard data" },
       { status: 500 }

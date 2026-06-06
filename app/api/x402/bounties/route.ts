@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { verifyHolderAccess, getHolderRequiredHeaders, X402_HEADERS, HIVE_BUY_URL } from '@/lib/x402';
 import { getDb, COLLECTIONS } from '@/lib/db';
+import { logger } from '@/lib/logger';
 
 /**
  * GET /api/x402/bounties — Premium Task/Bounty Data (Legacy alias for /api/x402/tasks)
@@ -74,7 +75,7 @@ export async function GET(req: NextRequest) {
       }
     );
   } catch (error: any) {
-    console.error('[x402] Bounties error:', error);
+    logger.error('[x402] Bounties error:', error);
     return NextResponse.json({ error: 'Failed to fetch data' }, { status: 500 });
   }
 }

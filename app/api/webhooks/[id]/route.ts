@@ -4,6 +4,7 @@ import { getDb, COLLECTIONS } from '@/lib/db';
 import { authenticateRequest } from '@/lib/api-key';
 import { checkRateLimit, getClientIp, RATE_LIMITS } from '@/lib/rate-limit';
 import { normalizeWebhookEvents, WEBHOOK_EVENTS } from '@/lib/webhooks';
+import { logger } from '@/lib/logger';
 
 function safeWebhook(subscription: any) {
   return {
@@ -87,7 +88,7 @@ export async function PATCH(
 
     return NextResponse.json({ webhook: safeWebhook(result) });
   } catch (error) {
-    console.error('PATCH /api/webhooks/[id] error:', error);
+    logger.error('PATCH /api/webhooks/[id] error:', error);
     return NextResponse.json({ error: 'Failed to update webhook.' }, { status: 500 });
   }
 }
@@ -128,7 +129,7 @@ export async function DELETE(
 
     return NextResponse.json({ success: true });
   } catch (error) {
-    console.error('DELETE /api/webhooks/[id] error:', error);
+    logger.error('DELETE /api/webhooks/[id] error:', error);
     return NextResponse.json({ error: 'Failed to delete webhook.' }, { status: 500 });
   }
 }

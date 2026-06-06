@@ -8,6 +8,9 @@ import { authenticateClient } from "@/lib/client-auth";
 import { authenticateRequest } from "@/lib/api-key";
 import { enqueueWebhookEvent } from "@/lib/webhooks";
 import { validateAcceptanceRubric } from "@/lib/task-builder";
+import { awardPoints } from "@/lib/points";
+import { rankAgentsForTask } from "@/lib/smart-matching";
+import { logger } from '@/lib/logger';
 
 // GET /api/tasks — List tasks with optional filters
 export async function GET(request: NextRequest) {
@@ -75,7 +78,7 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json({ tasks: mapped, total, page, limit });
   } catch (error) {
-    console.error("GET /api/tasks error:", error);
+    logger.error("GET /api/tasks error:", error);
     return NextResponse.json(
       { error: "Failed to fetch tasks" },
       { status: 500 }
@@ -233,40 +236,126 @@ export async function POST(request: NextRequest) {
       createdAt: new Date(),
     });
 
-    // Trigger agent bidding directly (same-process, no HTTP)
-    import('@/lib/stealth-agents/runner').then(({ handleNewTask }) => {
-      handleNewTask({
-        taskId: result.insertedId.toString(),
-        title,
-        description,
-        category,
-        requirements: requirements || '',
-        budget: budget || 'Negotiable',
-      }).catch((err: any) => console.error('[STEALTH] Agent bid failed:', err.message));
-    }).catch((err) => console.error('[STEALTH] Runner import failed:', err.message));
+    // Award 100 Hive Points for posting a task (excluding auto-posted tasks)
+    const isMockClient = verifiedAddress.startsWith('did:privy:cl_');
+    if (!isMockClient) {
+      awardPoints(verifiedAddress, 'create_task', 100, { title, taskId: result.insertedId.toString() })
+        .catch((err) => logger.error('[POINTS] Failed to award points for task creation:', err.message));
+    }
 
-    // Notify matching agents (async, non-blocking)
-    notifyMatchingAgents({
-      taskId: result.insertedId.toString(),
-      title,
-      category,
-      budget: budget || 'Negotiable',
-      description: description || '',
-    }).catch((err) => console.error('[NOTIFY] Agent notification failed:', err.message));
+    const taskId = result.insertedId.toString();
+
+    let matchedAndAssigned = false;
+    if (!isMockClient) {
+      try {
+        const matches = await rankAgentsForTask(db, {
+          id: taskId,
+          title,
+          description,
+          category,
+          requirements: requirements || '',
+          tags,
+          budget,
+          budgetAmount
+        }, { limit: 1 });
+
+        if (matches.length > 0) {
+          const bestMatch = matches[0];
+          // Assign task directly
+          await db.collection(COLLECTIONS.TASKS).updateOne(
+            { _id: result.insertedId },
+            {
+              $set: {
+                status: 'In Progress',
+                assignedAgent: bestMatch.agentId,
+                assignedAgentName: bestMatch.agentName,
+                updatedAt: new Date()
+              }
+            }
+          );
+
+          // Create accepted bid
+          await db.collection(COLLECTIONS.BIDS).insertOne({
+            taskId: taskId,
+            agentId: bestMatch.agentId,
+            agentName: bestMatch.agentName,
+            amount: budgetAmount || 0,
+            coverLetter: 'Directly assigned via Hive Smart Matching.',
+            timeEstimate: 'Instant',
+            status: 'accepted',
+            createdAt: new Date(),
+            updatedAt: new Date()
+          });
+
+          // Log assignment activity
+          await db.collection(COLLECTIONS.ACTIVITY).insertOne({
+            type: 'ProposalAccepted',
+            taskId: result.insertedId,
+            actorName: 'System',
+            metadata: {
+              taskTitle: title,
+              agentName: bestMatch.agentName,
+              agentId: bestMatch.agentId,
+              bidAmount: budgetAmount || 0,
+              directAssigned: true
+            },
+            createdAt: new Date(),
+          });
+
+          // Send bid.accepted webhook
+          enqueueWebhookEvent(db, {
+            event: 'bid.accepted',
+            taskId: taskId,
+            agentId: bestMatch.agentId,
+            actorName: displayName,
+            data: { taskTitle: title, amount: budgetAmount || 0 }
+          }).catch((err) => logger.error('[WEBHOOK] bid.accepted enqueue failed:', err.message));
+
+          matchedAndAssigned = true;
+          logger.info(`[DIRECT-ROUTING] Successfully assigned task "${title}" to "${bestMatch.agentName}"`);
+        }
+      } catch (err: any) {
+        logger.error('[DIRECT-ROUTING] Failed to auto-match/assign task:', err.message);
+      }
+    }
+
+    // Only trigger stealth bidding if not already matched and assigned
+    if (!matchedAndAssigned) {
+      // Trigger agent bidding directly (same-process, no HTTP)
+      import('@/lib/stealth-agents/runner').then(({ handleNewTask }) => {
+        handleNewTask({
+          taskId,
+          title,
+          description,
+          category,
+          requirements: requirements || '',
+          budget: budget || 'Negotiable',
+        }).catch((err: any) => logger.error('[STEALTH] Agent bid failed:', err.message));
+      }).catch((err) => logger.error('[STEALTH] Runner import failed:', err.message));
+
+      // Notify matching agents (async, non-blocking)
+      notifyMatchingAgents({
+        taskId,
+        title,
+        category,
+        budget: budget || 'Negotiable',
+        description: description || '',
+      }).catch((err) => logger.error('[NOTIFY] Agent notification failed:', err.message));
+    }
 
     enqueueWebhookEvent(db, {
       event: 'task.created',
-      taskId: result.insertedId.toString(),
+      taskId,
       actorName: displayName,
       data: { title, category, budget: budget || 'Negotiable' },
-    }).catch((err) => console.error('[WEBHOOK] task.created enqueue failed:', err.message));
+    }).catch((err) => logger.error('[WEBHOOK] task.created enqueue failed:', err.message));
 
     return NextResponse.json(
       { id: result.insertedId.toString(), ...task },
       { status: 201 }
     );
   } catch (error) {
-    console.error("POST /api/tasks error:", error);
+    logger.error("POST /api/tasks error:", error);
     return NextResponse.json(
       { error: "Failed to create task" },
       { status: 500 }

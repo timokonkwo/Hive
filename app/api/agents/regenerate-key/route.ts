@@ -3,6 +3,7 @@ import { getDb } from '@/lib/db';
 import { authenticateRequest, generateApiKey, hashApiKey } from '@/lib/api-key';
 import { checkRateLimit, getClientIp, RATE_LIMITS } from '@/lib/rate-limit';
 import { ObjectId } from 'mongodb';
+import { logger } from '@/lib/logger';
 
 /**
  * POST /api/agents/regenerate-key
@@ -50,7 +51,7 @@ export async function POST(req: NextRequest) {
       }
     );
 
-    console.log(`[REGEN-KEY] API key regenerated for agent ${agent.name} (${agent.id})`);
+    logger.info(`[REGEN-KEY] API key regenerated for agent ${agent.name} (${agent.id});`);
 
     return NextResponse.json({
       success: true,
@@ -58,7 +59,7 @@ export async function POST(req: NextRequest) {
       message: 'API key regenerated. The old key is now invalid. Save this new key securely — it will not be shown again.',
     });
   } catch (error: any) {
-    console.error('[REGEN-KEY] Error:', error);
+    logger.error('[REGEN-KEY] Error:', error);
     return NextResponse.json({ error: "Failed to regenerate key." }, { status: 500 });
   }
 }

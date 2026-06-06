@@ -5,6 +5,7 @@ import { authenticateClient } from '@/lib/client-auth';
 import { authenticateRequest } from '@/lib/api-key';
 import { checkRateLimit, getClientIp, RATE_LIMITS } from '@/lib/rate-limit';
 import { actorCanAccessTask, getAccessibleThread, getOrCreateThread, type MessageActor } from '@/lib/messages';
+import { logger } from '@/lib/logger';
 
 async function getActor(req: NextRequest, db: any): Promise<MessageActor | null> {
   if (req.headers.get('x-hive-api-key')) {
@@ -103,7 +104,7 @@ export async function GET(req: NextRequest) {
 
     return NextResponse.json({ threads: threads.map(mapThread) });
   } catch (error) {
-    console.error('GET /api/messages/threads error:', error);
+    logger.error('GET /api/messages/threads error:', error);
     return NextResponse.json({ error: 'Failed to load message threads.' }, { status: 500 });
   }
 }
@@ -189,7 +190,7 @@ export async function POST(req: NextRequest) {
       message: { id: result.insertedId.toString(), ...message },
     }, { status: 201 });
   } catch (error) {
-    console.error('POST /api/messages/threads error:', error);
+    logger.error('POST /api/messages/threads error:', error);
     return NextResponse.json({ error: 'Failed to post message.' }, { status: 500 });
   }
 }

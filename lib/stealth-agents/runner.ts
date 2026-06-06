@@ -2,11 +2,13 @@
  * Stealth Agent Runner
  * 
  * Main orchestrator for the stealth agent system.
- * Handles two modes:
- *   1. Event-driven: instant bidding when a new task is created (called by the trigger endpoint)
- *   2. Cron sweep: periodic check for tasks that were missed
  * 
- * Also runs the fulfillment loop for accepted bids.
+ * With the transition to direct routing, the bidding sweep is deprecated.
+ * Tasks are now auto-assigned at creation time via instant matching.
+ * This runner focuses on:
+ *   1. Fulfilling auto-assigned tasks that are In Progress
+ *   2. A lightweight fallback sweep for any tasks that slipped through
+ *      without an instant match (e.g., no available agent at post time)
  */
 
 import { findMatchingAgent, findUnbidTasks } from './matcher';
@@ -14,21 +16,21 @@ import { submitBid } from './bidder';
 import { fulfillAcceptedBids } from './fulfiller';
 
 /**
- * Handle a new task event (instant path).
- * Called by the internal trigger endpoint when a task is created.
+ * Handle an unmatched task that was posted without an instant match.
+ * Uses smart matching to find and assign the best available agent.
  */
-export async function handleNewTask(task: {
+export async function handleUnmatchedTask(task: {
   taskId: string;
   title: string;
   description: string;
   category: string;
   requirements: string;
   budget: string;
-}): Promise<{ bid: boolean; agent?: string; error?: string }> {
+}): Promise<{ matched: boolean; agent?: string; error?: string }> {
   try {
     const match = await findMatchingAgent(task.taskId, task.category);
     if (!match) {
-      return { bid: false, error: 'No matching agent available' };
+      return { matched: false, error: 'No matching agent available' };
     }
 
     const result = await submitBid({
@@ -43,19 +45,22 @@ export async function handleNewTask(task: {
     });
 
     return {
-      bid: result.success,
+      matched: result.success,
       agent: match.agent.name,
       error: result.error,
     };
   } catch (error: any) {
-    console.error('[STEALTH] handleNewTask error:', error.message);
-    return { bid: false, error: error.message };
+    console.error('[STEALTH] handleUnmatchedTask error:', error.message);
+    return { matched: false, error: error.message };
   }
 }
 
 /**
- * Sweep for open tasks without stealth agent bids (cron path).
- * Also checks for accepted bids that need fulfillment.
+ * Run the fulfillment loop and a lightweight fallback sweep.
+ * 
+ * The primary task assignment now happens at task creation time
+ * via instant matching. This sweep only catches edge cases where
+ * a task was posted but no agent was available at that moment.
  */
 export async function runSweep(): Promise<{
   bidsSubmitted: number;
@@ -65,33 +70,7 @@ export async function runSweep(): Promise<{
   const errors: string[] = [];
   let bidsSubmitted = 0;
 
-  try {
-    // 1. Find tasks that stealth agents haven't bid on
-    const unbidTasks = await findUnbidTasks();
-
-    console.log(`[STEALTH] Sweep: ${unbidTasks.length} unbid task(s) found`);
-
-    for (const task of unbidTasks) {
-      const result = await handleNewTask({
-        taskId: task.taskId,
-        title: task.title,
-        description: task.description,
-        category: task.category,
-        requirements: task.requirements,
-        budget: task.budget,
-      });
-
-      if (result.bid) {
-        bidsSubmitted++;
-      } else if (result.error && result.error !== 'No matching agent available') {
-        errors.push(`${task.taskId}: ${result.error}`);
-      }
-    }
-  } catch (error: any) {
-    errors.push(`Sweep error: ${error.message}`);
-  }
-
-  // 2. Check for accepted bids that need fulfillment
+  // 1. Fulfillment is the primary job: check for assigned tasks that need work
   let fulfillmentsProcessed = false;
   try {
     await fulfillAcceptedBids();
@@ -100,9 +79,43 @@ export async function runSweep(): Promise<{
     errors.push(`Fulfillment error: ${error.message}`);
   }
 
+  // 2. Lightweight fallback: catch any tasks that were posted without a match
+  try {
+    const unbidTasks = await findUnbidTasks();
+
+    if (unbidTasks.length > 0) {
+      console.log(`[STEALTH] Fallback sweep: ${unbidTasks.length} unmatched task(s) found`);
+
+      for (const task of unbidTasks) {
+        const result = await handleUnmatchedTask({
+          taskId: task.taskId,
+          title: task.title,
+          description: task.description,
+          category: task.category,
+          requirements: task.requirements,
+          budget: task.budget,
+        });
+
+        if (result.matched) {
+          bidsSubmitted++;
+        } else if (result.error && result.error !== 'No matching agent available') {
+          errors.push(`${task.taskId}: ${result.error}`);
+        }
+      }
+    }
+  } catch (error: any) {
+    errors.push(`Fallback sweep error: ${error.message}`);
+  }
+
   console.log(
-    `[STEALTH] Sweep complete: ${bidsSubmitted} bid(s) submitted, fulfillments: ${fulfillmentsProcessed}`
+    `[STEALTH] Sweep complete: fulfillments=${fulfillmentsProcessed}, fallback matches=${bidsSubmitted}`
   );
 
   return { bidsSubmitted, fulfillmentsProcessed, errors };
 }
+
+/**
+ * Backwards-compatible alias for callers still using the old name.
+ * Maps to handleUnmatchedTask.
+ */
+export const handleNewTask = handleUnmatchedTask;

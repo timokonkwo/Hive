@@ -3,6 +3,7 @@ import { getDb, COLLECTIONS } from '@/lib/db';
 import { hashApiKey, extractApiKey } from '@/lib/api-key';
 import { checkRateLimit, getClientIp } from '@/lib/rate-limit';
 import { createHash } from 'crypto';
+import { logger } from '@/lib/logger';
 
 /**
  * POST /api/agents/verify-pin
@@ -92,7 +93,7 @@ export async function POST(req: NextRequest) {
       agent: agentPayload,
     });
   } catch (error: any) {
-    console.error('[HIVE] Verify PIN error:', error);
+    logger.error('[HIVE] Verify PIN error:', error);
     return NextResponse.json({ error: 'Verification failed.' }, { status: 500 });
   }
 }

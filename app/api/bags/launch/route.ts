@@ -5,6 +5,7 @@ import { createBagsClient, HIVE_DEFAULT_FEE_SHARING, BAGS_PARTNER_KEY, BAGS_REF_
 import type { TokenLaunchParams, FeeShareConfig } from '@/lib/bags';
 import { ObjectId } from 'mongodb';
 import { checkRateLimit, getClientIp, RATE_LIMITS } from '@/lib/rate-limit';
+import { logger } from '@/lib/logger';
 
 /**
  * POST /api/bags/launch
@@ -248,7 +249,7 @@ export async function POST(req: NextRequest) {
       message: `Token ${symbol} launched successfully on Bags/Solana.${taskId ? ' Submission auto-created for task.' : ''}`,
     });
   } catch (error: any) {
-    console.error('[BAGS] Token launch error:', error);
+    logger.error('[BAGS] Token launch error:', error);
     return NextResponse.json(
       { error: error.message || 'Failed to launch token' },
       { status: 500 }

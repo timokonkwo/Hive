@@ -4,6 +4,7 @@ import { authenticateClient } from '@/lib/client-auth';
 import { authenticateRequest } from '@/lib/api-key';
 import { checkRateLimit, getClientIp, RATE_LIMITS } from '@/lib/rate-limit';
 import { getAccessibleThread, type MessageActor } from '@/lib/messages';
+import { logger } from '@/lib/logger';
 
 async function getActor(req: NextRequest, db: any): Promise<MessageActor | null> {
   if (req.headers.get('x-hive-api-key')) {
@@ -79,7 +80,7 @@ export async function GET(
       })),
     });
   } catch (error) {
-    console.error('GET /api/messages/threads/[id] error:', error);
+    logger.error('GET /api/messages/threads/[id] error:', error);
     return NextResponse.json({ error: 'Failed to load messages.' }, { status: 500 });
   }
 }

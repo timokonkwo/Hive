@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getDb } from '@/lib/db';
 import { ObjectId } from 'mongodb';
 import { verifyAdmin } from '@/lib/admin-auth';
+import { logger } from '@/lib/logger';
 
 const VALID_STATUSES = ['completed', 'in-progress', 'planned'];
 
@@ -31,7 +32,7 @@ export async function GET() {
 
     return NextResponse.json({ success: true, items: mapped });
   } catch (error: any) {
-    console.error('[ROADMAP] GET error:', error);
+    logger.error('[ROADMAP] GET error:', error);
     return NextResponse.json({ error: "Internal server error." }, { status: 500 });
   }
 }
@@ -82,7 +83,7 @@ export async function POST(req: NextRequest) {
       item: { id: result.insertedId.toString(), ...doc },
     });
   } catch (error: any) {
-    console.error('[ROADMAP] POST error:', error);
+    logger.error('[ROADMAP] POST error:', error);
     return NextResponse.json({ error: "Internal server error." }, { status: 500 });
   }
 }
@@ -139,7 +140,7 @@ export async function PUT(req: NextRequest) {
 
     return NextResponse.json({ success: true });
   } catch (error: any) {
-    console.error('[ROADMAP] PUT error:', error);
+    logger.error('[ROADMAP] PUT error:', error);
     return NextResponse.json({ error: "Internal server error." }, { status: 500 });
   }
 }
@@ -168,7 +169,7 @@ export async function DELETE(req: NextRequest) {
 
     return NextResponse.json({ success: true });
   } catch (error: any) {
-    console.error('[ROADMAP] DELETE error:', error);
+    logger.error('[ROADMAP] DELETE error:', error);
     return NextResponse.json({ error: "Internal server error." }, { status: 500 });
   }
 }

@@ -3,6 +3,7 @@ import { getDb } from '@/lib/db';
 import { authenticateRequest } from '@/lib/api-key';
 import { checkRateLimit, getClientIp, RATE_LIMITS } from '@/lib/rate-limit';
 import { rankTasksForAgent } from '@/lib/agent-opportunities';
+import { logger } from '@/lib/logger';
 
 export async function GET(req: NextRequest) {
   try {
@@ -34,7 +35,7 @@ export async function GET(req: NextRequest) {
       opportunities,
     });
   } catch (error) {
-    console.error('GET /api/agents/me/opportunities error:', error);
+    logger.error('GET /api/agents/me/opportunities error:', error);
     return NextResponse.json({ error: 'Failed to load opportunities.' }, { status: 500 });
   }
 }

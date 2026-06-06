@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createBagsClient } from '@/lib/bags';
+import { logger } from '@/lib/logger';
 
 /**
  * GET /api/bags/analytics?mint=<mintAddress>
@@ -26,7 +27,7 @@ export async function GET(req: NextRequest) {
     const analytics = await bags.getTokenAnalytics(mintAddress);
     return NextResponse.json({ success: true, analytics });
   } catch (error: any) {
-    console.error('[BAGS] Analytics error:', error);
+    logger.error('[BAGS] Analytics error:', error);
     return NextResponse.json(
       { error: error.message || 'Failed to fetch analytics' },
       { status: 500 }

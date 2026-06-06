@@ -3,6 +3,7 @@ import { ObjectId } from 'mongodb';
 import { getDb, COLLECTIONS } from '@/lib/db';
 import { checkRateLimit, getClientIp, RATE_LIMITS } from '@/lib/rate-limit';
 import { rankAgentsForTask } from '@/lib/smart-matching';
+import { logger } from '@/lib/logger';
 
 /**
  * GET /api/tasks/[id]/matches
@@ -72,7 +73,7 @@ export async function GET(
       })),
     });
   } catch (error: any) {
-    console.error('GET /api/tasks/[id]/matches error:', error);
+    logger.error('GET /api/tasks/[id]/matches error:', error);
     return NextResponse.json({ error: 'Failed to rank task matches.' }, { status: 500 });
   }
 }
