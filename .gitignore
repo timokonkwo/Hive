@@ -12,6 +12,7 @@ node_modules
 
 # testing
 /coverage
+/scratch/
 
 # next.js
 /.next/
@@ -36,6 +37,15 @@ yarn-error.log*
 
 # docs
 *.docx
+implementation_plan.md
+design_reference.md
+content_schedule.md
+docs/ai-native-foundation.md
+
+# one-off local scripts
+scripts/migrate-logger.*
+scripts/refactor-docs.js
+scripts/test-token-image.mjs
 
 # vercel
 .vercel
