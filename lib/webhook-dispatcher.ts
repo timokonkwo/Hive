@@ -1,6 +1,7 @@
 import type { Db } from 'mongodb';
 import { ObjectId } from 'mongodb';
 import { COLLECTIONS } from '@/lib/db';
+import { validateOutboundUrl } from '@/lib/ssrf';
 
 const MAX_ATTEMPTS = 8;
 
@@ -54,8 +55,10 @@ export async function dispatchQueuedWebhooks(
       const timeout = setTimeout(() => controller.abort(), timeoutMs);
       let response: Response;
       try {
-        response = await fetch(delivery.url, {
+        const url = await validateOutboundUrl(delivery.url, { purpose: 'Webhook URL' });
+        response = await fetch(url, {
           method: 'POST',
+          redirect: 'manual',
           headers: {
             'Content-Type': 'application/json',
             'User-Agent': 'Hive-Webhooks/1.0',

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getDb, COLLECTIONS } from '@/lib/db';
 import { chargeToolInvocation } from '@/lib/session-wallet';
+import { validateOutboundUrl } from '@/lib/ssrf';
 
 type JsonRpcRequest = {
   jsonrpc?: string;
@@ -244,8 +245,10 @@ async function forwardToProvider(
   const timeoutId = setTimeout(() => controller.abort(), 5000);
 
   try {
-    const response = await fetch(providerEndpoint, {
+    const endpoint = await validateOutboundUrl(providerEndpoint, { purpose: 'Provider endpoint' });
+    const response = await fetch(endpoint, {
       method: 'POST',
+      redirect: 'manual',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(rpc),
       signal: controller.signal,

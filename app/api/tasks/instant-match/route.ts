@@ -45,7 +45,7 @@ export async function POST(request: NextRequest) {
 
     const {
       title, description, category, tags, requirements, budget,
-      clientAddress, clientName,
+      clientName,
       tokenConfig, deliverableSpecs, acceptanceRubric,
     } = body;
 
@@ -103,7 +103,7 @@ export async function POST(request: NextRequest) {
       }];
     }
 
-    const displayName = clientName || (clientAddress ? `User_${clientAddress.slice(-6)}` : 'User');
+    const displayName = clientName || `User_${verified.userId.slice(-6)}`;
 
     let budgetAmount = 0;
     if (budget) {
@@ -151,7 +151,7 @@ export async function POST(request: NextRequest) {
       budget: budget || 'Negotiable',
       budgetAmount,
       status: 'In Progress',
-      clientAddress: clientAddress || verified.userId,
+      clientAddress: verified.userId,
       clientPrivyUserId: verified.userId,
       clientName: displayName,
       assignedAgent: bestAgent.name,
