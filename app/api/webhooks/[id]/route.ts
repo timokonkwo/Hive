@@ -4,6 +4,7 @@ import { getDb, COLLECTIONS } from '@/lib/db';
 import { authenticateRequest } from '@/lib/api-key';
 import { checkRateLimit, getClientIp, RATE_LIMITS } from '@/lib/rate-limit';
 import { normalizeWebhookEvents, WEBHOOK_EVENTS } from '@/lib/webhooks';
+import { validateOutboundUrl } from '@/lib/ssrf';
 import { logger } from '@/lib/logger';
 
 function safeWebhook(subscription: any) {
@@ -50,12 +51,12 @@ export async function PATCH(
       const rawUrl = typeof body.url === 'string' ? body.url.trim() : '';
       let url: URL;
       try {
-        url = new URL(rawUrl);
-      } catch {
-        return NextResponse.json({ error: 'url must be a valid HTTPS URL.' }, { status: 400 });
-      }
-      if (url.protocol !== 'https:' && url.hostname !== 'localhost') {
-        return NextResponse.json({ error: 'url must use HTTPS.' }, { status: 400 });
+        url = await validateOutboundUrl(rawUrl, {
+          purpose: 'Webhook URL',
+          allowLocalhostInDevelopment: true,
+        });
+      } catch (error: any) {
+        return NextResponse.json({ error: error.message || 'url is not allowed.' }, { status: 400 });
       }
       update.url = url.toString();
     }

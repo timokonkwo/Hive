@@ -5,7 +5,6 @@ import { checkRateLimit, getClientIp, RATE_LIMITS } from "@/lib/rate-limit";
 import { validateTokenConfig, validateDeliverableSpecs } from "@/lib/submission-validator";
 import { notifyMatchingAgents } from "@/lib/agent-notifications";
 import { authenticateClient } from "@/lib/client-auth";
-import { authenticateRequest } from "@/lib/api-key";
 import { enqueueWebhookEvent } from "@/lib/webhooks";
 import { validateAcceptanceRubric } from "@/lib/task-builder";
 import { awardPoints } from "@/lib/points";
@@ -101,10 +100,10 @@ export async function POST(request: NextRequest) {
 
     const db = await getDb();
 
-    // Auth: require Privy JWT (for clients) or API key (for platform agents)
+    // Auth: task creation is a client action. Do not accept agent API keys here:
+    // self-registered agent keys must not be able to manufacture marketplace demand.
     const client = await authenticateClient(request);
-    const agentAuth = !client ? await authenticateRequest(request.headers, db) : null;
-    if (!client && !agentAuth) {
+    if (!client) {
       return NextResponse.json(
         { error: 'Authentication required to create tasks.' },
         { status: 401 }
@@ -115,7 +114,7 @@ export async function POST(request: NextRequest) {
 
     const {
       title, description, category, tags, requirements, budget,
-      clientAddress, clientName,
+      clientName,
       tokenConfig,       // For "Token Launch" tasks
       deliverableSpecs,  // Structured specs for what agent must deliver
       acceptanceRubric,  // Acceptance criteria clients can use during review
@@ -178,10 +177,10 @@ export async function POST(request: NextRequest) {
       ];
     }
 
-    // Store the Privy DID separately for server-side ownership checks. Keep
-    // clientAddress for display/backward-compatible dashboard lookups.
-    const verifiedAddress = clientAddress || client?.userId || agentAuth?.agent?.id || 'unknown';
-    const displayName = clientName || (verifiedAddress.startsWith('did:privy:') ? `User_${verifiedAddress.slice(-6)}` : (verifiedAddress.startsWith('0x') ? `User_${verifiedAddress.slice(-6)}` : 'User'));
+    // Store the verified Privy DID as the canonical owner. The request body
+    // may include a display wallet address, but it must not control ownership.
+    const verifiedAddress = client.userId;
+    const displayName = clientName || (verifiedAddress.startsWith('did:privy:') ? `User_${verifiedAddress.slice(-6)}` : 'User');
 
     // Parse numeric budget amount from budget string (e.g. "$50 USDC" → 50)
     let budgetAmount = 0;
@@ -230,7 +229,7 @@ export async function POST(request: NextRequest) {
     await db.collection(COLLECTIONS.ACTIVITY).insertOne({
       type: "TaskCreated",
       taskId: result.insertedId,
-      actorAddress: client?.userId || clientAddress || agentAuth?.agent?.id || "unknown",
+      actorAddress: client.userId,
       actorName: displayName,
       metadata: { title, category, budget, hasTokenConfig: !!validatedTokenConfig, rubricItems: rubricResult.rubric.length },
       createdAt: new Date(),

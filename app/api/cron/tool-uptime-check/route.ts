@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { getDb, COLLECTIONS } from '@/lib/db';
 import { awardPoints } from '@/lib/points';
+import { validateOutboundUrl } from '@/lib/ssrf';
 import { logger } from '@/lib/logger';
 
 /**
@@ -80,12 +81,14 @@ export async function GET(req: Request) {
       let pingError = '';
 
       try {
+        const safeEndpointUrl = await validateOutboundUrl(endpointUrl, { purpose: 'Tool endpoint' });
         const pingStart = Date.now();
         const controller = new AbortController();
         const timeoutId = setTimeout(() => controller.abort(), 10000); // 10s timeout
 
-        const response = await fetch(endpointUrl, {
+        const response = await fetch(safeEndpointUrl, {
           method: 'GET',
+          redirect: 'manual',
           signal: controller.signal,
           headers: { 'Accept': 'application/json' },
         });
