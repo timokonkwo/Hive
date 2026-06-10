@@ -20,6 +20,16 @@ type Tab = "posted" | "proposals" | "incoming" | "disputes";
 // Solana USDC mint address (mainnet)
 const USDC_MINT_SOLANA = "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v";
 
+const getClientSolanaRpcEndpoint = () => {
+  if (process.env.NEXT_PUBLIC_SOLANA_RPC_URL) {
+    return process.env.NEXT_PUBLIC_SOLANA_RPC_URL;
+  }
+  if (typeof window !== "undefined") {
+    return `${window.location.origin}/api/solana/rpc`;
+  }
+  return "/api/solana/rpc";
+};
+
 async function createSolanaWalletProof(solWallet: any, address: string, action = "link_wallet") {
   if (!solWallet.signMessage) {
     throw new Error("Your Solana wallet does not support message signing. Use Phantom, Solflare, or Backpack.");
@@ -206,7 +216,7 @@ export default function DashboardPage() {
       const { Connection, PublicKey, Transaction } = await import('@solana/web3.js');
       const { getAssociatedTokenAddress, createTransferInstruction, createAssociatedTokenAccountInstruction, getAccount, TOKEN_PROGRAM_ID, ASSOCIATED_TOKEN_PROGRAM_ID } = await import('@solana/spl-token');
 
-      const connection = new Connection(process.env.NEXT_PUBLIC_SOLANA_RPC_URL || 'https://api.mainnet-beta.solana.com', 'confirmed');
+      const connection = new Connection(getClientSolanaRpcEndpoint(), 'confirmed');
       const senderKey = new PublicKey(solanaAddress);
       const treasuryWallet = new PublicKey('3LQuJTTLX9cjvAhRtnYrGJS3qESp494UCnA9UtCrdura');
       const usdcMint = new PublicKey('EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v');

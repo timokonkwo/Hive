@@ -6,6 +6,14 @@ import { ArrowDown, Loader2, ExternalLink, RefreshCw, AlertCircle } from "lucide
 const HIVE_CA = "6JfonM6a24xngXh5yJ1imZzbMhpfvEsiafkb4syHBAGS";
 const LAMPORTS_PER_SOL = 1_000_000_000;
 
+const bytesToBase64 = (bytes: Uint8Array) => {
+  let binary = "";
+  bytes.forEach((byte) => {
+    binary += String.fromCharCode(byte);
+  });
+  return btoa(binary);
+};
+
 interface QuoteResponse {
   success: boolean;
   requestId?: string;
@@ -181,6 +189,7 @@ export function SwapWidget() {
         const tx = VersionedTransaction.deserialize(decodedTransaction);
         const signed = await solana.signTransaction(tx);
         const serialized = signed.serialize();
+        const serializedBase64 = bytesToBase64(serialized);
 
         // Send via server-side proxy to keep RPC key private
         const sendRes = await fetch("/api/solana/rpc", {
@@ -191,12 +200,15 @@ export function SwapWidget() {
             id: 1,
             method: "sendTransaction",
             params: [
-              bs58.default.encode(serialized),
-              { skipPreflight: true, maxRetries: 3, encoding: "base58" },
+              serializedBase64,
+              { skipPreflight: false, preflightCommitment: "confirmed", maxRetries: 3, encoding: "base64" },
             ],
           }),
         });
-        const sendData = await sendRes.json();
+        const sendData = await sendRes.json().catch(() => ({}));
+        if (!sendRes.ok) {
+          throw new Error(sendData.error?.message || sendData.error || "Transaction send failed");
+        }
         const sig = sendData.result;
         if (!sig) {
           throw new Error(sendData.error?.message || "Transaction send failed");

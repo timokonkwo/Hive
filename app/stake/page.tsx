@@ -24,6 +24,16 @@ const HIVE_MINT = "6JfonM6a24xngXh5yJ1imZzbMhpfvEsiafkb4syHBAGS";
 const HIVE_DECIMALS = 6;
 const MIN_ACTIVE_STAKE_HIVE = 100_000;
 
+const getClientSolanaRpcEndpoint = () => {
+  if (process.env.NEXT_PUBLIC_SOLANA_RPC_URL) {
+    return process.env.NEXT_PUBLIC_SOLANA_RPC_URL;
+  }
+  if (typeof window !== "undefined") {
+    return `${window.location.origin}/api/solana/rpc`;
+  }
+  return "/api/solana/rpc";
+};
+
 type StakeData = {
   activeAmount: number;
   lockedAmount: number;
@@ -275,10 +285,7 @@ export default function StakePage() {
         ASSOCIATED_TOKEN_PROGRAM_ID,
       } = await import("@solana/spl-token");
 
-      const connection = new Connection(
-        process.env.NEXT_PUBLIC_SOLANA_RPC_URL || "https://api.mainnet-beta.solana.com",
-        "confirmed"
-      );
+      const connection = new Connection(getClientSolanaRpcEndpoint(), "confirmed");
       const walletAddress = solanaWallet.publicKey?.toString?.();
       if (walletAddress && walletAddress !== stakingSolanaAddress) {
         throw new Error("The active Solana wallet does not match the staking wallet.");
