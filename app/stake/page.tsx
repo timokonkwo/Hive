@@ -34,6 +34,28 @@ const getClientSolanaRpcEndpoint = () => {
   return "/api/solana/rpc";
 };
 
+const wait = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
+async function confirmSignatureByPolling(connection: any, signature: string, lastValidBlockHeight: number) {
+  const startedAt = Date.now();
+  while (Date.now() - startedAt < 60_000) {
+    const status = (await connection.getSignatureStatuses([signature]))?.value?.[0];
+    if (status?.err) {
+      throw new Error(`Transaction failed: ${JSON.stringify(status.err)}`);
+    }
+    if (status?.confirmationStatus === "confirmed" || status?.confirmationStatus === "finalized") {
+      return;
+    }
+
+    const blockHeight = await connection.getBlockHeight("confirmed");
+    if (blockHeight > lastValidBlockHeight) {
+      throw new Error("Transaction expired before confirmation. Please try again.");
+    }
+    await wait(1_500);
+  }
+  throw new Error("Transaction was sent but not confirmed in time. Check your wallet activity before retrying.");
+}
+
 type StakeData = {
   activeAmount: number;
   lockedAmount: number;
@@ -324,8 +346,8 @@ export default function StakePage() {
         )
       );
 
-      const { blockhash } = await connection.getLatestBlockhash("confirmed");
-      transaction.recentBlockhash = blockhash;
+      const latestBlockhash = await connection.getLatestBlockhash("confirmed");
+      transaction.recentBlockhash = latestBlockhash.blockhash;
       transaction.feePayer = senderKey;
 
       const signedTx = await solanaWallet.signTransaction(transaction);
@@ -334,15 +356,7 @@ export default function StakePage() {
         preflightCommitment: "confirmed",
       });
 
-      const latestBlockhash = await connection.getLatestBlockhash("confirmed");
-      await connection.confirmTransaction(
-        {
-          signature: txSignature,
-          blockhash: latestBlockhash.blockhash,
-          lastValidBlockHeight: latestBlockhash.lastValidBlockHeight,
-        },
-        "confirmed"
-      );
+      await confirmSignatureByPolling(connection, txSignature, latestBlockhash.lastValidBlockHeight);
 
       const res = await authFetch("/api/staking", {
         method: "POST",
