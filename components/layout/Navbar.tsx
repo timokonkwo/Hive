@@ -4,7 +4,7 @@ import React from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { usePathname } from "next/navigation";
-import { X, Book, Activity, Trophy, LogOut, Briefcase, Plus, Bot, Map, Coins, Lock, Scale } from "lucide-react";
+import { X, Book, Activity, Trophy, LogOut, Briefcase, Plus, Bot, Map, Lock, Scale } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { useAuthFetch } from "@/hooks/useAuthFetch";
 
@@ -74,10 +74,10 @@ export const Navbar = () => {
         <div className="hidden lg:flex flex-1 items-center justify-center gap-4 xl:gap-6 text-[13px] font-medium px-4">
           <NavLink href="/marketplace" label="Marketplace" pathname={pathname} isDark={isDark} />
           <NavLink href="/agents" label="Agents" pathname={pathname} isDark={isDark} />
+          <NavLink href="/registry" label="Registry" pathname={pathname} isDark={isDark} />
           <NavLink href="/agent/dashboard" label="Agent Hub" pathname={pathname} isDark={isDark} />
           <NavLink href="/docs" label="Docs" pathname={pathname} isDark={isDark} />
-          <NavLink href="/token" label="Token" pathname={pathname} isDark={isDark} />
-          <NavLink href="/stake" label="Stake" pathname={pathname} isDark={isDark} />
+          <NavLink href="/stake" label="$HIVE" pathname={pathname} isDark={isDark} />
           <NavLink href="/dao" label="DAO" pathname={pathname} isDark={isDark} />
 
           {authenticated && (
@@ -178,11 +178,11 @@ export const Navbar = () => {
              )}
              <MobileNavLink href="/marketplace" icon={Briefcase} label="Marketplace" isDark={isDark} onClick={() => setIsMenuOpen(false)} />
              <MobileNavLink href="/agents" icon={Trophy} label="Agents" isDark={isDark} onClick={() => setIsMenuOpen(false)} />
+             <MobileNavLink href="/registry" icon={Map} label="Registry" isDark={isDark} onClick={() => setIsMenuOpen(false)} />
              <MobileNavLink href="/agent/dashboard" icon={Bot} label="Agent Hub" isDark={isDark} onClick={() => setIsMenuOpen(false)} />
              <MobileNavLink href="/docs" icon={Book} label="Docs" isDark={isDark} onClick={() => setIsMenuOpen(false)} />
-             <MobileNavLink href="/stake" icon={Lock} label="Stake" isDark={isDark} onClick={() => setIsMenuOpen(false)} />
+             <MobileNavLink href="/stake" icon={Lock} label="$HIVE" isDark={isDark} onClick={() => setIsMenuOpen(false)} />
              <MobileNavLink href="/dao" icon={Scale} label="DAO" isDark={isDark} onClick={() => setIsMenuOpen(false)} />
-             <MobileNavLink href="/token" icon={Coins} label="Token" isDark={isDark} onClick={() => setIsMenuOpen(false)} />
              
              {authenticated ? (
                 <>

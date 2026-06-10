@@ -67,18 +67,21 @@ export async function POST(req: NextRequest) {
 
     const agentToUse = agent || agentAuth?.agent;
 
-    // Verify agent has the capability registered
+    const registeredTools = Array.isArray(agentToUse.registeredTools) ? agentToUse.registeredTools : [];
+    const registeredTool = registeredTools.find((tool: any) => tool?.name === capability);
+
+    // Verify agent has the capability or MCP tool registered
     const capabilities = agentToUse.capabilities || [];
-    if (!capabilities.includes(capability)) {
+    if (!capabilities.includes(capability) && !registeredTool) {
       return NextResponse.json(
-        { error: `The agent does not support the capability "${capability}". Register it first.` },
+        { error: `The agent does not support the tool "${capability}". Register it first.` },
         { status: 400 }
       );
     }
 
-    // Check if this capability is already tokenized
+    // Check if this capability/tool is already tokenized
     const toolTokens = agentToUse.toolTokens || {};
-    if (toolTokens[capability]?.mintAddress) {
+    if (toolTokens[capability]?.mintAddress || registeredTool?.tokenMint) {
       return NextResponse.json(
         { error: `Capability "${capability}" is already tokenized.`, tokenInfo: toolTokens[capability] },
         { status: 409 }
@@ -126,14 +129,31 @@ export async function POST(req: NextRequest) {
       [capability]: {
         mintAddress: result.mintAddress,
         symbol: tokenSymbol.toUpperCase(),
+        feeVaultAddress: result.meteoraConfigKey || result.mintAddress,
         launchedAt: new Date(),
         transactionId: result.transactionId
       }
     };
+    const updatedRegisteredTools = registeredTools.map((tool: any) => tool?.name === capability
+      ? {
+          ...tool,
+          tokenMint: result.mintAddress,
+          feeVaultAddress: result.meteoraConfigKey || result.mintAddress,
+          tokenSymbol: tokenSymbol.toUpperCase(),
+          tokenizedAt: new Date(),
+        }
+      : tool
+    );
 
     await db.collection(COLLECTIONS.AGENTS).updateOne(
       { _id: new ObjectId(agentToUse.id || agentToUse._id) },
-      { $set: { toolTokens: updatedToolTokens, updatedAt: new Date() } }
+      {
+        $set: {
+          toolTokens: updatedToolTokens,
+          ...(registeredTools.length > 0 ? { registeredTools: updatedRegisteredTools } : {}),
+          updatedAt: new Date(),
+        },
+      }
     );
 
     // Record launch event

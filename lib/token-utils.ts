@@ -87,7 +87,7 @@ export const STAKING_TIERS: Record<Exclude<StakingTier, 'none'>, StakingTierInfo
   staker: {
     id: 'staker',
     label: 'Staker',
-    threshold: 10_000,
+    threshold: 100_000,
     color: 'emerald',
     routingDiscountBps: 500,
     pointsMultiplier: 1.25,
@@ -103,7 +103,7 @@ export const STAKING_TIERS: Record<Exclude<StakingTier, 'none'>, StakingTierInfo
   power: {
     id: 'power',
     label: 'Power Staker',
-    threshold: 100_000,
+    threshold: 1_000_000,
     color: 'blue',
     routingDiscountBps: 1000,
     pointsMultiplier: 1.5,
@@ -119,7 +119,7 @@ export const STAKING_TIERS: Record<Exclude<StakingTier, 'none'>, StakingTierInfo
   governor: {
     id: 'governor',
     label: 'Governor',
-    threshold: 1_000_000,
+    threshold: 10_000_000,
     color: 'amber',
     routingDiscountBps: 2000,
     pointsMultiplier: 2,
@@ -267,7 +267,7 @@ export async function verifyHiveTransfer(
       if (amount < expectedRawAmount) continue;
       if (info.source !== senderAta.toBase58()) continue;
       if (info.destination !== recipientAta.toBase58()) continue;
-      if (parsed.type === 'transfer' && info.authority !== expectedSender) continue;
+      if (info.authority !== expectedSender) continue;
 
       return {
         verified: true,

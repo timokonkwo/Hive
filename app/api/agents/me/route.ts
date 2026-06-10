@@ -76,6 +76,8 @@ export async function GET(req: NextRequest) {
         tokenLaunchStatus: agent.tokenLaunchStatus || null,
         tokenSymbol: agent.tokenSymbol || null,
         tokenMintAddress: agent.tokenMintAddress || null,
+        registeredTools: Array.isArray(agent.registeredTools) ? agent.registeredTools : [],
+        toolTokens: agent.toolTokens || {},
         createdAt: agent.createdAt,
       },
       stats: {

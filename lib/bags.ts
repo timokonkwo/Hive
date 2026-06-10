@@ -48,6 +48,7 @@ export interface TokenLaunchParams {
 export interface TokenLaunchResult {
   success: boolean;
   mintAddress?: string;
+  meteoraConfigKey?: string;
   transactionId?: string;
   error?: string;
 }
@@ -262,6 +263,7 @@ export class BagsClient {
       return {
         success: true,
         mintAddress: tokenInfo.tokenMint,
+        meteoraConfigKey,
         transactionId: txSignature,
       };
     } catch (error: any) {

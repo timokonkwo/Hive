@@ -2,6 +2,9 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getDb, COLLECTIONS } from '@/lib/db';
 import { chargeToolInvocation, refundToolInvocation } from '@/lib/session-wallet';
 import { validateOutboundUrl } from '@/lib/ssrf';
+import { authenticateRequest } from '@/lib/api-key';
+import { authenticateClient } from '@/lib/client-auth';
+import { checkRateLimit, getClientIp } from '@/lib/rate-limit';
 
 type JsonRpcRequest = {
   jsonrpc?: string;
@@ -12,6 +15,7 @@ type JsonRpcRequest = {
 
 const MAX_PROVIDER_REQUEST_BYTES = 128 * 1024;
 const MAX_PROVIDER_RESPONSE_BYTES = 1024 * 1024;
+const MAX_MCP_REQUEST_BYTES = 128 * 1024;
 
 function jsonRpcResult(id: JsonRpcRequest['id'], result: any) {
   return NextResponse.json({ jsonrpc: '2.0', id: id ?? null, result });
@@ -47,16 +51,21 @@ async function resolveClientId(req: NextRequest): Promise<string | null> {
   if (key) {
     try {
       const db = await getDb();
-      const agent = await db.collection(COLLECTIONS.AGENTS).findOne({ apiKey: key });
-      if (agent) return agent.ownerAddress || agent._id.toString();
+      const auth = await authenticateRequest(req.headers, db);
+      if (auth?.agent) return auth.agent.ownerAddress || auth.agent.walletAddress || auth.agent.id;
     } catch { /* fall through */ }
   }
 
-  // Fallback: check for Privy user ID passed in custom header
-  const privyUserId = req.headers.get('x-privy-user-id');
-  if (privyUserId) return privyUserId;
+  const client = await authenticateClient(req);
+  if (client) return client.userId;
 
   return null;
+}
+
+function requestTooLarge(req: NextRequest) {
+  const rawLength = req.headers.get('content-length');
+  const length = rawLength ? Number(rawLength) : 0;
+  return Number.isFinite(length) && length > MAX_MCP_REQUEST_BYTES;
 }
 
 async function callJson(req: NextRequest, path: string, init: RequestInit = {}) {
@@ -149,6 +158,47 @@ const tools = [
   },
 ];
 
+async function listExternalTools() {
+  try {
+    const db = await getDb();
+    const agents = await db.collection(COLLECTIONS.AGENTS)
+      .find({
+        status: { $ne: 'suspended' },
+        'registeredTools.endpoint': { $exists: true },
+      })
+      .project({ name: 1, reputation: 1, registeredTools: 1, solanaAddress: 1 })
+      .limit(200)
+      .toArray();
+
+    const reserved = new Set(tools.map((tool) => tool.name));
+    const seen = new Set<string>();
+    return agents.flatMap((agent: any) =>
+      (Array.isArray(agent.registeredTools) ? agent.registeredTools : [])
+        .filter((tool: any) => tool?.name && tool?.endpoint && tool?.status !== 'disabled')
+        .filter((tool: any) => {
+          if (reserved.has(tool.name) || seen.has(tool.name)) return false;
+          seen.add(tool.name);
+          return true;
+        })
+        .map((tool: any) => ({
+          name: tool.name,
+          description: tool.description || `External Hive MCP tool from ${agent.name || 'registered provider'}.`,
+          inputSchema: tool.inputSchema || { type: 'object', properties: {} },
+          costPerCall: tool.costPerCall || 0,
+          provider: {
+            name: agent.name || null,
+            address: agent.solanaAddress || null,
+            reputation: agent.reputation || 0,
+          },
+          tokenMint: tool.tokenMint || null,
+          feeVaultAddress: tool.feeVaultAddress || null,
+        }))
+    );
+  } catch {
+    return [];
+  }
+}
+
 /**
  * Execute a built-in Hive tool. These are internal tools that don't
  * require forwarding to an external provider.
@@ -213,6 +263,7 @@ async function resolveExternalTool(toolName: string): Promise<{
   agentId: string;
 } | null> {
   try {
+    if (typeof toolName !== 'string' || toolName.length > 128) return null;
     const db = await getDb();
     // Look for an agent that has registered this tool capability
     const agent = await db.collection(COLLECTIONS.AGENTS).findOne({
@@ -285,7 +336,17 @@ async function forwardToProvider(
 // ── HTTP Handlers ──
 
 export async function GET(req: NextRequest) {
+  const ip = getClientIp(req);
+  const rl = checkRateLimit(`mcp-get:${ip}`, { maxRequests: 120, windowSeconds: 60 });
+  if (!rl.allowed) {
+    return NextResponse.json(
+      { error: `Rate limited. Try again in ${rl.resetInSeconds}s.` },
+      { status: 429, headers: { 'Retry-After': String(rl.resetInSeconds) } }
+    );
+  }
+
   const baseUrl = new URL(req.url).origin;
+  const externalTools = await listExternalTools();
   return NextResponse.json({
     name: 'Hive MCP Gateway',
     version: '0.2.0',
@@ -296,14 +357,37 @@ export async function GET(req: NextRequest) {
       header: 'x-hive-api-key',
       bearerSupported: true,
     },
-    tools: tools.map(({ name, description }) => ({ name, description })),
+    tools: [
+      ...tools.map(({ name, description }) => ({ name, description })),
+      ...externalTools.map(({ name, description, costPerCall, provider, tokenMint }) => ({
+        name,
+        description,
+        costPerCall,
+        provider,
+        tokenMint,
+      })),
+    ],
   });
 }
 
 export async function POST(req: NextRequest) {
+  const ip = getClientIp(req);
+  const rl = checkRateLimit(`mcp-post:${ip}`, { maxRequests: 60, windowSeconds: 60 });
+  if (!rl.allowed) {
+    return jsonRpcError(null, -32029, `Rate limited. Try again in ${rl.resetInSeconds}s.`, 429);
+  }
+
+  if (requestTooLarge(req)) {
+    return jsonRpcError(null, -32600, 'MCP request payload is too large.', 413);
+  }
+
   let rpc: JsonRpcRequest;
   try {
-    rpc = await req.json();
+    const raw = await req.text();
+    if (Buffer.byteLength(raw, 'utf8') > MAX_MCP_REQUEST_BYTES) {
+      return jsonRpcError(null, -32600, 'MCP request payload is too large.', 413);
+    }
+    rpc = JSON.parse(raw);
   } catch {
     return jsonRpcError(null, -32700, 'Invalid JSON');
   }
@@ -318,18 +402,25 @@ export async function POST(req: NextRequest) {
     }
 
     if (rpc.method === 'tools/list') {
-      return jsonRpcResult(rpc.id, { tools });
+      return jsonRpcResult(rpc.id, { tools: [...tools, ...(await listExternalTools())] });
     }
 
     if (rpc.method === 'tools/call') {
       const toolName = rpc.params?.name;
       const toolArgs = rpc.params?.arguments || {};
+      if (typeof toolName !== 'string' || toolName.length === 0 || toolName.length > 128) {
+        return jsonRpcError(rpc.id, -32602, 'tools/call requires a valid string params.name.');
+      }
 
       // Check if this is a registered external provider tool
       const externalTool = await resolveExternalTool(toolName);
 
       if (externalTool && externalTool.costPerCall > 0) {
         // ─── Paid external tool: authenticate + charge + forward ───
+        if (!externalTool.providerAddress) {
+          return jsonRpcError(rpc.id, -32004, 'Provider payout wallet is not configured.', 409);
+        }
+
         const clientId = await resolveClientId(req);
         if (!clientId) {
           return jsonRpcError(rpc.id, -32001, 'Authentication required. Provide x-hive-api-key or authorization header.', 401);
@@ -375,6 +466,15 @@ export async function POST(req: NextRequest) {
             });
           } catch { /* best effort logging */ }
 
+          return jsonRpcError(rpc.id, -32003, `Provider execution failed: ${fwdError.message}`);
+        }
+      }
+
+      if (externalTool) {
+        try {
+          const result = await forwardToProvider(externalTool.providerEndpoint, rpc);
+          return jsonRpcResult(rpc.id, result);
+        } catch (fwdError: any) {
           return jsonRpcError(rpc.id, -32003, `Provider execution failed: ${fwdError.message}`);
         }
       }

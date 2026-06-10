@@ -60,6 +60,7 @@ export async function GET(request: NextRequest) {
         twitter: profile.twitter || null,
         website: profile.website || null,
         solanaAddress: profile.solanaAddress || null,
+        solanaAddressVerifiedAt: profile.solanaAddressVerifiedAt || null,
         createdAt: profile.createdAt,
         updatedAt: profile.updatedAt,
       },

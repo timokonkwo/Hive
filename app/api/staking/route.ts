@@ -5,6 +5,8 @@ import { authenticateClient } from '@/lib/client-auth';
 import { authenticateRequest } from '@/lib/api-key';
 import {
   ALL_STAKING_TIERS,
+  HIVE_DECIMALS,
+  STAKING_TIERS,
   getStakingTier,
   getStakingTierInfo,
   verifyHiveTransfer,
@@ -14,6 +16,13 @@ import { checkRateLimit, getClientIp, RATE_LIMITS } from '@/lib/rate-limit';
 import { logger } from '@/lib/logger';
 
 const TX_SIGNATURE_REGEX = /^[1-9A-HJ-NP-Za-km-z]{64,100}$/;
+const MAX_STAKE_HIVE = 1_000_000_000;
+const MIN_ACTIVE_STAKE_HIVE = STAKING_TIERS.staker.threshold;
+
+function hasValidHivePrecision(amount: number) {
+  const raw = amount * Math.pow(10, HIVE_DECIMALS);
+  return Number.isSafeInteger(Math.round(raw)) && Math.abs(raw - Math.round(raw)) < 1e-6;
+}
 
 async function resolveStaker(req: NextRequest, db: any) {
   const client = await authenticateClient(req);
@@ -114,10 +123,13 @@ export async function POST(req: NextRequest) {
       !solanaAddress ||
       typeof solanaAddress !== 'string' ||
       typeof amountHive !== 'number' ||
-      amountHive <= 0
+      !Number.isFinite(amountHive) ||
+      amountHive <= 0 ||
+      amountHive > MAX_STAKE_HIVE ||
+      !hasValidHivePrecision(amountHive)
     ) {
       return NextResponse.json(
-        { error: 'txSignature, solanaAddress, and a positive amountHive are required.' },
+        { error: `txSignature, solanaAddress, and a positive amountHive with up to ${HIVE_DECIMALS} decimals are required.` },
         { status: 400 }
       );
     }
@@ -144,6 +156,15 @@ export async function POST(req: NextRequest) {
       return NextResponse.json(
         { error: 'Stake sender must match the Solana wallet linked to this Hive account.' },
         { status: 403 }
+      );
+    }
+
+    const existingStake = await db.collection(COLLECTIONS.STAKES).findOne({ stakerId: staker.stakerId });
+    const projectedActiveStake = (existingStake?.activeAmount || 0) + amountHive;
+    if (projectedActiveStake < MIN_ACTIVE_STAKE_HIVE) {
+      return NextResponse.json(
+        { error: `Minimum active stake is ${MIN_ACTIVE_STAKE_HIVE.toLocaleString()} HIVE.` },
+        { status: 400 }
       );
     }
 
@@ -244,7 +265,7 @@ export async function POST(req: NextRequest) {
         { _id: new ObjectId(staker.stakerId) },
         {
           $set: {
-            isStaked: activeAmount >= 10_000,
+            isStaked: activeAmount >= MIN_ACTIVE_STAKE_HIVE,
             stakedAmount: activeAmount,
             stakingTier: tier,
             updatedAt: now,

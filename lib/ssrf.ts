@@ -37,6 +37,14 @@ function ownHostnames(): Set<string> {
 function isBlockedHostname(hostname: string, blockOwnHostnames: boolean): boolean {
   const host = normalizeHostname(hostname);
   if (BLOCKED_HOSTNAMES.has(host) || host.endsWith('.localhost')) return true;
+  if (
+    host.endsWith('.local') ||
+    host.endsWith('.internal') ||
+    host.endsWith('.lan') ||
+    host.endsWith('.home.arpa') ||
+    host.endsWith('.svc') ||
+    host.endsWith('.cluster.local')
+  ) return true;
   if (blockOwnHostnames && ownHostnames().has(host)) return true;
   return false;
 }
@@ -118,6 +126,10 @@ export async function validateOutboundUrl(
 
   if (url.username || url.password) {
     throw new Error(`${purpose} must not include credentials.`);
+  }
+
+  if (!localhostAllowed && url.port && url.port !== '443') {
+    throw new Error(`${purpose} must use the default HTTPS port.`);
   }
 
   if (localhostAllowed) return url;
