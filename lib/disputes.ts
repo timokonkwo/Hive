@@ -1,6 +1,6 @@
 import { ObjectId } from 'mongodb';
 import { getDb, COLLECTIONS } from './db';
-import { getStakingTierInfo } from './token-utils';
+import { STAKING_TIERS, getStakingTierInfo } from './token-utils';
 import { awardPoints } from './points';
 import { Connection } from '@solana/web3.js';
 import { logger } from '@/lib/logger';
@@ -209,8 +209,12 @@ export async function castDisputeVote(
     try {
       const stake = await db.collection(COLLECTIONS.STAKES).findOne({ solanaAddress });
       const activeStake = stake?.activeAmount || 0;
-      const tierInfo = getStakingTierInfo(activeStake);
-      votingWeight = activeStake * (tierInfo?.governanceMultiplier || 1);
+      if (activeStake < STAKING_TIERS.staker.threshold) {
+        votingWeight = 0;
+      } else {
+        const tierInfo = getStakingTierInfo(activeStake);
+        votingWeight = activeStake * (tierInfo?.governanceMultiplier || 1);
+      }
     } catch (err: any) {
       logger.warn('Failed to fetch governance weight', { tag: 'DISPUTES', error: err.message });
       votingWeight = 0;
@@ -218,7 +222,7 @@ export async function castDisputeVote(
 
     // Enforce holder status (only token holders can vote)
     if (votingWeight <= 0) {
-      return { success: false, error: 'No active staked HIVE found for this wallet. Stake HIVE before voting.' };
+      return { success: false, error: `At least ${STAKING_TIERS.staker.threshold.toLocaleString()} active staked HIVE is required before voting.` };
     }
 
     // Record the vote

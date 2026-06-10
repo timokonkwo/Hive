@@ -55,6 +55,8 @@ interface AgentData {
   tokenLaunchStatus: string | null;
   tokenSymbol: string | null;
   tokenMintAddress: string | null;
+  registeredTools?: any[];
+  toolTokens?: Record<string, any>;
   createdAt: string;
 }
 
@@ -1096,6 +1098,12 @@ export default function AgentDashboardPage() {
                       </span>
                     ))}
                   </div>
+                  <Link
+                    href="/agent/dashboard/tools"
+                    className="mt-4 inline-flex items-center gap-2 px-3 py-2 bg-white text-black hover:bg-zinc-200 rounded text-xs font-bold transition-colors"
+                  >
+                    <Plug size={14} /> Manage MCP Tools
+                  </Link>
                 </div>
 
                 {/* Payment Wallet */}
@@ -1629,20 +1637,30 @@ export default function AgentDashboardPage() {
                     <h3 className="text-sm font-bold font-mono uppercase tracking-widest text-zinc-400 flex items-center gap-2">
                       <Coins size={14} className="text-violet-400" /> Tool Tokenization
                     </h3>
-                    <span className="text-[9px] font-mono uppercase text-zinc-500">Bags.fm Protocol</span>
+                    <Link href="/agent/dashboard/tools" className="text-[9px] font-mono uppercase text-violet-400 hover:text-violet-300">Manage Tools</Link>
                   </div>
 
                   <div className="space-y-3">
-                    {agent.capabilities && agent.capabilities.length > 0 ? (
-                      agent.capabilities.map((cap) => {
-                        const tokenInfo = (agent as any).toolTokens?.[cap];
-                        const isTokenized = !!tokenInfo?.mintAddress;
+                    {((agent.registeredTools && agent.registeredTools.length > 0) ? agent.registeredTools : agent.capabilities || []).length > 0 ? (
+                      ((agent.registeredTools && agent.registeredTools.length > 0) ? agent.registeredTools : agent.capabilities || []).map((item: any) => {
+                        const cap = typeof item === 'string' ? item : item.name;
+                        const tokenInfo = (typeof item === 'object' && item.tokenMint ? {
+                          mintAddress: item.tokenMint,
+                          symbol: item.tokenSymbol,
+                        } : null) || (agent as any).toolTokens?.[cap];
+                        const isTokenized = !!(tokenInfo?.mintAddress || (typeof item === 'object' && item.tokenMint));
+                        const cost = typeof item === 'object' ? item.costPerCall : null;
 
                         return (
                           <div key={cap} className="p-4 bg-black/30 border border-zinc-800/80 rounded-lg flex flex-col md:flex-row md:items-center justify-between gap-4">
                             <div>
                               <div className="flex items-center gap-2">
                                 <span className="text-xs font-bold font-mono uppercase text-white">{cap}</span>
+                                {cost !== null && (
+                                  <span className="text-[8px] font-mono bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 px-1.5 py-0.5 rounded uppercase font-bold">
+                                    ${Number(cost || 0).toFixed(4)}/call
+                                  </span>
+                                )}
                                 {isTokenized && (
                                   <span className="text-[8px] font-mono bg-violet-500/10 text-violet-400 border border-violet-500/20 px-1.5 py-0.5 rounded uppercase font-bold">
                                     Tokenized
@@ -1652,7 +1670,9 @@ export default function AgentDashboardPage() {
                               <p className="text-[10px] text-zinc-500 font-mono mt-1">
                                 {isTokenized 
                                   ? `Mint: ${tokenInfo.mintAddress.slice(0, 8)}...${tokenInfo.mintAddress.slice(-8)}`
-                                  : "Tokenize capability to distribute microfees to holders."}
+                                  : typeof item === 'object'
+                                    ? "Tokenize this registered MCP tool's fee stream."
+                                    : "Legacy capability. Register a dedicated MCP tool for endpoint routing."}
                               </p>
                             </div>
 
@@ -1712,8 +1732,11 @@ export default function AgentDashboardPage() {
                         );
                       })
                     ) : (
-                      <div className="text-center py-6 text-zinc-500 text-xs font-mono">
-                        No registered capabilities found.
+                      <div className="text-center py-6">
+                        <p className="text-zinc-500 text-xs font-mono">No MCP tools registered yet.</p>
+                        <Link href="/agent/dashboard/tools" className="inline-flex mt-3 text-[10px] font-mono uppercase tracking-widest text-violet-400 hover:text-violet-300">
+                          Register Tool
+                        </Link>
                       </div>
                     )}
                   </div>
@@ -1733,7 +1756,7 @@ export default function AgentDashboardPage() {
                       <div>
                         <div className="text-[10px] text-zinc-500 font-mono uppercase">Staked Balance</div>
                         <div className="text-white font-mono font-bold text-xl mt-0.5">{stakedBalance.toLocaleString()} $HIVE</div>
-                        <p className="text-[9px] text-zinc-600 font-mono mt-1">Minimum required: 10,000 HIVE</p>
+                        <p className="text-[9px] text-zinc-600 font-mono mt-1">Minimum required: 100,000 HIVE</p>
                       </div>
                       <div className="text-right">
                         <div className="text-[10px] text-zinc-500 font-mono uppercase">Node Status</div>
