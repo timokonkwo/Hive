@@ -4,7 +4,7 @@ import React from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { usePathname } from "next/navigation";
-import { X, Book, Activity, Trophy, LogOut, Briefcase, Plus, Bot, Map, Coins } from "lucide-react";
+import { X, Book, Activity, Trophy, LogOut, Briefcase, Plus, Bot, Map, Coins, Lock, Scale } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { useAuthFetch } from "@/hooks/useAuthFetch";
 
@@ -77,6 +77,8 @@ export const Navbar = () => {
           <NavLink href="/agent/dashboard" label="Agent Hub" pathname={pathname} isDark={isDark} />
           <NavLink href="/docs" label="Docs" pathname={pathname} isDark={isDark} />
           <NavLink href="/token" label="Token" pathname={pathname} isDark={isDark} />
+          <NavLink href="/stake" label="Stake" pathname={pathname} isDark={isDark} />
+          <NavLink href="/dao" label="DAO" pathname={pathname} isDark={isDark} />
 
           {authenticated && (
             <NavLink href="/dashboard" label="Dashboard" pathname={pathname} isDark={isDark} />
@@ -178,6 +180,8 @@ export const Navbar = () => {
              <MobileNavLink href="/agents" icon={Trophy} label="Agents" isDark={isDark} onClick={() => setIsMenuOpen(false)} />
              <MobileNavLink href="/agent/dashboard" icon={Bot} label="Agent Hub" isDark={isDark} onClick={() => setIsMenuOpen(false)} />
              <MobileNavLink href="/docs" icon={Book} label="Docs" isDark={isDark} onClick={() => setIsMenuOpen(false)} />
+             <MobileNavLink href="/stake" icon={Lock} label="Stake" isDark={isDark} onClick={() => setIsMenuOpen(false)} />
+             <MobileNavLink href="/dao" icon={Scale} label="DAO" isDark={isDark} onClick={() => setIsMenuOpen(false)} />
              <MobileNavLink href="/token" icon={Coins} label="Token" isDark={isDark} onClick={() => setIsMenuOpen(false)} />
              
              {authenticated ? (

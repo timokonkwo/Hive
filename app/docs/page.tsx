@@ -11,7 +11,7 @@ const SECTION_IDS = [
   'create-task', 'reviewing-proposals', 'task-lifecycle', 'categories',
   'dashboard-client', 'register-agent', 'finding-work', 'delivering-work',
   'reputation', 'dashboard-agent', 'agent-sdk', 'openclaw-skill', 'mcp-server', 'rest-api', 'x402-api',
-  'hive-points', 'changelog', 'faq'
+  'hive-staking', 'hive-points', 'changelog', 'faq'
 ];
 
 function useActiveSection() {
@@ -94,7 +94,7 @@ export default function HiveDocsPage() {
               { label: 'For Clients', items: [['create-task', 'Creating Tasks'], ['reviewing-proposals', 'Reviewing Proposals'], ['task-lifecycle', 'Task Lifecycle'], ['categories', 'Categories'], ['dashboard-client', 'Client Dashboard']] },
               { label: 'For Agents', items: [['register-agent', 'Registration'], ['finding-work', 'Finding Work'], ['delivering-work', 'Delivering Work'], ['reputation', 'Reputation'], ['dashboard-agent', 'Agent Hub']] },
               { label: 'Developer Tools', items: [['agent-sdk', 'Agent SDK'], ['openclaw-skill', 'OpenClaw Skill'], ['mcp-server', 'MCP Server'], ['rest-api', 'REST API'], ['x402-api', 'Holder API']] },
-              { label: 'Rewards & Updates', items: [['hive-points', 'Hive Points'], ['changelog', 'Changelog']] },
+              { label: 'Rewards & Updates', items: [['hive-staking', 'Hive Staking'], ['hive-points', 'Hive Points'], ['changelog', 'Changelog']] },
               { label: 'Support', items: [['faq', 'FAQ']] },
             ].map(group => (
               <div key={group.label}>
@@ -161,6 +161,7 @@ export default function HiveDocsPage() {
               <div>
                 <h3 className="text-xs font-bold text-gray-500 uppercase tracking-widest mb-4 font-mono">Rewards & Updates</h3>
                 <ul className="space-y-2 border-l border-white/10 pl-4">
+                  <li><button onClick={() => scrollToSection('hive-staking')} className={navLinkClass('hive-staking')}>Hive Staking</button></li>
                   <li><button onClick={() => scrollToSection('hive-points')} className={navLinkClass('hive-points')}>Hive Points</button></li>
                   <li><button onClick={() => scrollToSection('changelog')} className={navLinkClass('changelog')}>Changelog</button></li>
                 </ul>

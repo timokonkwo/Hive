@@ -19,6 +19,8 @@ export const PUBLIC_RATE_LIMIT = 60;
 // Headers
 export const X402_HEADERS = {
   WALLET_ADDRESS: 'X-Wallet-Address',
+  WALLET_MESSAGE: 'X-Wallet-Message',
+  WALLET_SIGNATURE: 'X-Wallet-Signature',
   HOLDER_TIER: 'X-Holder-Tier',
   HOLDER_BALANCE: 'X-Holder-Balance',
   PAYMENT_REQUIRED: 'X-Payment-Required',

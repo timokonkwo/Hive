@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getDb, COLLECTIONS } from '@/lib/db';
-import { chargeToolInvocation } from '@/lib/session-wallet';
+import { chargeToolInvocation, refundToolInvocation } from '@/lib/session-wallet';
 import { validateOutboundUrl } from '@/lib/ssrf';
 
 type JsonRpcRequest = {
@@ -9,6 +9,9 @@ type JsonRpcRequest = {
   method?: string;
   params?: any;
 };
+
+const MAX_PROVIDER_REQUEST_BYTES = 128 * 1024;
+const MAX_PROVIDER_RESPONSE_BYTES = 1024 * 1024;
 
 function jsonRpcResult(id: JsonRpcRequest['id'], result: any) {
   return NextResponse.json({ jsonrpc: '2.0', id: id ?? null, result });
@@ -246,15 +249,33 @@ async function forwardToProvider(
 
   try {
     const endpoint = await validateOutboundUrl(providerEndpoint, { purpose: 'Provider endpoint' });
+    const body = JSON.stringify(rpc);
+    if (Buffer.byteLength(body, 'utf8') > MAX_PROVIDER_REQUEST_BYTES) {
+      throw new Error('Provider request payload is too large.');
+    }
+
     const response = await fetch(endpoint, {
       method: 'POST',
       redirect: 'manual',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(rpc),
+      body,
       signal: controller.signal,
     });
 
-    const data = await response.json();
+    if (!response.ok) {
+      throw new Error(`Provider returned HTTP ${response.status}.`);
+    }
+
+    const text = await response.text();
+    if (Buffer.byteLength(text, 'utf8') > MAX_PROVIDER_RESPONSE_BYTES) {
+      throw new Error('Provider response payload is too large.');
+    }
+
+    const data = text ? JSON.parse(text) : {};
+    if (data?.error) {
+      const message = typeof data.error?.message === 'string' ? data.error.message : 'Provider returned a JSON-RPC error.';
+      throw new Error(message.slice(0, 300));
+    }
     return data.result || data;
   } finally {
     clearTimeout(timeoutId);
@@ -331,6 +352,13 @@ export async function POST(req: NextRequest) {
           const result = await forwardToProvider(externalTool.providerEndpoint, rpc);
           return jsonRpcResult(rpc.id, result);
         } catch (fwdError: any) {
+          await refundToolInvocation(
+            clientId,
+            charge.ledgerId,
+            charge.chargedCost || externalTool.costPerCall,
+            fwdError.message || 'Provider execution failed.'
+          ).catch(() => undefined);
+
           // Log as potential dispute candidate
           try {
             const db = await getDb();

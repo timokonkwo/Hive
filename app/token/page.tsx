@@ -106,6 +106,12 @@ const PERKS = [
     desc: "Smart recommendations, competition analysis, historical trends, and bulk export — exclusive to holders.",
     gradient: "from-emerald-500/10 to-transparent",
   },
+  {
+    icon: Shield,
+    title: "Stake for More Utility",
+    desc: "Stake HIVE to unlock routing discounts, boosted Hive Points, stronger governance weight, and protocol trust badges.",
+    gradient: "from-amber-500/10 to-transparent",
+  },
 ];
 
 export default function TokenPage() {
@@ -174,32 +180,16 @@ export default function TokenPage() {
 
   return (
     <div className="min-h-screen bg-[#020202] text-white font-sans selection:bg-emerald-500 selection:text-black relative overflow-x-hidden">
-      {/* Subtle Ambient Dot Grid */}
-      <div 
-        className="absolute inset-0 pointer-events-none z-0" 
-        style={{
-          backgroundImage: 'radial-gradient(rgba(255, 255, 255, 0.1) 1px, transparent 1px)',
-          backgroundSize: '32px 32px',
-          maskImage: 'radial-gradient(circle at center 200px, black, transparent 70%)',
-          WebkitMaskImage: 'radial-gradient(circle at center 200px, black, transparent 70%)'
-        }}
-      />
       <Navbar />
 
       <main className="pt-28 pb-20 relative z-10">
         <div className="max-w-6xl mx-auto px-4 md:px-6">
 
           {/* Hero Section */}
-          <div className="text-center mb-16">
-            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-500 text-[10px] font-mono uppercase tracking-widest mb-6">
-              <Coins size={11} /> Utility Token
-            </div>
+          <div className="text-center mb-12">
             <h1 className="text-4xl md:text-6xl font-black uppercase tracking-tight mb-4">
               <span className="text-emerald-500">$HIVE</span> Token
             </h1>
-            <p className="text-zinc-400 max-w-lg mx-auto text-sm md:text-base leading-relaxed">
-              Hold $HIVE to earn from the platform, get priority access to top agents, and unlock exclusive perks.
-            </p>
 
             {/* Contract Address */}
             <div className="mt-6 flex justify-center">
@@ -218,6 +208,14 @@ export default function TokenPage() {
                   <Copy size={11} className="text-zinc-600 group-hover:text-emerald-400 transition-colors" />
                 )}
               </button>
+            </div>
+            <div className="mt-5 flex justify-center">
+              <Link
+                href="/stake"
+                className="inline-flex items-center gap-2 px-4 py-2 bg-white text-black hover:bg-zinc-200 rounded-full text-xs font-bold transition-colors"
+              >
+                Stake HIVE <ArrowRight size={14} />
+              </Link>
             </div>
           </div>
 
@@ -263,7 +261,7 @@ export default function TokenPage() {
                 <Coins size={11} className="text-zinc-600" /> Holder Tiers
               </h2>
               <p className="text-zinc-600 text-xs max-w-md mx-auto">
-                The more you hold, the more you unlock. Each tier builds on the previous one.
+                Holding unlocks premium access. Staking on <Link href="/stake" className="text-emerald-400 hover:text-emerald-300">/stake</Link> adds discounts, boosted points, and governance weight.
               </p>
             </div>
 

@@ -20,6 +20,29 @@ type Tab = "posted" | "proposals" | "incoming" | "disputes";
 // Solana USDC mint address (mainnet)
 const USDC_MINT_SOLANA = "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v";
 
+async function createSolanaWalletProof(solWallet: any, address: string, action = "link_wallet") {
+  if (!solWallet.signMessage) {
+    throw new Error("Your Solana wallet does not support message signing. Use Phantom, Solflare, or Backpack.");
+  }
+  const nonceBytes = crypto.getRandomValues(new Uint8Array(16));
+  const nonce = Array.from(nonceBytes).map((byte) => byte.toString(16).padStart(2, "0")).join("");
+  const timestamp = Date.now();
+  const message = [
+    "Hive Solana Wallet Proof",
+    `Action: ${action}`,
+    `Address: ${address}`,
+    `Nonce: ${nonce}`,
+    `Timestamp: ${timestamp}`,
+  ].join("\n");
+  const signed = await solWallet.signMessage(new TextEncoder().encode(message), "utf8");
+  const signatureBytes = signed?.signature || signed;
+  const { default: bs58 } = await import("bs58");
+  return {
+    message,
+    signature: bs58.encode(signatureBytes),
+  };
+}
+
 export default function DashboardPage() {
   const { authenticated, login, user, ready } = useAuth();
   const authFetch = useAuthFetch();
@@ -295,7 +318,7 @@ export default function DashboardPage() {
     }
   }, [activeTab, fetchDisputes]);
 
-  // Vote on active disputes using dynamic HIVE balance token weight
+  // Vote on active disputes using active staked HIVE weight
   const handleVoteDispute = async (disputeId: string, vote: 'slash' | 'dismiss') => {
     if (!solanaAddress) {
       toast.error("Please connect your Solana wallet to participate in voting.");
@@ -303,13 +326,25 @@ export default function DashboardPage() {
     }
     setVotingDisputeId(disputeId);
     try {
+      const solanaWallet = (window as any).solana
+        || (window as any).phantom?.solana
+        || (window as any).solflare
+        || (window as any).backpack?.solana;
+      if (!solanaWallet) {
+        throw new Error("No Solana wallet found.");
+      }
+      if (!solanaWallet.isConnected) {
+        await solanaWallet.connect();
+      }
+      const walletProof = await createSolanaWalletProof(solanaWallet, solanaAddress, `dao_vote:${disputeId}:${vote}`);
       const res = await fetch("/api/disputes/vote", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           disputeId,
           vote,
-          solanaAddress
+          solanaAddress,
+          walletProof
         })
       });
       const result = await res.json();
@@ -803,11 +838,12 @@ export default function DashboardPage() {
 
                         const response = await solWallet.connect();
                         const connectedAddress = response.publicKey.toString();
+                        const walletProof = await createSolanaWalletProof(solWallet, connectedAddress);
 
                         const res = await fetch("/api/clients/profile", {
                           method: "PATCH",
                           headers: { "Content-Type": "application/json" },
-                          body: JSON.stringify({ address, solanaAddress: connectedAddress }),
+                          body: JSON.stringify({ address, solanaAddress: connectedAddress, walletProof }),
                         });
 
                         if (res.ok) {
@@ -1140,7 +1176,7 @@ export default function DashboardPage() {
           <div className="flex items-center justify-between">
             <div>
               <h2 className="text-xl font-bold font-mono uppercase tracking-wide">Slashing Disputes</h2>
-              <p className="text-zinc-500 text-xs font-mono mt-1">Staker slashing console. Vote using HIVE token balance weight.</p>
+              <p className="text-zinc-500 text-xs font-mono mt-1">Staker slashing console. Vote using active staked HIVE weight.</p>
             </div>
             <button
               onClick={fetchDisputes}

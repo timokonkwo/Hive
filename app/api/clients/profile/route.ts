@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getDb, COLLECTIONS } from '@/lib/db';
 import { checkRateLimit, getClientIp, RATE_LIMITS } from '@/lib/rate-limit';
 import { authenticateClient } from '@/lib/client-auth';
+import { verifyAndConsumeSolanaMessageSignature } from '@/lib/solana-signature';
+import { PublicKey } from '@solana/web3.js';
 import { logger } from '@/lib/logger';
 
 export const dynamic = 'force-dynamic';
@@ -85,7 +87,7 @@ export async function PATCH(request: NextRequest) {
     }
 
     const body = await request.json();
-    const { address, name, bio, company, twitter, website, solanaAddress } = body;
+    const { address, name, bio, company, twitter, website, solanaAddress, walletProof } = body;
 
     const verified = await authenticateClient(request);
     if (!verified) {
@@ -94,6 +96,7 @@ export async function PATCH(request: NextRequest) {
         { status: 401 }
       );
     }
+    const db = await getDb();
     const externalAddress = typeof address === 'string' && address.trim() ? address.trim() : null;
     const profileAddress = verified.userId;
 
@@ -124,7 +127,6 @@ export async function PATCH(request: NextRequest) {
       if (solanaAddress !== null && solanaAddress !== '') {
         // SECURITY: Validate Solana address format
         try {
-          const { PublicKey } = await import('@solana/web3.js');
           new PublicKey(solanaAddress);
         } catch {
           return NextResponse.json({ error: 'Invalid Solana wallet address.' }, { status: 400 });
@@ -132,13 +134,33 @@ export async function PATCH(request: NextRequest) {
         if (typeof solanaAddress !== 'string' || solanaAddress.length > 50) {
           return NextResponse.json({ error: 'Invalid Solana wallet address format.' }, { status: 400 });
         }
-        updates.solanaAddress = solanaAddress.trim();
+        const normalizedSolanaAddress = new PublicKey(solanaAddress).toBase58();
+        const proof = walletProof && typeof walletProof === 'object' ? walletProof : null;
+        if (!proof?.message || !proof?.signature) {
+          return NextResponse.json(
+            { error: 'Wallet signature required to link this Solana address.' },
+            { status: 400 }
+          );
+        }
+        const verifiedProof = await verifyAndConsumeSolanaMessageSignature(db, {
+          address: normalizedSolanaAddress,
+          action: 'link_wallet',
+          message: proof.message,
+          signature: proof.signature,
+        });
+        if (!verifiedProof.verified) {
+          return NextResponse.json(
+            { error: verifiedProof.error || 'Wallet signature could not be verified.' },
+            { status: 400 }
+          );
+        }
+        updates.solanaAddress = normalizedSolanaAddress;
+        updates.solanaAddressVerifiedAt = new Date();
       } else {
         updates.solanaAddress = null;
+        updates.solanaAddressVerifiedAt = null;
       }
     }
-
-    const db = await getDb();
 
     // Upsert: create if not exists, update if exists
     const result = await db.collection(COLLECTIONS.CLIENTS).updateOne(

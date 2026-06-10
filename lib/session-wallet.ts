@@ -1,6 +1,7 @@
 import { getDb, COLLECTIONS } from './db';
 import { verifyUsdcTransfer } from './solana-pay';
 import { logger } from '@/lib/logger';
+import { getStakingTierInfo } from './token-utils';
 
 /**
  * Record a client deposit to their session budget.
@@ -15,13 +16,32 @@ export async function depositSessionBudget(
   try {
     const db = await getDb();
 
-    // Check if signature was already processed
-    const alreadyProcessed = await db.collection(COLLECTIONS.SESSION_LEDGER).findOne({
-      settlementTxSignature: txSignature,
-      type: 'deposit'
-    });
-    if (alreadyProcessed) {
-      return { success: false, error: 'Transaction has already been processed.' };
+    try {
+      await db.collection(COLLECTIONS.SESSION_LEDGER).createIndex(
+        { settlementTxSignature: 1, type: 1 },
+        { unique: true, partialFilterExpression: { type: 'deposit' }, background: true }
+      );
+    } catch {
+      return { success: false, error: 'Deposit replay protection is not ready. Try again shortly.' };
+    }
+
+    let ledgerId: any;
+    try {
+      const ledgerResult = await db.collection(COLLECTIONS.SESSION_LEDGER).insertOne({
+        userId,
+        type: 'deposit',
+        amount: amountUsdc,
+        timestamp: new Date(),
+        status: 'pending',
+        settlementTxSignature: txSignature,
+        solanaAddress
+      });
+      ledgerId = ledgerResult.insertedId;
+    } catch (insertError: any) {
+      if (insertError?.code === 11000) {
+        return { success: false, error: 'Transaction has already been processed.' };
+      }
+      throw insertError;
     }
 
     const treasuryWallet = process.env.HIVE_TREASURY_WALLET || '3LQuJTTLX9cjvAhRtnYrGJS3qESp494UCnA9UtCrdura';
@@ -35,42 +55,56 @@ export async function depositSessionBudget(
     );
 
     if (!verification.verified) {
+      await db.collection(COLLECTIONS.SESSION_LEDGER).deleteOne({ _id: ledgerId, status: 'pending' });
       return { success: false, error: verification.error || 'Solana transaction verification failed.' };
     }
 
     const actualAmount = verification.confirmedAmount || amountUsdc;
 
     // Update client balance
-    await db.collection(COLLECTIONS.SESSION_BUDGETS).updateOne(
-      { userId },
-      {
-        $set: {
-          solanaAddress,
-          status: 'active',
-          updatedAt: new Date()
+    try {
+      await db.collection(COLLECTIONS.SESSION_BUDGETS).updateOne(
+        { userId },
+        {
+          $set: {
+            solanaAddress,
+            status: 'active',
+            updatedAt: new Date()
+          },
+          $inc: {
+            depositBalance: actualAmount,
+            reservedBalance: 0
+          },
+          $setOnInsert: {
+            lastSettledAt: new Date(),
+            createdAt: new Date()
+          }
         },
-        $inc: {
-          depositBalance: actualAmount,
-          reservedBalance: 0
-        },
-        $setOnInsert: {
-          lastSettledAt: new Date(),
-          createdAt: new Date()
-        }
-      },
-      { upsert: true }
-    );
+        { upsert: true }
+      );
+    } catch (budgetError) {
+      await db.collection(COLLECTIONS.SESSION_LEDGER).deleteOne({ _id: ledgerId, status: 'pending' });
+      throw budgetError;
+    }
 
-    // Insert deposit event in ledger
-    await db.collection(COLLECTIONS.SESSION_LEDGER).insertOne({
-      userId,
-      type: 'deposit',
-      amount: actualAmount,
-      timestamp: new Date(),
-      status: 'settled',
-      settlementTxSignature: txSignature,
-      solanaAddress
-    });
+    try {
+      await db.collection(COLLECTIONS.SESSION_LEDGER).updateOne({
+        _id: ledgerId,
+        status: 'pending',
+      }, {
+        $set: {
+          amount: actualAmount,
+          status: 'settled',
+          verifiedAt: new Date(),
+        }
+      });
+    } catch (ledgerError) {
+      await db.collection(COLLECTIONS.SESSION_BUDGETS).updateOne(
+        { userId },
+        { $inc: { depositBalance: -actualAmount }, $set: { updatedAt: new Date() } }
+      );
+      throw ledgerError;
+    }
 
     logger.info('Deposit processed', { tag: 'SESSION', amount: actualAmount, userId });
     return { success: true };
@@ -91,19 +125,23 @@ export async function chargeToolInvocation(
   toolId: string,
   providerAddress: string,
   cost: number
-): Promise<{ success: boolean; error?: string; remainingBalance?: number }> {
+): Promise<{ success: boolean; error?: string; remainingBalance?: number; ledgerId?: any; chargedCost?: number }> {
   try {
     const db = await getDb();
+    const stake = await db.collection(COLLECTIONS.STAKES).findOne({ stakerId: userId });
+    const stakingTierInfo = getStakingTierInfo(stake?.activeAmount || 0);
+    const discountBps = stakingTierInfo?.routingDiscountBps || 0;
+    const discountedCost = Math.max(0, Math.round(cost * (10_000 - discountBps)) / 10_000);
 
     // Atomic deduction: only succeeds if balance >= cost AND session is active
     const result = await db.collection(COLLECTIONS.SESSION_BUDGETS).findOneAndUpdate(
       {
         userId,
         status: 'active',
-        depositBalance: { $gte: cost },
+        depositBalance: { $gte: discountedCost },
       },
       {
-        $inc: { depositBalance: -cost },
+        $inc: { depositBalance: -discountedCost },
         $set: { updatedAt: new Date() },
       },
       { returnDocument: 'after' }
@@ -141,21 +179,70 @@ export async function chargeToolInvocation(
     }
 
     // Record unpaid invocation in the session ledger
-    await db.collection(COLLECTIONS.SESSION_LEDGER).insertOne({
-      userId,
-      type: 'invocation',
-      toolId,
-      providerAddress,
-      cost,
-      timestamp: new Date(),
-      status: 'pending',
-    });
+    let ledgerResult;
+    try {
+      ledgerResult = await db.collection(COLLECTIONS.SESSION_LEDGER).insertOne({
+        userId,
+        type: 'invocation',
+        toolId,
+        providerAddress,
+        cost: discountedCost,
+        originalCost: cost,
+        stakingDiscountBps: discountBps,
+        stakingTier: stakingTierInfo?.id || 'none',
+        timestamp: new Date(),
+        status: 'pending',
+      });
+    } catch (ledgerError) {
+      await db.collection(COLLECTIONS.SESSION_BUDGETS).updateOne(
+        { userId },
+        { $inc: { depositBalance: discountedCost }, $set: { status: 'active', updatedAt: new Date() } }
+      );
+      throw ledgerError;
+    }
 
-    return { success: true, remainingBalance: newBalance };
+    return { success: true, remainingBalance: newBalance, ledgerId: ledgerResult.insertedId, chargedCost: discountedCost };
   } catch (error: any) {
     logger.error('Failed to charge invocation fee', { tag: 'SESSION', error: error.message });
     return { success: false, error: error.message || 'Failed to process invocation charge' };
   }
+}
+
+export async function refundToolInvocation(
+  userId: string,
+  ledgerId: any,
+  amount: number,
+  reason: string
+): Promise<void> {
+  if (!ledgerId || !Number.isFinite(amount) || amount <= 0) return;
+
+  const db = await getDb();
+  const refunded = await db.collection(COLLECTIONS.SESSION_LEDGER).findOneAndUpdate(
+    {
+      _id: ledgerId,
+      userId,
+      type: 'invocation',
+      status: 'pending',
+    },
+    {
+      $set: {
+        status: 'refunded',
+        refundReason: reason.slice(0, 500),
+        refundedAt: new Date(),
+      },
+    },
+    { returnDocument: 'after' }
+  );
+
+  if (!refunded) return;
+
+  await db.collection(COLLECTIONS.SESSION_BUDGETS).updateOne(
+    { userId },
+    {
+      $inc: { depositBalance: amount },
+      $set: { status: 'active', updatedAt: new Date() },
+    }
+  );
 }
 
 /**

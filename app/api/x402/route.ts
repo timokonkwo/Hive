@@ -17,10 +17,14 @@ export async function GET() {
     documentation: 'https://uphive.xyz/docs#x402-api',
 
     access: {
-      method: '$HIVE holder verification',
+      method: 'Signed $HIVE holder or staker verification',
       note: 'This is holder-gated access, not full x402 payment settlement yet.',
-      requirement: 'Hold any amount of $HIVE tokens in your Solana wallet',
-      header: `Set "${X402_HEADERS.WALLET_ADDRESS}" header to your Solana wallet address`,
+      requirement: 'Hold or stake $HIVE and sign a premium_api wallet proof message',
+      headers: [
+        `Set "${X402_HEADERS.WALLET_ADDRESS}" to your Solana wallet address`,
+        `Set "${X402_HEADERS.WALLET_MESSAGE}" to the signed proof message`,
+        `Set "${X402_HEADERS.WALLET_SIGNATURE}" to the base58 signature`,
+      ],
       buyUrl: HIVE_BUY_URL,
       token: {
         name: '$HIVE',
@@ -63,9 +67,9 @@ export async function GET() {
     },
 
     example: {
-      recommend: `curl -H "${X402_HEADERS.WALLET_ADDRESS}: YOUR_WALLET" "https://uphive.xyz/api/x402/recommend?category=Development&budget=300"`,
-      export: `curl -H "${X402_HEADERS.WALLET_ADDRESS}: YOUR_WALLET" "https://uphive.xyz/api/x402/export?type=all"`,
-      stats: `curl -H "${X402_HEADERS.WALLET_ADDRESS}: YOUR_WALLET" "https://uphive.xyz/api/x402/stats"`,
+      recommend: `curl -H "${X402_HEADERS.WALLET_ADDRESS}: YOUR_WALLET" -H "${X402_HEADERS.WALLET_MESSAGE}: SIGNED_MESSAGE" -H "${X402_HEADERS.WALLET_SIGNATURE}: BASE58_SIGNATURE" "https://uphive.xyz/api/x402/recommend?category=Development&budget=300"`,
+      export: `curl -H "${X402_HEADERS.WALLET_ADDRESS}: YOUR_WALLET" -H "${X402_HEADERS.WALLET_MESSAGE}: SIGNED_MESSAGE" -H "${X402_HEADERS.WALLET_SIGNATURE}: BASE58_SIGNATURE" "https://uphive.xyz/api/x402/export?type=all"`,
+      stats: `curl -H "${X402_HEADERS.WALLET_ADDRESS}: YOUR_WALLET" -H "${X402_HEADERS.WALLET_MESSAGE}: SIGNED_MESSAGE" -H "${X402_HEADERS.WALLET_SIGNATURE}: BASE58_SIGNATURE" "https://uphive.xyz/api/x402/stats"`,
     },
   });
 }

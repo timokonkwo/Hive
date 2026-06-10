@@ -9,8 +9,32 @@ import {
 	} from "lucide-react";
 import { toast } from "sonner";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 
 const USDC_MINT_SOLANA = "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v";
+
+async function createSolanaWalletProof(solWallet: any, address: string, action = "link_wallet") {
+  if (!solWallet.signMessage) {
+    throw new Error("Your Solana wallet does not support message signing. Use Phantom, Solflare, or Backpack.");
+  }
+  const nonceBytes = crypto.getRandomValues(new Uint8Array(16));
+  const nonce = Array.from(nonceBytes).map((byte) => byte.toString(16).padStart(2, "0")).join("");
+  const timestamp = Date.now();
+  const message = [
+    "Hive Solana Wallet Proof",
+    `Action: ${action}`,
+    `Address: ${address}`,
+    `Nonce: ${nonce}`,
+    `Timestamp: ${timestamp}`,
+  ].join("\n");
+  const signed = await solWallet.signMessage(new TextEncoder().encode(message), "utf8");
+  const signatureBytes = signed?.signature || signed;
+  const { default: bs58 } = await import("bs58");
+  return {
+    message,
+    signature: bs58.encode(signatureBytes),
+  };
+}
 
 interface AgentData {
   id: string;
@@ -21,6 +45,9 @@ interface AgentData {
   avgSatisfaction: number;
   reviewCount: number;
   isVerified: boolean;
+  isStaked?: boolean;
+  stakedAmount?: number;
+  stakingTier?: string;
   walletAddress: string | null;
   solanaAddress: string | null;
   website: string | null;
@@ -152,8 +179,6 @@ export default function AgentDashboardPage() {
   const [solBalance, setSolBalance] = useState<string | null>(null);
   const [usdcBalance, setUsdcBalance] = useState<string | null>(null);
   const [showChangeWallet, setShowChangeWallet] = useState(false);
-  const [newWalletAddress, setNewWalletAddress] = useState("");
-  const [changingWallet, setChangingWallet] = useState(false);
 
   // Token launch state
   const [launchingToken, setLaunchingToken] = useState(false);
@@ -180,10 +205,14 @@ export default function AgentDashboardPage() {
   const [launchingToolToken, setLaunchingToolToken] = useState(false);
 
   // Staking state
-  const [stakedBalance, setStakedBalance] = useState(10000); // Default staked balance in $HIVE
+  const [stakedBalance, setStakedBalance] = useState(0);
   const [nodeStatus, setNodeStatus] = useState<'free' | 'locked' | 'slashed'>('free');
   const [activeDisputes, setActiveDisputes] = useState<any[]>([]);
   const [disputesLoading, setDisputesLoading] = useState(false);
+
+  useEffect(() => {
+    setStakedBalance(agent?.stakedAmount || 0);
+  }, [agent?.stakedAmount]);
 
   // Restore session on mount
   useEffect(() => {
@@ -759,6 +788,7 @@ export default function AgentDashboardPage() {
 
       const response = await solWallet.connect();
       const connectedAddress = response.publicKey.toString();
+      const walletProof = await createSolanaWalletProof(solWallet, connectedAddress);
 
       // Save to agent profile
       const res = await fetch("/api/agents/me", {
@@ -767,7 +797,7 @@ export default function AgentDashboardPage() {
           "Content-Type": "application/json",
           "x-hive-api-key": apiKey,
         },
-        body: JSON.stringify({ solanaAddress: connectedAddress }),
+        body: JSON.stringify({ solanaAddress: connectedAddress, walletProof }),
       });
 
       if (res.ok) {
@@ -1123,51 +1153,12 @@ export default function AgentDashboardPage() {
                               onClick={() => setShowChangeWallet(false)}
                               className="text-[10px] text-zinc-600 hover:text-zinc-400 font-mono uppercase"
                             >
-                              or paste address manually
+                              cancel
                             </button>
                           </div>
-                          <input
-                            type="text"
-                            value={newWalletAddress}
-                            onChange={(e) => setNewWalletAddress(e.target.value)}
-                            placeholder="Paste Solana address..."
-                            className="w-full bg-black border border-zinc-700 rounded-sm px-3 py-2 text-white text-xs font-mono outline-none focus:border-amber-500 transition-colors"
-                          />
-                          <button
-                            onClick={async () => {
-                              const addr = newWalletAddress.trim();
-                              if (!addr || addr.length < 32 || addr.length > 58) {
-                                toast.error("Invalid Solana address");
-                                return;
-                              }
-                              setChangingWallet(true);
-                              try {
-                                const res = await fetch("/api/agents/me", {
-                                  method: "PATCH",
-                                  headers: { "Content-Type": "application/json", "x-hive-api-key": apiKey },
-                                  body: JSON.stringify({ solanaAddress: addr }),
-                                });
-                                if (res.ok) {
-                                  setAgent(prev => prev ? { ...prev, solanaAddress: addr } : prev);
-                                  toast.success("Wallet updated!");
-                                  fetchBalances(addr);
-                                  setShowChangeWallet(false);
-                                  setNewWalletAddress("");
-                                } else {
-                                  const err = await res.json();
-                                  toast.error(err.error || "Failed to update wallet");
-                                }
-                              } catch {
-                                toast.error("Failed to update wallet");
-                              } finally {
-                                setChangingWallet(false);
-                              }
-                            }}
-                            disabled={changingWallet || !newWalletAddress.trim()}
-                            className="w-full py-2 bg-amber-600 hover:bg-amber-500 text-white font-bold font-mono text-[10px] uppercase tracking-widest rounded-sm transition-colors disabled:opacity-40"
-                          >
-                            {changingWallet ? "Saving..." : "Save address"}
-                          </button>
+                          <p className="text-[10px] text-zinc-500 font-mono leading-relaxed">
+                            Wallet changes require a signed message from the Solana wallet. Paste-only address changes are disabled.
+                          </p>
                         </div>
                       )}
                     </div>
@@ -1182,52 +1173,9 @@ export default function AgentDashboardPage() {
                         >
                           <Wallet size={14} /> Connect Solana Wallet
                         </button>
-                        <div className="my-3 flex items-center gap-3">
-                          <div className="flex-1 h-px bg-zinc-800" />
-                          <span className="text-zinc-600 text-[10px] font-mono uppercase">or paste address</span>
-                          <div className="flex-1 h-px bg-zinc-800" />
-                        </div>
-                        <input
-                          type="text"
-                          value={newWalletAddress}
-                          onChange={(e) => setNewWalletAddress(e.target.value)}
-                          placeholder="Solana wallet address..."
-                          className="w-full bg-black border border-zinc-800 rounded-sm px-3 py-2.5 text-white text-xs font-mono outline-none focus:border-purple-500 transition-colors mb-2"
-                        />
-                        <button
-                          onClick={async () => {
-                            const addr = newWalletAddress.trim();
-                            if (!addr || addr.length < 32 || addr.length > 44) {
-                              toast.error("Invalid Solana address");
-                              return;
-                            }
-                            setChangingWallet(true);
-                            try {
-                              const res = await fetch("/api/agents/me", {
-                                method: "PATCH",
-                                headers: { "Content-Type": "application/json", "x-hive-api-key": apiKey },
-                                body: JSON.stringify({ solanaAddress: addr }),
-                              });
-                              if (res.ok) {
-                                setAgent(prev => prev ? { ...prev, solanaAddress: addr } : prev);
-                                toast.success("Wallet saved!");
-                                fetchBalances(addr);
-                                setNewWalletAddress("");
-                              } else {
-                                const err = await res.json();
-                                toast.error(err.error || "Failed to save wallet");
-                              }
-                            } catch {
-                              toast.error("Failed to save wallet");
-                            } finally {
-                              setChangingWallet(false);
-                            }
-                          }}
-                          disabled={changingWallet || !newWalletAddress.trim()}
-                          className="w-full py-2 bg-zinc-800 hover:bg-zinc-700 text-white font-bold font-mono text-[10px] uppercase tracking-widest rounded-sm transition-colors disabled:opacity-40"
-                        >
-                          {changingWallet ? "Saving..." : "Save Address"}
-                        </button>
+                        <p className="mt-3 text-[10px] text-zinc-500 font-mono leading-relaxed">
+                          Wallet linking requires a signed message from your Solana wallet. Paste-only address linking is disabled.
+                        </p>
                       </div>
                       <div className="bg-amber-500/5 border border-amber-500/20 p-3 rounded">
                         <p className="text-amber-400 text-[11px]">
@@ -1833,6 +1781,13 @@ export default function AgentDashboardPage() {
                         <span>No active disputes. Your agent is in good standing and ready to accept new tasks.</span>
                       </div>
                     )}
+
+                    <Link
+                      href="/stake"
+                      className="inline-flex items-center justify-center gap-2 w-full bg-white text-black hover:bg-zinc-200 rounded px-4 py-2.5 text-xs font-bold transition-colors"
+                    >
+                      Manage HIVE Stake
+                    </Link>
                   </div>
                 </div>
 

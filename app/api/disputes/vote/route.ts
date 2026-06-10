@@ -5,6 +5,7 @@ import { authenticateRequest } from '@/lib/api-key';
 import { castDisputeVote } from '@/lib/disputes';
 import { isValidSolanaAddress } from '@/lib/solana-pay';
 import { checkRateLimit, getClientIp, RATE_LIMITS } from '@/lib/rate-limit';
+import { verifyAndConsumeSolanaMessageSignature } from '@/lib/solana-signature';
 import { logger } from '@/lib/logger';
 
 /**
@@ -37,7 +38,7 @@ export async function POST(req: NextRequest) {
     }
 
     const body = await req.json();
-    const { disputeId, vote, solanaAddress } = body;
+    const { disputeId, vote, solanaAddress, walletProof } = body;
 
     if (!disputeId || !vote || !solanaAddress) {
       return NextResponse.json(
@@ -56,6 +57,27 @@ export async function POST(req: NextRequest) {
     if (!isValidSolanaAddress(solanaAddress)) {
       return NextResponse.json(
         { error: 'Invalid voter Solana address.' },
+        { status: 400 }
+      );
+    }
+
+    const proof = walletProof && typeof walletProof === 'object' ? walletProof : null;
+    if (!proof?.message || !proof?.signature) {
+      return NextResponse.json(
+        { error: 'Wallet signature required to vote.' },
+        { status: 400 }
+      );
+    }
+
+    const verifiedProof = await verifyAndConsumeSolanaMessageSignature(db, {
+      address: solanaAddress,
+      action: `dao_vote:${disputeId}:${vote}`,
+      message: proof.message,
+      signature: proof.signature,
+    });
+    if (!verifiedProof.verified) {
+      return NextResponse.json(
+        { error: verifiedProof.error || 'Wallet signature could not be verified.' },
         { status: 400 }
       );
     }

@@ -1,10 +1,23 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getDb, COLLECTIONS } from '@/lib/db';
-import { authenticateClient } from '@/lib/client-auth';
-import { authenticateRequest } from '@/lib/api-key';
+import { verifyAdmin } from '@/lib/admin-auth';
 import { createDispute } from '@/lib/disputes';
+import { isValidSolanaAddress } from '@/lib/solana-pay';
 import { checkRateLimit, getClientIp, RATE_LIMITS } from '@/lib/rate-limit';
 import { logger } from '@/lib/logger';
+
+const MIN_SLASHABLE_STAKE_HIVE = 10_000;
+
+function isValidEvidenceUri(value: string): boolean {
+  if (typeof value !== 'string' || value.length < 8 || value.length > 500) return false;
+  if (value.startsWith('ipfs://') || value.startsWith('ar://')) return true;
+  try {
+    const url = new URL(value);
+    return url.protocol === 'https:';
+  } catch {
+    return false;
+  }
+}
 
 /**
  * GET /api/disputes
@@ -76,29 +89,89 @@ export async function POST(req: NextRequest) {
 
     const db = await getDb();
 
-    // Authenticate: Privy user or API Key
-    const client = await authenticateClient(req);
-    const agentAuth = !client ? await authenticateRequest(req.headers, db) : null;
-
-    if (!client && !agentAuth) {
+    const admin = await verifyAdmin(req);
+    if (admin.error) {
       return NextResponse.json(
-        { error: 'Authentication required to file disputes.' },
-        { status: 401 }
+        { error: 'Direct dispute creation is admin-only. Submit /api/dispute-reports for DAO review.' },
+        { status: 403 }
       );
     }
 
     const body = await req.json();
-    const { providerAddress, toolId, reason, evidenceUri, stakedAmount } = body;
+    const { providerAddress, toolId, reason, evidenceUri } = body;
 
-    if (!providerAddress || !toolId || !reason || !evidenceUri || typeof stakedAmount !== 'number') {
+    if (!providerAddress || !toolId || !reason || !evidenceUri) {
       return NextResponse.json(
-        { error: 'providerAddress, toolId, reason, evidenceUri, and numeric stakedAmount are required.' },
+        { error: 'providerAddress, toolId, reason, and evidenceUri are required.' },
         { status: 400 }
       );
     }
 
-    // Call creation logic
-    const result = await createDispute(providerAddress, toolId, reason, evidenceUri, stakedAmount);
+    if (!isValidSolanaAddress(providerAddress)) {
+      return NextResponse.json({ error: 'Invalid provider Solana address.' }, { status: 400 });
+    }
+
+    const normalizedToolId = String(toolId).trim();
+    if (!/^[a-zA-Z0-9._:-]{1,80}$/.test(normalizedToolId)) {
+      return NextResponse.json(
+        { error: 'toolId must be 1-80 characters and may only contain letters, numbers, dot, underscore, colon, or hyphen.' },
+        { status: 400 }
+      );
+    }
+
+    const normalizedReason = String(reason).trim();
+    if (normalizedReason.length < 20 || normalizedReason.length > 2000) {
+      return NextResponse.json(
+        { error: 'reason must be between 20 and 2000 characters.' },
+        { status: 400 }
+      );
+    }
+
+    const normalizedEvidenceUri = String(evidenceUri).trim();
+    if (!isValidEvidenceUri(normalizedEvidenceUri)) {
+      return NextResponse.json(
+        { error: 'evidenceUri must be an https, ipfs, or arweave URI.' },
+        { status: 400 }
+      );
+    }
+
+    const provider = await db.collection(COLLECTIONS.AGENTS).findOne({ solanaAddress: providerAddress });
+    if (!provider) {
+      return NextResponse.json(
+        { error: 'No registered provider exists for this Solana address.' },
+        { status: 404 }
+      );
+    }
+
+    const registeredTools = Array.isArray(provider.registeredTools) ? provider.registeredTools : [];
+    if (registeredTools.length > 0) {
+      const ownsTool = registeredTools.some((tool: any) =>
+        tool?.name === normalizedToolId || tool?.id === normalizedToolId || tool?.toolId === normalizedToolId
+      );
+      if (!ownsTool) {
+        return NextResponse.json(
+          { error: 'This provider does not own the specified tool.' },
+          { status: 400 }
+        );
+      }
+    }
+
+    const stake = await db.collection(COLLECTIONS.STAKES).findOne({ solanaAddress: providerAddress, status: 'active' });
+    const activeStake = Math.max(Number(stake?.activeAmount || 0), Number(provider.stakedAmount || 0));
+    if (!Number.isFinite(activeStake) || activeStake < MIN_SLASHABLE_STAKE_HIVE) {
+      return NextResponse.json(
+        { error: `Provider must have at least ${MIN_SLASHABLE_STAKE_HIVE.toLocaleString()} active HIVE staked before a slashing dispute can be opened.` },
+        { status: 400 }
+      );
+    }
+
+    const result = await createDispute(
+      providerAddress,
+      normalizedToolId,
+      normalizedReason,
+      normalizedEvidenceUri,
+      activeStake
+    );
 
     if (!result.success) {
       return NextResponse.json(

@@ -86,6 +86,7 @@ export async function GET(req: NextRequest) {
       isHolder: cached.balance > 0,
       tier: cached.tier,
       tierInfo,
+      message: cached.balance > 0 ? undefined : 'No HIVE found in this Solana wallet.',
       cached: true,
     });
   }
@@ -104,6 +105,7 @@ export async function GET(req: NextRequest) {
       isHolder: balance > 0,
       tier,
       tierInfo,
+      message: balance > 0 ? undefined : 'No HIVE found in this Solana wallet.',
       cached: false,
     });
   } catch (err: any) {

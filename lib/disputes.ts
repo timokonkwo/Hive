@@ -1,6 +1,6 @@
 import { ObjectId } from 'mongodb';
 import { getDb, COLLECTIONS } from './db';
-import { getHiveBalance } from './token-utils';
+import { getStakingTierInfo } from './token-utils';
 import { awardPoints } from './points';
 import { Connection } from '@solana/web3.js';
 import { logger } from '@/lib/logger';
@@ -19,11 +19,30 @@ export async function createDispute(
   toolId: string,
   reason: string,
   evidenceUri: string,
-  stakedAmount: number
+  stakedAmount: number,
+  options: {
+    reportId?: string;
+    category?: string;
+    openedBy?: string;
+    openedByRole?: string;
+    evidencePeriodHours?: number;
+    votingPeriodHours?: number;
+    quorumBps?: number;
+    slashThresholdBps?: number;
+  } = {}
 ): Promise<{ success: boolean; disputeId?: string; error?: string }> {
   try {
     const db = await getDb();
     const connection = getConnection();
+
+    try {
+      await db.collection(COLLECTIONS.DISPUTES).createIndex(
+        { providerAddress: 1, toolId: 1, status: 1 },
+        { unique: true, partialFilterExpression: { status: 'active' }, background: true }
+      );
+    } catch {
+      return { success: false, error: 'Dispute replay protection is not ready. Try again shortly.' };
+    }
 
     // Check if there is an active dispute for this provider/tool already
     const activeDispute = await db.collection(COLLECTIONS.DISPUTES).findOne({
@@ -37,25 +56,47 @@ export async function createDispute(
 
     // Get current Solana slot height for snapshot auditing
     const slot = await connection.getSlot('confirmed').catch((err) => {
-      logger.warn('Failed to fetch Solana slot height, using mock', { tag: 'DISPUTES', error: err.message });
-      return 182736450; // Fallback audit block height
+      logger.warn('Failed to fetch Solana slot height', { tag: 'DISPUTES', error: err.message });
+      return null;
     });
+    if (!slot) {
+      return { success: false, error: 'Could not create a verifiable governance snapshot. Try again shortly.' };
+    }
 
-    const deadline = new Date(Date.now() + 48 * 60 * 60 * 1000); // 48-hour voting window
+    const now = new Date();
+    const evidencePeriodHours = Math.min(Math.max(options.evidencePeriodHours ?? 24, 0), 168);
+    const votingPeriodHours = Math.min(Math.max(options.votingPeriodHours ?? 48, 1), 168);
+    const evidenceOpenUntil = new Date(now.getTime() + evidencePeriodHours * 60 * 60 * 1000);
+    const votingStartsAt = evidenceOpenUntil;
+    const votingEndsAt = new Date(votingStartsAt.getTime() + votingPeriodHours * 60 * 60 * 1000);
+    const quorumBps = Math.min(Math.max(options.quorumBps ?? 500, 0), 10_000);
+    const slashThresholdBps = Math.min(Math.max(options.slashThresholdBps ?? 6000, 5_001), 10_000);
+    const quorumRequired = Math.round(stakedAmount * (quorumBps / 10_000));
 
     const dispute = {
+      reportId: options.reportId || null,
       providerAddress,
       toolId,
+      category: options.category || 'other',
       stakedAmount,
       reason,
       evidenceUri,
       status: 'active' as const,
+      phase: evidencePeriodHours > 0 ? 'evidence' : 'voting',
       votesForSlash: 0,
       votesAgainstSlash: 0,
       voteCount: 0,
       snapshotBlock: slot,
-      deadline,
-      createdAt: new Date()
+      evidenceOpenUntil,
+      votingStartsAt,
+      votingEndsAt,
+      quorumRequired,
+      quorumBps,
+      slashThresholdBps,
+      openedBy: options.openedBy || 'system',
+      openedByRole: options.openedByRole || 'system',
+      deadline: votingEndsAt,
+      createdAt: now
     };
 
     const result = await db.collection(COLLECTIONS.DISPUTES).insertOne(dispute);
@@ -70,13 +111,17 @@ export async function createDispute(
     // Log dispute activity
     await db.collection(COLLECTIONS.ACTIVITY).insertOne({
       type: 'DisputeCreated',
-      actorName: 'System',
+      actorName: options.openedByRole || 'System',
       metadata: {
         disputeId,
+        reportId: options.reportId || null,
         providerAddress,
         toolId,
         stakedAmount,
-        reason
+        reason,
+        phase: dispute.phase,
+        votingStartsAt,
+        votingEndsAt
       },
       createdAt: new Date(),
     });
@@ -84,6 +129,9 @@ export async function createDispute(
     logger.info('Dispute opened', { tag: 'DISPUTES', disputeId, providerAddress, stakedAmount });
     return { success: true, disputeId };
   } catch (error: any) {
+    if (error?.code === 11000) {
+      return { success: false, error: 'An active dispute is already open for this tool provider.' };
+    }
     logger.error('Dispute creation failed', { tag: 'DISPUTES', error: (error as Error).message });
     return { success: false, error: error.message || 'Failed to open dispute' };
   }
@@ -91,7 +139,7 @@ export async function createDispute(
 
 /**
  * Cast a vote on an active dispute.
- * Voting weight is calculated dynamically from the voter's Solana $HIVE token balance.
+ * Voting weight is calculated from the voter's active recorded HIVE stake.
  */
 export async function castDisputeVote(
   userId: string,
@@ -101,6 +149,21 @@ export async function castDisputeVote(
 ): Promise<{ success: boolean; error?: string }> {
   try {
     const db = await getDb();
+
+    try {
+      await Promise.all([
+        db.collection(COLLECTIONS.DISPUTE_VOTES).createIndex(
+          { disputeId: 1, userId: 1 },
+          { unique: true, background: true }
+        ),
+        db.collection(COLLECTIONS.DISPUTE_VOTES).createIndex(
+          { disputeId: 1, solanaAddress: 1 },
+          { unique: true, background: true }
+        ),
+      ]);
+    } catch {
+      return { success: false, error: 'Vote replay protection is not ready. Try again shortly.' };
+    }
     
     // Find dispute
     const oId = new ObjectId(disputeId);
@@ -118,38 +181,63 @@ export async function castDisputeVote(
       return { success: false, error: 'The voting window for this dispute has closed.' };
     }
 
+    const now = new Date();
+    if (dispute.votingStartsAt && now < new Date(dispute.votingStartsAt)) {
+      return { success: false, error: 'This dispute is still in the evidence period. Voting has not started.' };
+    }
+
+    if (dispute.phase === 'evidence') {
+      await db.collection(COLLECTIONS.DISPUTES).updateOne(
+        { _id: oId, phase: 'evidence' },
+        { $set: { phase: 'voting', updatedAt: now } }
+      );
+    }
+
     // Check if already voted
     const alreadyVoted = await db.collection(COLLECTIONS.DISPUTE_VOTES).findOne({
-      userId,
-      disputeId
+      disputeId,
+      $or: [{ userId }, { solanaAddress }]
     });
     if (alreadyVoted) {
       return { success: false, error: 'You have already voted on this dispute.' };
     }
 
-    // Check $HIVE balance for voting weight
+    // Use recorded stake for governance weight. Live token balance voting is
+    // intentionally excluded because it can be flash-loaned or moved between wallets.
     let votingWeight = 0;
+    const votingSource = 'staked_hive';
     try {
-      votingWeight = await getHiveBalance(solanaAddress);
+      const stake = await db.collection(COLLECTIONS.STAKES).findOne({ solanaAddress });
+      const activeStake = stake?.activeAmount || 0;
+      const tierInfo = getStakingTierInfo(activeStake);
+      votingWeight = activeStake * (tierInfo?.governanceMultiplier || 1);
     } catch (err: any) {
-      logger.warn('Failed to fetch live $HIVE balance, checking mock/test environment', { tag: 'DISPUTES', error: err.message });
+      logger.warn('Failed to fetch governance weight', { tag: 'DISPUTES', error: err.message });
       votingWeight = 0;
     }
 
     // Enforce holder status (only token holders can vote)
     if (votingWeight <= 0) {
-      return { success: false, error: 'Only $HIVE token holders are eligible to participate in governance votes.' };
+      return { success: false, error: 'No active staked HIVE found for this wallet. Stake HIVE before voting.' };
     }
 
     // Record the vote
-    await db.collection(COLLECTIONS.DISPUTE_VOTES).insertOne({
-      userId,
-      disputeId,
-      vote,
-      weight: votingWeight,
-      solanaAddress,
-      timestamp: new Date()
-    });
+    try {
+      await db.collection(COLLECTIONS.DISPUTE_VOTES).insertOne({
+        userId,
+        disputeId,
+        vote,
+        weight: votingWeight,
+        source: votingSource,
+        solanaAddress,
+        timestamp: new Date()
+      });
+    } catch (error: any) {
+      if (error?.code === 11000) {
+        return { success: false, error: 'You have already voted on this dispute.' };
+      }
+      throw error;
+    }
 
     // Increment dispute metrics
     const incrementFields: Record<string, number> = {
