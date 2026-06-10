@@ -105,6 +105,17 @@ describe('Solana browser transaction routing', () => {
     assert.doesNotMatch(dashboardPage, /api\.mainnet-beta\.solana\.com/);
   });
 
+  it('does not use browser WebSocket confirmation against the HTTP RPC proxy', () => {
+    assert.match(stakePage, /confirmSignatureByPolling/);
+    assert.match(stakePage, /getSignatureStatuses/);
+    assert.match(stakePage, /getBlockHeight/);
+    assert.doesNotMatch(stakePage, /confirmTransaction\(/);
+    assert.match(dashboardPage, /confirmSignatureByPolling/);
+    assert.match(dashboardPage, /getSignatureStatuses/);
+    assert.match(dashboardPage, /getBlockHeight/);
+    assert.doesNotMatch(dashboardPage, /confirmTransaction\(/);
+  });
+
   it('allows signed transaction broadcast through the RPC proxy without reopening broad RPC access', () => {
     assert.match(rpcProxy, /'sendTransaction'/);
     assert.match(rpcProxy, /MAX_RPC_BODY_BYTES\s*=\s*96\s*\*\s*1024/);
