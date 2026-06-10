@@ -10,15 +10,16 @@ import {
   Clock, ChevronRight, AlertTriangle, Inbox, Zap,
   Search, Trash2, ChevronLeft, ChevronsLeft, ChevronsRight,
   ArrowUpDown, X, Bot, MessageSquare, Bug, Lightbulb, CheckSquare, Square,
-  Send, ChevronDown, ExternalLink, Download, Edit3, Check, Map, Plus, ArrowRight
+  Send, ChevronDown, ExternalLink, Download, Edit3, Check, Map, Plus, ArrowRight, Coins
 } from "lucide-react";
 import Link from "next/link";
 import { toast } from "sonner";
 
-type AdminTab = "overview" | "tasks" | "agents" | "submissions" | "dao" | "activity" | "feedback" | "tokens" | "roadmap";
+type AdminTab = "overview" | "tasks" | "agents" | "submissions" | "stakers" | "dao" | "activity" | "feedback" | "tokens" | "roadmap";
 
 const AGENTS_PER_PAGE = 20;
 const TASKS_PER_PAGE = 20;
+const STAKERS_PER_PAGE = 20;
 
 const ROADMAP_ICONS = [
   'Briefcase', 'Bot', 'CreditCard', 'Trophy', 'Code', 'Server',
@@ -108,6 +109,15 @@ export default function AdminDashboardPage() {
   const [roadmapSaving, setRoadmapSaving] = useState(false);
   const [showRoadmapForm, setShowRoadmapForm] = useState(false);
   const [roadmapCollapsed, setRoadmapCollapsed] = useState<Record<string, boolean>>({ completed: true });
+
+  // Staker management state
+  const [stakers, setStakers] = useState<any[]>([]);
+  const [stakersStats, setStakersStats] = useState<any>(null);
+  const [stakersTotal, setStakersTotal] = useState(0);
+  const [stakersPage, setStakersPage] = useState(1);
+  const [stakersSearch, setStakersSearch] = useState("");
+  const [stakersStatusFilter, setStakersStatusFilter] = useState("all");
+  const [stakersLoading, setStakersLoading] = useState(false);
 
   // DAO management state
   const [daoData, setDaoData] = useState<any>(null);
@@ -392,6 +402,42 @@ export default function AdminDashboardPage() {
 
   useEffect(() => { setSubmissionsPage(1); }, [submissionsSearch, submissionsStatusFilter]);
 
+  const fetchStakers = useCallback(async () => {
+    if (!isAdmin || !address) return;
+    setStakersLoading(true);
+    try {
+      const params = new URLSearchParams({
+        page: String(stakersPage),
+        limit: String(STAKERS_PER_PAGE),
+        address,
+        status: stakersStatusFilter,
+      });
+      if (stakersSearch) params.set("search", stakersSearch);
+
+      const res = await authFetch(`/api/admin/stakers?${params.toString()}`);
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        throw new Error(data.error || "Failed to load stakers.");
+      }
+      setStakers(data.stakers || []);
+      setStakersStats(data.stats || null);
+      setStakersTotal(data.total || 0);
+    } catch (error: any) {
+      toast.error(error.message || "Failed to load stakers.");
+    } finally {
+      setStakersLoading(false);
+    }
+  }, [isAdmin, address, stakersPage, stakersSearch, stakersStatusFilter, authFetch]);
+
+  useEffect(() => {
+    if (activeTab === "stakers") {
+      const timeout = setTimeout(fetchStakers, 300);
+      return () => clearTimeout(timeout);
+    }
+  }, [activeTab, fetchStakers]);
+
+  useEffect(() => { setStakersPage(1); }, [stakersSearch, stakersStatusFilter]);
+
   const updateFeedbackStatus = async (id: string, newStatus: string) => {
     if (!address) return;
     try {
@@ -522,6 +568,7 @@ export default function AdminDashboardPage() {
 
   const agentsTotalPages = Math.ceil(agentsTotal / AGENTS_PER_PAGE);
   const tasksTotalPages = Math.ceil(tasksTotal / TASKS_PER_PAGE);
+  const stakersTotalPages = Math.ceil(stakersTotal / STAKERS_PER_PAGE);
 
   // Access denied
   if (!authenticated || (!adminChecked) || (adminChecked && !isAdmin)) {
@@ -594,7 +641,7 @@ export default function AdminDashboardPage() {
 
       {/* Tabs */}
       <div className="flex border-b border-zinc-800 mb-8 gap-1 overflow-x-auto scrollbar-hide -mx-4 px-4 sm:mx-0 sm:px-0">
-        {(["overview", "tasks", "agents", "submissions", "dao", "activity", "feedback", "tokens", "roadmap"] as AdminTab[]).map((tab) => (
+        {(["overview", "tasks", "agents", "submissions", "stakers", "dao", "activity", "feedback", "tokens", "roadmap"] as AdminTab[]).map((tab) => (
           <button
             key={tab}
             onClick={() => setActiveTab(tab)}
@@ -999,6 +1046,131 @@ export default function AdminDashboardPage() {
               </div>
               <p className="text-[10px] font-mono uppercase tracking-widest text-zinc-600">
                 Showing {(agentsPage - 1) * AGENTS_PER_PAGE + 1}–{Math.min(agentsPage * AGENTS_PER_PAGE, agentsTotal)} of {agentsTotal} agents
+              </p>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ── Stakers Tab ── */}
+      {activeTab === "stakers" && (
+        <div className="space-y-6">
+          <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+            <StatCard label="Stakers" value={stakersStats?.totalStakers || 0} icon={<Users size={16} />} color="text-emerald-400" />
+            <StatCard label="Active" value={stakersStats?.activeStakers || 0} icon={<CheckCircle size={16} />} color="text-blue-400" />
+            <StatCard label="Active HIVE" value={stakersStats?.totalActiveAmount || 0} icon={<Coins size={16} />} color="text-amber-400" />
+            <StatCard label="Locked HIVE" value={stakersStats?.totalLockedAmount || 0} icon={<Shield size={16} />} color="text-violet-400" />
+            <StatCard label="Slashed HIVE" value={stakersStats?.totalSlashedAmount || 0} icon={<AlertTriangle size={16} />} color="text-red-400" />
+          </div>
+
+          <div className="flex flex-col md:flex-row gap-4">
+            <div className="relative flex-1">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-500" />
+              <input
+                type="text"
+                value={stakersSearch}
+                onChange={(e) => setStakersSearch(e.target.value)}
+                placeholder="Search by wallet, staker id, type, or status..."
+                className="w-full bg-zinc-900/50 border border-zinc-800 rounded-lg pl-10 pr-4 py-2.5 text-sm text-white placeholder-zinc-600 outline-none focus:border-zinc-600 transition-colors font-mono"
+              />
+              {stakersSearch && (
+                <button onClick={() => setStakersSearch("")} className="absolute right-3 top-1/2 -translate-y-1/2 text-zinc-500 hover:text-white">
+                  <X size={14} />
+                </button>
+              )}
+            </div>
+            <div className="flex items-center gap-2 overflow-x-auto">
+              {["all", "active", "locked", "slashed", "none"].map((status) => (
+                <button
+                  key={status}
+                  onClick={() => setStakersStatusFilter(status)}
+                  className={`px-3 py-2 text-[10px] font-mono uppercase tracking-widest border rounded-lg transition-colors shrink-0 ${
+                    stakersStatusFilter === status
+                      ? "border-emerald-500 text-emerald-500 bg-emerald-500/10"
+                      : "border-zinc-800 text-zinc-500 hover:border-zinc-600"
+                  }`}
+                >
+                  {status}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div className="bg-zinc-900/30 border border-zinc-800 rounded-lg overflow-hidden overflow-x-auto">
+            <div className="hidden md:grid grid-cols-[1.1fr_90px_120px_120px_120px_100px_130px_90px] gap-4 px-4 py-3 bg-black/40 border-b border-zinc-800 text-[10px] font-mono uppercase tracking-widest text-zinc-500 min-w-[980px]">
+              <span>Staker</span>
+              <span>Type</span>
+              <span>Active</span>
+              <span>Locked</span>
+              <span>Slashed</span>
+              <span>Tier</span>
+              <span>Updated</span>
+              <span>Last Tx</span>
+            </div>
+
+            {stakersLoading ? (
+              <div className="py-12 flex items-center justify-center">
+                <Loader2 className="w-6 h-6 text-emerald-500 animate-spin" />
+              </div>
+            ) : stakers.length === 0 ? (
+              <div className="py-12 text-center text-zinc-600 text-sm font-mono">No stakers found</div>
+            ) : (
+              stakers.map((staker) => (
+                <div key={staker.id} className="grid grid-cols-[1.1fr_90px_120px_120px_120px_100px_130px_90px] gap-4 px-4 py-3 border-b border-zinc-800/50 hover:bg-white/[0.02] transition-colors items-center text-sm min-w-[980px]">
+                  <div className="min-w-0">
+                    <div className="text-white font-medium truncate">{staker.displayName || staker.solanaAddress || staker.stakerId}</div>
+                    <div className="text-[10px] text-zinc-600 font-mono truncate">
+                      {staker.solanaAddress ? `${staker.solanaAddress.slice(0, 8)}...${staker.solanaAddress.slice(-6)}` : staker.stakerId}
+                    </div>
+                  </div>
+                  <span className="text-[10px] font-mono uppercase text-zinc-400">{staker.stakerType}</span>
+                  <span className="text-xs font-mono text-emerald-400">{(staker.activeAmount || 0).toLocaleString()} HIVE</span>
+                  <span className="text-xs font-mono text-violet-400">{(staker.lockedAmount || 0).toLocaleString()} HIVE</span>
+                  <span className="text-xs font-mono text-red-400">{(staker.slashedAmount || 0).toLocaleString()} HIVE</span>
+                  <span className="text-[10px] font-mono uppercase text-zinc-300">{staker.tierLabel}</span>
+                  <span className="text-[10px] text-zinc-600 font-mono">
+                    {staker.updatedAt ? new Date(staker.updatedAt).toLocaleString() : "—"}
+                  </span>
+                  <div>
+                    {staker.lastStakeEvent?.txSignature ? (
+                      <a
+                        href={`https://solscan.io/tx/${staker.lastStakeEvent.txSignature}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center gap-1 text-[10px] font-mono text-emerald-400 hover:text-emerald-300"
+                      >
+                        <ExternalLink size={10} /> View
+                      </a>
+                    ) : (
+                      <span className="text-[10px] text-zinc-700 font-mono">—</span>
+                    )}
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
+
+          {stakersTotalPages > 1 && (
+            <div className="mt-6 flex flex-col items-center gap-3">
+              <div className="flex items-center gap-1">
+                <PaginationBtn onClick={() => setStakersPage(1)} disabled={stakersPage === 1}>
+                  <ChevronsLeft size={14} />
+                </PaginationBtn>
+                <PaginationBtn onClick={() => setStakersPage(p => p - 1)} disabled={stakersPage === 1}>
+                  <ChevronLeft size={14} />
+                </PaginationBtn>
+                <span className="px-4 py-2 text-xs font-mono text-zinc-400">
+                  Page {stakersPage} of {stakersTotalPages}
+                </span>
+                <PaginationBtn onClick={() => setStakersPage(p => p + 1)} disabled={stakersPage === stakersTotalPages}>
+                  <ChevronRight size={14} />
+                </PaginationBtn>
+                <PaginationBtn onClick={() => setStakersPage(stakersTotalPages)} disabled={stakersPage === stakersTotalPages}>
+                  <ChevronsRight size={14} />
+                </PaginationBtn>
+              </div>
+              <p className="text-[10px] font-mono uppercase tracking-widest text-zinc-600">
+                Showing {(stakersPage - 1) * STAKERS_PER_PAGE + 1}–{Math.min(stakersPage * STAKERS_PER_PAGE, stakersTotal)} of {stakersTotal} stakers
               </p>
             </div>
           )}
