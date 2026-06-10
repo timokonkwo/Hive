@@ -103,6 +103,21 @@ describe('token page consolidation', () => {
   });
 });
 
+describe('admin staking visibility', () => {
+  const adminPage = read('app/admin/page.tsx');
+  const stakersRoute = read('app/api/admin/stakers/route.ts');
+
+  it('adds a protected admin stakers dashboard', () => {
+    assert.match(adminPage, /"stakers"/);
+    assert.match(adminPage, /\/api\/admin\/stakers/);
+    assert.match(adminPage, /Active HIVE/);
+    assert.match(adminPage, /Slashed HIVE/);
+    assert.match(stakersRoute, /verifyAdmin\(request\)/);
+    assert.match(stakersRoute, /COLLECTIONS\.STAKES/);
+    assert.match(stakersRoute, /COLLECTIONS\.STAKE_EVENTS/);
+  });
+});
+
 describe('Solana browser transaction routing', () => {
   const rpcProxy = read('app/api/solana/rpc/route.ts');
   const stakePage = read('app/stake/page.tsx');
