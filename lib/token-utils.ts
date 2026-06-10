@@ -9,8 +9,8 @@ import { getAssociatedTokenAddressSync } from '@solana/spl-token';
 
 export const HIVE_MINT = new PublicKey('6JfonM6a24xngXh5yJ1imZzbMhpfvEsiafkb4syHBAGS');
 
-// Token has 6 decimals (standard for Bags launches)
-export const HIVE_DECIMALS = 6;
+// $HIVE mint uses 9 decimals.
+export const HIVE_DECIMALS = 9;
 
 export type HiveTier = 'none' | 'holder' | 'stacker' | 'og';
 
@@ -215,11 +215,17 @@ export async function verifyHiveTransfer(
       return { verified: false, error: 'Sender and recipient cannot be the same address.' };
     }
 
-    const connection = new Connection(process.env.SOLANA_RPC_URL || 'https://api.mainnet-beta.solana.com', 'finalized');
-    const tx = await connection.getParsedTransaction(txSignature, {
-      maxSupportedTransactionVersion: 0,
-      commitment: 'finalized',
-    });
+    const connection = new Connection(process.env.SOLANA_RPC_URL || 'https://api.mainnet-beta.solana.com', 'confirmed');
+    let tx = null;
+    const startedAt = Date.now();
+    while (Date.now() - startedAt < 30_000) {
+      tx = await connection.getParsedTransaction(txSignature, {
+        maxSupportedTransactionVersion: 0,
+        commitment: 'confirmed',
+      });
+      if (tx) break;
+      await new Promise((resolve) => setTimeout(resolve, 1500));
+    }
 
     if (!tx) {
       return { verified: false, error: 'Transaction not found. It may still be confirming.' };
