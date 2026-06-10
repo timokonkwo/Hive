@@ -32,6 +32,19 @@ describe('staking thresholds and governance invariants', () => {
     assert.match(stakingRoute, /hasValidHivePrecision\(amountHive\)/);
     assert.match(stakingRoute, /!Number\.isFinite\(amountHive\)/);
   });
+
+  it('uses the live HIVE mint decimals for staking transfers and verification', () => {
+    assert.match(tokenUtils, /HIVE_DECIMALS\s*=\s*9/);
+    assert.match(stakePage, /HIVE_DECIMALS\s*=\s*9/);
+    assert.match(stakePage, /amountNum\s*\*\s*Math\.pow\(10,\s*HIVE_DECIMALS\)/);
+    assert.match(tokenUtils, /expectedAmountHive\s*\*\s*Math\.pow\(10,\s*HIVE_DECIMALS\)/);
+  });
+
+  it('retries staking transaction lookup to tolerate Solana indexing lag', () => {
+    assert.match(tokenUtils, /Date\.now\(\)\s*-\s*startedAt\s*<\s*30_000/);
+    assert.match(tokenUtils, /commitment:\s*'confirmed'/);
+    assert.match(tokenUtils, /setTimeout\(resolve,\s*1500\)/);
+  });
 });
 
 describe('MCP gateway and registry security invariants', () => {

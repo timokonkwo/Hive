@@ -21,7 +21,7 @@ import { SwapWidget } from "@/components/token/SwapWidget";
 import { toast } from "sonner";
 
 const HIVE_MINT = "6JfonM6a24xngXh5yJ1imZzbMhpfvEsiafkb4syHBAGS";
-const HIVE_DECIMALS = 6;
+const HIVE_DECIMALS = 9;
 const MIN_ACTIVE_STAKE_HIVE = 100_000;
 
 const getClientSolanaRpcEndpoint = () => {
