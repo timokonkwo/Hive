@@ -89,3 +89,37 @@ describe('token page consolidation', () => {
     assert.match(tokenPage, /redirect\("\/stake"\)/);
   });
 });
+
+describe('Solana browser transaction routing', () => {
+  const rpcProxy = read('app/api/solana/rpc/route.ts');
+  const stakePage = read('app/stake/page.tsx');
+  const dashboardPage = read('app/dashboard/page.tsx');
+  const swapWidget = read('components/token/SwapWidget.tsx');
+
+  it('routes client-side staking and deposits through the same-origin RPC proxy by default', () => {
+    assert.match(stakePage, /getClientSolanaRpcEndpoint/);
+    assert.match(stakePage, /window\.location\.origin\}\/api\/solana\/rpc/);
+    assert.doesNotMatch(stakePage, /api\.mainnet-beta\.solana\.com/);
+    assert.match(dashboardPage, /getClientSolanaRpcEndpoint/);
+    assert.match(dashboardPage, /window\.location\.origin\}\/api\/solana\/rpc/);
+    assert.doesNotMatch(dashboardPage, /api\.mainnet-beta\.solana\.com/);
+  });
+
+  it('allows signed transaction broadcast through the RPC proxy without reopening broad RPC access', () => {
+    assert.match(rpcProxy, /'sendTransaction'/);
+    assert.match(rpcProxy, /MAX_RPC_BODY_BYTES\s*=\s*96\s*\*\s*1024/);
+    assert.match(rpcProxy, /MAX_SIGNED_TRANSACTION_CHARS\s*=\s*32\s*\*\s*1024/);
+    assert.match(rpcProxy, /BASE64_PATTERN/);
+    assert.match(rpcProxy, /sendTransaction requires base64 transaction encoding/);
+    assert.match(rpcProxy, /encoding:\s*'base64'/);
+    assert.doesNotMatch(rpcProxy, /getProgramAccounts/);
+  });
+
+  it('submits Bags swap transactions as base64 and surfaces RPC send errors', () => {
+    assert.match(swapWidget, /bytesToBase64/);
+    assert.match(swapWidget, /encoding:\s*"base64"/);
+    assert.match(swapWidget, /preflightCommitment:\s*"confirmed"/);
+    assert.match(swapWidget, /sendData\.error\?\.message/);
+    assert.doesNotMatch(swapWidget, /encoding:\s*"base58"/);
+  });
+});
