@@ -70,6 +70,76 @@ export const TIERS: Record<Exclude<HiveTier, 'none'>, TierInfo> = {
 
 export const ALL_TIERS = [TIERS.holder, TIERS.stacker, TIERS.og];
 
+export type StakingTier = 'none' | 'staker' | 'power' | 'governor';
+
+export interface StakingTierInfo {
+  id: StakingTier;
+  label: string;
+  threshold: number;
+  color: string;
+  routingDiscountBps: number;
+  pointsMultiplier: number;
+  governanceMultiplier: number;
+  benefits: string[];
+}
+
+export const STAKING_TIERS: Record<Exclude<StakingTier, 'none'>, StakingTierInfo> = {
+  staker: {
+    id: 'staker',
+    label: 'Staker',
+    threshold: 10_000,
+    color: 'emerald',
+    routingDiscountBps: 500,
+    pointsMultiplier: 1.25,
+    governanceMultiplier: 1,
+    benefits: [
+      'Premium API access',
+      '5% MCP routing discount',
+      '1.25x Hive Points',
+      'DAO voting eligibility',
+      'Staker badge',
+    ],
+  },
+  power: {
+    id: 'power',
+    label: 'Power Staker',
+    threshold: 100_000,
+    color: 'blue',
+    routingDiscountBps: 1000,
+    pointsMultiplier: 1.5,
+    governanceMultiplier: 1.25,
+    benefits: [
+      '10% MCP routing discount',
+      '1.5x Hive Points',
+      'Proposal access',
+      'Priority routing',
+      'Early feature access',
+    ],
+  },
+  governor: {
+    id: 'governor',
+    label: 'Governor',
+    threshold: 1_000_000,
+    color: 'amber',
+    routingDiscountBps: 2000,
+    pointsMultiplier: 2,
+    governanceMultiplier: 2,
+    benefits: [
+      '20% MCP routing discount',
+      '2x Hive Points',
+      'Advanced governance',
+      'High-trust badge',
+      'Priority access to tokenized tool launches',
+    ],
+  },
+};
+
+export const ALL_STAKING_TIERS = [
+  STAKING_TIERS.staker,
+  STAKING_TIERS.power,
+  STAKING_TIERS.governor,
+];
+
 /**
  * Get the $HIVE token balance for a Solana wallet.
  * Returns the human-readable balance (decimals applied).
@@ -118,4 +188,96 @@ export function getTierInfo(balance: number): TierInfo | null {
   const tier = getHolderTier(balance);
   if (tier === 'none') return null;
   return TIERS[tier];
+}
+
+export function getStakingTier(stakedAmount: number): StakingTier {
+  if (stakedAmount >= STAKING_TIERS.governor.threshold) return 'governor';
+  if (stakedAmount >= STAKING_TIERS.power.threshold) return 'power';
+  if (stakedAmount >= STAKING_TIERS.staker.threshold) return 'staker';
+  return 'none';
+}
+
+export function getStakingTierInfo(stakedAmount: number): StakingTierInfo | null {
+  const tier = getStakingTier(stakedAmount);
+  if (tier === 'none') return null;
+  return STAKING_TIERS[tier];
+}
+
+export async function verifyHiveTransfer(
+  txSignature: string,
+  expectedSender: string,
+  expectedRecipient: string,
+  expectedAmountHive: number,
+  options: { maxAgeMinutes?: number } = {}
+): Promise<{ verified: boolean; error?: string; confirmedAmount?: number; blockTime?: number }> {
+  try {
+    if (expectedSender === expectedRecipient) {
+      return { verified: false, error: 'Sender and recipient cannot be the same address.' };
+    }
+
+    const connection = new Connection(process.env.SOLANA_RPC_URL || 'https://api.mainnet-beta.solana.com', 'finalized');
+    const tx = await connection.getParsedTransaction(txSignature, {
+      maxSupportedTransactionVersion: 0,
+      commitment: 'finalized',
+    });
+
+    if (!tx) {
+      return { verified: false, error: 'Transaction not found. It may still be confirming.' };
+    }
+
+    if (tx.meta?.err) {
+      return { verified: false, error: 'Transaction failed on-chain.' };
+    }
+
+    const maxAgeMinutes = options.maxAgeMinutes ?? 15;
+    if (!tx.blockTime) {
+      return { verified: false, error: 'Transaction block time is unavailable.' };
+    }
+    const ageMs = Date.now() - tx.blockTime * 1000;
+    if (ageMs > maxAgeMinutes * 60 * 1000) {
+      return { verified: false, error: `Transaction is older than ${maxAgeMinutes} minutes.` };
+    }
+
+    const sender = new PublicKey(expectedSender);
+    const recipient = new PublicKey(expectedRecipient);
+    const senderAta = getAssociatedTokenAddressSync(HIVE_MINT, sender);
+    const recipientAta = getAssociatedTokenAddressSync(HIVE_MINT, recipient);
+    const expectedRawAmount = Math.round(expectedAmountHive * Math.pow(10, HIVE_DECIMALS));
+
+    const instructions = tx.transaction.message.instructions;
+    const innerInstructions = tx.meta?.innerInstructions || [];
+    const allInstructions = [
+      ...instructions,
+      ...innerInstructions.flatMap((ii: any) => ii.instructions),
+    ];
+
+    for (const ix of allInstructions) {
+      const parsed = (ix as any)?.parsed;
+      if (!parsed || (parsed.type !== 'transfer' && parsed.type !== 'transferChecked')) continue;
+
+      const info = parsed.info;
+      if (parsed.type === 'transferChecked' && info.mint !== HIVE_MINT.toBase58()) {
+        continue;
+      }
+
+      const amount = parsed.type === 'transferChecked'
+        ? Number(info.tokenAmount?.amount || 0)
+        : Number(info.amount || 0);
+
+      if (amount < expectedRawAmount) continue;
+      if (info.source !== senderAta.toBase58()) continue;
+      if (info.destination !== recipientAta.toBase58()) continue;
+      if (parsed.type === 'transfer' && info.authority !== expectedSender) continue;
+
+      return {
+        verified: true,
+        confirmedAmount: amount / Math.pow(10, HIVE_DECIMALS),
+        blockTime: tx.blockTime,
+      };
+    }
+
+    return { verified: false, error: 'No matching HIVE transfer found in transaction.' };
+  } catch (error: any) {
+    return { verified: false, error: `Verification failed: ${error.message}` };
+  }
 }

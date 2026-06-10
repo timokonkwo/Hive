@@ -32,7 +32,11 @@ export async function GET(req: NextRequest) {
     );
   }
 
-  const verification = await verifyHolderAccess(wallet);
+  const verification = await verifyHolderAccess(wallet, {
+    message: req.headers.get(X402_HEADERS.WALLET_MESSAGE),
+    signature: req.headers.get(X402_HEADERS.WALLET_SIGNATURE),
+    requireSignature: true,
+  });
 
   if (!verification.allowed) {
     return NextResponse.json(

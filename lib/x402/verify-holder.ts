@@ -5,8 +5,10 @@
  * Any balance > 0 grants access to premium API endpoints.
  */
 
-import { getHiveBalance, getHolderTier, getTierInfo } from '@/lib/token-utils';
+import { getHiveBalance, getHolderTier, getStakingTierInfo, getTierInfo } from '@/lib/token-utils';
 import { PublicKey } from '@solana/web3.js';
+import { getDb, COLLECTIONS } from '@/lib/db';
+import { verifyAndConsumeSolanaMessageSignature } from '@/lib/solana-signature';
 
 export interface HolderVerificationResult {
   allowed: boolean;
@@ -23,7 +25,10 @@ const cache = new Map<string, { result: HolderVerificationResult; fetchedAt: num
 /**
  * Verify a wallet holds $HIVE and return access decision.
  */
-export async function verifyHolderAccess(walletAddress: string): Promise<HolderVerificationResult> {
+export async function verifyHolderAccess(
+  walletAddress: string,
+  options: { message?: string | null; signature?: string | null; requireSignature?: boolean } = {}
+): Promise<HolderVerificationResult> {
   if (!walletAddress) {
     return { allowed: false, tier: 'none', balance: 0, error: 'Wallet address required' };
   }
@@ -35,22 +40,43 @@ export async function verifyHolderAccess(walletAddress: string): Promise<HolderV
     return { allowed: false, tier: 'none', balance: 0, error: 'Invalid Solana wallet address' };
   }
 
+  const normalizedWallet = new PublicKey(walletAddress).toBase58();
+  if (options.requireSignature) {
+    if (!options.message || !options.signature) {
+      return { allowed: false, tier: 'none', balance: 0, error: 'Wallet signature required for premium access' };
+    }
+    const db = await getDb();
+    const proof = await verifyAndConsumeSolanaMessageSignature(db, {
+      address: normalizedWallet,
+      action: 'premium_api',
+      message: options.message,
+      signature: options.signature,
+    });
+    if (!proof.verified) {
+      return { allowed: false, tier: 'none', balance: 0, error: proof.error || 'Wallet signature could not be verified' };
+    }
+  }
+
   // Check cache
-  const cached = cache.get(walletAddress);
+  const cached = cache.get(normalizedWallet);
   if (cached && Date.now() - cached.fetchedAt < CACHE_TTL) {
     return cached.result;
   }
 
   try {
-    const balance = await getHiveBalance(walletAddress);
+    const balance = await getHiveBalance(normalizedWallet);
     const tier = getHolderTier(balance);
     const tierInfo = getTierInfo(balance);
+    const db = await getDb();
+    const stake = await db.collection(COLLECTIONS.STAKES).findOne({ solanaAddress: normalizedWallet });
+    const activeStake = stake?.activeAmount || 0;
+    const stakingTierInfo = getStakingTierInfo(activeStake);
 
     const result: HolderVerificationResult = {
-      allowed: balance > 0,
-      tier,
+      allowed: balance > 0 || activeStake > 0,
+      tier: stakingTierInfo?.id || tier,
       balance,
-      tierInfo,
+      tierInfo: stakingTierInfo || tierInfo,
     };
 
     // Cache result
@@ -58,7 +84,7 @@ export async function verifyHolderAccess(walletAddress: string): Promise<HolderV
       const firstKey = cache.keys().next().value;
       if (firstKey) cache.delete(firstKey);
     }
-    cache.set(walletAddress, { result, fetchedAt: Date.now() });
+    cache.set(normalizedWallet, { result, fetchedAt: Date.now() });
 
     return result;
   } catch (err: any) {

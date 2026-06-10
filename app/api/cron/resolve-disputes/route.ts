@@ -1,9 +1,9 @@
 import { NextResponse } from 'next/server';
 import { getDb, COLLECTIONS } from '@/lib/db';
-import { Connection, Keypair, PublicKey, Transaction } from '@solana/web3.js';
+import { Connection, Keypair, Transaction } from '@solana/web3.js';
 import {
   getAssociatedTokenAddress,
-  createTransferInstruction,
+  createBurnInstruction,
   TOKEN_PROGRAM_ID
 } from '@solana/spl-token';
 import { HIVE_MINT, HIVE_DECIMALS } from '@/lib/token-utils';
@@ -69,35 +69,32 @@ export async function GET(req: Request) {
       return NextResponse.json({ message: 'No active disputes have reached their deadline.' });
     }
 
-    const burnAddress = '11111111111111111111111111111111'; // System burn wallet
-
     for (const dispute of expiredDisputes) {
       const voteFor = dispute.votesForSlash || 0;
       const voteAgainst = dispute.votesAgainstSlash || 0;
-      const isSlashedOutcome = voteFor > voteAgainst;
-      const finalStatus = isSlashedOutcome ? 'slashed' : 'dismissed';
+      const totalVotes = voteFor + voteAgainst;
+      const quorumRequired = Number(dispute.quorumRequired || Math.round((dispute.stakedAmount || 0) * 0.05));
+      const slashThresholdBps = Number(dispute.slashThresholdBps || 6000);
+      const slashShareBps = totalVotes > 0 ? Math.round((voteFor / totalVotes) * 10_000) : 0;
+      const quorumMet = totalVotes >= quorumRequired;
+      const isSlashedOutcome = quorumMet && slashShareBps >= slashThresholdBps;
+      let finalStatus = !quorumMet ? 'failed_quorum' : isSlashedOutcome ? 'slashed' : 'dismissed';
 
       let txSignature = '';
 
       if (isSlashedOutcome && treasuryKeypair && dispute.stakedAmount > 0) {
-        // Build on-chain slash transfer to burn account
+        // Burn treasury-custodied HIVE that represents the provider's recorded stake.
         try {
-          const providerPubKey = new PublicKey(dispute.providerAddress);
-          const burnPubKey = new PublicKey(burnAddress);
-
-          const sourceAta = await getAssociatedTokenAddress(HIVE_MINT, providerPubKey);
-          const destinationAta = await getAssociatedTokenAddress(HIVE_MINT, burnPubKey);
+          const sourceAta = await getAssociatedTokenAddress(HIVE_MINT, treasuryKeypair.publicKey);
 
           const transaction = new Transaction();
           const rawAmount = BigInt(Math.round(dispute.stakedAmount * Math.pow(10, HIVE_DECIMALS)));
 
-          // Note: Because providers stake in our gateway, the gateway treasury is the authority
-          // allowed to transfer the provider's staked deposit. We build the transfer instruction.
           transaction.add(
-            createTransferInstruction(
+            createBurnInstruction(
               sourceAta,
-              destinationAta,
-              treasuryKeypair.publicKey, // authority
+              HIVE_MINT,
+              treasuryKeypair.publicKey,
               rawAmount,
               [],
               TOKEN_PROGRAM_ID
@@ -111,13 +108,14 @@ export async function GET(req: Request) {
 
           // Broadcast signature (this will simulate or execute depending on wallet tokens)
           txSignature = await connection.sendRawTransaction(transaction.serialize(), {
-            skipPreflight: true,
+            skipPreflight: false,
             maxRetries: 3
           });
           logger.info(`[CRON-DISPUTE] Slashing tx broadcasted: ${txSignature}`);
         } catch (err: any) {
           logger.error(`[CRON-DISPUTE] Slashing SPL token instruction failed for ${dispute.providerAddress}:`, err.message);
           txSignature = 'failed_chain_error';
+          finalStatus = 'execution_failed';
         }
       }
 
@@ -127,8 +125,12 @@ export async function GET(req: Request) {
         {
           $set: {
             status: finalStatus,
+            phase: 'resolved',
             resolutionTx: txSignature || null,
-            resolvedAt: new Date()
+            resolvedAt: new Date(),
+            quorumMet,
+            totalVoteWeight: totalVotes,
+            slashShareBps
           }
         }
       );
@@ -149,6 +151,19 @@ export async function GET(req: Request) {
         { $set: agentUpdate }
       );
 
+      if (finalStatus === 'slashed') {
+        await db.collection(COLLECTIONS.STAKES).updateOne(
+          { solanaAddress: dispute.providerAddress },
+          {
+            $inc: {
+              activeAmount: -Math.abs(dispute.stakedAmount || 0),
+              slashedAmount: Math.abs(dispute.stakedAmount || 0),
+            },
+            $set: { status: 'none', updatedAt: new Date() },
+          }
+        );
+      }
+
       // Log resolution activity
       await db.collection(COLLECTIONS.ACTIVITY).insertOne({
         type: 'DisputeResolved',
@@ -160,6 +175,9 @@ export async function GET(req: Request) {
           outcome: finalStatus,
           votesFor: voteFor,
           votesAgainst: voteAgainst,
+          quorumMet,
+          quorumRequired,
+          slashThresholdBps,
           slashingTxSignature: txSignature || null
         },
         createdAt: new Date()

@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { ALL_TIERS } from '@/lib/token-utils';
+import { ALL_STAKING_TIERS, ALL_TIERS } from '@/lib/token-utils';
 
 /**
  * GET /api/token/benefits
@@ -23,6 +23,19 @@ export async function GET() {
         ? `${(t.threshold / 1000).toFixed(0)}K+ HIVE`
         : `${t.threshold}+ HIVE`,
       color: t.color,
+      benefits: t.benefits,
+    })),
+    stakingTiers: ALL_STAKING_TIERS.map(t => ({
+      id: t.id,
+      label: t.label,
+      threshold: t.threshold,
+      thresholdDisplay: t.threshold >= 1_000_000
+        ? `${(t.threshold / 1_000_000).toFixed(0)}M+ HIVE staked`
+        : `${(t.threshold / 1000).toFixed(0)}K+ HIVE staked`,
+      color: t.color,
+      routingDiscountBps: t.routingDiscountBps,
+      pointsMultiplier: t.pointsMultiplier,
+      governanceMultiplier: t.governanceMultiplier,
       benefits: t.benefits,
     })),
   });

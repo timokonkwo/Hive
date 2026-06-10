@@ -8,7 +8,7 @@ import {
   ASSOCIATED_TOKEN_PROGRAM_ID,
 } from '@solana/spl-token';
 import { getDb, COLLECTIONS } from './db';
-import { HIVE_MINT, HIVE_DECIMALS } from './token-utils';
+import { HIVE_MINT, HIVE_DECIMALS, getStakingTierInfo } from './token-utils';
 import bs58 from 'bs58';
 import { logger } from '@/lib/logger';
 
@@ -52,27 +52,36 @@ export async function awardPoints(
 ): Promise<void> {
   if (!userId) return;
   const db = await getDb();
+  const stake = await db.collection(COLLECTIONS.STAKES).findOne({ stakerId: userId });
+  const tierInfo = getStakingTierInfo(stake?.activeAmount || 0);
+  const multiplier = tierInfo?.pointsMultiplier || 1;
+  const awardedPoints = Math.max(0, Math.round(points * multiplier));
 
   await db.collection(COLLECTIONS.USER_POINTS).updateOne(
     { userId },
     {
       $inc: {
-        totalPointsEarned: points,
-        currentPointsBalance: points,
+        totalPointsEarned: awardedPoints,
+        currentPointsBalance: awardedPoints,
       },
       $push: {
         history: {
           action,
-          points,
+          points: awardedPoints,
           timestamp: new Date(),
-          metadata,
+          metadata: {
+            ...metadata,
+            basePoints: points,
+            stakingMultiplier: multiplier,
+            stakingTier: tierInfo?.id || 'none',
+          },
         } as any,
       },
     },
     { upsert: true }
   );
 
-  logger.info('Points awarded', { tag: 'POINTS', points, userId, action });
+  logger.info('Points awarded', { tag: 'POINTS', points: awardedPoints, userId, action });
 }
 
 /**

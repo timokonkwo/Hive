@@ -15,7 +15,7 @@ import {
 import Link from "next/link";
 import { toast } from "sonner";
 
-type AdminTab = "overview" | "tasks" | "agents" | "submissions" | "activity" | "feedback" | "tokens" | "roadmap";
+type AdminTab = "overview" | "tasks" | "agents" | "submissions" | "dao" | "activity" | "feedback" | "tokens" | "roadmap";
 
 const AGENTS_PER_PAGE = 20;
 const TASKS_PER_PAGE = 20;
@@ -108,6 +108,13 @@ export default function AdminDashboardPage() {
   const [roadmapSaving, setRoadmapSaving] = useState(false);
   const [showRoadmapForm, setShowRoadmapForm] = useState(false);
   const [roadmapCollapsed, setRoadmapCollapsed] = useState<Record<string, boolean>>({ completed: true });
+
+  // DAO management state
+  const [daoData, setDaoData] = useState<any>(null);
+  const [daoLoading, setDaoLoading] = useState(false);
+  const [daoActionId, setDaoActionId] = useState<string | null>(null);
+  const [daoReportStatus, setDaoReportStatus] = useState("all");
+  const [daoDisputeStatus, setDaoDisputeStatus] = useState("active");
 
   const address = user?.wallet?.address;
 
@@ -298,6 +305,56 @@ export default function AdminDashboardPage() {
   }, [activeTab, fetchFeedback]);
 
   useEffect(() => { setFeedbackPage(1); }, [feedbackTypeFilter, feedbackStatusFilter]);
+
+  const fetchDaoData = useCallback(async () => {
+    if (!isAdmin || !address) return;
+    setDaoLoading(true);
+    try {
+      const params = new URLSearchParams({
+        address,
+        reportStatus: daoReportStatus,
+        disputeStatus: daoDisputeStatus,
+      });
+      const res = await authFetch(`/api/admin/dao?${params.toString()}`);
+      if (res.ok) {
+        setDaoData(await res.json());
+      } else {
+        const data = await res.json().catch(() => ({}));
+        toast.error(data.error || "Failed to load DAO controls.");
+      }
+    } catch {
+      toast.error("Failed to load DAO controls.");
+    } finally {
+      setDaoLoading(false);
+    }
+  }, [isAdmin, address, daoReportStatus, daoDisputeStatus, authFetch]);
+
+  useEffect(() => {
+    if (activeTab === "dao") fetchDaoData();
+  }, [activeTab, fetchDaoData]);
+
+  const runDaoAction = async (payload: Record<string, any>, label: string) => {
+    if (!address) return;
+    const targetId = payload.reportId || payload.disputeId || label;
+    setDaoActionId(targetId);
+    try {
+      const res = await authFetch(`/api/admin/dao?address=${encodeURIComponent(address)}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || !data.success) {
+        throw new Error(data.error || `${label} failed.`);
+      }
+      toast.success(label);
+      fetchDaoData();
+    } catch (error: any) {
+      toast.error(error.message || `${label} failed.`);
+    } finally {
+      setDaoActionId(null);
+    }
+  };
 
   // Fetch submissions
   const fetchSubmissions = useCallback(async () => {
@@ -537,7 +594,7 @@ export default function AdminDashboardPage() {
 
       {/* Tabs */}
       <div className="flex border-b border-zinc-800 mb-8 gap-1 overflow-x-auto scrollbar-hide -mx-4 px-4 sm:mx-0 sm:px-0">
-        {(["overview", "tasks", "agents", "submissions", "activity", "feedback", "tokens", "roadmap"] as AdminTab[]).map((tab) => (
+        {(["overview", "tasks", "agents", "submissions", "dao", "activity", "feedback", "tokens", "roadmap"] as AdminTab[]).map((tab) => (
           <button
             key={tab}
             onClick={() => setActiveTab(tab)}
@@ -943,6 +1000,189 @@ export default function AdminDashboardPage() {
               <p className="text-[10px] font-mono uppercase tracking-widest text-zinc-600">
                 Showing {(agentsPage - 1) * AGENTS_PER_PAGE + 1}–{Math.min(agentsPage * AGENTS_PER_PAGE, agentsTotal)} of {agentsTotal} agents
               </p>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ── DAO Tab ── */}
+      {activeTab === "dao" && (
+        <div className="space-y-6">
+          <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+            <StatCard label="Submitted" value={daoData?.stats?.submittedReports || 0} icon={<Inbox size={16} />} color="text-amber-400" />
+            <StatCard label="Needs Evidence" value={daoData?.stats?.needsEvidenceReports || 0} icon={<FileText size={16} />} color="text-blue-400" />
+            <StatCard label="Escalated" value={daoData?.stats?.escalatedReports || 0} icon={<AlertTriangle size={16} />} color="text-red-400" />
+            <StatCard label="Active Votes" value={daoData?.stats?.activeDisputes || 0} icon={<Clock size={16} />} color="text-emerald-400" />
+            <StatCard label="Queued" value={daoData?.stats?.queuedDisputes || 0} icon={<CheckCircle size={16} />} color="text-violet-400" />
+          </div>
+
+          <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
+            <div>
+              <h2 className="text-xl font-bold font-mono uppercase tracking-wide">DAO Review Queue</h2>
+              <p className="text-zinc-500 text-xs font-mono mt-1">Triage reports before they become slashable governance votes.</p>
+            </div>
+            <div className="flex flex-wrap items-center gap-2">
+              <select
+                value={daoReportStatus}
+                onChange={(e) => setDaoReportStatus(e.target.value)}
+                className="bg-zinc-900 border border-zinc-800 text-white text-xs font-mono px-3 py-2 rounded outline-none"
+              >
+                <option value="all">All Reports</option>
+                <option value="submitted">Submitted</option>
+                <option value="needs_evidence">Needs Evidence</option>
+                <option value="rejected">Rejected</option>
+                <option value="escalated">Escalated</option>
+              </select>
+              <select
+                value={daoDisputeStatus}
+                onChange={(e) => setDaoDisputeStatus(e.target.value)}
+                className="bg-zinc-900 border border-zinc-800 text-white text-xs font-mono px-3 py-2 rounded outline-none"
+              >
+                <option value="active">Active Disputes</option>
+                <option value="queued">Queued</option>
+                <option value="dismissed">Dismissed</option>
+                <option value="slashed">Slashed</option>
+                <option value="all">All Disputes</option>
+              </select>
+              <button
+                onClick={fetchDaoData}
+                disabled={daoLoading}
+                className="px-4 py-2 bg-white/5 hover:bg-white/10 text-zinc-300 rounded text-xs font-mono transition-colors disabled:opacity-50"
+              >
+                {daoLoading ? "Refreshing..." : "Refresh"}
+              </button>
+            </div>
+          </div>
+
+          {daoLoading ? (
+            <div className="py-12 text-center"><Loader2 className="w-6 h-6 text-emerald-500 animate-spin mx-auto" /></div>
+          ) : (
+            <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
+              <section className="space-y-3">
+                <h3 className="text-xs font-mono uppercase tracking-widest text-zinc-400 font-bold">Reports</h3>
+                {(daoData?.reports || []).length === 0 ? (
+                  <div className="py-10 text-center text-zinc-600 border border-dashed border-zinc-800 rounded-lg font-mono text-sm">No reports match this filter</div>
+                ) : (
+                  (daoData?.reports || []).map((report: any) => (
+                    <div key={report.id} className="p-4 bg-zinc-900/30 border border-zinc-800 rounded-lg space-y-3">
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="min-w-0">
+                          <div className="flex flex-wrap items-center gap-2">
+                            <span className="font-bold text-white">Tool: {report.toolId}</span>
+                            <span className="text-[9px] font-mono uppercase border border-white/10 rounded px-2 py-0.5 text-zinc-400">{report.status}</span>
+                            <span className="text-[9px] font-mono uppercase border border-white/10 rounded px-2 py-0.5 text-zinc-500">{report.category}</span>
+                          </div>
+                          <p className="text-[11px] font-mono text-zinc-500 truncate mt-1">Provider: {report.providerAddress}</p>
+                          <p className="text-xs text-zinc-400 mt-2 line-clamp-3">{report.reason}</p>
+                        </div>
+                        <div className="text-right text-[10px] font-mono text-zinc-500 shrink-0">
+                          <div>{(report.providerStake || 0).toLocaleString()} HIVE</div>
+                          <div>{report.affectedParty ? "Affected" : report.watchdogEligible ? "Watchdog" : "Reporter"}</div>
+                        </div>
+                      </div>
+                      {report.triageReason && (
+                        <div className="text-xs text-amber-300 bg-amber-500/5 border border-amber-500/20 rounded p-2">{report.triageReason}</div>
+                      )}
+                      <div className="flex flex-wrap items-center gap-2">
+                        <a href={report.evidenceUri} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 text-xs text-emerald-400 hover:underline font-mono">
+                          <ExternalLink size={10} /> Evidence
+                        </a>
+                        {report.status !== "escalated" && report.status !== "rejected" && (
+                          <>
+                            <button
+                              onClick={() => runDaoAction({ action: "escalate_report", reportId: report.id }, "Report escalated")}
+                              disabled={daoActionId === report.id}
+                              className="px-3 py-1.5 bg-red-500/10 border border-red-500/20 text-red-400 hover:bg-red-500/20 rounded text-[10px] font-mono uppercase disabled:opacity-50"
+                            >
+                              Escalate
+                            </button>
+                            <button
+                              onClick={() => runDaoAction({ action: "request_evidence", reportId: report.id, reason: "More evidence required before DAO escalation." }, "Evidence requested")}
+                              disabled={daoActionId === report.id}
+                              className="px-3 py-1.5 bg-blue-500/10 border border-blue-500/20 text-blue-400 hover:bg-blue-500/20 rounded text-[10px] font-mono uppercase disabled:opacity-50"
+                            >
+                              Request Evidence
+                            </button>
+                            <button
+                              onClick={() => runDaoAction({ action: "reject_report", reportId: report.id, reason: "Rejected during admin triage." }, "Report rejected")}
+                              disabled={daoActionId === report.id}
+                              className="px-3 py-1.5 bg-zinc-800 border border-zinc-700 text-zinc-400 hover:text-white rounded text-[10px] font-mono uppercase disabled:opacity-50"
+                            >
+                              Reject
+                            </button>
+                          </>
+                        )}
+                      </div>
+                    </div>
+                  ))
+                )}
+              </section>
+
+              <section className="space-y-3">
+                <h3 className="text-xs font-mono uppercase tracking-widest text-zinc-400 font-bold">Formal Disputes</h3>
+                {(daoData?.disputes || []).length === 0 ? (
+                  <div className="py-10 text-center text-zinc-600 border border-dashed border-zinc-800 rounded-lg font-mono text-sm">No disputes match this filter</div>
+                ) : (
+                  (daoData?.disputes || []).map((dispute: any) => {
+                    const totalWeight = (dispute.votesForSlash || 0) + (dispute.votesAgainstSlash || 0);
+                    const slashPct = totalWeight > 0 ? ((dispute.votesForSlash || 0) / totalWeight) * 100 : 0;
+                    return (
+                      <div key={dispute.id} className="p-4 bg-zinc-900/30 border border-zinc-800 rounded-lg space-y-3">
+                        <div className="flex items-start justify-between gap-3">
+                          <div className="min-w-0">
+                            <div className="flex flex-wrap items-center gap-2">
+                              <span className="font-bold text-white">Tool: {dispute.toolId}</span>
+                              <span className="text-[9px] font-mono uppercase border border-white/10 rounded px-2 py-0.5 text-zinc-400">{dispute.phase || dispute.status}</span>
+                            </div>
+                            <p className="text-[11px] font-mono text-zinc-500 truncate mt-1">Provider: {dispute.providerAddress}</p>
+                            <p className="text-xs text-zinc-400 mt-2 line-clamp-2">{dispute.reason}</p>
+                          </div>
+                          <div className="text-right text-[10px] font-mono text-zinc-500 shrink-0">
+                            <div>{(dispute.stakedAmount || 0).toLocaleString()} HIVE at risk</div>
+                            <div>{totalWeight.toLocaleString()} / {(dispute.quorumRequired || 0).toLocaleString()} quorum</div>
+                          </div>
+                        </div>
+                        <div>
+                          <div className="flex justify-between text-[10px] font-mono text-zinc-500 mb-1">
+                            <span>Slash share</span>
+                            <span>{slashPct.toFixed(1)}% / {((dispute.slashThresholdBps || 6000) / 100).toFixed(0)}%</span>
+                          </div>
+                          <div className="h-2 bg-zinc-800 rounded overflow-hidden">
+                            <div className="h-full bg-red-500" style={{ width: `${Math.min(100, slashPct)}%` }} />
+                          </div>
+                        </div>
+                        {dispute.status === "active" && (
+                          <div className="flex flex-wrap items-center gap-2">
+                            {dispute.phase === "evidence" && (
+                              <button
+                                onClick={() => runDaoAction({ action: "start_voting", disputeId: dispute.id }, "Voting started")}
+                                disabled={daoActionId === dispute.id}
+                                className="px-3 py-1.5 bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 hover:bg-emerald-500/20 rounded text-[10px] font-mono uppercase disabled:opacity-50"
+                              >
+                                Start Voting
+                              </button>
+                            )}
+                            <button
+                              onClick={() => runDaoAction({ action: "extend_dispute", disputeId: dispute.id, hours: 24 }, "Dispute extended")}
+                              disabled={daoActionId === dispute.id}
+                              className="px-3 py-1.5 bg-blue-500/10 border border-blue-500/20 text-blue-400 hover:bg-blue-500/20 rounded text-[10px] font-mono uppercase disabled:opacity-50"
+                            >
+                              Extend 24h
+                            </button>
+                            <button
+                              onClick={() => runDaoAction({ action: "dismiss_dispute", disputeId: dispute.id, reason: "Dismissed during admin safety review." }, "Dispute dismissed")}
+                              disabled={daoActionId === dispute.id}
+                              className="px-3 py-1.5 bg-zinc-800 border border-zinc-700 text-zinc-400 hover:text-white rounded text-[10px] font-mono uppercase disabled:opacity-50"
+                            >
+                              Dismiss
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })
+                )}
+              </section>
             </div>
           )}
         </div>

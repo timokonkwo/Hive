@@ -41,6 +41,11 @@ export const COLLECTIONS = {
   USER_POINTS: "user_points",
   SESSION_BUDGETS: "session_budgets",
   SESSION_LEDGER: "session_ledger",
+  STAKES: "stakes",
+  STAKE_EVENTS: "stake_events",
+  WALLET_PROOFS: "wallet_proofs",
+  DISPUTE_REPORTS: "dispute_reports",
+  DISPUTE_EVIDENCE: "dispute_evidence",
   DISPUTES: "disputes",
   DISPUTE_VOTES: "dispute_votes",
 } as const;
