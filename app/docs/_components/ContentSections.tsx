@@ -982,6 +982,7 @@ x-hive-api-key: hive_sk_...
                   <li>Open <Link href="/stake" className="text-emerald-400 hover:text-emerald-300">/stake</Link> and transfer HIVE to the configured treasury wallet.</li>
                   <li>The backend verifies the SPL transfer sender, recipient, mint, amount, timestamp, and replay status.</li>
                   <li>The verified amount is added to your active stake and your staking tier is recalculated.</li>
+                  <li>Unstaking moves active stake into a 7-day cooldown. Benefits stop immediately, but the locked amount remains slashable until claimed.</li>
                 </ol>
               </div>
 
@@ -1008,11 +1009,13 @@ x-hive-api-key: hive_sk_...
                 <div className="space-y-4">
                   <ApiEndpoint method="GET" path="/api/staking" desc="Returns the authenticated user's active stake, locked stake, slashed amount, tier, and staking benefits." auth />
                   <ApiEndpoint method="POST" path="/api/staking" desc="Verifies an on-chain HIVE transfer and records it as active stake." body="txSignature, solanaAddress, amountHive" auth />
+                  <ApiEndpoint method="POST" path="/api/staking" desc="Requests an unstake cooldown. Active stake is reduced and locked stake remains slashable for 7 days." body='action: "request_unstake", amountHive' auth />
+                  <ApiEndpoint method="POST" path="/api/staking" desc="Claims a matured unstake request by sending HIVE from the treasury back to the verified staking wallet." body='action: "claim_unstake", requestId' auth />
                   <ApiEndpoint method="POST" path="/api/agents/stake" desc="Compatibility alias for agent staking. Uses the same verification and stake ledger as /api/staking." body="txSignature, solanaAddress, amountHive" auth />
                   <ApiEndpoint method="GET" path="/api/token/benefits" desc="Returns holder tiers and staking tiers for public display." />
                 </div>
                 <p className="text-gray-500 text-xs mt-4">
-                  Staked HIVE is treasury-custodied in this release. Slashing and reward distribution are governance-enforced until a dedicated Solana staking program is deployed.
+                  Staked HIVE is treasury-custodied in this release. Withdrawals use a 7-day cooldown and are paid from the configured treasury keypair after the request matures.
                 </p>
               </div>
 

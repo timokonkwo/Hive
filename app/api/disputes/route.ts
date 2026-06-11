@@ -156,11 +156,14 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    const stake = await db.collection(COLLECTIONS.STAKES).findOne({ solanaAddress: providerAddress, status: 'active' });
-    const activeStake = Math.max(Number(stake?.activeAmount || 0), Number(provider.stakedAmount || 0));
-    if (!Number.isFinite(activeStake) || activeStake < MIN_SLASHABLE_STAKE_HIVE) {
+    const stake = await db.collection(COLLECTIONS.STAKES).findOne({ solanaAddress: providerAddress });
+    const slashableStake = Math.max(
+      Number(stake?.activeAmount || 0) + Number(stake?.lockedAmount || 0),
+      Number(provider.stakedAmount || 0)
+    );
+    if (!Number.isFinite(slashableStake) || slashableStake < MIN_SLASHABLE_STAKE_HIVE) {
       return NextResponse.json(
-        { error: `Provider must have at least ${MIN_SLASHABLE_STAKE_HIVE.toLocaleString()} active HIVE staked before a slashing dispute can be opened.` },
+        { error: `Provider must have at least ${MIN_SLASHABLE_STAKE_HIVE.toLocaleString()} slashable HIVE staked before a slashing dispute can be opened.` },
         { status: 400 }
       );
     }
@@ -170,7 +173,7 @@ export async function POST(req: NextRequest) {
       normalizedToolId,
       normalizedReason,
       normalizedEvidenceUri,
-      activeStake
+      slashableStake
     );
 
     if (!result.success) {

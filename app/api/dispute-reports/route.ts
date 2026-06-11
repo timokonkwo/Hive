@@ -140,8 +140,11 @@ export async function POST(req: NextRequest) {
 
     const reporterStake = await db.collection(COLLECTIONS.STAKES).findOne({ stakerId: reporter.reporterId, status: 'active' });
     const watchdogEligible = (reporterStake?.activeAmount || 0) >= 10_000;
-    const providerStake = await db.collection(COLLECTIONS.STAKES).findOne({ solanaAddress: providerAddress, status: 'active' });
-    const activeProviderStake = Math.max(Number(providerStake?.activeAmount || 0), Number(provider.stakedAmount || 0));
+    const providerStake = await db.collection(COLLECTIONS.STAKES).findOne({ solanaAddress: providerAddress });
+    const activeProviderStake = Math.max(
+      Number(providerStake?.activeAmount || 0) + Number(providerStake?.lockedAmount || 0),
+      Number(provider.stakedAmount || 0)
+    );
 
     try {
       await db.collection(COLLECTIONS.DISPUTE_REPORTS).createIndex(

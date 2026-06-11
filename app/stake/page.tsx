@@ -72,6 +72,15 @@ type StakeData = {
   };
   solanaAddress: string | null;
   solanaAddressVerified?: boolean;
+  pendingUnstakes?: Array<{
+    id: string;
+    amount: number;
+    status: string;
+    requestedAt: string;
+    unlocksAt: string;
+    claimTxSignature?: string;
+    slashedAmount?: number;
+  }>;
 };
 
 async function createSolanaWalletProof(solWallet: any, address: string, action = "link_wallet") {
@@ -140,6 +149,9 @@ export default function StakePage() {
   const [balanceLoading, setBalanceLoading] = useState(false);
   const [balanceMessage, setBalanceMessage] = useState("");
   const [caCopied, setCaCopied] = useState(false);
+  const [unstakeAmount, setUnstakeAmount] = useState("");
+  const [unstaking, setUnstaking] = useState(false);
+  const [claimingUnstakeId, setClaimingUnstakeId] = useState<string | null>(null);
 
   const userAddress = user?.wallet?.address || "";
   const isSolanaAuthWallet = user?.wallet?.chainType === "solana" && !!userAddress && !userAddress.startsWith("did:") && !userAddress.startsWith("0x");
@@ -152,6 +164,12 @@ export default function StakePage() {
     if (!stake?.tierInfo) return ["Stake 100,000 HIVE to unlock premium access, routing discounts, and DAO voting."];
     return stake.tierInfo.benefits;
   }, [stake]);
+
+  const pendingUnstakes = useMemo(() => (
+    Array.isArray(stake?.pendingUnstakes)
+      ? stake.pendingUnstakes.filter((request) => request.status !== "claimed")
+      : []
+  ), [stake]);
 
   const fetchStake = useCallback(async () => {
     if (!authenticated) return;
@@ -383,6 +401,71 @@ export default function StakePage() {
     }
   };
 
+  const handleRequestUnstake = async () => {
+    if (!authenticated) {
+      login();
+      return;
+    }
+    const amountNum = Number(unstakeAmount);
+    if (!Number.isFinite(amountNum) || amountNum <= 0) {
+      toast.error("Enter a valid HIVE amount to unstake.");
+      return;
+    }
+    if (amountNum > (stake?.activeAmount || 0)) {
+      toast.error("You cannot unstake more than your active stake.");
+      return;
+    }
+
+    setUnstaking(true);
+    try {
+      const res = await authFetch("/api/staking", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "request_unstake", amountHive: amountNum }),
+      });
+      const result = await res.json().catch(() => ({}));
+      if (!res.ok || !result.success) {
+        throw new Error(result.error || "Unstake request failed.");
+      }
+      setStake(result.stake);
+      setUnstakeAmount("");
+      toast.success(`Unstake requested. Claim opens on ${new Date(result.request.unlocksAt).toLocaleString()}.`);
+      fetchStake();
+    } catch (error: any) {
+      toast.error(error.message || "Unstake request failed.");
+    } finally {
+      setUnstaking(false);
+    }
+  };
+
+  const handleClaimUnstake = async (requestId: string) => {
+    if (!authenticated) {
+      login();
+      return;
+    }
+
+    setClaimingUnstakeId(requestId);
+    try {
+      const res = await authFetch("/api/staking", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "claim_unstake", requestId }),
+      });
+      const result = await res.json().catch(() => ({}));
+      if (!res.ok || !result.success) {
+        throw new Error(result.error || "Unstake claim failed.");
+      }
+      setStake(result.stake);
+      toast.success(`Claimed ${result.claimedAmount.toLocaleString()} HIVE.`);
+      fetchStake();
+      fetchHiveBalance(stakingSolanaAddress);
+    } catch (error: any) {
+      toast.error(error.message || "Unstake claim failed.");
+    } finally {
+      setClaimingUnstakeId(null);
+    }
+  };
+
   const copyCA = () => {
     navigator.clipboard.writeText(HIVE_MINT);
     setCaCopied(true);
@@ -516,6 +599,63 @@ export default function StakePage() {
                     Get HIVE <ExternalLink size={11} />
                   </a>
                 )}
+
+                <div className="mt-6 pt-5 border-t border-white/10">
+                  <div className="grid grid-cols-2 gap-2 mb-4">
+                    <Metric label="Cooldown" value="7 Days" />
+                    <Metric label="Locked" value={`${(stake?.lockedAmount || 0).toLocaleString()} HIVE`} />
+                  </div>
+                  <label className="text-[10px] font-mono uppercase tracking-widest text-zinc-500">Unstake Amount</label>
+                  <div className="mt-2 flex gap-2">
+                    <input
+                      value={unstakeAmount}
+                      onChange={(e) => setUnstakeAmount(e.target.value)}
+                      inputMode="decimal"
+                      className="min-w-0 flex-1 bg-black/60 border border-white/10 rounded px-3 py-3 text-sm font-mono outline-none focus:border-amber-500/40"
+                      placeholder="Amount from active stake"
+                    />
+                    <button
+                      onClick={handleRequestUnstake}
+                      disabled={!authenticated || unstaking || (stake?.activeAmount || 0) <= 0}
+                      className="inline-flex items-center gap-2 border border-amber-500/30 text-amber-300 px-4 py-3 rounded font-bold text-sm disabled:opacity-50 hover:bg-amber-500/10"
+                    >
+                      {unstaking ? <Loader2 size={15} className="animate-spin" /> : <Shield size={15} />}
+                      Unstake
+                    </button>
+                  </div>
+
+                  {pendingUnstakes.length > 0 && (
+                    <div className="mt-4 space-y-2">
+                      {pendingUnstakes.map((request) => {
+                        const isClaimable = request.status === "cooldown" && new Date(request.unlocksAt).getTime() <= Date.now();
+                        return (
+                          <div key={request.id} className="flex items-center justify-between gap-3 border border-white/10 bg-black/40 rounded p-3">
+                            <div className="min-w-0">
+                              <div className="text-sm font-mono text-white">{request.amount.toLocaleString()} HIVE</div>
+                              <div className="text-[10px] font-mono text-zinc-600 truncate">
+                                {request.status === "slashed"
+                                  ? `Slashed${request.slashedAmount ? `: ${request.slashedAmount.toLocaleString()} HIVE` : ""}`
+                                  : `Claim: ${new Date(request.unlocksAt).toLocaleString()}`}
+                              </div>
+                            </div>
+                            {request.status === "slashed" ? (
+                              <span className="text-[10px] font-mono uppercase text-red-400">Slashed</span>
+                            ) : (
+                              <button
+                                onClick={() => handleClaimUnstake(request.id)}
+                                disabled={!isClaimable || claimingUnstakeId === request.id}
+                                className="inline-flex items-center gap-1.5 px-3 py-2 rounded border border-emerald-500/30 text-emerald-300 text-[10px] font-mono uppercase disabled:opacity-40 hover:bg-emerald-500/10"
+                              >
+                                {claimingUnstakeId === request.id ? <Loader2 size={12} className="animate-spin" /> : <Check size={12} />}
+                                Claim
+                              </button>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
               </section>
             </section>
 

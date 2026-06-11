@@ -152,14 +152,48 @@ export async function GET(req: Request) {
       );
 
       if (finalStatus === 'slashed') {
+        const stake = await db.collection(COLLECTIONS.STAKES).findOne({ solanaAddress: dispute.providerAddress });
+        const activeAmount = Number(stake?.activeAmount || 0);
+        const lockedAmount = Number(stake?.lockedAmount || 0);
+        const slashAmount = Math.min(Math.abs(dispute.stakedAmount || 0), activeAmount + lockedAmount);
+        const activeSlash = Math.min(activeAmount, slashAmount);
+        const lockedSlash = Math.min(lockedAmount, slashAmount - activeSlash);
+        const pendingUnstakes = Array.isArray(stake?.pendingUnstakes) ? [...stake.pendingUnstakes] : [];
+
+        if (lockedSlash > 0) {
+          let remainingLockedSlash = lockedSlash;
+          for (const request of pendingUnstakes) {
+            if (remainingLockedSlash <= 0) break;
+            if (!request || !['cooldown', 'claiming'].includes(request.status)) continue;
+            const requestAmount = Number(request.amount || 0);
+            if (requestAmount <= 0) continue;
+            const requestSlash = Math.min(requestAmount, remainingLockedSlash);
+            request.amount = requestAmount - requestSlash;
+            request.slashedAmount = Number(request.slashedAmount || 0) + requestSlash;
+            request.slashedAt = new Date();
+            if (request.amount <= 0) {
+              request.amount = 0;
+              request.status = 'slashed';
+            }
+            remainingLockedSlash -= requestSlash;
+          }
+        }
+
+        const remainingActive = Math.max(0, activeAmount - activeSlash);
+        const remainingLocked = Math.max(0, lockedAmount - lockedSlash);
         await db.collection(COLLECTIONS.STAKES).updateOne(
           { solanaAddress: dispute.providerAddress },
           {
-            $inc: {
-              activeAmount: -Math.abs(dispute.stakedAmount || 0),
-              slashedAmount: Math.abs(dispute.stakedAmount || 0),
+            $set: {
+              activeAmount: remainingActive,
+              lockedAmount: remainingLocked,
+              pendingUnstakes,
+              status: remainingActive > 0 ? 'active' : remainingLocked > 0 ? 'cooldown' : 'none',
+              updatedAt: new Date(),
             },
-            $set: { status: 'none', updatedAt: new Date() },
+            $inc: {
+              slashedAmount: slashAmount,
+            },
           }
         );
       }

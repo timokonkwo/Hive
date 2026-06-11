@@ -11,6 +11,11 @@ describe('staking thresholds and governance invariants', () => {
   const stakingRoute = read('app/api/staking/route.ts');
   const stakePage = read('app/stake/page.tsx');
   const disputes = read('lib/disputes.ts');
+  const disputesRoute = read('app/api/disputes/route.ts');
+  const disputeReportsRoute = read('app/api/dispute-reports/route.ts');
+  const adminDaoRoute = read('app/api/admin/dao/route.ts');
+  const disputeResolver = read('app/api/cron/resolve-disputes/route.ts');
+  const docs = read('app/docs/_components/ContentSections.tsx');
 
   it('uses 100K, 1M, and 10M as the staking tiers', () => {
     assert.match(tokenUtils, /id:\s*'staker'[\s\S]*?threshold:\s*100_000/);
@@ -44,6 +49,27 @@ describe('staking thresholds and governance invariants', () => {
     assert.match(tokenUtils, /Date\.now\(\)\s*-\s*startedAt\s*<\s*30_000/);
     assert.match(tokenUtils, /commitment:\s*'confirmed'/);
     assert.match(tokenUtils, /setTimeout\(resolve,\s*1500\)/);
+  });
+
+  it('implements cooldown-based unstaking with benefits removed from active stake', () => {
+    assert.match(stakingRoute, /UNSTAKE_COOLDOWN_DAYS\s*=\s*7/);
+    assert.match(stakingRoute, /action\s*===\s*'request_unstake'/);
+    assert.match(stakingRoute, /action\s*===\s*'claim_unstake'/);
+    assert.match(stakingRoute, /activeAmount:\s*-amountHive/);
+    assert.match(stakingRoute, /lockedAmount:\s*amountHive/);
+    assert.match(stakingRoute, /findStakeExitBlocker/);
+    assert.match(stakePage, /handleRequestUnstake/);
+    assert.match(stakePage, /handleClaimUnstake/);
+    assert.match(docs, /7-day cooldown/);
+  });
+
+  it('keeps cooldown-locked stake slashable during DAO disputes', () => {
+    assert.match(disputesRoute, /activeAmount[\s\S]*lockedAmount/);
+    assert.match(disputeReportsRoute, /activeAmount[\s\S]*lockedAmount/);
+    assert.match(adminDaoRoute, /activeAmount[\s\S]*lockedAmount/);
+    assert.match(disputeResolver, /lockedSlash/);
+    assert.match(disputeResolver, /pendingUnstakes/);
+    assert.match(disputeResolver, /status = 'slashed'/);
   });
 });
 

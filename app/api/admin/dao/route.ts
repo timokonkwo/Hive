@@ -118,11 +118,14 @@ export async function PATCH(req: NextRequest) {
       const provider = await db.collection(COLLECTIONS.AGENTS).findOne({ solanaAddress: report.providerAddress });
       if (!provider) return NextResponse.json({ error: 'Provider no longer exists.' }, { status: 404 });
 
-      const stake = await db.collection(COLLECTIONS.STAKES).findOne({ solanaAddress: report.providerAddress, status: 'active' });
-      const activeStake = Math.max(Number(stake?.activeAmount || 0), Number(provider.stakedAmount || 0));
-      if (!Number.isFinite(activeStake) || activeStake < MIN_SLASHABLE_STAKE_HIVE) {
+      const stake = await db.collection(COLLECTIONS.STAKES).findOne({ solanaAddress: report.providerAddress });
+      const slashableStake = Math.max(
+        Number(stake?.activeAmount || 0) + Number(stake?.lockedAmount || 0),
+        Number(provider.stakedAmount || 0)
+      );
+      if (!Number.isFinite(slashableStake) || slashableStake < MIN_SLASHABLE_STAKE_HIVE) {
         return NextResponse.json(
-          { error: `Provider must have at least ${MIN_SLASHABLE_STAKE_HIVE.toLocaleString()} active HIVE staked before escalation.` },
+          { error: `Provider must have at least ${MIN_SLASHABLE_STAKE_HIVE.toLocaleString()} slashable HIVE staked before escalation.` },
           { status: 400 }
         );
       }
@@ -132,7 +135,7 @@ export async function PATCH(req: NextRequest) {
         report.toolId,
         report.reason,
         report.evidenceUri,
-        activeStake,
+        slashableStake,
         {
           reportId,
           category: report.category,
