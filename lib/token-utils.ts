@@ -11,6 +11,7 @@ export const HIVE_MINT = new PublicKey('6JfonM6a24xngXh5yJ1imZzbMhpfvEsiafkb4syH
 
 // $HIVE mint uses 9 decimals.
 export const HIVE_DECIMALS = 9;
+const HIVE_DECIMAL_MULTIPLIER = 1_000_000_000n;
 
 export type HiveTier = 'none' | 'holder' | 'stacker' | 'og';
 
@@ -203,12 +204,27 @@ export function getStakingTierInfo(stakedAmount: number): StakingTierInfo | null
   return STAKING_TIERS[tier];
 }
 
+export function parseHiveAmountToRaw(amount: number | string): bigint | null {
+  const text = typeof amount === 'number' ? amount.toString() : amount.trim();
+  if (!/^\d+(\.\d{1,9})?$/.test(text)) return null;
+
+  const [wholePart, fractionalPart = ''] = text.split('.');
+  const whole = BigInt(wholePart || '0');
+  const fractional = BigInt(fractionalPart.padEnd(HIVE_DECIMALS, '0') || '0');
+  const raw = whole * HIVE_DECIMAL_MULTIPLIER + fractional;
+  return raw > 0n ? raw : null;
+}
+
+export function rawHiveAmountToNumber(rawAmount: bigint): number {
+  return Number(rawAmount) / Math.pow(10, HIVE_DECIMALS);
+}
+
 export async function verifyHiveTransfer(
   txSignature: string,
   expectedSender: string,
   expectedRecipient: string,
-  expectedAmountHive: number,
-  options: { maxAgeMinutes?: number } = {}
+  expectedAmountHive: number | string,
+  options: { maxAgeMinutes?: number | null } = {}
 ): Promise<{ verified: boolean; error?: string; confirmedAmount?: number; blockTime?: number }> {
   try {
     if (expectedSender === expectedRecipient) {
@@ -235,20 +251,25 @@ export async function verifyHiveTransfer(
       return { verified: false, error: 'Transaction failed on-chain.' };
     }
 
-    const maxAgeMinutes = options.maxAgeMinutes ?? 15;
     if (!tx.blockTime) {
       return { verified: false, error: 'Transaction block time is unavailable.' };
     }
-    const ageMs = Date.now() - tx.blockTime * 1000;
-    if (ageMs > maxAgeMinutes * 60 * 1000) {
-      return { verified: false, error: `Transaction is older than ${maxAgeMinutes} minutes.` };
+    const maxAgeMinutes = options.maxAgeMinutes ?? 15;
+    if (maxAgeMinutes !== null) {
+      const ageMs = Date.now() - tx.blockTime * 1000;
+      if (ageMs > maxAgeMinutes * 60 * 1000) {
+        return { verified: false, error: `Transaction is older than ${maxAgeMinutes} minutes.` };
+      }
     }
 
     const sender = new PublicKey(expectedSender);
     const recipient = new PublicKey(expectedRecipient);
     const senderAta = getAssociatedTokenAddressSync(HIVE_MINT, sender);
     const recipientAta = getAssociatedTokenAddressSync(HIVE_MINT, recipient);
-    const expectedRawAmount = Math.round(expectedAmountHive * Math.pow(10, HIVE_DECIMALS));
+    const expectedRawAmount = parseHiveAmountToRaw(expectedAmountHive);
+    if (!expectedRawAmount) {
+      return { verified: false, error: `Expected HIVE amount must have up to ${HIVE_DECIMALS} decimals.` };
+    }
 
     const instructions = tx.transaction.message.instructions;
     const innerInstructions = tx.meta?.innerInstructions || [];
@@ -266,9 +287,10 @@ export async function verifyHiveTransfer(
         continue;
       }
 
-      const amount = parsed.type === 'transferChecked'
-        ? Number(info.tokenAmount?.amount || 0)
-        : Number(info.amount || 0);
+      const rawAmountText = parsed.type === 'transferChecked'
+        ? String(info.tokenAmount?.amount || '0')
+        : String(info.amount || '0');
+      const amount = BigInt(rawAmountText);
 
       if (amount < expectedRawAmount) continue;
       if (info.source !== senderAta.toBase58()) continue;
@@ -277,7 +299,7 @@ export async function verifyHiveTransfer(
 
       return {
         verified: true,
-        confirmedAmount: amount / Math.pow(10, HIVE_DECIMALS),
+        confirmedAmount: rawHiveAmountToNumber(amount),
         blockTime: tx.blockTime,
       };
     }

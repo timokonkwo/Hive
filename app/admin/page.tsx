@@ -118,6 +118,14 @@ export default function AdminDashboardPage() {
   const [stakersSearch, setStakersSearch] = useState("");
   const [stakersStatusFilter, setStakersStatusFilter] = useState("all");
   const [stakersLoading, setStakersLoading] = useState(false);
+  const [stakeReconcileForm, setStakeReconcileForm] = useState({
+    txSignature: "",
+    solanaAddress: "",
+    amountHive: "",
+    stakerType: "",
+    stakerId: "",
+  });
+  const [reconcilingStake, setReconcilingStake] = useState(false);
 
   // DAO management state
   const [daoData, setDaoData] = useState<any>(null);
@@ -437,6 +445,42 @@ export default function AdminDashboardPage() {
   }, [activeTab, fetchStakers]);
 
   useEffect(() => { setStakersPage(1); }, [stakersSearch, stakersStatusFilter]);
+
+  const handleReconcileStake = async () => {
+    if (!stakeReconcileForm.txSignature.trim() || !stakeReconcileForm.solanaAddress.trim() || !stakeReconcileForm.amountHive.trim()) {
+      toast.error("Transaction signature, wallet, and HIVE amount are required.");
+      return;
+    }
+
+    setReconcilingStake(true);
+    try {
+      const body: Record<string, string> = {
+        txSignature: stakeReconcileForm.txSignature.trim(),
+        solanaAddress: stakeReconcileForm.solanaAddress.trim(),
+        amountHive: stakeReconcileForm.amountHive.trim(),
+      };
+      if (stakeReconcileForm.stakerType) body.stakerType = stakeReconcileForm.stakerType;
+      if (stakeReconcileForm.stakerId.trim()) body.stakerId = stakeReconcileForm.stakerId.trim();
+
+      const res = await authFetch("/api/admin/stakers/reconcile", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || !data.success) {
+        throw new Error(data.error || "Stake reconciliation failed.");
+      }
+      toast.success(`Reconciled ${Number(data.stake?.addedAmount || 0).toLocaleString()} HIVE.`);
+      setStakersSearch(stakeReconcileForm.solanaAddress.trim());
+      setStakeReconcileForm({ txSignature: "", solanaAddress: "", amountHive: "", stakerType: "", stakerId: "" });
+      fetchStakers();
+    } catch (error: any) {
+      toast.error(error.message || "Stake reconciliation failed.");
+    } finally {
+      setReconcilingStake(false);
+    }
+  };
 
   const updateFeedbackStatus = async (id: string, newStatus: string) => {
     if (!address) return;
@@ -1061,6 +1105,56 @@ export default function AdminDashboardPage() {
             <StatCard label="Active HIVE" value={stakersStats?.totalActiveAmount || 0} icon={<Coins size={16} />} color="text-amber-400" />
             <StatCard label="Locked HIVE" value={stakersStats?.totalLockedAmount || 0} icon={<Shield size={16} />} color="text-violet-400" />
             <StatCard label="Slashed HIVE" value={stakersStats?.totalSlashedAmount || 0} icon={<AlertTriangle size={16} />} color="text-red-400" />
+          </div>
+
+          <div className="bg-zinc-900/30 border border-zinc-800 rounded-lg p-4">
+            <div className="flex flex-col lg:flex-row lg:items-end gap-3">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-3 flex-1">
+                <AdminField
+                  label="Transaction"
+                  value={stakeReconcileForm.txSignature}
+                  onChange={(value) => setStakeReconcileForm((prev) => ({ ...prev, txSignature: value }))}
+                  placeholder="Solana signature"
+                />
+                <AdminField
+                  label="Wallet"
+                  value={stakeReconcileForm.solanaAddress}
+                  onChange={(value) => setStakeReconcileForm((prev) => ({ ...prev, solanaAddress: value }))}
+                  placeholder="Staker Solana wallet"
+                />
+                <AdminField
+                  label="Amount"
+                  value={stakeReconcileForm.amountHive}
+                  onChange={(value) => setStakeReconcileForm((prev) => ({ ...prev, amountHive: value }))}
+                  placeholder="10000000"
+                />
+              </div>
+              <button
+                onClick={handleReconcileStake}
+                disabled={reconcilingStake}
+                className="inline-flex items-center justify-center gap-2 bg-emerald-500 text-black px-4 py-2.5 rounded-lg font-bold text-xs uppercase tracking-widest disabled:opacity-50"
+              >
+                {reconcilingStake ? <Loader2 size={14} className="animate-spin" /> : <Plus size={14} />}
+                Reconcile
+              </button>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mt-3">
+              <select
+                value={stakeReconcileForm.stakerType}
+                onChange={(e) => setStakeReconcileForm((prev) => ({ ...prev, stakerType: e.target.value }))}
+                className="bg-black/40 border border-zinc-800 rounded-lg px-3 py-2.5 text-xs text-zinc-300 outline-none focus:border-zinc-600 font-mono"
+              >
+                <option value="">Auto-detect verified profile</option>
+                <option value="client">Client</option>
+                <option value="agent">Agent</option>
+              </select>
+              <input
+                value={stakeReconcileForm.stakerId}
+                onChange={(e) => setStakeReconcileForm((prev) => ({ ...prev, stakerId: e.target.value }))}
+                placeholder="Optional staker id for conflict resolution"
+                className="bg-black/40 border border-zinc-800 rounded-lg px-3 py-2.5 text-xs text-zinc-300 placeholder-zinc-600 outline-none focus:border-zinc-600 font-mono"
+              />
+            </div>
           </div>
 
           <div className="flex flex-col md:flex-row gap-4">
@@ -2273,6 +2367,30 @@ function StatusBadge({ status }: { status: string }) {
     <span className={`inline-flex px-2 py-0.5 rounded-full border text-[10px] font-bold uppercase ${styles[status] || "bg-zinc-800 text-zinc-400 border-zinc-700"}`}>
       {status}
     </span>
+  );
+}
+
+function AdminField({
+  label,
+  value,
+  onChange,
+  placeholder,
+}: {
+  label: string;
+  value: string;
+  onChange: (value: string) => void;
+  placeholder: string;
+}) {
+  return (
+    <label className="block">
+      <span className="block text-[10px] font-mono uppercase tracking-widest text-zinc-600 mb-1.5">{label}</span>
+      <input
+        value={value}
+        onChange={(event) => onChange(event.target.value)}
+        placeholder={placeholder}
+        className="w-full bg-black/40 border border-zinc-800 rounded-lg px-3 py-2.5 text-xs text-zinc-300 placeholder-zinc-600 outline-none focus:border-zinc-600 font-mono"
+      />
+    </label>
   );
 }
 

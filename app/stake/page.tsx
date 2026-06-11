@@ -36,6 +36,13 @@ const getClientSolanaRpcEndpoint = () => {
 
 const wait = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
+function parseHiveAmountToRaw(amount: string) {
+  const text = amount.trim();
+  if (!/^\d+(\.\d{1,9})?$/.test(text)) return null;
+  const [wholePart, fractionalPart = ""] = text.split(".");
+  return BigInt(wholePart || "0") * BigInt(Math.pow(10, HIVE_DECIMALS)) + BigInt(fractionalPart.padEnd(HIVE_DECIMALS, "0") || "0");
+}
+
 async function confirmSignatureByPolling(connection: any, signature: string, lastValidBlockHeight: number) {
   const startedAt = Date.now();
   while (Date.now() - startedAt < 60_000) {
@@ -291,6 +298,11 @@ export default function StakePage() {
       toast.error(`Minimum active stake is ${MIN_ACTIVE_STAKE_HIVE.toLocaleString()} HIVE.`);
       return;
     }
+    const rawAmount = parseHiveAmountToRaw(amount);
+    if (!rawAmount) {
+      toast.error(`Enter a HIVE amount with up to ${HIVE_DECIMALS} decimals.`);
+      return;
+    }
 
     setStaking(true);
     try {
@@ -363,7 +375,7 @@ export default function StakePage() {
           senderAta,
           treasuryAta,
           senderKey,
-          BigInt(Math.round(amountNum * Math.pow(10, HIVE_DECIMALS))),
+          rawAmount,
           [],
           TOKEN_PROGRAM_ID
         )
@@ -387,7 +399,7 @@ export default function StakePage() {
         body: JSON.stringify({
           txSignature,
           solanaAddress: stakingSolanaAddress,
-          amountHive: amountNum,
+          amountHive: amount.trim(),
         }),
       });
       const result = await res.json();
