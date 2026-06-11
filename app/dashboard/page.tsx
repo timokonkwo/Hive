@@ -240,7 +240,7 @@ export default function DashboardPage() {
 
       const connection = new Connection(getClientSolanaRpcEndpoint(), 'confirmed');
       const senderKey = new PublicKey(solanaAddress);
-      const treasuryWallet = new PublicKey('3LQuJTTLX9cjvAhRtnYrGJS3qESp494UCnA9UtCrdura');
+      const treasuryWallet = new PublicKey('BN1T9QNRAKnpKJ1EqzcjrzziSHvJhhnY8xV8F9FsFvCy');
       const usdcMint = new PublicKey('EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v');
 
       const senderAta = await getAssociatedTokenAddress(usdcMint, senderKey);

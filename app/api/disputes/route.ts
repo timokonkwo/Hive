@@ -3,10 +3,12 @@ import { getDb, COLLECTIONS } from '@/lib/db';
 import { verifyAdmin } from '@/lib/admin-auth';
 import { createDispute } from '@/lib/disputes';
 import { isValidSolanaAddress } from '@/lib/solana-pay';
+import { STAKING_TIERS } from '@/lib/token-utils';
 import { checkRateLimit, getClientIp, RATE_LIMITS } from '@/lib/rate-limit';
 import { logger } from '@/lib/logger';
 
-const MIN_SLASHABLE_STAKE_HIVE = 10_000;
+const MIN_SLASHABLE_STAKE_HIVE = STAKING_TIERS.staker.threshold;
+const MAX_DISPUTE_BODY_BYTES = 12 * 1024;
 
 function isValidEvidenceUri(value: string): boolean {
   if (typeof value !== 'string' || value.length < 8 || value.length > 500) return false;
@@ -97,7 +99,18 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const body = await req.json();
+    const raw = await req.text();
+    if (Buffer.byteLength(raw, 'utf8') > MAX_DISPUTE_BODY_BYTES) {
+      return NextResponse.json({ error: 'Dispute body is too large.' }, { status: 413 });
+    }
+
+    let body: any;
+    try {
+      body = JSON.parse(raw);
+    } catch {
+      return NextResponse.json({ error: 'Invalid JSON body.' }, { status: 400 });
+    }
+
     const { providerAddress, toolId, reason, evidenceUri } = body;
 
     if (!providerAddress || !toolId || !reason || !evidenceUri) {
@@ -156,11 +169,23 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    const stake = await db.collection(COLLECTIONS.STAKES).findOne({ solanaAddress: providerAddress, status: 'active' });
-    const activeStake = Math.max(Number(stake?.activeAmount || 0), Number(provider.stakedAmount || 0));
-    if (!Number.isFinite(activeStake) || activeStake < MIN_SLASHABLE_STAKE_HIVE) {
+    const stake = await db.collection(COLLECTIONS.STAKES).findOne({ solanaAddress: providerAddress });
+    const hasClaimingUnstake = Array.isArray(stake?.pendingUnstakes)
+      && stake.pendingUnstakes.some((request: any) => request?.status === 'claiming');
+    if (hasClaimingUnstake) {
       return NextResponse.json(
-        { error: `Provider must have at least ${MIN_SLASHABLE_STAKE_HIVE.toLocaleString()} active HIVE staked before a slashing dispute can be opened.` },
+        { error: 'This provider has an unstake claim finalizing. Try again shortly.' },
+        { status: 409 }
+      );
+    }
+
+    const slashableStake = Math.max(
+      Number(stake?.activeAmount || 0) + Number(stake?.lockedAmount || 0),
+      Number(provider.stakedAmount || 0)
+    );
+    if (!Number.isFinite(slashableStake) || slashableStake < MIN_SLASHABLE_STAKE_HIVE) {
+      return NextResponse.json(
+        { error: `Provider must have at least ${MIN_SLASHABLE_STAKE_HIVE.toLocaleString()} slashable HIVE staked before a slashing dispute can be opened.` },
         { status: 400 }
       );
     }
@@ -170,7 +195,7 @@ export async function POST(req: NextRequest) {
       normalizedToolId,
       normalizedReason,
       normalizedEvidenceUri,
-      activeStake
+      slashableStake
     );
 
     if (!result.success) {

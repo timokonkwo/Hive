@@ -5,7 +5,7 @@ import { verifyAdmin } from '@/lib/admin-auth';
 import { getStakingTier, getStakingTierInfo } from '@/lib/token-utils';
 import { logger } from '@/lib/logger';
 
-const ALLOWED_STATUSES = new Set(['all', 'active', 'none', 'locked', 'slashed']);
+const ALLOWED_STATUSES = new Set(['all', 'active', 'none', 'cooldown', 'claiming', 'locked', 'slashed']);
 
 function escapeRegex(value: string) {
   return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');

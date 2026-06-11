@@ -61,7 +61,7 @@ export default function HiveDocsPage() {
     }`;
 
   return (
-    <div className="min-h-screen bg-[#020202] text-white font-sans selection:bg-emerald-500 selection:text-black relative overflow-x-hidden" style={{ scrollBehavior: 'smooth' }}>
+    <div className="min-h-screen bg-[#020202] text-white font-sans selection:bg-emerald-500 selection:text-black relative overflow-x-clip" style={{ scrollBehavior: 'smooth' }}>
       {/* Subtle Ambient Dot Grid */}
       <div 
         className="absolute inset-0 pointer-events-none z-0" 
@@ -113,8 +113,8 @@ export default function HiveDocsPage() {
       <main className="pt-32 pb-20">
         <div className="max-w-7xl mx-auto px-6 grid grid-cols-1 lg:grid-cols-12 gap-12">
           
-          <aside className="lg:col-span-3 hidden lg:block sticky top-32 h-fit pr-4 self-start">
-            <div className="space-y-8">
+          <aside className="lg:col-span-3 hidden lg:block self-start" aria-label="Docs navigation">
+            <div className="fixed top-24 bottom-6 left-6 xl:left-[calc((100vw-80rem)/2+1.5rem)] w-64 overflow-y-auto pr-4 space-y-8">
               <div>
                 <h3 className="text-xs font-bold text-gray-500 uppercase tracking-widest mb-4 font-mono">Getting Started</h3>
                 <ul className="space-y-2 border-l border-white/10 pl-4">

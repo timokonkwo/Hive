@@ -11,6 +11,13 @@ describe('staking thresholds and governance invariants', () => {
   const stakingRoute = read('app/api/staking/route.ts');
   const stakePage = read('app/stake/page.tsx');
   const disputes = read('lib/disputes.ts');
+  const disputesRoute = read('app/api/disputes/route.ts');
+  const disputeReportsRoute = read('app/api/dispute-reports/route.ts');
+  const adminDaoRoute = read('app/api/admin/dao/route.ts');
+  const disputeResolver = read('app/api/cron/resolve-disputes/route.ts');
+  const sessionWallet = read('lib/session-wallet.ts');
+  const dashboardPage = read('app/dashboard/page.tsx');
+  const docs = read('app/docs/_components/ContentSections.tsx');
 
   it('uses 100K, 1M, and 10M as the staking tiers', () => {
     assert.match(tokenUtils, /id:\s*'staker'[\s\S]*?threshold:\s*100_000/);
@@ -44,6 +51,63 @@ describe('staking thresholds and governance invariants', () => {
     assert.match(tokenUtils, /Date\.now\(\)\s*-\s*startedAt\s*<\s*30_000/);
     assert.match(tokenUtils, /commitment:\s*'confirmed'/);
     assert.match(tokenUtils, /setTimeout\(resolve,\s*1500\)/);
+  });
+
+  it('implements cooldown-based unstaking with benefits removed from active stake', () => {
+    assert.match(stakingRoute, /UNSTAKE_COOLDOWN_DAYS\s*=\s*7/);
+    assert.match(stakingRoute, /action\s*===\s*'request_unstake'/);
+    assert.match(stakingRoute, /action\s*===\s*'claim_unstake'/);
+    assert.match(stakingRoute, /activeAmount:\s*-amountHive/);
+    assert.match(stakingRoute, /lockedAmount:\s*amountHive/);
+    assert.match(stakingRoute, /findStakeExitBlocker/);
+    assert.match(stakePage, /handleRequestUnstake/);
+    assert.match(stakePage, /handleClaimUnstake/);
+    assert.match(docs, /7-day cooldown/);
+  });
+
+  it('keeps treasury HIVE custody on a dedicated signer env var', () => {
+    assert.match(stakingRoute, /process\.env\.HIVE_TREASURY_KEYPAIR/);
+    assert.match(disputeResolver, /process\.env\.HIVE_TREASURY_KEYPAIR/);
+    assert.match(read('lib/points.ts'), /process\.env\.HIVE_TREASURY_KEYPAIR/);
+    assert.doesNotMatch(stakingRoute, /HIVE_LAUNCH_KEYPAIR \|\| process\.env\.HIVE_AGENT_LAUNCH_KEYPAIR/);
+    assert.doesNotMatch(disputeResolver, /HIVE_LAUNCH_KEYPAIR \|\| process\.env\.HIVE_AGENT_LAUNCH_KEYPAIR/);
+  });
+
+  it('keeps in-flight unstake claims slashable and blocks dispute races', () => {
+    assert.match(stakingRoute, /'pendingUnstakes\.\$\.status': 'claiming'/);
+    assert.match(stakingRoute, /lockedAmount:\s*\{\s*\$gte:\s*amountHive\s*\}[\s\S]*?\$inc:\s*\{\s*lockedAmount:\s*-amountHive/);
+    assert.doesNotMatch(stakingRoute, /claimStartedAt[\s\S]{0,180}\$inc:\s*\{\s*lockedAmount:\s*-amountHive/);
+    assert.match(disputeReportsRoute, /status === 'claiming'/);
+    assert.match(disputesRoute, /status === 'claiming'/);
+    assert.match(adminDaoRoute, /status === 'claiming'/);
+  });
+
+  it('keeps cooldown-locked stake slashable during DAO disputes', () => {
+    assert.match(disputesRoute, /activeAmount[\s\S]*lockedAmount/);
+    assert.match(disputeReportsRoute, /activeAmount[\s\S]*lockedAmount/);
+    assert.match(adminDaoRoute, /activeAmount[\s\S]*lockedAmount/);
+    assert.match(disputeResolver, /lockedSlash/);
+    assert.match(disputeResolver, /pendingUnstakes/);
+    assert.match(disputeResolver, /status = 'slashed'/);
+  });
+
+  it('uses the 100K staker threshold for dispute watchdog and slashing gates', () => {
+    assert.match(disputeReportsRoute, /STAKING_TIERS\.staker\.threshold/);
+    assert.match(disputesRoute, /STAKING_TIERS\.staker\.threshold/);
+    assert.match(adminDaoRoute, /STAKING_TIERS\.staker\.threshold/);
+    assert.doesNotMatch(disputeReportsRoute, /activeAmount \|\| 0\) >= 10_000/);
+    assert.doesNotMatch(disputesRoute, /MIN_SLASHABLE_STAKE_HIVE = 10_000/);
+    assert.doesNotMatch(adminDaoRoute, /MIN_SLASHABLE_STAKE_HIVE = 10_000/);
+  });
+
+  it('uses the configured default treasury wallet consistently', () => {
+    const treasury = 'BN1T9QNRAKnpKJ1EqzcjrzziSHvJhhnY8xV8F9FsFvCy';
+    assert.match(stakingRoute, new RegExp(treasury));
+    assert.match(sessionWallet, new RegExp(treasury));
+    assert.match(dashboardPage, new RegExp(treasury));
+    assert.doesNotMatch(stakingRoute, /3LQuJTTLX9cjvAhRtnYrGJS3qESp494UCnA9UtCrdura/);
+    assert.doesNotMatch(sessionWallet, /3LQuJTTLX9cjvAhRtnYrGJS3qESp494UCnA9UtCrdura/);
+    assert.doesNotMatch(dashboardPage, /3LQuJTTLX9cjvAhRtnYrGJS3qESp494UCnA9UtCrdura/);
   });
 });
 
@@ -115,6 +179,27 @@ describe('admin staking visibility', () => {
     assert.match(stakersRoute, /verifyAdmin\(request\)/);
     assert.match(stakersRoute, /COLLECTIONS\.STAKES/);
     assert.match(stakersRoute, /COLLECTIONS\.STAKE_EVENTS/);
+  });
+});
+
+describe('points conversion fund safety', () => {
+  const convertRoute = read('app/api/points/convert/route.ts');
+  const points = read('lib/points.ts');
+
+  it('only converts points to a verified linked Solana wallet', () => {
+    assert.match(convertRoute, /MAX_POINTS_CONVERT_BODY_BYTES/);
+    assert.match(convertRoute, /Number\.isSafeInteger\(points\)/);
+    assert.match(convertRoute, /solanaAddressVerifiedAt/);
+    assert.match(convertRoute, /Points can only be converted to your verified linked Solana wallet/);
+  });
+
+  it('reserves points before treasury payout and does not restore after broadcast', () => {
+    assert.match(points, /Treasury conversion keypair does not match HIVE_TREASURY_WALLET/);
+    assert.match(points, /currentPointsBalance:\s*\{\s*\$gte:\s*pointsToConvert\s*\}/);
+    assert.match(points, /currentPointsBalance:\s*-pointsToConvert/);
+    assert.match(points, /if \(txSignature\)/);
+    assert.match(points, /convert_to_hive_unconfirmed/);
+    assert.match(points, /currentPointsBalance:\s*pointsToConvert/);
   });
 });
 

@@ -982,7 +982,42 @@ x-hive-api-key: hive_sk_...
                   <li>Open <Link href="/stake" className="text-emerald-400 hover:text-emerald-300">/stake</Link> and transfer HIVE to the configured treasury wallet.</li>
                   <li>The backend verifies the SPL transfer sender, recipient, mint, amount, timestamp, and replay status.</li>
                   <li>The verified amount is added to your active stake and your staking tier is recalculated.</li>
+                  <li>Unstaking moves active stake into a 7-day cooldown. Benefits stop immediately, but the locked amount remains slashable until claimed.</li>
                 </ol>
+              </div>
+
+              <div className="bg-[#0A0A0A] border border-white/10 p-6 rounded-sm mb-8">
+                <h3 className="text-white font-bold font-mono mb-4">Unstaking & Cooldown</h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+                  <div className="border border-white/10 rounded-sm p-4">
+                    <h4 className="text-emerald-400 font-mono font-bold text-xs uppercase tracking-widest mb-2">Request</h4>
+                    <p className="text-gray-400">
+                      A user can request a partial or full unstake from active stake. The requested amount leaves active stake immediately,
+                      which means routing discounts, points multipliers, governance weight, and trust badges are recalculated right away.
+                    </p>
+                  </div>
+                  <div className="border border-white/10 rounded-sm p-4">
+                    <h4 className="text-amber-400 font-mono font-bold text-xs uppercase tracking-widest mb-2">Cooldown</h4>
+                    <p className="text-gray-400">
+                      The requested amount stays locked for 7 days. During this period it cannot be claimed, and it remains slashable if
+                      the staker is subject to an active DAO dispute or pending report.
+                    </p>
+                  </div>
+                  <div className="border border-white/10 rounded-sm p-4">
+                    <h4 className="text-blue-400 font-mono font-bold text-xs uppercase tracking-widest mb-2">Claim</h4>
+                    <p className="text-gray-400">
+                      After cooldown, the user claims from the staking page. Hive sends the matured amount back to the same verified Solana
+                      staking wallet from the treasury signer. Admins do not manually process normal unstake returns.
+                    </p>
+                  </div>
+                  <div className="border border-white/10 rounded-sm p-4">
+                    <h4 className="text-red-400 font-mono font-bold text-xs uppercase tracking-widest mb-2">Locks & Slashing</h4>
+                    <p className="text-gray-400">
+                      Active disputes and pending DAO reports block new unstake requests and claims. If a dispute passes, active and cooldown
+                      stake can be slashed before any remaining matured cooldown amount is claimable.
+                    </p>
+                  </div>
+                </div>
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
@@ -1008,11 +1043,13 @@ x-hive-api-key: hive_sk_...
                 <div className="space-y-4">
                   <ApiEndpoint method="GET" path="/api/staking" desc="Returns the authenticated user's active stake, locked stake, slashed amount, tier, and staking benefits." auth />
                   <ApiEndpoint method="POST" path="/api/staking" desc="Verifies an on-chain HIVE transfer and records it as active stake." body="txSignature, solanaAddress, amountHive" auth />
+                  <ApiEndpoint method="POST" path="/api/staking" desc="Requests an unstake cooldown. Active stake is reduced and locked stake remains slashable for 7 days." body='action: "request_unstake", amountHive' auth />
+                  <ApiEndpoint method="POST" path="/api/staking" desc="Claims a matured unstake request by sending HIVE from the treasury back to the verified staking wallet." body='action: "claim_unstake", requestId' auth />
                   <ApiEndpoint method="POST" path="/api/agents/stake" desc="Compatibility alias for agent staking. Uses the same verification and stake ledger as /api/staking." body="txSignature, solanaAddress, amountHive" auth />
                   <ApiEndpoint method="GET" path="/api/token/benefits" desc="Returns holder tiers and staking tiers for public display." />
                 </div>
                 <p className="text-gray-500 text-xs mt-4">
-                  Staked HIVE is treasury-custodied in this release. Slashing and reward distribution are governance-enforced until a dedicated Solana staking program is deployed.
+                  Staked HIVE is treasury-custodied in this release. Withdrawals use a 7-day cooldown and are paid from the configured treasury keypair after the request matures.
                 </p>
               </div>
 

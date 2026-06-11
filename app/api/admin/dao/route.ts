@@ -3,9 +3,11 @@ import { ObjectId } from 'mongodb';
 import { verifyAdmin } from '@/lib/admin-auth';
 import { getDb, COLLECTIONS } from '@/lib/db';
 import { createDispute } from '@/lib/disputes';
+import { STAKING_TIERS } from '@/lib/token-utils';
 import { logger } from '@/lib/logger';
 
-const MIN_SLASHABLE_STAKE_HIVE = 10_000;
+const MIN_SLASHABLE_STAKE_HIVE = STAKING_TIERS.staker.threshold;
+const MAX_DAO_ADMIN_BODY_BYTES = 12 * 1024;
 
 function mapDoc(doc: any) {
   return doc ? { ...doc, id: doc._id.toString(), _id: undefined } : null;
@@ -70,7 +72,18 @@ export async function PATCH(req: NextRequest) {
     if (admin.error) return admin.error;
 
     const db = await getDb();
-    const body = await req.json();
+    const raw = await req.text();
+    if (Buffer.byteLength(raw, 'utf8') > MAX_DAO_ADMIN_BODY_BYTES) {
+      return NextResponse.json({ error: 'DAO admin request body is too large.' }, { status: 413 });
+    }
+
+    let body: any;
+    try {
+      body = JSON.parse(raw);
+    } catch {
+      return NextResponse.json({ error: 'Invalid JSON body.' }, { status: 400 });
+    }
+
     const action = String(body.action || '');
     const now = new Date();
     const adminId = admin.client?.userId || 'admin_api_key';
@@ -118,11 +131,23 @@ export async function PATCH(req: NextRequest) {
       const provider = await db.collection(COLLECTIONS.AGENTS).findOne({ solanaAddress: report.providerAddress });
       if (!provider) return NextResponse.json({ error: 'Provider no longer exists.' }, { status: 404 });
 
-      const stake = await db.collection(COLLECTIONS.STAKES).findOne({ solanaAddress: report.providerAddress, status: 'active' });
-      const activeStake = Math.max(Number(stake?.activeAmount || 0), Number(provider.stakedAmount || 0));
-      if (!Number.isFinite(activeStake) || activeStake < MIN_SLASHABLE_STAKE_HIVE) {
+      const stake = await db.collection(COLLECTIONS.STAKES).findOne({ solanaAddress: report.providerAddress });
+      const hasClaimingUnstake = Array.isArray(stake?.pendingUnstakes)
+        && stake.pendingUnstakes.some((request: any) => request?.status === 'claiming');
+      if (hasClaimingUnstake) {
         return NextResponse.json(
-          { error: `Provider must have at least ${MIN_SLASHABLE_STAKE_HIVE.toLocaleString()} active HIVE staked before escalation.` },
+          { error: 'This provider has an unstake claim finalizing. Try again shortly.' },
+          { status: 409 }
+        );
+      }
+
+      const slashableStake = Math.max(
+        Number(stake?.activeAmount || 0) + Number(stake?.lockedAmount || 0),
+        Number(provider.stakedAmount || 0)
+      );
+      if (!Number.isFinite(slashableStake) || slashableStake < MIN_SLASHABLE_STAKE_HIVE) {
+        return NextResponse.json(
+          { error: `Provider must have at least ${MIN_SLASHABLE_STAKE_HIVE.toLocaleString()} slashable HIVE staked before escalation.` },
           { status: 400 }
         );
       }
@@ -132,7 +157,7 @@ export async function PATCH(req: NextRequest) {
         report.toolId,
         report.reason,
         report.evidenceUri,
-        activeStake,
+        slashableStake,
         {
           reportId,
           category: report.category,

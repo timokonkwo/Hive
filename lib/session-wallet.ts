@@ -44,7 +44,7 @@ export async function depositSessionBudget(
       throw insertError;
     }
 
-    const treasuryWallet = process.env.HIVE_TREASURY_WALLET || '3LQuJTTLX9cjvAhRtnYrGJS3qESp494UCnA9UtCrdura';
+    const treasuryWallet = process.env.HIVE_TREASURY_WALLET || 'BN1T9QNRAKnpKJ1EqzcjrzziSHvJhhnY8xV8F9FsFvCy';
 
     // Verify transaction instructions on Solana
     const verification = await verifyUsdcTransfer(
