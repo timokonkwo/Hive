@@ -44,6 +44,7 @@ describe('staking thresholds and governance invariants', () => {
     assert.match(tokenUtils, /HIVE_DECIMALS\s*=\s*9/);
     assert.match(tokenUtils, /parseHiveAmountToRaw/);
     assert.match(tokenUtils, /BigInt\(rawAmountText\)/);
+    assert.match(tokenUtils, /hasOwnProperty\.call\(options,\s*'maxAgeMinutes'\)/);
     assert.match(stakePage, /HIVE_DECIMALS\s*=\s*9/);
     assert.match(stakePage, /parseHiveAmountToRaw\(amount\)/);
     assert.doesNotMatch(stakePage, /Math\.round\(amountNum\s*\*\s*Math\.pow\(10,\s*HIVE_DECIMALS\)\)/);
@@ -174,6 +175,7 @@ describe('admin staking visibility', () => {
   const adminPage = read('app/admin/page.tsx');
   const stakersRoute = read('app/api/admin/stakers/route.ts');
   const reconcileRoute = read('app/api/admin/stakers/reconcile/route.ts');
+  const adminAuth = read('lib/admin-auth.ts');
 
   it('adds a protected admin stakers dashboard', () => {
     assert.match(adminPage, /"stakers"/);
@@ -193,6 +195,14 @@ describe('admin staking visibility', () => {
     assert.match(reconcileRoute, /maxAgeMinutes:\s*null/);
     assert.match(reconcileRoute, /solanaAddressVerifiedAt/);
     assert.match(reconcileRoute, /HIVE_TREASURY_WALLET/);
+    assert.match(reconcileRoute, /deleteOne\(\{\s*txSignature,\s*status:\s*'pending_reconcile'\s*\}\)/);
+  });
+
+  it('does not allow request-supplied admin addresses unless explicitly enabled', () => {
+    assert.match(adminAuth, /ADMIN_PRIVY_DID/);
+    assert.match(adminAuth, /ENABLE_LEGACY_ADMIN_ADDRESS_AUTH === 'true'/);
+    assert.match(adminAuth, /Disabled by default because the address is request-supplied/);
+    assert.doesNotMatch(adminAuth, /if \(adminAddress\) \{/);
   });
 });
 

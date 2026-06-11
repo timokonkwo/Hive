@@ -10,7 +10,7 @@ import { logger } from '@/lib/logger';
  * GET /api/admin/token-stats
  *
  * Returns agent token launch stats for the admin dashboard.
- * Protected by ADMIN_ADDRESS wallet auth (same as /api/admin/verify).
+ * Protected by shared admin auth (ADMIN_API_KEY or ADMIN_PRIVY_DID).
  */
 export async function GET(req: NextRequest) {
   // Admin auth
@@ -172,14 +172,7 @@ export async function GET(req: NextRequest) {
  * POST /api/admin/token-stats
  *
  * Admin actions: launch token for agent, or claim partner fees.
- * Protected by ADMIN_ADDRESS wallet auth.
- *
- * The admin page sends `adminAddress` (the connected wallet) in the body.
- * We verify it matches ADMIN_ADDRESS — the same env var used by /api/admin/verify.
- *
- * This is NOT spoofable because the admin dashboard already gates access
- * via Privy authentication + /api/admin/verify. The POST body address
- * is a double-check, not the sole auth mechanism.
+ * Protected by shared admin auth (ADMIN_API_KEY or ADMIN_PRIVY_DID).
  */
 export async function POST(req: NextRequest) {
   // Admin auth

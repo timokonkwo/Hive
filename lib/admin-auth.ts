@@ -8,14 +8,14 @@ import { logger } from '@/lib/logger';
  * Accepts THREE mechanisms (in priority order):
  *   1. ADMIN_API_KEY in x-admin-key header (for programmatic/cron access)
  *   2. Privy JWT where user's Privy DID matches ADMIN_PRIVY_DID (strongest)
- *   3. Privy JWT + claimed wallet address matches ADMIN_ADDRESS (transitional)
+ *   3. Privy JWT + claimed wallet address matches ADMIN_ADDRESS only when
+ *      ENABLE_LEGACY_ADMIN_ADDRESS_AUTH=true (temporary migration fallback)
  *
- * IMPORTANT: Method 3 is a transitional fallback. It requires a valid Privy
- * session (so random unauthenticated users can't exploit it), but any
- * authenticated Privy user who knows the ADMIN_ADDRESS could claim admin.
+ * IMPORTANT: Method 3 is intentionally disabled by default. Address-claim
+ * admin auth is weaker because the claimed address is request-supplied.
  *
- * Set ADMIN_PRIVY_DID in your env to your Privy user ID to use method 2
- * and disable the weaker method 3. Find your Privy DID in the Privy dashboard
+ * Set ADMIN_PRIVY_DID in your env to your Privy user ID to use method 2.
+ * Find your Privy DID in the Privy dashboard
  * under Users, or from the browser console: user.id after logging in.
  *
  * Usage:
@@ -53,21 +53,18 @@ export async function verifyAdmin(
     return { client };
   }
 
-  // Method 3 (transitional): Privy JWT + claimed address matches ADMIN_ADDRESS
-  // This is weaker because any logged-in user who knows the admin address
-  // could pass it. But it's still better than the old no-auth pattern.
+  // Method 3 (explicit migration fallback): Privy JWT + claimed address matches
+  // ADMIN_ADDRESS. Disabled by default because the address is request-supplied.
   const adminAddress = process.env.ADMIN_ADDRESS;
-  if (adminAddress) {
+  const legacyAddressAuthEnabled = process.env.ENABLE_LEGACY_ADMIN_ADDRESS_AUTH === 'true';
+  if (legacyAddressAuthEnabled && adminAddress) {
     const claimedAddress =
       request.headers.get('x-admin-address') ||
       new URL(request.url).searchParams.get('address') ||
       '';
 
     if (claimedAddress.toLowerCase() === adminAddress.toLowerCase()) {
-      if (!adminPrivyDid) {
-        // Warn that this method is weaker — nudge toward setting ADMIN_PRIVY_DID
-        logger.warn('Using transitional address-based admin check. Set ADMIN_PRIVY_DID env var to strengthen admin auth.', { tag: 'ADMIN-AUTH', userId: client.userId });
-      }
+      logger.warn('Using legacy address-based admin check. Set ADMIN_PRIVY_DID and remove ENABLE_LEGACY_ADMIN_ADDRESS_AUTH.', { tag: 'ADMIN-AUTH', userId: client.userId });
       return { client };
     }
   }

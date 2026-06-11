@@ -254,7 +254,9 @@ export async function verifyHiveTransfer(
     if (!tx.blockTime) {
       return { verified: false, error: 'Transaction block time is unavailable.' };
     }
-    const maxAgeMinutes = options.maxAgeMinutes ?? 15;
+    const maxAgeMinutes = Object.prototype.hasOwnProperty.call(options, 'maxAgeMinutes')
+      ? (options.maxAgeMinutes === undefined ? 15 : options.maxAgeMinutes)
+      : 15;
     if (maxAgeMinutes !== null) {
       const ageMs = Date.now() - tx.blockTime * 1000;
       if (ageMs > maxAgeMinutes * 60 * 1000) {
