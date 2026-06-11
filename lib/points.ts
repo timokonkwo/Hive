@@ -27,7 +27,7 @@ function parseKeypair(raw: string): Keypair {
 }
 
 function getTreasuryKeypair(): Keypair | null {
-  const raw = process.env.HIVE_LAUNCH_KEYPAIR || process.env.HIVE_AGENT_LAUNCH_KEYPAIR;
+  const raw = process.env.HIVE_TREASURY_KEYPAIR;
   if (!raw) return null;
   try {
     return parseKeypair(raw);
@@ -140,7 +140,7 @@ export async function convertPointsToHive(
   if (!treasuryKeypair) {
     return {
       success: false,
-      error: 'Treasury conversion keypair is not configured on the server.',
+      error: 'Treasury conversion keypair is not configured on the server. Set HIVE_TREASURY_KEYPAIR.',
     };
   }
 

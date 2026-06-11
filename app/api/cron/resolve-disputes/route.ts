@@ -10,6 +10,8 @@ import { HIVE_MINT, HIVE_DECIMALS } from '@/lib/token-utils';
 import bs58 from 'bs58';
 import { logger } from '@/lib/logger';
 
+const DEFAULT_HIVE_TREASURY_WALLET = 'BN1T9QNRAKnpKJ1EqzcjrzziSHvJhhnY8xV8F9FsFvCy';
+
 function parseKeypair(raw: string): Keypair {
   const trimmed = raw.trim();
   if (trimmed.startsWith('[')) {
@@ -20,7 +22,7 @@ function parseKeypair(raw: string): Keypair {
 }
 
 function getTreasuryKeypair(): Keypair | null {
-  const raw = process.env.HIVE_LAUNCH_KEYPAIR || process.env.HIVE_AGENT_LAUNCH_KEYPAIR;
+  const raw = process.env.HIVE_TREASURY_KEYPAIR;
   if (!raw) return null;
   try {
     return parseKeypair(raw);
@@ -33,6 +35,12 @@ function getTreasuryKeypair(): Keypair | null {
 function getConnection(): Connection {
   const rpcUrl = process.env.SOLANA_RPC_URL || 'https://api.mainnet-beta.solana.com';
   return new Connection(rpcUrl, 'confirmed');
+}
+
+function isConfiguredTreasuryKeypair(keypair: Keypair | null): keypair is Keypair {
+  if (!keypair) return false;
+  const configuredTreasury = process.env.HIVE_TREASURY_WALLET || DEFAULT_HIVE_TREASURY_WALLET;
+  return keypair.publicKey.toBase58() === configuredTreasury;
 }
 
 /**
@@ -82,40 +90,45 @@ export async function GET(req: Request) {
 
       let txSignature = '';
 
-      if (isSlashedOutcome && treasuryKeypair && dispute.stakedAmount > 0) {
-        // Burn treasury-custodied HIVE that represents the provider's recorded stake.
-        try {
-          const sourceAta = await getAssociatedTokenAddress(HIVE_MINT, treasuryKeypair.publicKey);
-
-          const transaction = new Transaction();
-          const rawAmount = BigInt(Math.round(dispute.stakedAmount * Math.pow(10, HIVE_DECIMALS)));
-
-          transaction.add(
-            createBurnInstruction(
-              sourceAta,
-              HIVE_MINT,
-              treasuryKeypair.publicKey,
-              rawAmount,
-              [],
-              TOKEN_PROGRAM_ID
-            )
-          );
-
-          const { blockhash } = await connection.getLatestBlockhash('confirmed');
-          transaction.recentBlockhash = blockhash;
-          transaction.feePayer = treasuryKeypair.publicKey;
-          transaction.sign(treasuryKeypair);
-
-          // Broadcast signature (this will simulate or execute depending on wallet tokens)
-          txSignature = await connection.sendRawTransaction(transaction.serialize(), {
-            skipPreflight: false,
-            maxRetries: 3
-          });
-          logger.info(`[CRON-DISPUTE] Slashing tx broadcasted: ${txSignature}`);
-        } catch (err: any) {
-          logger.error(`[CRON-DISPUTE] Slashing SPL token instruction failed for ${dispute.providerAddress}:`, err.message);
-          txSignature = 'failed_chain_error';
+      if (isSlashedOutcome && dispute.stakedAmount > 0) {
+        if (!isConfiguredTreasuryKeypair(treasuryKeypair)) {
+          logger.error('[CRON-DISPUTE] Slashing skipped: HIVE_TREASURY_KEYPAIR is missing or does not match HIVE_TREASURY_WALLET');
+          txSignature = 'failed_treasury_key_mismatch';
           finalStatus = 'execution_failed';
+        } else {
+          // Burn treasury-custodied HIVE that represents the provider's recorded stake.
+          try {
+            const sourceAta = await getAssociatedTokenAddress(HIVE_MINT, treasuryKeypair.publicKey);
+
+            const transaction = new Transaction();
+            const rawAmount = BigInt(Math.round(dispute.stakedAmount * Math.pow(10, HIVE_DECIMALS)));
+
+            transaction.add(
+              createBurnInstruction(
+                sourceAta,
+                HIVE_MINT,
+                treasuryKeypair.publicKey,
+                rawAmount,
+                [],
+                TOKEN_PROGRAM_ID
+              )
+            );
+
+            const { blockhash } = await connection.getLatestBlockhash('confirmed');
+            transaction.recentBlockhash = blockhash;
+            transaction.feePayer = treasuryKeypair.publicKey;
+            transaction.sign(treasuryKeypair);
+
+            txSignature = await connection.sendRawTransaction(transaction.serialize(), {
+              skipPreflight: false,
+              maxRetries: 3
+            });
+            logger.info(`[CRON-DISPUTE] Slashing tx broadcasted: ${txSignature}`);
+          } catch (err: any) {
+            logger.error(`[CRON-DISPUTE] Slashing SPL token instruction failed for ${dispute.providerAddress}:`, err.message);
+            txSignature = 'failed_chain_error';
+            finalStatus = 'execution_failed';
+          }
         }
       }
 

@@ -65,6 +65,23 @@ describe('staking thresholds and governance invariants', () => {
     assert.match(docs, /7-day cooldown/);
   });
 
+  it('keeps treasury HIVE custody on a dedicated signer env var', () => {
+    assert.match(stakingRoute, /process\.env\.HIVE_TREASURY_KEYPAIR/);
+    assert.match(disputeResolver, /process\.env\.HIVE_TREASURY_KEYPAIR/);
+    assert.match(read('lib/points.ts'), /process\.env\.HIVE_TREASURY_KEYPAIR/);
+    assert.doesNotMatch(stakingRoute, /HIVE_LAUNCH_KEYPAIR \|\| process\.env\.HIVE_AGENT_LAUNCH_KEYPAIR/);
+    assert.doesNotMatch(disputeResolver, /HIVE_LAUNCH_KEYPAIR \|\| process\.env\.HIVE_AGENT_LAUNCH_KEYPAIR/);
+  });
+
+  it('keeps in-flight unstake claims slashable and blocks dispute races', () => {
+    assert.match(stakingRoute, /'pendingUnstakes\.\$\.status': 'claiming'/);
+    assert.match(stakingRoute, /lockedAmount:\s*\{\s*\$gte:\s*amountHive\s*\}[\s\S]*?\$inc:\s*\{\s*lockedAmount:\s*-amountHive/);
+    assert.doesNotMatch(stakingRoute, /claimStartedAt[\s\S]{0,180}\$inc:\s*\{\s*lockedAmount:\s*-amountHive/);
+    assert.match(disputeReportsRoute, /status === 'claiming'/);
+    assert.match(disputesRoute, /status === 'claiming'/);
+    assert.match(adminDaoRoute, /status === 'claiming'/);
+  });
+
   it('keeps cooldown-locked stake slashable during DAO disputes', () => {
     assert.match(disputesRoute, /activeAmount[\s\S]*lockedAmount/);
     assert.match(disputeReportsRoute, /activeAmount[\s\S]*lockedAmount/);

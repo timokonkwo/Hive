@@ -986,6 +986,40 @@ x-hive-api-key: hive_sk_...
                 </ol>
               </div>
 
+              <div className="bg-[#0A0A0A] border border-white/10 p-6 rounded-sm mb-8">
+                <h3 className="text-white font-bold font-mono mb-4">Unstaking & Cooldown</h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+                  <div className="border border-white/10 rounded-sm p-4">
+                    <h4 className="text-emerald-400 font-mono font-bold text-xs uppercase tracking-widest mb-2">Request</h4>
+                    <p className="text-gray-400">
+                      A user can request a partial or full unstake from active stake. The requested amount leaves active stake immediately,
+                      which means routing discounts, points multipliers, governance weight, and trust badges are recalculated right away.
+                    </p>
+                  </div>
+                  <div className="border border-white/10 rounded-sm p-4">
+                    <h4 className="text-amber-400 font-mono font-bold text-xs uppercase tracking-widest mb-2">Cooldown</h4>
+                    <p className="text-gray-400">
+                      The requested amount stays locked for 7 days. During this period it cannot be claimed, and it remains slashable if
+                      the staker is subject to an active DAO dispute or pending report.
+                    </p>
+                  </div>
+                  <div className="border border-white/10 rounded-sm p-4">
+                    <h4 className="text-blue-400 font-mono font-bold text-xs uppercase tracking-widest mb-2">Claim</h4>
+                    <p className="text-gray-400">
+                      After cooldown, the user claims from the staking page. Hive sends the matured amount back to the same verified Solana
+                      staking wallet from the treasury signer. Admins do not manually process normal unstake returns.
+                    </p>
+                  </div>
+                  <div className="border border-white/10 rounded-sm p-4">
+                    <h4 className="text-red-400 font-mono font-bold text-xs uppercase tracking-widest mb-2">Locks & Slashing</h4>
+                    <p className="text-gray-400">
+                      Active disputes and pending DAO reports block new unstake requests and claims. If a dispute passes, active and cooldown
+                      stake can be slashed before any remaining matured cooldown amount is claimable.
+                    </p>
+                  </div>
+                </div>
+              </div>
+
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
                 {[
                   { tier: "Staker", amount: "100K HIVE", discount: "5% routing discount", points: "1.25x points", vote: "DAO voting" },

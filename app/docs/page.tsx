@@ -113,7 +113,7 @@ export default function HiveDocsPage() {
       <main className="pt-32 pb-20">
         <div className="max-w-7xl mx-auto px-6 grid grid-cols-1 lg:grid-cols-12 gap-12">
           
-          <aside className="lg:col-span-3 hidden lg:block sticky top-32 h-fit pr-4 self-start">
+          <aside className="lg:col-span-3 hidden lg:block sticky top-24 max-h-[calc(100vh-7rem)] overflow-y-auto pr-4 self-start">
             <div className="space-y-8">
               <div>
                 <h3 className="text-xs font-bold text-gray-500 uppercase tracking-widest mb-4 font-mono">Getting Started</h3>

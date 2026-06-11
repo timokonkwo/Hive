@@ -50,7 +50,7 @@ function parseKeypair(raw: string): Keypair {
 }
 
 function getTreasuryKeypair(): Keypair | null {
-  const raw = process.env.HIVE_LAUNCH_KEYPAIR || process.env.HIVE_AGENT_LAUNCH_KEYPAIR;
+  const raw = process.env.HIVE_TREASURY_KEYPAIR;
   if (!raw) return null;
   try {
     return parseKeypair(raw);
@@ -142,7 +142,7 @@ async function findStakeExitBlocker(db: any, solanaAddress: string) {
 async function sendHiveFromTreasury(recipientAddress: string, amountHive: number) {
   const treasuryKeypair = getTreasuryKeypair();
   if (!treasuryKeypair) {
-    throw new Error('Treasury withdrawal keypair is not configured.');
+    throw new Error('Treasury withdrawal keypair is not configured. Set HIVE_TREASURY_KEYPAIR on the server.');
   }
 
   const configuredTreasury = process.env.HIVE_TREASURY_WALLET || DEFAULT_HIVE_TREASURY_WALLET;
@@ -446,9 +446,6 @@ async function handleClaimUnstake(db: any, staker: any, body: any) {
       },
     },
     {
-      $inc: {
-        lockedAmount: -amountHive,
-      },
       $set: {
         'pendingUnstakes.$.status': 'claiming',
         'pendingUnstakes.$.claimStartedAt': now,
@@ -466,7 +463,6 @@ async function handleClaimUnstake(db: any, staker: any, body: any) {
     await db.collection(COLLECTIONS.STAKES).updateOne(
       { _id: stake._id, 'pendingUnstakes.id': requestId },
       {
-        $inc: { lockedAmount: amountHive },
         $set: {
           'pendingUnstakes.$.status': 'cooldown',
           'pendingUnstakes.$.claimError': postLockBlocker,
@@ -484,7 +480,6 @@ async function handleClaimUnstake(db: any, staker: any, body: any) {
     await db.collection(COLLECTIONS.STAKES).updateOne(
       { _id: stake._id, 'pendingUnstakes.id': requestId },
       {
-        $inc: { lockedAmount: amountHive },
         $set: {
           'pendingUnstakes.$.status': 'cooldown',
           'pendingUnstakes.$.claimError': error.message || 'Treasury transfer failed.',
@@ -499,9 +494,13 @@ async function handleClaimUnstake(db: any, staker: any, body: any) {
   const updatedStake = await db.collection(COLLECTIONS.STAKES).findOneAndUpdate(
     {
       _id: stake._id,
+      lockedAmount: { $gte: amountHive },
       pendingUnstakes: { $elemMatch: { id: requestId, status: 'claiming' } },
     },
     {
+      $inc: {
+        lockedAmount: -amountHive,
+      },
       $set: {
         'pendingUnstakes.$.status': 'claimed',
         'pendingUnstakes.$.claimedAt': claimedAt,

@@ -132,6 +132,15 @@ export async function PATCH(req: NextRequest) {
       if (!provider) return NextResponse.json({ error: 'Provider no longer exists.' }, { status: 404 });
 
       const stake = await db.collection(COLLECTIONS.STAKES).findOne({ solanaAddress: report.providerAddress });
+      const hasClaimingUnstake = Array.isArray(stake?.pendingUnstakes)
+        && stake.pendingUnstakes.some((request: any) => request?.status === 'claiming');
+      if (hasClaimingUnstake) {
+        return NextResponse.json(
+          { error: 'This provider has an unstake claim finalizing. Try again shortly.' },
+          { status: 409 }
+        );
+      }
+
       const slashableStake = Math.max(
         Number(stake?.activeAmount || 0) + Number(stake?.lockedAmount || 0),
         Number(provider.stakedAmount || 0)

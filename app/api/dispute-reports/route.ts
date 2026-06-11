@@ -154,6 +154,15 @@ export async function POST(req: NextRequest) {
     const reporterStake = await db.collection(COLLECTIONS.STAKES).findOne({ stakerId: reporter.reporterId, status: 'active' });
     const watchdogEligible = (reporterStake?.activeAmount || 0) >= STAKING_TIERS.staker.threshold;
     const providerStake = await db.collection(COLLECTIONS.STAKES).findOne({ solanaAddress: providerAddress });
+    const providerHasClaimingUnstake = Array.isArray(providerStake?.pendingUnstakes)
+      && providerStake.pendingUnstakes.some((request: any) => request?.status === 'claiming');
+    if (providerHasClaimingUnstake) {
+      return NextResponse.json(
+        { error: 'This provider has an unstake claim finalizing. Try again shortly.' },
+        { status: 409 }
+      );
+    }
+
     const activeProviderStake = Math.max(
       Number(providerStake?.activeAmount || 0) + Number(providerStake?.lockedAmount || 0),
       Number(provider.stakedAmount || 0)

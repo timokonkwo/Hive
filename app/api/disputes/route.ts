@@ -170,6 +170,15 @@ export async function POST(req: NextRequest) {
     }
 
     const stake = await db.collection(COLLECTIONS.STAKES).findOne({ solanaAddress: providerAddress });
+    const hasClaimingUnstake = Array.isArray(stake?.pendingUnstakes)
+      && stake.pendingUnstakes.some((request: any) => request?.status === 'claiming');
+    if (hasClaimingUnstake) {
+      return NextResponse.json(
+        { error: 'This provider has an unstake claim finalizing. Try again shortly.' },
+        { status: 409 }
+      );
+    }
+
     const slashableStake = Math.max(
       Number(stake?.activeAmount || 0) + Number(stake?.lockedAmount || 0),
       Number(provider.stakedAmount || 0)
