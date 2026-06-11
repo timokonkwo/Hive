@@ -126,106 +126,116 @@ export async function POST(req: NextRequest) {
     }
 
     const treasuryWallet = process.env.HIVE_TREASURY_WALLET || DEFAULT_HIVE_TREASURY_WALLET;
-    const verification = await verifyHiveTransfer(
-      txSignature,
-      solanaAddress,
-      treasuryWallet,
-      amountHive,
-      { maxAgeMinutes: null }
-    );
+    let stakeCredited = false;
 
-    if (!verification.verified) {
-      await db.collection(COLLECTIONS.STAKE_EVENTS).deleteOne({ txSignature, status: 'pending_reconcile' });
-      return NextResponse.json(
-        { error: verification.error || 'HIVE staking transfer could not be verified.' },
-        { status: 400 }
+    try {
+      const verification = await verifyHiveTransfer(
+        txSignature,
+        solanaAddress,
+        treasuryWallet,
+        amountHive,
+        { maxAgeMinutes: null }
       );
-    }
 
-    const confirmedAmount = verification.confirmedAmount || amountHiveNumber;
-    const now = new Date();
-    const stakeResult = await db.collection(COLLECTIONS.STAKES).findOneAndUpdate(
-      { stakerId: staker.stakerId },
-      {
-        $set: {
-          stakerType: staker.stakerType,
-          solanaAddress,
-          status: 'active',
-          updatedAt: now,
-        },
-        $inc: { activeAmount: confirmedAmount },
-        $setOnInsert: {
-          lockedAmount: 0,
-          slashedAmount: 0,
-          createdAt: now,
-        },
-      },
-      { upsert: true, returnDocument: 'after' }
-    );
-
-    const activeAmount = stakeResult?.activeAmount || confirmedAmount;
-    const tier = getStakingTier(activeAmount);
-
-    await db.collection(COLLECTIONS.STAKE_EVENTS).updateOne(
-      { txSignature },
-      {
-        $set: {
-          status: 'verified',
-          confirmedAmount,
-          blockTime: verification.blockTime || null,
-          verifiedAt: now,
-          reconciledAt: now,
-          resultingActiveAmount: activeAmount,
-          resultingTier: tier,
-        },
+      if (!verification.verified) {
+        await db.collection(COLLECTIONS.STAKE_EVENTS).deleteOne({ txSignature, status: 'pending_reconcile' });
+        return NextResponse.json(
+          { error: verification.error || 'HIVE staking transfer could not be verified.' },
+          { status: 400 }
+        );
       }
-    );
 
-    if (staker.stakerType === 'agent') {
-      await db.collection(COLLECTIONS.AGENTS).updateOne(
-        { _id: new ObjectId(staker.stakerId) },
+      const confirmedAmount = verification.confirmedAmount || amountHiveNumber;
+      const now = new Date();
+      const stakeResult = await db.collection(COLLECTIONS.STAKES).findOneAndUpdate(
+        { stakerId: staker.stakerId },
         {
           $set: {
-            isStaked: activeAmount >= STAKING_TIERS.staker.threshold,
-            stakedAmount: activeAmount,
-            stakingTier: tier,
+            stakerType: staker.stakerType,
+            solanaAddress,
+            status: 'active',
             updatedAt: now,
+          },
+          $inc: { activeAmount: confirmedAmount },
+          $setOnInsert: {
+            lockedAmount: 0,
+            slashedAmount: 0,
+            createdAt: now,
+          },
+        },
+        { upsert: true, returnDocument: 'after' }
+      );
+      stakeCredited = true;
+
+      const activeAmount = stakeResult?.activeAmount || confirmedAmount;
+      const tier = getStakingTier(activeAmount);
+
+      await db.collection(COLLECTIONS.STAKE_EVENTS).updateOne(
+        { txSignature },
+        {
+          $set: {
+            status: 'verified',
+            confirmedAmount,
+            blockTime: verification.blockTime || null,
+            verifiedAt: now,
+            reconciledAt: now,
+            resultingActiveAmount: activeAmount,
+            resultingTier: tier,
           },
         }
       );
-    } else {
-      await db.collection(COLLECTIONS.CLIENTS).updateOne(
-        { address: staker.stakerId },
-        { $set: { stakedAmount: activeAmount, stakingTier: tier, updatedAt: now } }
-      );
+
+      if (staker.stakerType === 'agent') {
+        await db.collection(COLLECTIONS.AGENTS).updateOne(
+          { _id: new ObjectId(staker.stakerId) },
+          {
+            $set: {
+              isStaked: activeAmount >= STAKING_TIERS.staker.threshold,
+              stakedAmount: activeAmount,
+              stakingTier: tier,
+              updatedAt: now,
+            },
+          }
+        );
+      } else {
+        await db.collection(COLLECTIONS.CLIENTS).updateOne(
+          { address: staker.stakerId },
+          { $set: { stakedAmount: activeAmount, stakingTier: tier, updatedAt: now } }
+        );
+      }
+
+      await db.collection(COLLECTIONS.ACTIVITY).insertOne({
+        type: 'HiveStakeReconciled',
+        actorName: 'admin',
+        metadata: {
+          stakerId: staker.stakerId,
+          stakerType: staker.stakerType,
+          solanaAddress,
+          amount: confirmedAmount,
+          activeAmount,
+          tier,
+          txSignature,
+        },
+        createdAt: now,
+      });
+
+      return NextResponse.json({
+        success: true,
+        stake: {
+          stakerId: staker.stakerId,
+          stakerType: staker.stakerType,
+          solanaAddress,
+          activeAmount,
+          addedAmount: confirmedAmount,
+          tier,
+        },
+      });
+    } catch (error) {
+      if (!stakeCredited) {
+        await db.collection(COLLECTIONS.STAKE_EVENTS).deleteOne({ txSignature, status: 'pending_reconcile' });
+      }
+      throw error;
     }
-
-    await db.collection(COLLECTIONS.ACTIVITY).insertOne({
-      type: 'HiveStakeReconciled',
-      actorName: 'admin',
-      metadata: {
-        stakerId: staker.stakerId,
-        stakerType: staker.stakerType,
-        solanaAddress,
-        amount: confirmedAmount,
-        activeAmount,
-        tier,
-        txSignature,
-      },
-      createdAt: now,
-    });
-
-    return NextResponse.json({
-      success: true,
-      stake: {
-        stakerId: staker.stakerId,
-        stakerType: staker.stakerType,
-        solanaAddress,
-        activeAmount,
-        addedAmount: confirmedAmount,
-        tier,
-      },
-    });
   } catch (error: any) {
     logger.error('POST /api/admin/stakers/reconcile error:', error);
     return NextResponse.json({ error: error.message || 'Failed to reconcile stake.' }, { status: 500 });
