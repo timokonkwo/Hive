@@ -1022,9 +1022,9 @@ x-hive-api-key: hive_sk_...
 
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
                 {[
-                  { tier: "Staker", amount: "100K HIVE", discount: "5% routing discount", points: "1.25x points", vote: "DAO voting" },
-                  { tier: "Power Staker", amount: "1M HIVE", discount: "10% routing discount", points: "1.5x points", vote: "Proposal access" },
-                  { tier: "Governor", amount: "10M HIVE", discount: "20% routing discount", points: "2x points", vote: "Advanced governance" },
+                  { tier: "Staker", amount: "100K+ HIVE", discount: "5% routing discount", points: "1.25x points", vote: "DAO voting" },
+                  { tier: "Power Staker", amount: "1M+ HIVE", discount: "10% routing discount", points: "1.5x points", vote: "Proposal access" },
+                  { tier: "Governor", amount: "10M+ HIVE", discount: "20% routing discount", points: "2x points", vote: "Advanced governance" },
                 ].map(item => (
                   <div key={item.tier} className="bg-[#0A0A0A] border border-emerald-500/10 p-5 rounded-sm">
                     <h3 className="text-emerald-400 font-bold font-mono text-sm mb-1">{item.tier}</h3>

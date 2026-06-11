@@ -116,7 +116,7 @@ async function createSolanaWalletProof(solWallet: any, address: string, action =
 const tierCards = [
   {
     label: "Staker",
-    amount: "100K HIVE",
+    amount: "100K+ HIVE",
     discount: "5%",
     points: "1.25x",
     governance: "1.0x",
@@ -125,7 +125,7 @@ const tierCards = [
   },
   {
     label: "Power Staker",
-    amount: "1M HIVE",
+    amount: "1M+ HIVE",
     discount: "10%",
     points: "1.5x",
     governance: "1.25x",
@@ -134,7 +134,7 @@ const tierCards = [
   },
   {
     label: "Governor",
-    amount: "10M HIVE",
+    amount: "10M+ HIVE",
     discount: "20%",
     points: "2x",
     governance: "2.0x",
@@ -513,7 +513,7 @@ export default function StakePage() {
                 </button>
               </div>
               <div className="grid grid-cols-2 md:grid-cols-4 gap-3 w-full lg:w-auto">
-                <Metric label="Stake Min" value="100K HIVE" />
+                <Metric label="Stake Min" value="100K+ HIVE" />
                 <Metric label="Top Discount" value="20%" />
                 <Metric label="Top Points" value="2x" />
                 <Metric label="Voting" value="Staked" />

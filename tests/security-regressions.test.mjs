@@ -19,19 +19,19 @@ describe('staking thresholds and governance invariants', () => {
   const dashboardPage = read('app/dashboard/page.tsx');
   const docs = read('app/docs/_components/ContentSections.tsx');
 
-  it('uses 100K, 1M, and 10M as the staking tiers', () => {
+  it('uses 100K+, 1M+, and 10M+ as the staking tiers', () => {
     assert.match(tokenUtils, /id:\s*'staker'[\s\S]*?threshold:\s*100_000/);
     assert.match(tokenUtils, /id:\s*'power'[\s\S]*?threshold:\s*1_000_000/);
     assert.match(tokenUtils, /id:\s*'governor'[\s\S]*?threshold:\s*10_000_000/);
   });
 
-  it('enforces the 100K minimum before accepting stake or DAO voting', () => {
+  it('enforces the 100K+ minimum before accepting stake or DAO voting', () => {
     assert.match(stakingRoute, /MIN_ACTIVE_STAKE_HIVE\s*=\s*STAKING_TIERS\.staker\.threshold/);
     assert.match(stakingRoute, /projectedActiveStake\s*<\s*MIN_ACTIVE_STAKE_HIVE/);
     assert.match(stakingRoute, /isStaked:\s*activeAmount\s*>=\s*MIN_ACTIVE_STAKE_HIVE/);
     assert.match(disputes, /activeStake\s*<\s*STAKING_TIERS\.staker\.threshold/);
     assert.match(stakePage, /MIN_ACTIVE_STAKE_HIVE\s*=\s*100_000/);
-    assert.match(stakePage, /Stake Min" value="100K HIVE"/);
+    assert.match(stakePage, /Stake Min" value="100K\+ HIVE"/);
   });
 
   it('keeps malformed or oversized staking amounts out of on-chain verification', () => {
@@ -95,7 +95,7 @@ describe('staking thresholds and governance invariants', () => {
     assert.match(disputeResolver, /status = 'slashed'/);
   });
 
-  it('uses the 100K staker threshold for dispute watchdog and slashing gates', () => {
+  it('uses the 100K+ staker threshold for dispute watchdog and slashing gates', () => {
     assert.match(disputeReportsRoute, /STAKING_TIERS\.staker\.threshold/);
     assert.match(disputesRoute, /STAKING_TIERS\.staker\.threshold/);
     assert.match(adminDaoRoute, /STAKING_TIERS\.staker\.threshold/);

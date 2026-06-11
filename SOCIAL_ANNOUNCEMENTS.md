@@ -12,9 +12,9 @@ Any HIVE holder can stake from a linked Solana wallet and unlock protocol benefi
 
 3. Staking tiers:
 
-- 10K HIVE: Staker
-- 100K HIVE: Power Staker
-- 1M HIVE: Governor
+- 100K+ HIVE: Staker
+- 1M+ HIVE: Power Staker
+- 10M+ HIVE: Governor
 
 Each tier increases access, discounts, points boosts, and governance weight.
 
