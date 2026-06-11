@@ -32,7 +32,8 @@ const MIN_ACTIVE_STAKE_HIVE = STAKING_TIERS.staker.threshold;
 const UNSTAKE_COOLDOWN_DAYS = 7;
 const UNSTAKE_COOLDOWN_MS = UNSTAKE_COOLDOWN_DAYS * 24 * 60 * 60 * 1000;
 const UNSTAKE_REQUEST_ID_REGEX = /^[a-f0-9]{24}$/i;
-const DEFAULT_HIVE_TREASURY_WALLET = '3LQuJTTLX9cjvAhRtnYrGJS3qESp494UCnA9UtCrdura';
+const DEFAULT_HIVE_TREASURY_WALLET = 'BN1T9QNRAKnpKJ1EqzcjrzziSHvJhhnY8xV8F9FsFvCy';
+const MAX_STAKING_REQUEST_BYTES = 8 * 1024;
 
 function hasValidHivePrecision(amount: number) {
   const raw = amount * Math.pow(10, HIVE_DECIMALS);
@@ -445,6 +446,9 @@ async function handleClaimUnstake(db: any, staker: any, body: any) {
       },
     },
     {
+      $inc: {
+        lockedAmount: -amountHive,
+      },
       $set: {
         'pendingUnstakes.$.status': 'claiming',
         'pendingUnstakes.$.claimStartedAt': now,
@@ -457,6 +461,22 @@ async function handleClaimUnstake(db: any, staker: any, body: any) {
     return NextResponse.json({ error: 'This unstake request is not claimable right now.' }, { status: 409 });
   }
 
+  const postLockBlocker = await findStakeExitBlocker(db, solanaAddress);
+  if (postLockBlocker) {
+    await db.collection(COLLECTIONS.STAKES).updateOne(
+      { _id: stake._id, 'pendingUnstakes.id': requestId },
+      {
+        $inc: { lockedAmount: amountHive },
+        $set: {
+          'pendingUnstakes.$.status': 'cooldown',
+          'pendingUnstakes.$.claimError': postLockBlocker,
+          updatedAt: new Date(),
+        },
+      }
+    );
+    return NextResponse.json({ error: postLockBlocker }, { status: 409 });
+  }
+
   let txSignature = '';
   try {
     txSignature = await sendHiveFromTreasury(solanaAddress, amountHive);
@@ -464,6 +484,7 @@ async function handleClaimUnstake(db: any, staker: any, body: any) {
     await db.collection(COLLECTIONS.STAKES).updateOne(
       { _id: stake._id, 'pendingUnstakes.id': requestId },
       {
+        $inc: { lockedAmount: amountHive },
         $set: {
           'pendingUnstakes.$.status': 'cooldown',
           'pendingUnstakes.$.claimError': error.message || 'Treasury transfer failed.',
@@ -478,13 +499,9 @@ async function handleClaimUnstake(db: any, staker: any, body: any) {
   const updatedStake = await db.collection(COLLECTIONS.STAKES).findOneAndUpdate(
     {
       _id: stake._id,
-      lockedAmount: { $gte: amountHive },
       pendingUnstakes: { $elemMatch: { id: requestId, status: 'claiming' } },
     },
     {
-      $inc: {
-        lockedAmount: -amountHive,
-      },
       $set: {
         'pendingUnstakes.$.status': 'claimed',
         'pendingUnstakes.$.claimedAt': claimedAt,
@@ -572,7 +589,18 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Authentication required.' }, { status: 401 });
     }
 
-    const body = await req.json();
+    const raw = await req.text();
+    if (Buffer.byteLength(raw, 'utf8') > MAX_STAKING_REQUEST_BYTES) {
+      return NextResponse.json({ error: 'Staking request body is too large.' }, { status: 413 });
+    }
+
+    let body: any;
+    try {
+      body = JSON.parse(raw);
+    } catch {
+      return NextResponse.json({ error: 'Invalid JSON body.' }, { status: 400 });
+    }
+
     if (body?.action === 'request_unstake') {
       return handleRequestUnstake(db, staker, body);
     }

@@ -1,11 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getDb } from '@/lib/db';
+import { COLLECTIONS, getDb } from '@/lib/db';
 import { authenticateClient } from '@/lib/client-auth';
 import { authenticateRequest } from '@/lib/api-key';
 import { convertPointsToHive, MIN_CONVERSION_THRESHOLD } from '@/lib/points';
 import { checkRateLimit, getClientIp } from '@/lib/rate-limit';
 import { PublicKey } from '@solana/web3.js';
 import { logger } from '@/lib/logger';
+
+const MAX_POINTS_CONVERT_BODY_BYTES = 4 * 1024;
+const MAX_POINTS_CONVERT = 1_000_000_000;
 
 /**
  * POST /api/points/convert
@@ -40,12 +43,23 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const body = await req.json();
+    const raw = await req.text();
+    if (Buffer.byteLength(raw, 'utf8') > MAX_POINTS_CONVERT_BODY_BYTES) {
+      return NextResponse.json({ error: 'Conversion request body is too large.' }, { status: 413 });
+    }
+
+    let body: any;
+    try {
+      body = JSON.parse(raw);
+    } catch {
+      return NextResponse.json({ error: 'Invalid JSON body.' }, { status: 400 });
+    }
+
     const { points, solanaAddress } = body;
 
-    if (!points || typeof points !== 'number' || points <= 0) {
+    if (!points || typeof points !== 'number' || !Number.isSafeInteger(points) || points <= 0 || points > MAX_POINTS_CONVERT) {
       return NextResponse.json(
-        { error: 'Points must be a positive number.' },
+        { error: 'Points must be a positive safe integer.' },
         { status: 400 }
       );
     }
@@ -72,6 +86,23 @@ export async function POST(req: NextRequest) {
         { error: 'Invalid Solana address format.' },
         { status: 400 }
       );
+    }
+
+    if (client) {
+      const profile = await db.collection(COLLECTIONS.CLIENTS).findOne({ address: userId });
+      if (!profile?.solanaAddressVerifiedAt || profile.solanaAddress !== solanaAddress) {
+        return NextResponse.json(
+          { error: 'Points can only be converted to your verified linked Solana wallet.' },
+          { status: 403 }
+        );
+      }
+    } else if (agentAuth) {
+      if (!agentAuth.agent?.solanaAddressVerifiedAt || agentAuth.agent.solanaAddress !== solanaAddress) {
+        return NextResponse.json(
+          { error: 'Points can only be converted to the agent verified Solana wallet.' },
+          { status: 403 }
+        );
+      }
     }
 
     const result = await convertPointsToHive(userId, points, solanaAddress);

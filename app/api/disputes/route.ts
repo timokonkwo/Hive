@@ -3,10 +3,12 @@ import { getDb, COLLECTIONS } from '@/lib/db';
 import { verifyAdmin } from '@/lib/admin-auth';
 import { createDispute } from '@/lib/disputes';
 import { isValidSolanaAddress } from '@/lib/solana-pay';
+import { STAKING_TIERS } from '@/lib/token-utils';
 import { checkRateLimit, getClientIp, RATE_LIMITS } from '@/lib/rate-limit';
 import { logger } from '@/lib/logger';
 
-const MIN_SLASHABLE_STAKE_HIVE = 10_000;
+const MIN_SLASHABLE_STAKE_HIVE = STAKING_TIERS.staker.threshold;
+const MAX_DISPUTE_BODY_BYTES = 12 * 1024;
 
 function isValidEvidenceUri(value: string): boolean {
   if (typeof value !== 'string' || value.length < 8 || value.length > 500) return false;
@@ -97,7 +99,18 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const body = await req.json();
+    const raw = await req.text();
+    if (Buffer.byteLength(raw, 'utf8') > MAX_DISPUTE_BODY_BYTES) {
+      return NextResponse.json({ error: 'Dispute body is too large.' }, { status: 413 });
+    }
+
+    let body: any;
+    try {
+      body = JSON.parse(raw);
+    } catch {
+      return NextResponse.json({ error: 'Invalid JSON body.' }, { status: 400 });
+    }
+
     const { providerAddress, toolId, reason, evidenceUri } = body;
 
     if (!providerAddress || !toolId || !reason || !evidenceUri) {

@@ -3,9 +3,11 @@ import { ObjectId } from 'mongodb';
 import { verifyAdmin } from '@/lib/admin-auth';
 import { getDb, COLLECTIONS } from '@/lib/db';
 import { createDispute } from '@/lib/disputes';
+import { STAKING_TIERS } from '@/lib/token-utils';
 import { logger } from '@/lib/logger';
 
-const MIN_SLASHABLE_STAKE_HIVE = 10_000;
+const MIN_SLASHABLE_STAKE_HIVE = STAKING_TIERS.staker.threshold;
+const MAX_DAO_ADMIN_BODY_BYTES = 12 * 1024;
 
 function mapDoc(doc: any) {
   return doc ? { ...doc, id: doc._id.toString(), _id: undefined } : null;
@@ -70,7 +72,18 @@ export async function PATCH(req: NextRequest) {
     if (admin.error) return admin.error;
 
     const db = await getDb();
-    const body = await req.json();
+    const raw = await req.text();
+    if (Buffer.byteLength(raw, 'utf8') > MAX_DAO_ADMIN_BODY_BYTES) {
+      return NextResponse.json({ error: 'DAO admin request body is too large.' }, { status: 413 });
+    }
+
+    let body: any;
+    try {
+      body = JSON.parse(raw);
+    } catch {
+      return NextResponse.json({ error: 'Invalid JSON body.' }, { status: 400 });
+    }
+
     const action = String(body.action || '');
     const now = new Date();
     const adminId = admin.client?.userId || 'admin_api_key';

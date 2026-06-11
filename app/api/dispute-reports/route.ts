@@ -4,10 +4,12 @@ import { getDb, COLLECTIONS } from '@/lib/db';
 import { authenticateClient } from '@/lib/client-auth';
 import { authenticateRequest } from '@/lib/api-key';
 import { isValidSolanaAddress } from '@/lib/solana-pay';
+import { STAKING_TIERS } from '@/lib/token-utils';
 import { checkRateLimit, getClientIp, RATE_LIMITS } from '@/lib/rate-limit';
 import { logger } from '@/lib/logger';
 
 const REPORT_CATEGORIES = new Set(['failed_execution', 'malicious_output', 'billing', 'uptime', 'policy', 'other']);
+const MAX_DISPUTE_REPORT_BODY_BYTES = 12 * 1024;
 
 function isValidEvidenceUri(value: string): boolean {
   if (typeof value !== 'string' || value.length < 8 || value.length > 500) return false;
@@ -80,7 +82,18 @@ export async function POST(req: NextRequest) {
     const reporter = await resolveReporter(req, db);
     if (!reporter) return NextResponse.json({ error: 'Authentication required to submit reports.' }, { status: 401 });
 
-    const body = await req.json();
+    const raw = await req.text();
+    if (Buffer.byteLength(raw, 'utf8') > MAX_DISPUTE_REPORT_BODY_BYTES) {
+      return NextResponse.json({ error: 'Dispute report body is too large.' }, { status: 413 });
+    }
+
+    let body: any;
+    try {
+      body = JSON.parse(raw);
+    } catch {
+      return NextResponse.json({ error: 'Invalid JSON body.' }, { status: 400 });
+    }
+
     const providerAddress = String(body.providerAddress || '').trim();
     const toolId = String(body.toolId || '').trim();
     const evidenceUri = String(body.evidenceUri || '').trim();
@@ -139,7 +152,7 @@ export async function POST(req: NextRequest) {
     }
 
     const reporterStake = await db.collection(COLLECTIONS.STAKES).findOne({ stakerId: reporter.reporterId, status: 'active' });
-    const watchdogEligible = (reporterStake?.activeAmount || 0) >= 10_000;
+    const watchdogEligible = (reporterStake?.activeAmount || 0) >= STAKING_TIERS.staker.threshold;
     const providerStake = await db.collection(COLLECTIONS.STAKES).findOne({ solanaAddress: providerAddress });
     const activeProviderStake = Math.max(
       Number(providerStake?.activeAmount || 0) + Number(providerStake?.lockedAmount || 0),

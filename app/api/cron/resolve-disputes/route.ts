@@ -135,21 +135,7 @@ export async function GET(req: Request) {
         }
       );
 
-      // Update Provider Agent profile state
-      const agentUpdate: Record<string, any> = {
-        disputeStatus: finalStatus === 'slashed' ? 'slashed' : 'resolved',
-        updatedAt: new Date()
-      };
-      if (finalStatus === 'slashed') {
-        agentUpdate.isSlashed = true;
-        agentUpdate.isVerified = false;
-        agentUpdate.reputation = 0; // Reputation wiped on slashing
-      }
-
-      await db.collection(COLLECTIONS.AGENTS).updateOne(
-        { solanaAddress: dispute.providerAddress },
-        { $set: agentUpdate }
-      );
+      let remainingProviderActiveStake: number | null = null;
 
       if (finalStatus === 'slashed') {
         const stake = await db.collection(COLLECTIONS.STAKES).findOne({ solanaAddress: dispute.providerAddress });
@@ -181,6 +167,7 @@ export async function GET(req: Request) {
 
         const remainingActive = Math.max(0, activeAmount - activeSlash);
         const remainingLocked = Math.max(0, lockedAmount - lockedSlash);
+        remainingProviderActiveStake = remainingActive;
         await db.collection(COLLECTIONS.STAKES).updateOne(
           { solanaAddress: dispute.providerAddress },
           {
@@ -197,6 +184,24 @@ export async function GET(req: Request) {
           }
         );
       }
+
+      // Update Provider Agent profile state
+      const agentUpdate: Record<string, any> = {
+        disputeStatus: finalStatus === 'slashed' ? 'slashed' : 'resolved',
+        updatedAt: new Date()
+      };
+      if (finalStatus === 'slashed') {
+        agentUpdate.isSlashed = true;
+        agentUpdate.isVerified = false;
+        agentUpdate.reputation = 0; // Reputation wiped on slashing
+        agentUpdate.stakedAmount = remainingProviderActiveStake || 0;
+        agentUpdate.isStaked = (remainingProviderActiveStake || 0) > 0;
+      }
+
+      await db.collection(COLLECTIONS.AGENTS).updateOne(
+        { solanaAddress: dispute.providerAddress },
+        { $set: agentUpdate }
+      );
 
       // Log resolution activity
       await db.collection(COLLECTIONS.ACTIVITY).insertOne({

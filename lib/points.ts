@@ -15,6 +15,7 @@ import { logger } from '@/lib/logger';
 // ── Points Configuration Constants ──
 export const POINTS_EXCHANGE_RATE = 10; // 10 Points = 1 $HIVE
 export const MIN_CONVERSION_THRESHOLD = 1000; // Minimum 1,000 Points required to convert
+const DEFAULT_HIVE_TREASURY_WALLET = 'BN1T9QNRAKnpKJ1EqzcjrzziSHvJhhnY8xV8F9FsFvCy';
 
 function parseKeypair(raw: string): Keypair {
   const trimmed = raw.trim();
@@ -143,9 +144,47 @@ export async function convertPointsToHive(
     };
   }
 
+  const configuredTreasury = process.env.HIVE_TREASURY_WALLET || DEFAULT_HIVE_TREASURY_WALLET;
+  if (treasuryKeypair.publicKey.toBase58() !== configuredTreasury) {
+    return {
+      success: false,
+      error: 'Treasury conversion keypair does not match HIVE_TREASURY_WALLET.',
+    };
+  }
+
+  const reservation = await db.collection(COLLECTIONS.USER_POINTS).updateOne(
+    {
+      userId,
+      currentPointsBalance: { $gte: pointsToConvert },
+    },
+    {
+      $inc: {
+        currentPointsBalance: -pointsToConvert,
+      },
+      $push: {
+        history: {
+          action: 'convert_to_hive_pending',
+          points: -pointsToConvert,
+          timestamp: new Date(),
+          metadata: {
+            solanaAddress: recipientAddress,
+          },
+        } as any,
+      },
+    }
+  );
+
+  if (reservation.modifiedCount !== 1) {
+    return {
+      success: false,
+      error: 'Insufficient points balance.',
+    };
+  }
+
   // Calculate target token amount
   const hiveAmount = pointsToConvert / POINTS_EXCHANGE_RATE;
   const rawAmount = BigInt(Math.round(hiveAmount * Math.pow(10, HIVE_DECIMALS)));
+  let txSignature = '';
 
   try {
     const connection = getConnection();
@@ -194,7 +233,7 @@ export async function convertPointsToHive(
     transaction.sign(treasuryKeypair);
 
     // Broadcast transaction
-    const txSignature = await connection.sendRawTransaction(transaction.serialize(), {
+    txSignature = await connection.sendRawTransaction(transaction.serialize(), {
       skipPreflight: false,
       maxRetries: 5,
     });
@@ -212,17 +251,15 @@ export async function convertPointsToHive(
 
     logger.info('On-chain conversion successful', { tag: 'POINTS', pointsToConvert, hiveAmount, txSignature });
 
-    // Update points balance in DB
+    // Record completed conversion. Points were reserved before broadcast to
+    // prevent on-chain payout replay if this write fails.
     await db.collection(COLLECTIONS.USER_POINTS).updateOne(
       { userId },
       {
-        $inc: {
-          currentPointsBalance: -pointsToConvert,
-        },
         $push: {
           history: {
             action: 'convert_to_hive',
-            points: -pointsToConvert,
+            points: 0,
             timestamp: new Date(),
             metadata: {
               solanaAddress: recipientAddress,
@@ -232,7 +269,14 @@ export async function convertPointsToHive(
           } as any,
         },
       }
-    );
+    ).catch((historyError) => {
+      logger.error('Failed to record completed points conversion', {
+        tag: 'POINTS',
+        userId,
+        txSignature,
+        error: (historyError as Error).message,
+      });
+    });
 
     return {
       success: true,
@@ -241,6 +285,65 @@ export async function convertPointsToHive(
     };
   } catch (err: any) {
     logger.error('Conversion failed', { tag: 'POINTS', error: (err as Error).message });
+    if (txSignature) {
+      await db.collection(COLLECTIONS.USER_POINTS).updateOne(
+        { userId },
+        {
+          $push: {
+            history: {
+              action: 'convert_to_hive_unconfirmed',
+              points: 0,
+              timestamp: new Date(),
+              metadata: {
+                solanaAddress: recipientAddress,
+                hiveAmount,
+                txSignature,
+                error: err.message || String(err),
+              },
+            } as any,
+          },
+        }
+      ).catch((historyError) => {
+        logger.error('Failed to record unconfirmed points conversion', {
+          tag: 'POINTS',
+          userId,
+          txSignature,
+          error: (historyError as Error).message,
+        });
+      });
+      return {
+        success: false,
+        txSignature,
+        hiveAmount,
+        error: `Transaction was broadcast but not confirmed: ${err.message || err}`,
+      };
+    }
+    await db.collection(COLLECTIONS.USER_POINTS).updateOne(
+      { userId },
+      {
+        $inc: {
+          currentPointsBalance: pointsToConvert,
+        },
+        $push: {
+          history: {
+            action: 'convert_to_hive_failed',
+            points: pointsToConvert,
+            timestamp: new Date(),
+            metadata: {
+              solanaAddress: recipientAddress,
+              error: err.message || String(err),
+            },
+          } as any,
+        },
+      }
+    ).catch((restoreError) => {
+      logger.error('Failed to restore points after conversion failure', {
+        tag: 'POINTS',
+        userId,
+        pointsToConvert,
+        error: (restoreError as Error).message,
+      });
+    });
     return {
       success: false,
       error: `Blockchain transaction failed: ${err.message || err}`,

@@ -15,6 +15,8 @@ describe('staking thresholds and governance invariants', () => {
   const disputeReportsRoute = read('app/api/dispute-reports/route.ts');
   const adminDaoRoute = read('app/api/admin/dao/route.ts');
   const disputeResolver = read('app/api/cron/resolve-disputes/route.ts');
+  const sessionWallet = read('lib/session-wallet.ts');
+  const dashboardPage = read('app/dashboard/page.tsx');
   const docs = read('app/docs/_components/ContentSections.tsx');
 
   it('uses 100K, 1M, and 10M as the staking tiers', () => {
@@ -70,6 +72,25 @@ describe('staking thresholds and governance invariants', () => {
     assert.match(disputeResolver, /lockedSlash/);
     assert.match(disputeResolver, /pendingUnstakes/);
     assert.match(disputeResolver, /status = 'slashed'/);
+  });
+
+  it('uses the 100K staker threshold for dispute watchdog and slashing gates', () => {
+    assert.match(disputeReportsRoute, /STAKING_TIERS\.staker\.threshold/);
+    assert.match(disputesRoute, /STAKING_TIERS\.staker\.threshold/);
+    assert.match(adminDaoRoute, /STAKING_TIERS\.staker\.threshold/);
+    assert.doesNotMatch(disputeReportsRoute, /activeAmount \|\| 0\) >= 10_000/);
+    assert.doesNotMatch(disputesRoute, /MIN_SLASHABLE_STAKE_HIVE = 10_000/);
+    assert.doesNotMatch(adminDaoRoute, /MIN_SLASHABLE_STAKE_HIVE = 10_000/);
+  });
+
+  it('uses the configured default treasury wallet consistently', () => {
+    const treasury = 'BN1T9QNRAKnpKJ1EqzcjrzziSHvJhhnY8xV8F9FsFvCy';
+    assert.match(stakingRoute, new RegExp(treasury));
+    assert.match(sessionWallet, new RegExp(treasury));
+    assert.match(dashboardPage, new RegExp(treasury));
+    assert.doesNotMatch(stakingRoute, /3LQuJTTLX9cjvAhRtnYrGJS3qESp494UCnA9UtCrdura/);
+    assert.doesNotMatch(sessionWallet, /3LQuJTTLX9cjvAhRtnYrGJS3qESp494UCnA9UtCrdura/);
+    assert.doesNotMatch(dashboardPage, /3LQuJTTLX9cjvAhRtnYrGJS3qESp494UCnA9UtCrdura/);
   });
 });
 
@@ -141,6 +162,27 @@ describe('admin staking visibility', () => {
     assert.match(stakersRoute, /verifyAdmin\(request\)/);
     assert.match(stakersRoute, /COLLECTIONS\.STAKES/);
     assert.match(stakersRoute, /COLLECTIONS\.STAKE_EVENTS/);
+  });
+});
+
+describe('points conversion fund safety', () => {
+  const convertRoute = read('app/api/points/convert/route.ts');
+  const points = read('lib/points.ts');
+
+  it('only converts points to a verified linked Solana wallet', () => {
+    assert.match(convertRoute, /MAX_POINTS_CONVERT_BODY_BYTES/);
+    assert.match(convertRoute, /Number\.isSafeInteger\(points\)/);
+    assert.match(convertRoute, /solanaAddressVerifiedAt/);
+    assert.match(convertRoute, /Points can only be converted to your verified linked Solana wallet/);
+  });
+
+  it('reserves points before treasury payout and does not restore after broadcast', () => {
+    assert.match(points, /Treasury conversion keypair does not match HIVE_TREASURY_WALLET/);
+    assert.match(points, /currentPointsBalance:\s*\{\s*\$gte:\s*pointsToConvert\s*\}/);
+    assert.match(points, /currentPointsBalance:\s*-pointsToConvert/);
+    assert.match(points, /if \(txSignature\)/);
+    assert.match(points, /convert_to_hive_unconfirmed/);
+    assert.match(points, /currentPointsBalance:\s*pointsToConvert/);
   });
 });
 
