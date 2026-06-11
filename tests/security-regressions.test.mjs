@@ -37,14 +37,17 @@ describe('staking thresholds and governance invariants', () => {
   it('keeps malformed or oversized staking amounts out of on-chain verification', () => {
     assert.match(stakingRoute, /MAX_STAKE_HIVE\s*=\s*1_000_000_000/);
     assert.match(stakingRoute, /hasValidHivePrecision\(amountHive\)/);
-    assert.match(stakingRoute, /!Number\.isFinite\(amountHive\)/);
+    assert.match(stakingRoute, /!Number\.isFinite\(amountHiveNumber\)/);
   });
 
   it('uses the live HIVE mint decimals for staking transfers and verification', () => {
     assert.match(tokenUtils, /HIVE_DECIMALS\s*=\s*9/);
+    assert.match(tokenUtils, /parseHiveAmountToRaw/);
+    assert.match(tokenUtils, /BigInt\(rawAmountText\)/);
     assert.match(stakePage, /HIVE_DECIMALS\s*=\s*9/);
-    assert.match(stakePage, /amountNum\s*\*\s*Math\.pow\(10,\s*HIVE_DECIMALS\)/);
-    assert.match(tokenUtils, /expectedAmountHive\s*\*\s*Math\.pow\(10,\s*HIVE_DECIMALS\)/);
+    assert.match(stakePage, /parseHiveAmountToRaw\(amount\)/);
+    assert.doesNotMatch(stakePage, /Math\.round\(amountNum\s*\*\s*Math\.pow\(10,\s*HIVE_DECIMALS\)\)/);
+    assert.doesNotMatch(tokenUtils, /expectedAmountHive\s*\*\s*Math\.pow\(10,\s*HIVE_DECIMALS\)/);
   });
 
   it('retries staking transaction lookup to tolerate Solana indexing lag', () => {
@@ -170,15 +173,26 @@ describe('token page consolidation', () => {
 describe('admin staking visibility', () => {
   const adminPage = read('app/admin/page.tsx');
   const stakersRoute = read('app/api/admin/stakers/route.ts');
+  const reconcileRoute = read('app/api/admin/stakers/reconcile/route.ts');
 
   it('adds a protected admin stakers dashboard', () => {
     assert.match(adminPage, /"stakers"/);
     assert.match(adminPage, /\/api\/admin\/stakers/);
+    assert.match(adminPage, /\/api\/admin\/stakers\/reconcile/);
     assert.match(adminPage, /Active HIVE/);
     assert.match(adminPage, /Slashed HIVE/);
     assert.match(stakersRoute, /verifyAdmin\(request\)/);
     assert.match(stakersRoute, /COLLECTIONS\.STAKES/);
     assert.match(stakersRoute, /COLLECTIONS\.STAKE_EVENTS/);
+  });
+
+  it('reconciles verified treasury transfers without opening replay or recipient loopholes', () => {
+    assert.match(reconcileRoute, /verifyAdmin\(req\)/);
+    assert.match(reconcileRoute, /createIndex\(\s*\{\s*txSignature:\s*1\s*\}/);
+    assert.match(reconcileRoute, /verifyHiveTransfer/);
+    assert.match(reconcileRoute, /maxAgeMinutes:\s*null/);
+    assert.match(reconcileRoute, /solanaAddressVerifiedAt/);
+    assert.match(reconcileRoute, /HIVE_TREASURY_WALLET/);
   });
 });
 

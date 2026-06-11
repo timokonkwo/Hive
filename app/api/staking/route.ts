@@ -19,6 +19,7 @@ import {
   STAKING_TIERS,
   getStakingTier,
   getStakingTierInfo,
+  parseHiveAmountToRaw,
   verifyHiveTransfer,
 } from '@/lib/token-utils';
 import { isValidSolanaAddress } from '@/lib/solana-pay';
@@ -34,10 +35,10 @@ const UNSTAKE_COOLDOWN_MS = UNSTAKE_COOLDOWN_DAYS * 24 * 60 * 60 * 1000;
 const UNSTAKE_REQUEST_ID_REGEX = /^[a-f0-9]{24}$/i;
 const DEFAULT_HIVE_TREASURY_WALLET = 'BN1T9QNRAKnpKJ1EqzcjrzziSHvJhhnY8xV8F9FsFvCy';
 const MAX_STAKING_REQUEST_BYTES = 8 * 1024;
+const MAX_STAKE_TX_AGE_MINUTES = 7 * 24 * 60;
 
-function hasValidHivePrecision(amount: number) {
-  const raw = amount * Math.pow(10, HIVE_DECIMALS);
-  return Number.isSafeInteger(Math.round(raw)) && Math.abs(raw - Math.round(raw)) < 1e-6;
+function hasValidHivePrecision(amount: number | string) {
+  return parseHiveAmountToRaw(amount) !== null;
 }
 
 function parseKeypair(raw: string): Keypair {
@@ -608,6 +609,7 @@ export async function POST(req: NextRequest) {
     }
 
     const { txSignature, solanaAddress, amountHive } = body;
+    const amountHiveNumber = Number(amountHive);
 
     if (
       !txSignature ||
@@ -615,10 +617,10 @@ export async function POST(req: NextRequest) {
       !TX_SIGNATURE_REGEX.test(txSignature) ||
       !solanaAddress ||
       typeof solanaAddress !== 'string' ||
-      typeof amountHive !== 'number' ||
-      !Number.isFinite(amountHive) ||
-      amountHive <= 0 ||
-      amountHive > MAX_STAKE_HIVE ||
+      (typeof amountHive !== 'number' && typeof amountHive !== 'string') ||
+      !Number.isFinite(amountHiveNumber) ||
+      amountHiveNumber <= 0 ||
+      amountHiveNumber > MAX_STAKE_HIVE ||
       !hasValidHivePrecision(amountHive)
     ) {
       return NextResponse.json(
@@ -653,7 +655,7 @@ export async function POST(req: NextRequest) {
     }
 
     const existingStake = await db.collection(COLLECTIONS.STAKES).findOne({ stakerId: staker.stakerId });
-    const projectedActiveStake = (existingStake?.activeAmount || 0) + amountHive;
+    const projectedActiveStake = (existingStake?.activeAmount || 0) + amountHiveNumber;
     if (projectedActiveStake < MIN_ACTIVE_STAKE_HIVE) {
       return NextResponse.json(
         { error: `Minimum active stake is ${MIN_ACTIVE_STAKE_HIVE.toLocaleString()} HIVE.` },
@@ -681,7 +683,7 @@ export async function POST(req: NextRequest) {
         stakerType: staker.stakerType,
         solanaAddress,
         txSignature,
-        amount: amountHive,
+        amount: amountHiveNumber,
         type: 'stake',
         status: 'pending',
         createdAt: new Date(),
@@ -700,7 +702,8 @@ export async function POST(req: NextRequest) {
       txSignature,
       solanaAddress,
       treasuryWallet,
-      amountHive
+      amountHive,
+      { maxAgeMinutes: MAX_STAKE_TX_AGE_MINUTES }
     );
 
     if (!verification.verified) {
@@ -711,7 +714,7 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const confirmedAmount = verification.confirmedAmount || amountHive;
+    const confirmedAmount = verification.confirmedAmount || amountHiveNumber;
     const now = new Date();
 
     const stakeResult = await db.collection(COLLECTIONS.STAKES).findOneAndUpdate(
