@@ -1,4 +1,4 @@
-import { Connection, Keypair, PublicKey, Transaction } from '@solana/web3.js';
+import { Connection, Keypair, LAMPORTS_PER_SOL, PublicKey, Transaction } from '@solana/web3.js';
 import {
   getAssociatedTokenAddress,
   createTransferInstruction,
@@ -8,7 +8,7 @@ import {
   ASSOCIATED_TOKEN_PROGRAM_ID,
 } from '@solana/spl-token';
 import { getDb, COLLECTIONS } from './db';
-import { HIVE_MINT, HIVE_DECIMALS, getStakingTierInfo } from './token-utils';
+import { HIVE_MINT, getStakingTierInfo, parseHiveAmountToRaw, rawHiveAmountToNumber } from './token-utils';
 import bs58 from 'bs58';
 import { logger } from '@/lib/logger';
 
@@ -16,6 +16,7 @@ import { logger } from '@/lib/logger';
 export const POINTS_EXCHANGE_RATE = 10; // 10 Points = 1 $HIVE
 export const MIN_CONVERSION_THRESHOLD = 1000; // Minimum 1,000 Points required to convert
 const DEFAULT_HIVE_TREASURY_WALLET = 'BN1T9QNRAKnpKJ1EqzcjrzziSHvJhhnY8xV8F9FsFvCy';
+const MIN_TREASURY_SOL_LAMPORTS = 5_000_000;
 
 function parseKeypair(raw: string): Keypair {
   const trimmed = raw.trim();
@@ -152,6 +153,17 @@ export async function convertPointsToHive(
     };
   }
 
+  // Calculate target token amount before reserving points so malformed
+  // arithmetic can never strand a user's points balance.
+  const hiveAmount = pointsToConvert / POINTS_EXCHANGE_RATE;
+  const rawAmount = parseHiveAmountToRaw(hiveAmount);
+  if (rawAmount === null) {
+    return {
+      success: false,
+      error: 'Calculated HIVE conversion amount is invalid.',
+    };
+  }
+
   const reservation = await db.collection(COLLECTIONS.USER_POINTS).updateOne(
     {
       userId,
@@ -181,9 +193,6 @@ export async function convertPointsToHive(
     };
   }
 
-  // Calculate target token amount
-  const hiveAmount = pointsToConvert / POINTS_EXCHANGE_RATE;
-  const rawAmount = BigInt(Math.round(hiveAmount * Math.pow(10, HIVE_DECIMALS)));
   let txSignature = '';
 
   try {
@@ -194,6 +203,28 @@ export async function convertPointsToHive(
     // Get associated token accounts
     const sourceAta = await getAssociatedTokenAddress(HIVE_MINT, treasuryPubKey);
     const destinationAta = await getAssociatedTokenAddress(HIVE_MINT, recipientPubKey);
+
+    const treasurySolLamports = await connection.getBalance(treasuryPubKey, 'confirmed');
+    if (treasurySolLamports < MIN_TREASURY_SOL_LAMPORTS) {
+      throw new Error(
+        `Treasury wallet ${treasuryPubKey.toBase58()} needs SOL for points conversion fees. ` +
+        `Current balance is ${(treasurySolLamports / LAMPORTS_PER_SOL).toFixed(6)} SOL; fund it with at least ` +
+        `${(MIN_TREASURY_SOL_LAMPORTS / LAMPORTS_PER_SOL).toFixed(3)} SOL and retry.`
+      );
+    }
+
+    let sourceAccount;
+    try {
+      sourceAccount = await getAccount(connection, sourceAta);
+    } catch {
+      throw new Error(`Treasury HIVE token account ${sourceAta.toBase58()} does not exist.`);
+    }
+    if (sourceAccount.amount < rawAmount) {
+      throw new Error(
+        `Treasury HIVE balance is insufficient for this conversion. Required ${hiveAmount.toLocaleString()} HIVE, ` +
+        `available ${rawHiveAmountToNumber(sourceAccount.amount).toLocaleString()} HIVE.`
+      );
+    }
 
     const transaction = new Transaction();
 
@@ -226,20 +257,28 @@ export async function convertPointsToHive(
     );
 
     // Fetch blockhash and sign
-    const { blockhash } = await connection.getLatestBlockhash('confirmed');
-    transaction.recentBlockhash = blockhash;
+    const latestBlockhash = await connection.getLatestBlockhash('confirmed');
+    transaction.recentBlockhash = latestBlockhash.blockhash;
     transaction.feePayer = treasuryPubKey;
 
     transaction.sign(treasuryKeypair);
 
     // Broadcast transaction
-    txSignature = await connection.sendRawTransaction(transaction.serialize(), {
-      skipPreflight: false,
-      maxRetries: 5,
-    });
+    try {
+      txSignature = await connection.sendRawTransaction(transaction.serialize(), {
+        skipPreflight: false,
+        maxRetries: 5,
+      });
+    } catch (error: any) {
+      let logs: string[] | null = null;
+      if (typeof error?.getLogs === 'function') {
+        logs = await error.getLogs(connection).catch(() => null);
+      }
+      const logText = logs?.length ? ` Logs: ${logs.join(' | ')}` : '';
+      throw new Error(`${error?.message || 'Treasury conversion simulation failed.'}${logText}`);
+    }
 
     // Confirm transaction
-    const latestBlockhash = await connection.getLatestBlockhash('confirmed');
     await connection.confirmTransaction(
       {
         signature: txSignature,

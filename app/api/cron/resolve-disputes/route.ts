@@ -1,16 +1,18 @@
 import { NextResponse } from 'next/server';
 import { getDb, COLLECTIONS } from '@/lib/db';
-import { Connection, Keypair, Transaction } from '@solana/web3.js';
+import { Connection, Keypair, LAMPORTS_PER_SOL, Transaction } from '@solana/web3.js';
 import {
   getAssociatedTokenAddress,
   createBurnInstruction,
+  getAccount,
   TOKEN_PROGRAM_ID
 } from '@solana/spl-token';
-import { HIVE_MINT, HIVE_DECIMALS } from '@/lib/token-utils';
+import { HIVE_MINT, parseHiveAmountToRaw, rawHiveAmountToNumber } from '@/lib/token-utils';
 import bs58 from 'bs58';
 import { logger } from '@/lib/logger';
 
 const DEFAULT_HIVE_TREASURY_WALLET = 'BN1T9QNRAKnpKJ1EqzcjrzziSHvJhhnY8xV8F9FsFvCy';
+const MIN_TREASURY_SOL_LAMPORTS = 5_000_000;
 
 function parseKeypair(raw: string): Keypair {
   const trimmed = raw.trim();
@@ -27,7 +29,7 @@ function getTreasuryKeypair(): Keypair | null {
   try {
     return parseKeypair(raw);
   } catch (err) {
-    logger.error('[CRON-DISPUTE] Failed to parse treasury keypair:', err);
+    logger.error('[CRON-DISPUTE] Failed to parse treasury keypair:', err instanceof Error ? err : new Error('Unknown parse error'));
     return null;
   }
 }
@@ -89,9 +91,30 @@ export async function GET(req: Request) {
       let finalStatus = !quorumMet ? 'failed_quorum' : isSlashedOutcome ? 'slashed' : 'dismissed';
 
       let txSignature = '';
+      let slashAmount = 0;
+      let activeSlash = 0;
+      let lockedSlash = 0;
+      let activeAmount = 0;
+      let lockedAmount = 0;
+      let pendingUnstakes: any[] = [];
 
       if (isSlashedOutcome && dispute.stakedAmount > 0) {
-        if (!isConfiguredTreasuryKeypair(treasuryKeypair)) {
+        const stake = await db.collection(COLLECTIONS.STAKES).findOne({ solanaAddress: dispute.providerAddress });
+        activeAmount = Number(stake?.activeAmount || 0);
+        lockedAmount = Number(stake?.lockedAmount || 0);
+        slashAmount = Math.min(Math.abs(Number(dispute.stakedAmount || 0)), activeAmount + lockedAmount);
+        activeSlash = Math.min(activeAmount, slashAmount);
+        lockedSlash = Math.min(lockedAmount, slashAmount - activeSlash);
+        pendingUnstakes = Array.isArray(stake?.pendingUnstakes) ? [...stake.pendingUnstakes] : [];
+
+        if (slashAmount <= 0) {
+          logger.warn('[CRON-DISPUTE] Slashing skipped: provider has no recorded active or locked stake', {
+            providerAddress: dispute.providerAddress,
+            disputeId: dispute._id?.toString?.(),
+          });
+          txSignature = 'failed_no_recorded_stake';
+          finalStatus = 'execution_failed';
+        } else if (!isConfiguredTreasuryKeypair(treasuryKeypair)) {
           logger.error('[CRON-DISPUTE] Slashing skipped: HIVE_TREASURY_KEYPAIR is missing or does not match HIVE_TREASURY_WALLET');
           txSignature = 'failed_treasury_key_mismatch';
           finalStatus = 'execution_failed';
@@ -99,9 +122,34 @@ export async function GET(req: Request) {
           // Burn treasury-custodied HIVE that represents the provider's recorded stake.
           try {
             const sourceAta = await getAssociatedTokenAddress(HIVE_MINT, treasuryKeypair.publicKey);
+            const rawAmount = parseHiveAmountToRaw(slashAmount);
+            if (rawAmount === null) {
+              throw new Error('Calculated slash amount is invalid.');
+            }
+
+            const treasurySolLamports = await connection.getBalance(treasuryKeypair.publicKey, 'confirmed');
+            if (treasurySolLamports < MIN_TREASURY_SOL_LAMPORTS) {
+              throw new Error(
+                `Treasury wallet ${treasuryKeypair.publicKey.toBase58()} needs SOL for slashing fees. ` +
+                `Current balance is ${(treasurySolLamports / LAMPORTS_PER_SOL).toFixed(6)} SOL; fund it with at least ` +
+                `${(MIN_TREASURY_SOL_LAMPORTS / LAMPORTS_PER_SOL).toFixed(3)} SOL and retry.`
+              );
+            }
+
+            let treasuryHiveAccount;
+            try {
+              treasuryHiveAccount = await getAccount(connection, sourceAta);
+            } catch {
+              throw new Error(`Treasury HIVE token account ${sourceAta.toBase58()} does not exist.`);
+            }
+            if (treasuryHiveAccount.amount < rawAmount) {
+              throw new Error(
+                `Treasury HIVE balance is insufficient for this slash. Required ${slashAmount.toLocaleString()} HIVE, ` +
+                `available ${rawHiveAmountToNumber(treasuryHiveAccount.amount).toLocaleString()} HIVE.`
+              );
+            }
 
             const transaction = new Transaction();
-            const rawAmount = BigInt(Math.round(dispute.stakedAmount * Math.pow(10, HIVE_DECIMALS)));
 
             transaction.add(
               createBurnInstruction(
@@ -114,15 +162,32 @@ export async function GET(req: Request) {
               )
             );
 
-            const { blockhash } = await connection.getLatestBlockhash('confirmed');
-            transaction.recentBlockhash = blockhash;
+            const latestBlockhash = await connection.getLatestBlockhash('confirmed');
+            transaction.recentBlockhash = latestBlockhash.blockhash;
             transaction.feePayer = treasuryKeypair.publicKey;
             transaction.sign(treasuryKeypair);
 
-            txSignature = await connection.sendRawTransaction(transaction.serialize(), {
-              skipPreflight: false,
-              maxRetries: 3
-            });
+            try {
+              txSignature = await connection.sendRawTransaction(transaction.serialize(), {
+                skipPreflight: false,
+                maxRetries: 3
+              });
+            } catch (error: any) {
+              let logs: string[] | null = null;
+              if (typeof error?.getLogs === 'function') {
+                logs = await error.getLogs(connection).catch(() => null);
+              }
+              const logText = logs?.length ? ` Logs: ${logs.join(' | ')}` : '';
+              throw new Error(`${error?.message || 'Treasury slash simulation failed.'}${logText}`);
+            }
+            await connection.confirmTransaction(
+              {
+                signature: txSignature,
+                blockhash: latestBlockhash.blockhash,
+                lastValidBlockHeight: latestBlockhash.lastValidBlockHeight,
+              },
+              'confirmed'
+            );
             logger.info(`[CRON-DISPUTE] Slashing tx broadcasted: ${txSignature}`);
           } catch (err: any) {
             logger.error(`[CRON-DISPUTE] Slashing SPL token instruction failed for ${dispute.providerAddress}:`, err.message);
@@ -151,14 +216,6 @@ export async function GET(req: Request) {
       let remainingProviderActiveStake: number | null = null;
 
       if (finalStatus === 'slashed') {
-        const stake = await db.collection(COLLECTIONS.STAKES).findOne({ solanaAddress: dispute.providerAddress });
-        const activeAmount = Number(stake?.activeAmount || 0);
-        const lockedAmount = Number(stake?.lockedAmount || 0);
-        const slashAmount = Math.min(Math.abs(dispute.stakedAmount || 0), activeAmount + lockedAmount);
-        const activeSlash = Math.min(activeAmount, slashAmount);
-        const lockedSlash = Math.min(lockedAmount, slashAmount - activeSlash);
-        const pendingUnstakes = Array.isArray(stake?.pendingUnstakes) ? [...stake.pendingUnstakes] : [];
-
         if (lockedSlash > 0) {
           let remainingLockedSlash = lockedSlash;
           for (const request of pendingUnstakes) {

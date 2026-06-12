@@ -35,12 +35,10 @@ const getPrivateKey = () => {
         // Check for common issues
         if (!cleanKey.includes('-----BEGIN PRIVATE KEY-----')) {
             logger.error('Private key is missing "-----BEGIN PRIVATE KEY-----"', { tag: 'GOOGLE SHEETS' });
-            logger.error('Key start', { tag: 'GOOGLE SHEETS', keyStart: cleanKey.slice(0, 20) });
             return undefined;
         }
         
-        // Log key stats for debugging
-        logger.info('Key sanitized', { tag: 'GOOGLE SHEETS', length: cleanKey.length });
+        logger.info('Google private key sanitized', { tag: 'GOOGLE SHEETS' });
         
         return cleanKey;
     } catch (e) {

@@ -18,6 +18,9 @@ describe('staking thresholds and governance invariants', () => {
   const sessionWallet = read('lib/session-wallet.ts');
   const dashboardPage = read('app/dashboard/page.tsx');
   const docs = read('app/docs/_components/ContentSections.tsx');
+  const points = read('lib/points.ts');
+  const logger = read('lib/logger.ts');
+  const googleSheets = read('lib/google-sheets.ts');
 
   it('uses 100K+, 1M+, and 10M+ as the staking tiers', () => {
     assert.match(tokenUtils, /id:\s*'staker'[\s\S]*?threshold:\s*100_000/);
@@ -84,6 +87,34 @@ describe('staking thresholds and governance invariants', () => {
     assert.match(stakingRoute, /treasuryHiveAccount\.amount\s*<\s*rawAmount/);
     assert.match(stakingRoute, /Treasury HIVE balance is insufficient/);
     assert.match(stakingRoute, /error\?\.getLogs/);
+  });
+
+  it('preflights treasury payouts for points conversion too', () => {
+    assert.match(points, /MIN_TREASURY_SOL_LAMPORTS\s*=\s*5_000_000/);
+    assert.match(points, /connection\.getBalance\(treasuryPubKey,\s*'confirmed'\)/);
+    assert.match(points, /needs SOL for points conversion fees/);
+    assert.match(points, /sourceAccount\.amount\s*<\s*rawAmount/);
+    assert.match(points, /Treasury HIVE balance is insufficient for this conversion/);
+    assert.match(points, /parseHiveAmountToRaw\(hiveAmount\)/);
+    assert.doesNotMatch(points, /hiveAmount \* Math\.pow\(10,\s*HIVE_DECIMALS\)/);
+  });
+
+  it('bounds DAO slashing burns to the provider recorded stake and confirms on chain', () => {
+    assert.match(disputeResolver, /slashAmount\s*=\s*Math\.min\(Math\.abs\(Number\(dispute\.stakedAmount/);
+    assert.match(disputeResolver, /parseHiveAmountToRaw\(slashAmount\)/);
+    assert.match(disputeResolver, /needs SOL for slashing fees/);
+    assert.match(disputeResolver, /treasuryHiveAccount\.amount\s*<\s*rawAmount/);
+    assert.match(disputeResolver, /connection\.confirmTransaction/);
+    assert.doesNotMatch(disputeResolver, /dispute\.stakedAmount \* Math\.pow\(10,\s*HIVE_DECIMALS\)/);
+  });
+
+  it('does not log private key material or other secrets', () => {
+    assert.match(logger, /SENSITIVE_KEY_PATTERN/);
+    assert.match(logger, /Bearer \[REDACTED\]/);
+    assert.match(logger, /hive_sk_\[REDACTED\]/);
+    assert.match(logger, /mongodb\$1:\/\/\[REDACTED\]/);
+    assert.doesNotMatch(googleSheets, /keyStart/);
+    assert.doesNotMatch(googleSheets, /cleanKey\.slice\(0,\s*20\)/);
   });
 
   it('keeps in-flight unstake claims slashable and blocks dispute races', () => {

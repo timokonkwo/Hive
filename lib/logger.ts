@@ -29,6 +29,7 @@ const LOG_LEVELS: Record<LogLevel, number> = {
 
 const isProduction = process.env.NODE_ENV === 'production';
 const minLevel = LOG_LEVELS[(process.env.LOG_LEVEL as LogLevel) || (isProduction ? 'info' : 'debug')];
+const SENSITIVE_KEY_PATTERN = /(secret|private|keypair|api[_-]?key|authorization|bearer|token|password|mongodb_uri|database_url)/i;
 
 function shouldLog(level: LogLevel): boolean {
   return LOG_LEVELS[level] >= minLevel;
@@ -42,25 +43,59 @@ function formatDev(entry: LogEntry): string {
   return `${time} [${tag}] ${msg}${extra}`;
 }
 
+function redactString(value: string): string {
+  return value
+    .replace(/Bearer\s+[A-Za-z0-9._~+/=-]+/gi, 'Bearer [REDACTED]')
+    .replace(/hive_sk_[A-Za-z0-9._-]+/g, 'hive_sk_[REDACTED]')
+    .replace(/mongodb(\+srv)?:\/\/[^"'\s]+/gi, 'mongodb$1://[REDACTED]');
+}
+
+function sanitizeLogValue(value: unknown, key = '', depth = 0): unknown {
+  if (SENSITIVE_KEY_PATTERN.test(key)) return '[REDACTED]';
+  if (value === null || value === undefined) return value;
+  if (typeof value === 'string') return redactString(value);
+  if (typeof value === 'number' || typeof value === 'boolean') return value;
+  if (value instanceof Date) return value.toISOString();
+  if (value instanceof Error) {
+    return {
+      message: redactString(value.message),
+      stack: value.stack ? redactString(value.stack) : undefined,
+    };
+  }
+  if (depth >= 4) return '[TRUNCATED]';
+  if (Array.isArray(value)) {
+    return value.slice(0, 25).map((item) => sanitizeLogValue(item, key, depth + 1));
+  }
+  if (typeof value === 'object') {
+    const output: Record<string, unknown> = {};
+    for (const [entryKey, entryValue] of Object.entries(value as Record<string, unknown>)) {
+      output[entryKey] = sanitizeLogValue(entryValue, entryKey, depth + 1);
+    }
+    return output;
+  }
+  return String(value);
+}
+
 function emit(level: LogLevel, msg: any, ...args: any[]): void {
   if (!shouldLog(level)) return;
 
   let message = typeof msg === 'string' ? msg : (msg instanceof Error ? msg.message : String(msg));
+  message = redactString(message);
   let context: Record<string, unknown> = {};
 
   // If the first argument was an Error object, let's capture its stack
   if (msg instanceof Error) {
     context.error = {
-      message: msg.message,
-      stack: msg.stack,
+      message: redactString(msg.message),
+      stack: msg.stack ? redactString(msg.stack) : undefined,
     };
   }
 
   args.forEach((arg, index) => {
     if (arg instanceof Error) {
       context.error = {
-        message: arg.message,
-        stack: arg.stack,
+        message: redactString(arg.message),
+        stack: arg.stack ? redactString(arg.stack) : undefined,
       };
     } else if (arg && typeof arg === 'object') {
       if (Array.isArray(arg)) {
@@ -74,9 +109,11 @@ function emit(level: LogLevel, msg: any, ...args: any[]): void {
         }
       }
     } else if (arg !== undefined) {
-      message += ` ${String(arg)}`;
+      message += ` ${redactString(String(arg))}`;
     }
   });
+
+  context = sanitizeLogValue(context) as Record<string, unknown>;
 
   const entry: LogEntry = {
     level,
