@@ -77,6 +77,15 @@ describe('staking thresholds and governance invariants', () => {
     assert.doesNotMatch(disputeResolver, /HIVE_LAUNCH_KEYPAIR \|\| process\.env\.HIVE_AGENT_LAUNCH_KEYPAIR/);
   });
 
+  it('preflights treasury SOL and HIVE balances before unstake claim payout', () => {
+    assert.match(stakingRoute, /MIN_TREASURY_SOL_LAMPORTS\s*=\s*5_000_000/);
+    assert.match(stakingRoute, /connection\.getBalance\(treasuryKeypair\.publicKey,\s*'confirmed'\)/);
+    assert.match(stakingRoute, /needs SOL for unstake claim fees/);
+    assert.match(stakingRoute, /treasuryHiveAccount\.amount\s*<\s*rawAmount/);
+    assert.match(stakingRoute, /Treasury HIVE balance is insufficient/);
+    assert.match(stakingRoute, /error\?\.getLogs/);
+  });
+
   it('keeps in-flight unstake claims slashable and blocks dispute races', () => {
     assert.match(stakingRoute, /'pendingUnstakes\.\$\.status': 'claiming'/);
     assert.match(stakingRoute, /lockedAmount:\s*\{\s*\$gte:\s*amountHive\s*\}[\s\S]*?\$inc:\s*\{\s*lockedAmount:\s*-amountHive/);

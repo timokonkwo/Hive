@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { ObjectId } from 'mongodb';
-import { Connection, Keypair, PublicKey, Transaction } from '@solana/web3.js';
+import { Connection, Keypair, LAMPORTS_PER_SOL, PublicKey, Transaction } from '@solana/web3.js';
 import {
   ASSOCIATED_TOKEN_PROGRAM_ID,
   TOKEN_PROGRAM_ID,
@@ -20,6 +20,7 @@ import {
   getStakingTier,
   getStakingTierInfo,
   parseHiveAmountToRaw,
+  rawHiveAmountToNumber,
   verifyHiveTransfer,
 } from '@/lib/token-utils';
 import { isValidSolanaAddress } from '@/lib/solana-pay';
@@ -36,6 +37,7 @@ const UNSTAKE_REQUEST_ID_REGEX = /^[a-f0-9]{24}$/i;
 const DEFAULT_HIVE_TREASURY_WALLET = 'BN1T9QNRAKnpKJ1EqzcjrzziSHvJhhnY8xV8F9FsFvCy';
 const MAX_STAKING_REQUEST_BYTES = 8 * 1024;
 const MAX_STAKE_TX_AGE_MINUTES = 7 * 24 * 60;
+const MIN_TREASURY_SOL_LAMPORTS = 5_000_000; // Covers transfer fees and recipient ATA creation.
 
 function hasValidHivePrecision(amount: number | string) {
   return parseHiveAmountToRaw(amount) !== null;
@@ -155,7 +157,33 @@ async function sendHiveFromTreasury(recipientAddress: string, amountHive: number
   const recipientKey = new PublicKey(recipientAddress);
   const treasuryAta = await getAssociatedTokenAddress(HIVE_MINT, treasuryKeypair.publicKey);
   const recipientAta = await getAssociatedTokenAddress(HIVE_MINT, recipientKey);
-  const rawAmount = BigInt(Math.round(amountHive * Math.pow(10, HIVE_DECIMALS)));
+  const rawAmount = parseHiveAmountToRaw(amountHive);
+  if (rawAmount === null) {
+    throw new Error('Invalid HIVE withdrawal amount.');
+  }
+
+  const treasurySolLamports = await connection.getBalance(treasuryKeypair.publicKey, 'confirmed');
+  if (treasurySolLamports < MIN_TREASURY_SOL_LAMPORTS) {
+    throw new Error(
+      `Treasury wallet ${treasuryKeypair.publicKey.toBase58()} needs SOL for unstake claim fees. ` +
+      `Current balance is ${(treasurySolLamports / LAMPORTS_PER_SOL).toFixed(6)} SOL; fund it with at least ` +
+      `${(MIN_TREASURY_SOL_LAMPORTS / LAMPORTS_PER_SOL).toFixed(3)} SOL and retry.`
+    );
+  }
+
+  let treasuryHiveAccount;
+  try {
+    treasuryHiveAccount = await getAccount(connection, treasuryAta);
+  } catch {
+    throw new Error(`Treasury HIVE token account ${treasuryAta.toBase58()} does not exist.`);
+  }
+
+  if (treasuryHiveAccount.amount < rawAmount) {
+    throw new Error(
+      `Treasury HIVE balance is insufficient for this claim. Required ${amountHive.toLocaleString()} HIVE, ` +
+      `available ${rawHiveAmountToNumber(treasuryHiveAccount.amount).toLocaleString()} HIVE.`
+    );
+  }
 
   const transaction = new Transaction();
   try {
@@ -189,10 +217,20 @@ async function sendHiveFromTreasury(recipientAddress: string, amountHive: number
   transaction.feePayer = treasuryKeypair.publicKey;
   transaction.sign(treasuryKeypair);
 
-  const txSignature = await connection.sendRawTransaction(transaction.serialize(), {
-    skipPreflight: false,
-    maxRetries: 5,
-  });
+  let txSignature = '';
+  try {
+    txSignature = await connection.sendRawTransaction(transaction.serialize(), {
+      skipPreflight: false,
+      maxRetries: 5,
+    });
+  } catch (error: any) {
+    let logs: string[] | null = null;
+    if (typeof error?.getLogs === 'function') {
+      logs = await error.getLogs(connection).catch(() => null);
+    }
+    const logText = logs?.length ? ` Logs: ${logs.join(' | ')}` : '';
+    throw new Error(`${error?.message || 'Treasury transfer simulation failed.'}${logText}`);
+  }
   await confirmSignatureByPolling(connection, txSignature, latestBlockhash.lastValidBlockHeight);
   return txSignature;
 }
