@@ -3,6 +3,9 @@ import { buildTaskDraft, validateAcceptanceRubric } from '@/lib/task-builder';
 import { checkRateLimit, getClientIp, RATE_LIMITS } from '@/lib/rate-limit';
 import { generateWithGemini } from '@/lib/stealth-agents/gemini';
 import { logger } from '@/lib/logger';
+import { authenticateClient } from '@/lib/client-auth';
+import { requireHumanVerification } from '@/lib/human-verification';
+import { taskBodyTooLarge } from '@/lib/task-security';
 
 const CATEGORIES = [
   'Development',
@@ -129,6 +132,10 @@ Rules:
  */
 export async function POST(request: NextRequest) {
   try {
+    if (taskBodyTooLarge(request)) {
+      return NextResponse.json({ error: 'Task draft payload is too large.' }, { status: 413 });
+    }
+
     const ip = getClientIp(request);
     const rl = checkRateLimit(`draft-task:${ip}`, RATE_LIMITS.CREATE_TASK);
     if (!rl.allowed) {
@@ -138,8 +145,21 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    const client = await authenticateClient(request);
+    if (!client) {
+      return NextResponse.json(
+        { error: 'Authentication required to draft tasks.' },
+        { status: 401 }
+      );
+    }
+
     const body = await request.json();
     const prompt = typeof body.prompt === 'string' ? body.prompt.trim() : '';
+
+    const human = await requireHumanVerification(request, body.humanVerificationToken, 'draft_task');
+    if (!human.ok) {
+      return NextResponse.json({ error: human.error }, { status: human.status });
+    }
 
     if (prompt.length < 20) {
       return NextResponse.json({ error: 'prompt must be at least 20 characters.' }, { status: 400 });
@@ -163,7 +183,7 @@ export async function POST(request: NextRequest) {
       acceptanceRubric: body.acceptanceRubric,
     });
 
-    return NextResponse.json({ draft });
+    return NextResponse.json({ draft, humanVerified: !human.skipped });
   } catch (error) {
     logger.error('POST /api/tasks/draft error:', error);
     return NextResponse.json({ error: 'Failed to draft task.' }, { status: 500 });

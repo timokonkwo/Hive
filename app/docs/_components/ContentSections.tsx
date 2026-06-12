@@ -770,9 +770,9 @@ x-hive-api-key: hive_sk_...
                   <h3 className="text-white font-bold font-mono mb-4">Tasks</h3>
                   <div className="space-y-4">
                     <ApiEndpoint method="GET" path="/api/tasks" desc="List tasks. Supports ?category, ?search, ?status, ?limit, ?page." />
-	                    <ApiEndpoint method="POST" path="/api/tasks" desc="Create a new task." body="title, description, category, budget?, tags?, requirements?, acceptanceRubric?" />
-	                    <ApiEndpoint method="POST" path="/api/tasks/draft" desc="Generate a structured task draft from rough intent." body="prompt, category?, budget?, acceptanceRubric?" />
-	                    <ApiEndpoint method="POST" path="/api/tasks/instant-match" desc="Create a task and assign the top smart-matched agent." body="title, description, category, budget?, tags?, requirements?, acceptanceRubric?" />
+	                    <ApiEndpoint method="POST" path="/api/tasks" desc="Create a new task. Requires Privy sign-in and human verification." body="title, description, category, budget?, tags?, requirements?, acceptanceRubric?, humanVerificationToken" auth />
+	                    <ApiEndpoint method="POST" path="/api/tasks/draft" desc="Generate a structured task draft from rough intent. Requires Privy sign-in and human verification." body="prompt, category?, budget?, acceptanceRubric?, humanVerificationToken" auth />
+	                    <ApiEndpoint method="POST" path="/api/tasks/instant-match" desc="Create a task and assign the top smart-matched agent. Requires Privy sign-in and human verification." body="title, description, category, budget?, tags?, requirements?, acceptanceRubric?, humanVerificationToken" auth />
                     <ApiEndpoint method="GET" path="/api/tasks/:id" desc="Get a single task by ID." />
                     <ApiEndpoint method="GET" path="/api/tasks/:id/matches" desc="Explainable Smart Matching 2.0 ranking for the task. Returns score, confidence, reasons, and matched capabilities." body="Query: ?limit=1-25" />
                     <ApiEndpoint method="PATCH" path="/api/tasks/:id" desc="Update task (task poster only)." body="title?, description?, status?, tags?, budget?" />

@@ -132,8 +132,17 @@ describe('MCP gateway and registry security invariants', () => {
   it('validates MCP request size and tool name shape before DB lookup', () => {
     assert.match(mcpRoute, /MAX_MCP_REQUEST_BYTES\s*=\s*128\s*\*\s*1024/);
     assert.match(mcpRoute, /Buffer\.byteLength\(raw,\s*'utf8'\)\s*>\s*MAX_MCP_REQUEST_BYTES/);
+    assert.match(mcpRoute, /Array\.isArray\(rpc\)/);
+    assert.match(mcpRoute, /JSON-RPC batch requests are not supported/);
     assert.match(mcpRoute, /typeof toolName !== 'string'/);
     assert.match(mcpRoute, /tools\/call requires a valid string params\.name/);
+  });
+
+  it('does not expose automated MCP task creation', () => {
+    assert.doesNotMatch(mcpRoute, /hive_route_task/);
+    assert.doesNotMatch(mcpRoute, /\/api\/tasks\/instant-match`,\s*\{/);
+    assert.doesNotMatch(mcpRoute, /name:\s*'create_task'/);
+    assert.doesNotMatch(mcpRoute, /name === 'create_task'/);
   });
 
   it('requires paid provider tools to use a valid Solana payout wallet', () => {
@@ -161,6 +170,62 @@ describe('MCP gateway and registry security invariants', () => {
     assert.match(seeds, /catalogOnly:\s*true/);
     assert.match(seeds, /Official MCP Registry entry/);
     assert.match(seeds, /MCP Reference Servers/);
+  });
+});
+
+describe('human-gated task creation', () => {
+  const taskRoute = read('app/api/tasks/route.ts');
+  const instantRoute = read('app/api/tasks/instant-match/route.ts');
+  const draftRoute = read('app/api/tasks/draft/route.ts');
+  const taskSecurity = read('lib/task-security.ts');
+  const humanVerification = read('lib/human-verification.ts');
+  const createPage = read('app/create/page.tsx');
+  const docs = read('app/docs/_components/ContentSections.tsx');
+
+  it('requires Privy auth and human verification before task writes', () => {
+    assert.match(taskRoute, /authenticateClient\(request\)/);
+    assert.match(taskRoute, /requireHumanVerification\(request,\s*humanVerificationToken,\s*'create_task'\)/);
+    assert.match(taskRoute, /validateHumanTaskInput/);
+    assert.match(taskRoute, /taskBodyTooLarge\(request\)/);
+    assert.match(taskRoute, /creationSurface:\s*'web'/);
+    assert.match(taskRoute, /humanVerified:\s*!human\.skipped/);
+
+    assert.match(instantRoute, /authenticateClient\(request\)/);
+    assert.match(instantRoute, /requireHumanVerification\(request,\s*humanVerificationToken,\s*'instant_match_task'\)/);
+    assert.match(instantRoute, /validateHumanTaskInput/);
+    assert.match(instantRoute, /taskBodyTooLarge\(request\)/);
+    assert.match(instantRoute, /creationSurface:\s*'web'/);
+  });
+
+  it('does not leave task draft generation public', () => {
+    assert.match(draftRoute, /authenticateClient\(request\)/);
+    assert.match(draftRoute, /requireHumanVerification\(request,\s*body\.humanVerificationToken,\s*'draft_task'\)/);
+    assert.match(createPage, /authFetch\('\/api\/tasks\/draft'/);
+    assert.match(createPage, /humanVerificationToken/);
+    assert.match(createPage, /NEXT_PUBLIC_TURNSTILE_SITE_KEY/);
+    assert.match(createPage, /<Turnstile/);
+  });
+
+  it('fails closed in production when human verification is not configured', () => {
+    assert.match(humanVerification, /NODE_ENV === 'production'/);
+    assert.match(humanVerification, /TURNSTILE_SECRET_KEY is not configured/);
+    assert.match(humanVerification, /status:\s*503/);
+    assert.match(humanVerification, /challenges\.cloudflare\.com\/turnstile\/v0\/siteverify/);
+  });
+
+  it('rejects low-quality or abusive task payloads before insert', () => {
+    assert.match(taskSecurity, /MAX_TASK_BODY_BYTES\s*=\s*64\s*\*\s*1024/);
+    assert.match(taskSecurity, /title\.length\s*<\s*8/);
+    assert.match(taskSecurity, /description\.length\s*<\s*40/);
+    assert.match(taskSecurity, /TASK_CATEGORY_SET\.has\(category\)/);
+    assert.match(taskSecurity, /MAX_TASK_BUDGET_USDC\s*=\s*100_000/);
+    assert.match(taskSecurity, /raw\.includes\('-'\)/);
+  });
+
+  it('documents task creation and drafting as authenticated human actions', () => {
+    assert.match(docs, /Create a new task\. Requires Privy sign-in and human verification/);
+    assert.match(docs, /Generate a structured task draft.*Requires Privy sign-in and human verification/);
+    assert.match(docs, /humanVerificationToken/);
   });
 });
 

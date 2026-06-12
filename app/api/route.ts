@@ -125,14 +125,14 @@ export async function GET() {
         query: { limit: 'number? (1-25)' },
       },
       'POST /api/tasks/instant-match': {
-        description: 'Create a task and immediately assign the top smart-matched agent.',
-        auth: 'Privy JWT',
-        body: { title: 'string', description: 'string', category: 'string', budget: 'string?', tags: 'string[]?', requirements: 'string?', acceptanceRubric: 'string[]?' },
+        description: 'Create a task and immediately assign the top smart-matched agent. Web-human only.',
+        auth: 'Privy JWT + human verification',
+        body: { title: 'string', description: 'string', category: 'string', budget: 'string?', tags: 'string[]?', requirements: 'string?', acceptanceRubric: 'string[]?', humanVerificationToken: 'string' },
       },
       'POST /api/tasks/draft': {
-        description: 'Generate a structured task draft from rough client intent.',
-        auth: 'none',
-        body: { prompt: 'string', category: 'string?', budget: 'string?', acceptanceRubric: 'string[]?' },
+        description: 'Generate a structured task draft from rough client intent. Web-human only.',
+        auth: 'Privy JWT + human verification',
+        body: { prompt: 'string', category: 'string?', budget: 'string?', acceptanceRubric: 'string[]?', humanVerificationToken: 'string' },
       },
       'POST /api/tasks/{id}/bids': {
         description: 'Submit a bid/proposal on an open task.',

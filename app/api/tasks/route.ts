@@ -10,6 +10,8 @@ import { validateAcceptanceRubric } from "@/lib/task-builder";
 import { awardPoints } from "@/lib/points";
 import { rankAgentsForTask } from "@/lib/smart-matching";
 import { logger } from '@/lib/logger';
+import { requireHumanVerification } from "@/lib/human-verification";
+import { taskBodyTooLarge, validateHumanTaskInput } from "@/lib/task-security";
 
 // GET /api/tasks — List tasks with optional filters
 export async function GET(request: NextRequest) {
@@ -88,6 +90,10 @@ export async function GET(request: NextRequest) {
 // POST /api/tasks — Create a new task
 export async function POST(request: NextRequest) {
   try {
+    if (taskBodyTooLarge(request)) {
+      return NextResponse.json({ error: 'Task payload is too large.' }, { status: 413 });
+    }
+
     // Rate limit: 10 task creations per minute per IP
     const ip = getClientIp(request);
     const rl = checkRateLimit(`create-task:${ip}`, RATE_LIMITS.CREATE_TASK);
@@ -118,18 +124,23 @@ export async function POST(request: NextRequest) {
       tokenConfig,       // For "Token Launch" tasks
       deliverableSpecs,  // Structured specs for what agent must deliver
       acceptanceRubric,  // Acceptance criteria clients can use during review
+      humanVerificationToken,
     } = body;
 
-    if (!title || !description || !category) {
-      return NextResponse.json(
-        { error: "title, description, and category are required" },
-        { status: 400 }
-      );
+    const human = await requireHumanVerification(request, humanVerificationToken, 'create_task');
+    if (!human.ok) {
+      return NextResponse.json({ error: human.error }, { status: human.status });
     }
+
+    const inputResult = validateHumanTaskInput({ title, description, category, tags, requirements, budget });
+    if (!inputResult.valid) {
+      return NextResponse.json({ error: inputResult.error }, { status: 400 });
+    }
+    const taskInput = inputResult.value;
 
     // Validate tokenConfig for Token Launch tasks (optional — agent figures out details)
     let validatedTokenConfig = null;
-    if (category === 'Token Launch' && tokenConfig) {
+    if (taskInput.category === 'Token Launch' && tokenConfig) {
       const tcResult = validateTokenConfig(tokenConfig);
       if (!tcResult.valid) {
         return NextResponse.json(
@@ -163,7 +174,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Auto-generate specs for Token Launch tasks if none provided
-    if (category === 'Token Launch' && finalSpecs.length === 0) {
+    if (taskInput.category === 'Token Launch' && finalSpecs.length === 0) {
       const specDescription = validatedTokenConfig
         ? `Launch token "${validatedTokenConfig.name}" (${validatedTokenConfig.symbol}) on Bags/Solana`
         : 'Launch a token on Bags/Solana based on the task description';
@@ -182,18 +193,6 @@ export async function POST(request: NextRequest) {
     const verifiedAddress = client.userId;
     const displayName = clientName || (verifiedAddress.startsWith('did:privy:') ? `User_${verifiedAddress.slice(-6)}` : 'User');
 
-    // Parse numeric budget amount from budget string (e.g. "$50 USDC" → 50)
-    let budgetAmount = 0;
-    if (budget) {
-      const match = String(budget).match(/([\d.]+)/);
-      if (match) budgetAmount = parseFloat(match[1]);
-    }
-
-    // Reject negative budgets
-    if (budgetAmount < 0) {
-      return NextResponse.json({ error: 'Budget cannot be negative.' }, { status: 400 });
-    }
-
     const rubricResult = validateAcceptanceRubric(acceptanceRubric);
     if (!rubricResult.valid) {
       return NextResponse.json(
@@ -203,13 +202,13 @@ export async function POST(request: NextRequest) {
     }
 
     const task = {
-      title,
-      description,
-      category,
-      tags: tags || [],
-      requirements: requirements || "",
-      budget: budget || "Negotiable",
-      budgetAmount,
+      title: taskInput.title,
+      description: taskInput.description,
+      category: taskInput.category,
+      tags: taskInput.tags,
+      requirements: taskInput.requirements,
+      budget: taskInput.budget,
+      budgetAmount: taskInput.budgetAmount,
       status: "Open",
       clientAddress: verifiedAddress,
       clientPrivyUserId: client?.userId || null,
@@ -219,6 +218,8 @@ export async function POST(request: NextRequest) {
       tokenConfig: validatedTokenConfig,
       deliverableSpecs: finalSpecs,
       acceptanceRubric: rubricResult.rubric,
+      creationSurface: 'web',
+      humanVerified: !human.skipped,
       createdAt: new Date(),
       updatedAt: new Date(),
     };
@@ -231,14 +232,22 @@ export async function POST(request: NextRequest) {
       taskId: result.insertedId,
       actorAddress: client.userId,
       actorName: displayName,
-      metadata: { title, category, budget, hasTokenConfig: !!validatedTokenConfig, rubricItems: rubricResult.rubric.length },
+      metadata: {
+        title: taskInput.title,
+        category: taskInput.category,
+        budget: taskInput.budget,
+        hasTokenConfig: !!validatedTokenConfig,
+        rubricItems: rubricResult.rubric.length,
+        humanVerified: !human.skipped,
+        authMethod: 'privy',
+      },
       createdAt: new Date(),
     });
 
     // Award 100 Hive Points for posting a task (excluding auto-posted tasks)
     const isMockClient = verifiedAddress.startsWith('did:privy:cl_');
     if (!isMockClient) {
-      awardPoints(verifiedAddress, 'create_task', 100, { title, taskId: result.insertedId.toString() })
+      awardPoints(verifiedAddress, 'create_task', 100, { title: taskInput.title, taskId: result.insertedId.toString() })
         .catch((err) => logger.error('[POINTS] Failed to award points for task creation:', err.message));
     }
 
@@ -249,13 +258,13 @@ export async function POST(request: NextRequest) {
       try {
         const matches = await rankAgentsForTask(db, {
           id: taskId,
-          title,
-          description,
-          category,
-          requirements: requirements || '',
-          tags,
-          budget,
-          budgetAmount
+          title: taskInput.title,
+          description: taskInput.description,
+          category: taskInput.category,
+          requirements: taskInput.requirements,
+          tags: taskInput.tags,
+          budget: taskInput.budget,
+          budgetAmount: taskInput.budgetAmount
         }, { limit: 1 });
 
         if (matches.length > 0) {
@@ -278,7 +287,7 @@ export async function POST(request: NextRequest) {
             taskId: taskId,
             agentId: bestMatch.agentId,
             agentName: bestMatch.agentName,
-            amount: budgetAmount || 0,
+            amount: taskInput.budgetAmount || 0,
             coverLetter: 'Directly assigned via Hive Smart Matching.',
             timeEstimate: 'Instant',
             status: 'accepted',
@@ -292,10 +301,10 @@ export async function POST(request: NextRequest) {
             taskId: result.insertedId,
             actorName: 'System',
             metadata: {
-              taskTitle: title,
+              taskTitle: taskInput.title,
               agentName: bestMatch.agentName,
               agentId: bestMatch.agentId,
-              bidAmount: budgetAmount || 0,
+              bidAmount: taskInput.budgetAmount || 0,
               directAssigned: true
             },
             createdAt: new Date(),
@@ -307,11 +316,11 @@ export async function POST(request: NextRequest) {
             taskId: taskId,
             agentId: bestMatch.agentId,
             actorName: displayName,
-            data: { taskTitle: title, amount: budgetAmount || 0 }
+            data: { taskTitle: taskInput.title, amount: taskInput.budgetAmount || 0 }
           }).catch((err) => logger.error('[WEBHOOK] bid.accepted enqueue failed:', err.message));
 
           matchedAndAssigned = true;
-          logger.info(`[DIRECT-ROUTING] Successfully assigned task "${title}" to "${bestMatch.agentName}"`);
+          logger.info(`[DIRECT-ROUTING] Successfully assigned task "${taskInput.title}" to "${bestMatch.agentName}"`);
         }
       } catch (err: any) {
         logger.error('[DIRECT-ROUTING] Failed to auto-match/assign task:', err.message);
@@ -324,21 +333,21 @@ export async function POST(request: NextRequest) {
       import('@/lib/stealth-agents/runner').then(({ handleNewTask }) => {
         handleNewTask({
           taskId,
-          title,
-          description,
-          category,
-          requirements: requirements || '',
-          budget: budget || 'Negotiable',
+          title: taskInput.title,
+          description: taskInput.description,
+          category: taskInput.category,
+          requirements: taskInput.requirements,
+          budget: taskInput.budget,
         }).catch((err: any) => logger.error('[STEALTH] Agent bid failed:', err.message));
       }).catch((err) => logger.error('[STEALTH] Runner import failed:', err.message));
 
       // Notify matching agents (async, non-blocking)
       notifyMatchingAgents({
         taskId,
-        title,
-        category,
-        budget: budget || 'Negotiable',
-        description: description || '',
+        title: taskInput.title,
+        category: taskInput.category,
+        budget: taskInput.budget,
+        description: taskInput.description,
       }).catch((err) => logger.error('[NOTIFY] Agent notification failed:', err.message));
     }
 
@@ -346,7 +355,7 @@ export async function POST(request: NextRequest) {
       event: 'task.created',
       taskId,
       actorName: displayName,
-      data: { title, category, budget: budget || 'Negotiable' },
+      data: { title: taskInput.title, category: taskInput.category, budget: taskInput.budget },
     }).catch((err) => logger.error('[WEBHOOK] task.created enqueue failed:', err.message));
 
     return NextResponse.json(

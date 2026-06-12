@@ -118,20 +118,6 @@ const tools = [
     },
   },
   {
-    name: 'hive_route_task',
-    description: 'Create an instant-matched task. The best available agent is assigned automatically. Requires x-hive-api-key.',
-    inputSchema: {
-      type: 'object',
-      properties: {
-        title: { type: 'string' },
-        description: { type: 'string' },
-        category: { type: 'string' },
-        budget: { type: 'string' },
-      },
-      required: ['title', 'description', 'category'],
-    },
-  },
-  {
     name: 'hive_deliver',
     description: 'Submit completed work for an assigned task. Requires x-hive-api-key.',
     inputSchema: {
@@ -221,20 +207,6 @@ async function callTool(req: NextRequest, name: string, args: any) {
   if (name === 'hive_get_task_matches') {
     const limit = Math.min(Math.max(Number(args?.limit || 5), 1), 25);
     const data = await callJson(req, `/api/tasks/${encodeURIComponent(args.taskId)}/matches?limit=${limit}`);
-    return toolText(JSON.stringify(data, null, 2));
-  }
-
-  if (name === 'hive_route_task') {
-    // Use the instant-match endpoint for direct routing
-    const data = await callJson(req, `/api/tasks/instant-match`, {
-      method: 'POST',
-      body: JSON.stringify({
-        title: args.title,
-        description: args.description,
-        category: args.category,
-        budget: args.budget || 'Negotiable',
-      }),
-    });
     return toolText(JSON.stringify(data, null, 2));
   }
 
@@ -388,6 +360,9 @@ export async function POST(req: NextRequest) {
       return jsonRpcError(null, -32600, 'MCP request payload is too large.', 413);
     }
     rpc = JSON.parse(raw);
+    if (Array.isArray(rpc)) {
+      return jsonRpcError(null, -32600, 'JSON-RPC batch requests are not supported.', 400);
+    }
   } catch {
     return jsonRpcError(null, -32700, 'Invalid JSON');
   }
@@ -511,7 +486,6 @@ export async function POST(req: NextRequest) {
     if (rpc.method === 'prompts/list') {
       return jsonRpcResult(rpc.id, {
         prompts: [
-          { name: 'create_task', description: 'Create a task and assign it to the best available agent on the Hive marketplace.' },
           { name: 'task_brief', description: 'Turn rough client intent into a clear Hive task brief.' },
         ],
       });
@@ -519,11 +493,6 @@ export async function POST(req: NextRequest) {
 
     if (rpc.method === 'prompts/get') {
       const name = rpc.params?.name;
-      if (name === 'create_task' || name === 'route_task') {
-        return jsonRpcResult(rpc.id, {
-          messages: [{ role: 'user', content: { type: 'text', text: 'Create a task for the Hive marketplace. Include a clear title, category, requirements, budget, and deliverable specifications.' } }],
-        });
-      }
       if (name === 'task_brief') {
         return jsonRpcResult(rpc.id, {
           messages: [{ role: 'user', content: { type: 'text', text: 'Convert this rough request into a Hive task brief with title, category, requirements, budget guidance, and deliverable specs.' } }],

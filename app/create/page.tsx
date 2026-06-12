@@ -14,6 +14,7 @@ import { toast } from "sonner";
 import { Navbar } from "@/components/layout/Navbar";
 import { Footer } from "@/components/layout/Footer";
 import { TaskCategory, TaskMetadata } from "@/lib/types/task";
+import { Turnstile } from "@/components/security/Turnstile";
 
 export default function CreateTaskPage() {
   return (
@@ -52,6 +53,14 @@ function CreateTaskContent() {
   const [instantMatch, setInstantMatch] = useState(false);
   const [draftPrompt, setDraftPrompt] = useState("");
   const [draftingTask, setDraftingTask] = useState(false);
+  const [humanVerificationToken, setHumanVerificationToken] = useState("");
+  const [turnstileKey, setTurnstileKey] = useState(0);
+  const turnstileSiteKey = process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY;
+
+  const resetHumanVerification = useCallback(() => {
+    setHumanVerificationToken("");
+    setTurnstileKey((key) => key + 1);
+  }, []);
 
   // Token Launch config
   const [tokenConfig, setTokenConfig] = useState<{
@@ -68,6 +77,10 @@ function CreateTaskContent() {
     }
     if (!formData.title || !formData.description || !formData.budget) {
       toast.error("Please fill in all required fields");
+      return;
+    }
+    if (turnstileSiteKey && !humanVerificationToken) {
+      toast.error("Complete human verification before posting");
       return;
     }
 
@@ -95,6 +108,7 @@ function CreateTaskContent() {
         acceptanceRubric: (formData.acceptanceRubric || [])
           .map((item: string) => item.trim())
           .filter(Boolean),
+        humanVerificationToken,
       };
 
       // Add tokenConfig for Token Launch tasks only if user provided preferences
@@ -148,6 +162,7 @@ function CreateTaskContent() {
 
       setIsPending(false);
       setIsSuccess(true);
+      resetHumanVerification();
       // Clear the saved draft
       try { sessionStorage.removeItem('hive_create_task_draft'); } catch {}
       const matchedAgent = instantMatch && !directHireAgent ? taskData.assignedAgentName : null;
@@ -163,6 +178,7 @@ function CreateTaskContent() {
 
     } catch (error: any) {
       setIsPending(false);
+      resetHumanVerification();
       toast.error("Error", { description: error.message });
     }
   };
@@ -187,14 +203,22 @@ function CreateTaskContent() {
   const [formData, setFormData] = useState<Partial<TaskMetadata> & { budget: string; requirements?: string; acceptanceRubric?: string[] }>(getInitialFormData);
 
   const applyTaskDraft = async () => {
+    if (!authenticated) {
+      login();
+      return;
+    }
     if (draftPrompt.trim().length < 20) {
       toast.error("Describe the task in at least 20 characters");
+      return;
+    }
+    if (turnstileSiteKey && !humanVerificationToken) {
+      toast.error("Complete human verification before drafting");
       return;
     }
 
     setDraftingTask(true);
     try {
-      const res = await fetch('/api/tasks/draft', {
+      const res = await authFetch('/api/tasks/draft', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -202,6 +226,7 @@ function CreateTaskContent() {
           category: formData.category,
           budget: formData.budget ? `$${formData.budget} USDC` : undefined,
           acceptanceRubric: formData.acceptanceRubric,
+          humanVerificationToken,
         }),
       });
       const data = await res.json();
@@ -220,7 +245,9 @@ function CreateTaskContent() {
         acceptanceRubric: draft.acceptanceRubric || [],
       }));
       toast.success("Task draft applied");
+      resetHumanVerification();
     } catch (error: any) {
+      resetHumanVerification();
       toast.error(error.message || "Failed to draft task");
     } finally {
       setDraftingTask(false);
@@ -401,10 +428,16 @@ function CreateTaskContent() {
 	                                  rows={3}
 	                                  className="w-full bg-black border border-zinc-800 rounded-sm px-3 py-2.5 text-white focus:border-emerald-500 outline-none transition-all font-mono text-xs resize-none"
 	                                />
+                                  <Turnstile
+                                    key={`draft-${turnstileKey}`}
+                                    siteKey={turnstileSiteKey}
+                                    onVerify={setHumanVerificationToken}
+                                    onExpire={resetHumanVerification}
+                                  />
 	                                <button
 	                                  type="button"
 	                                  onClick={applyTaskDraft}
-	                                  disabled={draftingTask || draftPrompt.trim().length < 20}
+	                                  disabled={draftingTask || draftPrompt.trim().length < 20 || Boolean(turnstileSiteKey && !humanVerificationToken)}
 	                                  className="inline-flex items-center gap-2 px-4 py-2 bg-emerald-600 hover:bg-emerald-500 disabled:opacity-40 text-white font-bold font-mono text-[10px] uppercase tracking-widest rounded-sm transition-colors"
 	                                >
 	                                  {draftingTask ? <Loader2 size={12} className="animate-spin" /> : <WandSparkles size={12} />}
@@ -698,6 +731,13 @@ function CreateTaskContent() {
                         </div>
                     </div>
 
+                    <Turnstile
+                      key={`post-${turnstileKey}`}
+                      siteKey={turnstileSiteKey}
+                      onVerify={setHumanVerificationToken}
+                      onExpire={resetHumanVerification}
+                    />
+
                     <div className="flex justify-between pt-4 items-center gap-4">
                          <button onClick={() => setStep(2)} className="text-zinc-500 hover:text-white font-mono text-xs uppercase tracking-widest">Back</button>
                          
@@ -708,7 +748,7 @@ function CreateTaskContent() {
                           ) : (
                             <button 
                                 onClick={handleSubmit}
-                                disabled={isPending}
+                                disabled={isPending || Boolean(turnstileSiteKey && !humanVerificationToken)}
                                 className={`flex-1 font-bold py-3 rounded-sm transition-all shadow-[0_0_20px_rgba(16,185,129,0.2)] disabled:opacity-50 flex items-center justify-center gap-2 font-mono uppercase tracking-widest text-xs ${
                                     isSuccess ? "bg-emerald-600 cursor-default" : "bg-emerald-600 hover:bg-emerald-500 text-white"
                                 }`}

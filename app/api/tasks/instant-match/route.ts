@@ -9,6 +9,8 @@ import { enqueueWebhookEvent } from '@/lib/webhooks';
 import { validateAcceptanceRubric } from '@/lib/task-builder';
 import { awardPoints } from '@/lib/points';
 import { logger } from '@/lib/logger';
+import { requireHumanVerification } from '@/lib/human-verification';
+import { taskBodyTooLarge, validateHumanTaskInput } from '@/lib/task-security';
 
 /**
  * POST /api/tasks/instant-match
@@ -21,6 +23,10 @@ import { logger } from '@/lib/logger';
  */
 export async function POST(request: NextRequest) {
   try {
+    if (taskBodyTooLarge(request)) {
+      return NextResponse.json({ error: 'Task payload is too large.' }, { status: 413 });
+    }
+
     // Rate limit: same as regular task creation
     const ip = getClientIp(request);
     const rl = checkRateLimit(`create-task:${ip}`, RATE_LIMITS.CREATE_TASK);
@@ -46,19 +52,23 @@ export async function POST(request: NextRequest) {
     const {
       title, description, category, tags, requirements, budget,
       clientName,
-      tokenConfig, deliverableSpecs, acceptanceRubric,
+      tokenConfig, deliverableSpecs, acceptanceRubric, humanVerificationToken,
     } = body;
 
-    if (!title || !description || !category) {
-      return NextResponse.json(
-        { error: 'title, description, and category are required' },
-        { status: 400 }
-      );
+    const human = await requireHumanVerification(request, humanVerificationToken, 'instant_match_task');
+    if (!human.ok) {
+      return NextResponse.json({ error: human.error }, { status: human.status });
     }
+
+    const inputResult = validateHumanTaskInput({ title, description, category, tags, requirements, budget });
+    if (!inputResult.valid) {
+      return NextResponse.json({ error: inputResult.error }, { status: 400 });
+    }
+    const taskInput = inputResult.value;
 
     // Validate tokenConfig for Token Launch tasks
     let validatedTokenConfig = null;
-    if (category === 'Token Launch' && tokenConfig) {
+    if (taskInput.category === 'Token Launch' && tokenConfig) {
       const tcResult = validateTokenConfig(tokenConfig);
       if (!tcResult.valid) {
         return NextResponse.json(
@@ -92,7 +102,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Auto-generate specs for Token Launch tasks
-    if (category === 'Token Launch' && finalSpecs.length === 0) {
+    if (taskInput.category === 'Token Launch' && finalSpecs.length === 0) {
       finalSpecs = [{
         type: 'token_launch',
         label: 'Token Launch',
@@ -104,15 +114,6 @@ export async function POST(request: NextRequest) {
     }
 
     const displayName = clientName || `User_${verified.userId.slice(-6)}`;
-
-    let budgetAmount = 0;
-    if (budget) {
-      const match = String(budget).match(/([\d.]+)/);
-      if (match) budgetAmount = parseFloat(match[1]);
-    }
-    if (budgetAmount < 0) {
-      return NextResponse.json({ error: 'Budget cannot be negative.' }, { status: 400 });
-    }
 
     const rubricResult = validateAcceptanceRubric(acceptanceRubric);
     if (!rubricResult.valid) {
@@ -126,7 +127,15 @@ export async function POST(request: NextRequest) {
 
     const matches = await rankAgentsForTask(
       db,
-      { title, description, category, requirements, tags, budget, budgetAmount },
+      {
+        title: taskInput.title,
+        description: taskInput.description,
+        category: taskInput.category,
+        requirements: taskInput.requirements,
+        tags: taskInput.tags,
+        budget: taskInput.budget,
+        budgetAmount: taskInput.budgetAmount,
+      },
       { limit: 5 }
     );
 
@@ -143,13 +152,13 @@ export async function POST(request: NextRequest) {
     // ─── Create the task ─────────────────────────────────────────
 
     const task = {
-      title,
-      description,
-      category,
-      tags: tags || [],
-      requirements: requirements || '',
-      budget: budget || 'Negotiable',
-      budgetAmount,
+      title: taskInput.title,
+      description: taskInput.description,
+      category: taskInput.category,
+      tags: taskInput.tags,
+      requirements: taskInput.requirements,
+      budget: taskInput.budget,
+      budgetAmount: taskInput.budgetAmount,
       status: 'In Progress',
       clientAddress: verified.userId,
       clientPrivyUserId: verified.userId,
@@ -163,6 +172,8 @@ export async function POST(request: NextRequest) {
       instantMatch: true,
       matchScore: bestMatch.score,
       matchConfidence: bestMatch.confidence,
+      creationSurface: 'web',
+      humanVerified: !human.skipped,
       createdAt: new Date(),
       updatedAt: new Date(),
     };
@@ -177,7 +188,7 @@ export async function POST(request: NextRequest) {
       agentId: bestAgent._id.toString(),
       agentName: bestAgent.name,
       agentAddress: bestAgent.solanaAddress || null,
-      amount: budget || 'Negotiable',
+      amount: taskInput.budget,
       timeEstimate: '2-4 days',
       coverLetter: `Matched automatically by Hive with ${bestMatch.confidence} confidence (${bestMatch.score}/100). ${bestMatch.reasons.join(' ')}`,
       status: 'accepted',
@@ -194,7 +205,7 @@ export async function POST(request: NextRequest) {
       {
         $set: {
           taskId,
-          category,
+          category: taskInput.category,
           matches: matches.map(({ agent, ...match }) => ({
             ...match,
             agent: {
@@ -220,7 +231,15 @@ export async function POST(request: NextRequest) {
       taskId: taskResult.insertedId,
       actorAddress: verified.userId,
       actorName: displayName,
-      metadata: { title, category, budget, instantMatch: true, rubricItems: rubricResult.rubric.length },
+      metadata: {
+        title: taskInput.title,
+        category: taskInput.category,
+        budget: taskInput.budget,
+        instantMatch: true,
+        rubricItems: rubricResult.rubric.length,
+        humanVerified: !human.skipped,
+        authMethod: 'privy',
+      },
       createdAt: new Date(),
     });
 
@@ -229,7 +248,7 @@ export async function POST(request: NextRequest) {
       taskId: taskResult.insertedId,
       actorName: bestAgent.name,
       metadata: {
-        taskTitle: title,
+        taskTitle: taskInput.title,
         agentName: bestAgent.name,
         agentId: bestAgent._id.toString(),
         autoMatched: true,
@@ -238,16 +257,16 @@ export async function POST(request: NextRequest) {
     });
 
     // Award Hive Points: +100 for task creation, +50 for instant work assignment
-    awardPoints(verified.userId, 'create_task', 100, { title, taskId, category, instantMatch: true })
+    awardPoints(verified.userId, 'create_task', 100, { title: taskInput.title, taskId, category: taskInput.category, instantMatch: true })
       .catch((err: any) => logger.error('[POINTS] Task creation award failed:', err.message));
-    awardPoints(bestAgent._id.toString(), 'work_assigned', 50, { title, taskId, matchScore: bestMatch.score })
+    awardPoints(bestAgent._id.toString(), 'work_assigned', 50, { title: taskInput.title, taskId, matchScore: bestMatch.score })
       .catch((err: any) => logger.error('[POINTS] Agent assignment award failed:', err.message));
 
     enqueueWebhookEvent(db, {
       event: 'task.created',
       taskId,
       actorName: displayName,
-      data: { title, category, budget, instantMatch: true },
+      data: { title: taskInput.title, category: taskInput.category, budget: taskInput.budget, instantMatch: true },
     }).catch((err) => logger.error('[WEBHOOK] task.created enqueue failed:', err.message));
 
     enqueueWebhookEvent(db, {
@@ -255,7 +274,7 @@ export async function POST(request: NextRequest) {
       taskId,
       agentId: bestAgent._id.toString(),
       actorName: bestAgent.name,
-      data: { taskTitle: title, matchScore: bestMatch.score, instantMatch: true },
+      data: { taskTitle: taskInput.title, matchScore: bestMatch.score, instantMatch: true },
     }).catch((err) => logger.error('[WEBHOOK] bid.accepted enqueue failed:', err.message));
 
     return NextResponse.json(
