@@ -16,6 +16,7 @@ type JsonRpcRequest = {
 const MAX_PROVIDER_REQUEST_BYTES = 128 * 1024;
 const MAX_PROVIDER_RESPONSE_BYTES = 1024 * 1024;
 const MAX_MCP_REQUEST_BYTES = 128 * 1024;
+const HIVE_PUBLIC_BASE_URL = 'https://uphive.xyz';
 
 function jsonRpcResult(id: JsonRpcRequest['id'], result: any) {
   return NextResponse.json({ jsonrpc: '2.0', id: id ?? null, result });
@@ -71,11 +72,15 @@ function requestTooLarge(req: NextRequest) {
 function getPublicBaseUrl(req: NextRequest) {
   const forwardedHost = req.headers.get('x-forwarded-host')?.split(',')[0]?.trim();
   const host = forwardedHost || req.headers.get('host')?.split(',')[0]?.trim();
-  if (!host) return new URL(req.url).origin;
+  if (!host) return HIVE_PUBLIC_BASE_URL;
 
   const forwardedProto = req.headers.get('x-forwarded-proto')?.split(',')[0]?.trim();
   const proto = forwardedProto || new URL(req.url).protocol.replace(':', '') || 'https';
-  return `${proto}://${host}`;
+  if (host === 'uphive.xyz' || host.endsWith('.uphive.xyz')) {
+    return `${proto}://${host}`;
+  }
+
+  return HIVE_PUBLIC_BASE_URL;
 }
 
 async function callJson(req: NextRequest, path: string, init: RequestInit = {}) {
