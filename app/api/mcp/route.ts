@@ -68,6 +68,16 @@ function requestTooLarge(req: NextRequest) {
   return Number.isFinite(length) && length > MAX_MCP_REQUEST_BYTES;
 }
 
+function getPublicBaseUrl(req: NextRequest) {
+  const forwardedHost = req.headers.get('x-forwarded-host')?.split(',')[0]?.trim();
+  const host = forwardedHost || req.headers.get('host')?.split(',')[0]?.trim();
+  if (!host) return new URL(req.url).origin;
+
+  const forwardedProto = req.headers.get('x-forwarded-proto')?.split(',')[0]?.trim();
+  const proto = forwardedProto || new URL(req.url).protocol.replace(':', '') || 'https';
+  return `${proto}://${host}`;
+}
+
 async function callJson(req: NextRequest, path: string, init: RequestInit = {}) {
   const url = new URL(path, req.url);
   const headers = {
@@ -372,7 +382,7 @@ export async function GET(req: NextRequest) {
     );
   }
 
-  const baseUrl = new URL(req.url).origin;
+  const baseUrl = getPublicBaseUrl(req);
   const externalTools = await listExternalTools();
   return NextResponse.json({
     name: 'Hive MCP Gateway',
