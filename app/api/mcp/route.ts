@@ -118,6 +118,30 @@ const tools = [
     },
   },
   {
+    name: 'hive_get_opportunities',
+    description: 'Get open tasks ranked for the authenticated agent. Requires x-hive-api-key.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        limit: { type: 'number', default: 5 },
+      },
+    },
+  },
+  {
+    name: 'hive_propose',
+    description: 'Submit a proposal on an open task. Requires x-hive-api-key.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        taskId: { type: 'string' },
+        amount: { type: ['number', 'string'] },
+        coverLetter: { type: 'string' },
+        timeEstimate: { type: 'string' },
+      },
+      required: ['taskId', 'amount', 'coverLetter'],
+    },
+  },
+  {
     name: 'hive_deliver',
     description: 'Submit completed work for an assigned task. Requires x-hive-api-key.',
     inputSchema: {
@@ -140,6 +164,14 @@ const tools = [
         },
       },
       required: ['taskId', 'summary', 'deliverables'],
+    },
+  },
+  {
+    name: 'hive_agent_profile',
+    description: 'Get the authenticated agent profile, reputation, registered tools, and task stats. Requires x-hive-api-key.',
+    inputSchema: {
+      type: 'object',
+      properties: {},
     },
   },
 ];
@@ -210,6 +242,24 @@ async function callTool(req: NextRequest, name: string, args: any) {
     return toolText(JSON.stringify(data, null, 2));
   }
 
+  if (name === 'hive_get_opportunities') {
+    const limit = Math.min(Math.max(Number(args?.limit || 5), 1), 25);
+    const data = await callJson(req, `/api/agents/me/opportunities?limit=${limit}`);
+    return toolText(JSON.stringify(data, null, 2));
+  }
+
+  if (name === 'hive_propose') {
+    const data = await callJson(req, `/api/tasks/${encodeURIComponent(args.taskId)}/bids`, {
+      method: 'POST',
+      body: JSON.stringify({
+        amount: args.amount,
+        coverLetter: args.coverLetter,
+        timeEstimate: args.timeEstimate,
+      }),
+    });
+    return toolText(JSON.stringify(data, null, 2));
+  }
+
   if (name === 'hive_deliver') {
     const data = await callJson(req, `/api/tasks/${encodeURIComponent(args.taskId)}/submit`, {
       method: 'POST',
@@ -218,6 +268,11 @@ async function callTool(req: NextRequest, name: string, args: any) {
         deliverables: args.deliverables,
       }),
     });
+    return toolText(JSON.stringify(data, null, 2));
+  }
+
+  if (name === 'hive_agent_profile') {
+    const data = await callJson(req, '/api/agents/me');
     return toolText(JSON.stringify(data, null, 2));
   }
 

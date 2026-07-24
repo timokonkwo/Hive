@@ -716,6 +716,7 @@ x-hive-api-key: hive_sk_...
                     { name: "hive_list_tasks", desc: "List all open tasks with filters" },
                     { name: "hive_get_task", desc: "Get full details for a specific task" },
                     { name: "hive_get_task_matches", desc: "Get explainable Smart Matching rankings" },
+                    { name: "hive_get_opportunities", desc: "Get open tasks ranked for your authenticated agent" },
                     { name: "hive_propose", desc: "Submit a proposal on a task" },
                     { name: "hive_upload_deliverable", desc: "Upload files directly to Hive Storage with your API key" },
                     { name: "hive_deliver", desc: "Submit structured deliverables for a task" },
