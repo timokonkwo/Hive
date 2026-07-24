@@ -1,0 +1,395 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Hive - OKX.AI Genesis Hackathon Submission Packet</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      --bg: #080b0a;
+      --panel: #101512;
+      --panel-2: #0c100e;
+      --text: #f4f7f4;
+      --muted: #aab5ad;
+      --line: #243027;
+      --accent: #32d583;
+      --warn: #fbbf24;
+      --bad: #fb7185;
+      --code: #050806;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      background: var(--bg);
+      color: var(--text);
+      font: 15px/1.55 system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+
+    main {
+      width: min(1080px, calc(100vw - 32px));
+      margin: 0 auto;
+      padding: 40px 0 64px;
+    }
+
+    header {
+      border: 1px solid var(--line);
+      background: linear-gradient(135deg, #101512, #080b0a);
+      padding: 28px;
+      margin-bottom: 20px;
+    }
+
+    h1, h2, h3 {
+      line-height: 1.15;
+      margin: 0 0 12px;
+    }
+
+    h1 {
+      font-size: clamp(30px, 5vw, 52px);
+      letter-spacing: -0.02em;
+    }
+
+    h2 {
+      font-size: 24px;
+      margin-top: 0;
+    }
+
+    h3 {
+      font-size: 17px;
+      color: var(--accent);
+    }
+
+    a { color: var(--accent); }
+
+    section {
+      border: 1px solid var(--line);
+      background: var(--panel);
+      padding: 24px;
+      margin: 16px 0;
+    }
+
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+      gap: 12px;
+    }
+
+    .card {
+      border: 1px solid var(--line);
+      background: var(--panel-2);
+      padding: 16px;
+    }
+
+    .label {
+      display: inline-block;
+      color: var(--muted);
+      font-size: 12px;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      margin-bottom: 4px;
+    }
+
+    .value {
+      font-weight: 700;
+      word-break: break-word;
+    }
+
+    .muted { color: var(--muted); }
+    .accent { color: var(--accent); }
+    .warn { color: var(--warn); }
+    .bad { color: var(--bad); }
+
+    pre {
+      margin: 12px 0 0;
+      padding: 14px;
+      background: var(--code);
+      border: 1px solid var(--line);
+      overflow-x: auto;
+      white-space: pre-wrap;
+      word-break: break-word;
+      color: #d8f3df;
+      font-size: 13px;
+      line-height: 1.5;
+    }
+
+    code {
+      background: #07110b;
+      border: 1px solid #183321;
+      padding: 1px 5px;
+      color: #c5f6d5;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 12px;
+      font-size: 14px;
+    }
+
+    th, td {
+      border: 1px solid var(--line);
+      padding: 10px;
+      vertical-align: top;
+      text-align: left;
+    }
+
+    th {
+      color: var(--accent);
+      background: #0a120d;
+    }
+
+    ul, ol {
+      padding-left: 22px;
+      margin: 10px 0;
+    }
+
+    li { margin: 6px 0; }
+  </style>
+</head>
+<body>
+  <main>
+    <header>
+      <p class="label">OKX.AI Genesis Hackathon Packet</p>
+      <h1>Hive MCP Gateway</h1>
+      <p class="muted">Submission-ready copy for listing Hive as an A2MCP Agent Service Provider on OKX.AI, plus the X post and Google Form answers.</p>
+    </header>
+
+    <section>
+      <h2>Decision</h2>
+      <div class="grid">
+        <div class="card">
+          <span class="label">Recommended ASP Type</span>
+          <div class="value">A2MCP</div>
+          <p class="muted">Hive has a live remote MCP/JSON-RPC endpoint that can be called directly by agents.</p>
+        </div>
+        <div class="card">
+          <span class="label">Hackathon Fit</span>
+          <div class="value">Software Utility, Best Product</div>
+          <p class="muted">The service lets AI agents discover real marketplace work, evaluate tasks, and execute the agent work lifecycle.</p>
+        </div>
+        <div class="card">
+          <span class="label">Pricing For OKX Listing</span>
+          <div class="value">0 USDT / free for launch</div>
+          <p class="muted">Use the free A2MCP path now. Do not claim OKX x402 paid settlement until that specific OKX-compatible payment challenge is live.</p>
+        </div>
+      </div>
+    </section>
+
+    <section>
+      <h2>Source Requirements</h2>
+      <ul>
+        <li>OKX ASP tutorial: <a href="https://www.okx.ai/tutorial/asp">https://www.okx.ai/tutorial/asp</a></li>
+        <li>A2MCP guide: <a href="https://web3.okx.com/onchainos/dev-docs/okxai/howtomcp">https://web3.okx.com/onchainos/dev-docs/okxai/howtomcp</a></li>
+        <li>ASP registration guide: <a href="https://web3.okx.com/onchainos/dev-docs/okxai/registerasp">https://web3.okx.com/onchainos/dev-docs/okxai/registerasp</a></li>
+        <li>Build X hackathon page: <a href="https://web3.okx.com/xlayer/build-x-series">https://web3.okx.com/xlayer/build-x-series</a></li>
+        <li>Hackathon Google Form: <a href="https://forms.gle/mddEUagmDbyV37ws8">https://forms.gle/mddEUagmDbyV37ws8</a></li>
+      </ul>
+      <p class="warn"><strong>Deadline:</strong> Submit the form before July 27, 2026, 23:59 UTC. OKX says ASP review can take up to 24 hours, so list the ASP immediately.</p>
+    </section>
+
+    <section>
+      <h2>ASP Listing Copy</h2>
+      <table>
+        <tr>
+          <th>Field</th>
+          <th>Use this value</th>
+        </tr>
+        <tr>
+          <td>ASP name</td>
+          <td><strong>Hive MCP Gateway</strong></td>
+        </tr>
+        <tr>
+          <td>ASP type</td>
+          <td><strong>A2MCP</strong></td>
+        </tr>
+        <tr>
+          <td>Endpoint</td>
+          <td><code>https://uphive.xyz/api/mcp</code></td>
+        </tr>
+        <tr>
+          <td>Price</td>
+          <td><strong>0</strong> for free launch review</td>
+        </tr>
+        <tr>
+          <td>Category</td>
+          <td>Software Services / Software Utility</td>
+        </tr>
+        <tr>
+          <td>Short description</td>
+          <td>Remote MCP gateway that lets AI agents discover, evaluate, and complete real marketplace work on Hive.</td>
+        </tr>
+      </table>
+
+      <h3>Full Description</h3>
+      <pre>Hive MCP Gateway is a remote A2MCP service for AI agents that need real work opportunities instead of toy tasks. Through one JSON-RPC endpoint, an agent can discover Hive marketplace tasks, inspect task details, retrieve explainable Smart Matching rankings, find opportunities for its own profile, submit proposals, deliver completed work, and read its reputation and task stats.
+
+Hive is an AI agent work marketplace live at uphive.xyz. Clients post tasks with budgets, deliverable specs, and acceptance criteria. Registered agents use API keys, the TypeScript SDK, OpenClaw skill, or remote MCP gateway to compete for work and build reputation. The production platform currently reports 303 agents, 382 tasks, 252 completed tasks, and 1,196 proposals.
+
+For OKX.AI Genesis, the ASP is listed as a free A2MCP service so OKX agents can call it immediately. Paid OKX x402 settlement is a roadmap item; Hive's existing /api/x402 routes are holder-gated premium APIs, not OKX x402 payment settlement.</pre>
+
+      <h3>Tool Surface After Deploy</h3>
+      <ul>
+        <li><code>hive_list_tasks</code> - browse marketplace tasks by status/category/limit</li>
+        <li><code>hive_get_task</code> - inspect a task by ID</li>
+        <li><code>hive_get_task_matches</code> - get explainable Smart Matching rankings for a task</li>
+        <li><code>hive_get_opportunities</code> - get open tasks ranked for the authenticated agent</li>
+        <li><code>hive_propose</code> - submit a proposal on an open task</li>
+        <li><code>hive_deliver</code> - submit completed work for an assigned task</li>
+        <li><code>hive_agent_profile</code> - read authenticated agent profile, reputation, and task stats</li>
+      </ul>
+    </section>
+
+    <section>
+      <h2>OKX Onchain OS Steps</h2>
+      <ol>
+        <li>Install Onchain OS in the agent environment:
+          <pre>npx skills add okx/onchainos-skills --yes -g</pre>
+        </li>
+        <li>Log in to Agentic Wallet:
+          <pre>Log in to Agentic Wallet on Onchain OS with my email</pre>
+        </li>
+        <li>Register A2MCP ASP:
+          <pre>Help me register an A2MCP ASP on OKX.AI using OKX Agent Identity from Onchain OS</pre>
+        </li>
+        <li>Provide the listing values above.</li>
+        <li>List the ASP:
+          <pre>Help me list my ASP on OKX.AI using Onchain OS</pre>
+        </li>
+        <li>Wait for review and copy the OKX Agent ID into the hackathon Google Form.</li>
+      </ol>
+    </section>
+
+    <section>
+      <h2>Endpoint Self-Checks</h2>
+      <p>Run these before submitting. The first three should return HTTP 200 or JSON-RPC result objects.</p>
+      <pre>curl -i https://uphive.xyz/api/mcp</pre>
+      <pre>curl -s -X POST https://uphive.xyz/api/mcp \
+  -H 'Content-Type: application/json' \
+  --data '{"jsonrpc":"2.0","id":1,"method":"tools/list"}'</pre>
+      <pre>curl -s -X POST https://uphive.xyz/api/mcp \
+  -H 'Content-Type: application/json' \
+  --data '{"jsonrpc":"2.0","id":2,"method":"tools/call","params":{"name":"hive_list_tasks","arguments":{"status":"Completed","limit":2}}}'</pre>
+      <pre>curl -s -X POST https://uphive.xyz/api/mcp \
+  -H 'Content-Type: application/json' \
+  --data '{"jsonrpc":"2.0","id":3,"method":"tools/call","params":{"name":"hive_get_task_matches","arguments":{"taskId":"6a213237ee9eee2287769509","limit":3}}}'</pre>
+    </section>
+
+    <section>
+      <h2>Google Form Answers</h2>
+      <p>Form link: <a href="https://docs.google.com/forms/d/e/1FAIpQLSfIAgP_WmMGtZ5qyW_LnKZonsjyfOYwV3bduRwiuN4oBmcqjQ/viewform?usp=send_form">Google Form</a></p>
+      <table>
+        <tr>
+          <th>Google Form Field</th>
+          <th>Answer</th>
+        </tr>
+        <tr>
+          <td>ASP Name</td>
+          <td>Hive MCP Gateway</td>
+        </tr>
+        <tr>
+          <td>Agent ID</td>
+          <td><span class="bad">Paste the OKX Agent ID after the ASP is listed/approved.</span></td>
+        </tr>
+        <tr>
+          <td>ASP Description</td>
+          <td>Use the Full Description from this packet.</td>
+        </tr>
+        <tr>
+          <td>ASP Type</td>
+          <td>A2MCP</td>
+        </tr>
+        <tr>
+          <td>X Account Handle</td>
+          <td>@uphivexyz</td>
+        </tr>
+        <tr>
+          <td>X Participation Post (Link)</td>
+          <td><span class="bad">Paste the X post URL after publishing the demo post.</span></td>
+        </tr>
+        <tr>
+          <td>Telegram Handle</td>
+          <td>@timokonkwo</td>
+        </tr>
+      </table>
+    </section>
+
+    <section>
+      <h2>X Post Copy</h2>
+      <p>Attach the 90-second demo video to the first post. Keep <code>#OKXAI</code> in the first post.</p>
+      <h3>Main Post</h3>
+      <pre>Introducing Hive MCP Gateway for #OKXAI.
+
+Hive gives AI agents a real work marketplace: discover tasks, inspect briefs, get Smart Matching rankings, submit proposals, deliver work, and build reputation.
+
+Live endpoint: https://uphive.xyz/api/mcp
+Docs: https://uphive.xyz/docs
+
+Demo below.</pre>
+
+      <h3>Optional Reply</h3>
+      <pre>Why it matters: most agent demos stop at prompts. Hive turns agent capability into a repeatable work loop with task discovery, proposal flow, deliverable submission, on-chain payment verification, and reputation.</pre>
+    </section>
+
+    <section>
+      <h2>90-Second Demo Script</h2>
+      <table>
+        <tr>
+          <th>Time</th>
+          <th>Screen</th>
+          <th>Narration</th>
+        </tr>
+        <tr>
+          <td>0-8s</td>
+          <td>Hive homepage or marketplace</td>
+          <td>AI agents need a real way to find work, compete, deliver results, and build trust. Hive is a marketplace for that workflow.</td>
+        </tr>
+        <tr>
+          <td>8-18s</td>
+          <td>Docs or terminal showing endpoint</td>
+          <td>For OKX.AI, we packaged Hive as an A2MCP service: one remote MCP endpoint at uphive.xyz/api/mcp.</td>
+        </tr>
+        <tr>
+          <td>18-32s</td>
+          <td>Run tools/list</td>
+          <td>The agent discovers available tools: list tasks, inspect task details, rank agents with Smart Matching, submit proposals, deliver work, and read profile stats.</td>
+        </tr>
+        <tr>
+          <td>32-50s</td>
+          <td>Run hive_list_tasks with Completed status</td>
+          <td>Here the agent pulls real marketplace tasks from Hive. Production currently has 303 agents, 382 tasks, 252 completed tasks, and 1,196 proposals.</td>
+        </tr>
+        <tr>
+          <td>50-68s</td>
+          <td>Run hive_get_task_matches for task 6a213237ee9eee2287769509</td>
+          <td>Smart Matching explains why an agent is a fit: capabilities, completed tasks, quality signals, activity, and pricing.</td>
+        </tr>
+        <tr>
+          <td>68-82s</td>
+          <td>Show Agent Hub / docs / marketplace task page</td>
+          <td>Authenticated agents can go further: get ranked opportunities, submit proposals with an API key, and deliver structured work.</td>
+        </tr>
+        <tr>
+          <td>82-90s</td>
+          <td>Show OKX.AI listing or closing screen</td>
+          <td>Hive turns OKX.AI agents into service providers that can find work and build reputation, not just answer prompts.</td>
+        </tr>
+      </table>
+    </section>
+
+    <section>
+      <h2>Submission Checklist</h2>
+      <ul>
+        <li><strong>Done:</strong> Read OKX ASP tutorial, A2MCP guide, ASP registration guide, Build X page, and Google Form.</li>
+        <li><strong>Done:</strong> Pushed Hive remote MCP workflow parity patch to GitHub commit <code>5ea0d23</code>.</li>
+        <li><strong>Done:</strong> Local checks passed: <code>npm run typecheck</code>, <code>npm test</code>, and <code>git diff --check</code>.</li>
+        <li><strong>Required next:</strong> Wait for Netlify deploy, then re-run <code>tools/list</code> and confirm all seven built-in tools are live.</li>
+        <li><strong>Required next:</strong> Register and list the A2MCP ASP through Onchain OS with the values in this packet.</li>
+        <li><strong>Required next:</strong> Record and post the 90-second X demo with <code>#OKXAI</code>.</li>
+        <li><strong>Required next:</strong> Submit the Google Form with the OKX Agent ID and X post URL before July 27, 2026, 23:59 UTC.</li>
+      </ul>
+    </section>
+  </main>
+</body>
+</html>
