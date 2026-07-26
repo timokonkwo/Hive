@@ -83,6 +83,50 @@ function getPublicBaseUrl(req: NextRequest) {
   return HIVE_PUBLIC_BASE_URL;
 }
 
+function publicToolMetadata(externalTools: any[], includeInputSchema = false) {
+  return [
+    ...tools.map(({ name, description, inputSchema }) => (
+      includeInputSchema ? { name, description, inputSchema } : { name, description }
+    )),
+    ...externalTools.map(({ name, description, costPerCall, provider, tokenMint }) => ({
+      name,
+      description,
+      costPerCall,
+      provider,
+      tokenMint,
+    })),
+  ];
+}
+
+async function freeServiceProbeResponse(req: NextRequest) {
+  const baseUrl = getPublicBaseUrl(req);
+  const externalTools = await listExternalTools();
+
+  return NextResponse.json({
+    name: 'Hive Work Router',
+    service: 'free-a2mcp',
+    status: 'ok',
+    endpoint: `${baseUrl}/api/mcp`,
+    description: 'Free Hive MCP gateway for marketplace discovery, task inspection, matching, proposals, delivery, and agent profile lookup.',
+    defaultAction: 'tools/list',
+    tools: publicToolMetadata(externalTools, true),
+    exampleRequest: {
+      jsonrpc: '2.0',
+      id: 1,
+      method: 'tools/call',
+      params: {
+        name: 'hive_list_tasks',
+        arguments: { status: 'Open', limit: 5 },
+      },
+    },
+    authentication: {
+      publicTools: ['hive_list_tasks', 'hive_get_task', 'hive_get_task_matches'],
+      header: 'x-hive-api-key',
+      requiredFor: ['hive_get_opportunities', 'hive_propose', 'hive_deliver', 'hive_agent_profile'],
+    },
+  });
+}
+
 async function callJson(req: NextRequest, path: string, init: RequestInit = {}) {
   const url = new URL(path, req.url);
   const headers = {
@@ -399,16 +443,7 @@ export async function GET(req: NextRequest) {
       header: 'x-hive-api-key',
       bearerSupported: true,
     },
-    tools: [
-      ...tools.map(({ name, description }) => ({ name, description })),
-      ...externalTools.map(({ name, description, costPerCall, provider, tokenMint }) => ({
-        name,
-        description,
-        costPerCall,
-        provider,
-        tokenMint,
-      })),
-    ],
+    tools: publicToolMetadata(externalTools),
   });
 }
 
@@ -429,9 +464,20 @@ export async function POST(req: NextRequest) {
     if (Buffer.byteLength(raw, 'utf8') > MAX_MCP_REQUEST_BYTES) {
       return jsonRpcError(null, -32600, 'MCP request payload is too large.', 413);
     }
+
+    if (raw.trim().length === 0) {
+      return freeServiceProbeResponse(req);
+    }
+
     rpc = JSON.parse(raw);
     if (Array.isArray(rpc)) {
       return jsonRpcError(null, -32600, 'JSON-RPC batch requests are not supported.', 400);
+    }
+    if (!rpc || typeof rpc !== 'object') {
+      return jsonRpcError(null, -32600, 'JSON-RPC request must be an object.', 400);
+    }
+    if (!rpc.method && !rpc.jsonrpc) {
+      return freeServiceProbeResponse(req);
     }
   } catch {
     return jsonRpcError(null, -32700, 'Invalid JSON');
