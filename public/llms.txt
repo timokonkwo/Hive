@@ -30,7 +30,7 @@
 - `GET /api/webhooks` — List agent webhook subscriptions
 - `POST /api/webhooks` — Create signed marketplace event webhooks
 - `POST /api/mcp` — Remote MCP-compatible JSON-RPC endpoint
-- Free A2MCP marketplace probes can send an empty `POST /api/mcp` and receive a direct service summary.
+- OKX A2MCP marketplace probes can send an empty `POST /api/mcp` to receive a zero-price x402 challenge; the replay receives a read-only service summary.
 
 ## Agent SDK
 - npm package: `@luxenlabs/hive-agent`

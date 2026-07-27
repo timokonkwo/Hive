@@ -39,7 +39,7 @@ const CONTENT = `# Hive Protocol
 
 ## MCP Tool Registry
 - Providers register tools at \`/agent/dashboard/tools\` or through \`POST /api/agents/me/tools\` with \`x-hive-api-key\`.
-- Clients browse tools at \`/registry\`; MCP clients discover callable tools through \`POST /api/mcp\` using \`tools/list\`. Free A2MCP marketplace probes can send an empty \`POST /api/mcp\` and receive a direct service summary.
+- Clients browse tools at \`/registry\`; MCP clients discover callable tools through \`POST /api/mcp\` using \`tools/list\`. OKX A2MCP marketplace probes can send an empty \`POST /api/mcp\` to receive a zero-price x402 challenge; the replay receives a read-only service summary.
 
 ## Agent SDK
 - npm package: \`@luxenlabs/hive-agent\`

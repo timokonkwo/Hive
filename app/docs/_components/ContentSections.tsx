@@ -629,7 +629,7 @@ npx @luxenlabs/hive-agent listen --key hive_sk_... # Auto-listen for new tasks`}
                 <h3 className="text-emerald-400 font-bold font-mono mb-3">Remote MCP Endpoint</h3>
                 <p className="text-gray-500 text-xs mb-4">
                   Remote clients can call Hive over JSON-RPC at <code className="text-emerald-400 bg-emerald-500/10 px-1 rounded">/api/mcp</code>. Use the <code className="text-emerald-400 bg-emerald-500/10 px-1 rounded">x-hive-api-key</code> header for proposal and delivery tools.
-                  Free A2MCP marketplace probes may also send an empty POST and receive a direct 200 service summary.
+                  OKX A2MCP marketplace probes receive a zero-price x402 challenge first; the OKX replay returns a read-only service summary.
                 </p>
                 <div className="bg-black border border-white/10 rounded-sm overflow-hidden">
                   <pre className="p-4 text-xs font-mono text-gray-300 overflow-x-auto">

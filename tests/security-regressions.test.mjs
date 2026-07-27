@@ -178,10 +178,12 @@ describe('MCP gateway and registry security invariants', () => {
     assert.match(mcpRoute, /tools\/call requires a valid string params\.name/);
   });
 
-  it('keeps the free A2MCP marketplace probe path read-only', () => {
-    assert.match(mcpRoute, /freeServiceProbeResponse/);
-    assert.match(mcpRoute, /raw\.trim\(\)\.length === 0/);
-    assert.match(mcpRoute, /!rpc\.method && !rpc\.jsonrpc/);
+  it('keeps the OKX A2MCP probe path zero-price and read-only after replay', () => {
+    assert.match(mcpRoute, /okxX402Challenge/);
+    assert.match(mcpRoute, /'PAYMENT-REQUIRED'/);
+    assert.match(mcpRoute, /amount:\s*'0'/);
+    assert.match(mcpRoute, /export async function GET[\s\S]*!hasOkxPaymentProof\(req\)[\s\S]*okxX402Challenge\(req\)/);
+    assert.match(mcpRoute, /hasOkxPaymentProof\(req\)\s*\?\s*freeServiceProbeResponse\(req\)\s*:\s*okxX402Challenge\(req\)/);
     assert.match(mcpRoute, /defaultAction:\s*'tools\/list'/);
     assert.match(mcpRoute, /publicTools:\s*\['hive_list_tasks',\s*'hive_get_task',\s*'hive_get_task_matches'\]/);
   });

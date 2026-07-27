@@ -17,6 +17,9 @@ const MAX_PROVIDER_REQUEST_BYTES = 128 * 1024;
 const MAX_PROVIDER_RESPONSE_BYTES = 1024 * 1024;
 const MAX_MCP_REQUEST_BYTES = 128 * 1024;
 const HIVE_PUBLIC_BASE_URL = 'https://uphive.xyz';
+const OKX_X402_NETWORK = 'eip155:196';
+const OKX_X402_USDT0_ASSET = '0x779ded0c9e1022225f8e0630b35a9b54be713736';
+const OKX_X402_PAY_TO = process.env.HIVE_OKX_X402_PAY_TO || '0x76bec047f770d10b46c7ec402aaa8ff0130ace1d';
 
 function jsonRpcResult(id: JsonRpcRequest['id'], result: any) {
   return NextResponse.json({ jsonrpc: '2.0', id: id ?? null, result });
@@ -123,6 +126,42 @@ async function freeServiceProbeResponse(req: NextRequest) {
       publicTools: ['hive_list_tasks', 'hive_get_task', 'hive_get_task_matches'],
       header: 'x-hive-api-key',
       requiredFor: ['hive_get_opportunities', 'hive_propose', 'hive_deliver', 'hive_agent_profile'],
+    },
+  });
+}
+
+function hasOkxPaymentProof(req: NextRequest) {
+  return Boolean(req.headers.get('x-payment') || req.headers.get('payment-signature'));
+}
+
+function okxX402Challenge(req: NextRequest) {
+  const baseUrl = getPublicBaseUrl(req);
+  const challenge = {
+    x402Version: 2,
+    resource: {
+      url: `${baseUrl}/api/mcp`,
+      description: 'Hive Work Router',
+      mimeType: 'application/json',
+    },
+    accepts: [
+      {
+        scheme: 'exact',
+        network: OKX_X402_NETWORK,
+        asset: OKX_X402_USDT0_ASSET,
+        amount: '0',
+        payTo: OKX_X402_PAY_TO,
+        maxTimeoutSeconds: 300,
+        extra: { name: 'USD₮0', version: '1' },
+      },
+    ],
+  };
+
+  const paymentRequired = Buffer.from(JSON.stringify(challenge), 'utf8').toString('base64');
+  return NextResponse.json(challenge, {
+    status: 402,
+    headers: {
+      'PAYMENT-REQUIRED': paymentRequired,
+      'Cache-Control': 'no-store',
     },
   });
 }
@@ -431,6 +470,10 @@ export async function GET(req: NextRequest) {
     );
   }
 
+  if (!hasOkxPaymentProof(req)) {
+    return okxX402Challenge(req);
+  }
+
   const baseUrl = getPublicBaseUrl(req);
   const externalTools = await listExternalTools();
   return NextResponse.json({
@@ -466,7 +509,7 @@ export async function POST(req: NextRequest) {
     }
 
     if (raw.trim().length === 0) {
-      return freeServiceProbeResponse(req);
+      return hasOkxPaymentProof(req) ? freeServiceProbeResponse(req) : okxX402Challenge(req);
     }
 
     rpc = JSON.parse(raw);
@@ -477,7 +520,7 @@ export async function POST(req: NextRequest) {
       return jsonRpcError(null, -32600, 'JSON-RPC request must be an object.', 400);
     }
     if (!rpc.method && !rpc.jsonrpc) {
-      return freeServiceProbeResponse(req);
+      return hasOkxPaymentProof(req) ? freeServiceProbeResponse(req) : okxX402Challenge(req);
     }
   } catch {
     return jsonRpcError(null, -32700, 'Invalid JSON');
