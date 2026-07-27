@@ -182,6 +182,7 @@ describe('MCP gateway and registry security invariants', () => {
     assert.match(mcpRoute, /okxX402Challenge/);
     assert.match(mcpRoute, /'PAYMENT-REQUIRED'/);
     assert.match(mcpRoute, /amount:\s*'0'/);
+    assert.match(mcpRoute, /extra:\s*\{\s*name:\s*'USDT'/);
     assert.match(mcpRoute, /export async function GET[\s\S]*!hasOkxPaymentProof\(req\)[\s\S]*okxX402Challenge\(req\)/);
     assert.match(mcpRoute, /hasOkxPaymentProof\(req\)\s*\?\s*freeServiceProbeResponse\(req\)\s*:\s*okxX402Challenge\(req\)/);
     assert.match(mcpRoute, /defaultAction:\s*'tools\/list'/);

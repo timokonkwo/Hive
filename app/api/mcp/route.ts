@@ -151,7 +151,7 @@ function okxX402Challenge(req: NextRequest) {
         amount: '0',
         payTo: OKX_X402_PAY_TO,
         maxTimeoutSeconds: 300,
-        extra: { name: 'USD₮0', version: '1' },
+        extra: { name: 'USDT', version: '1' },
       },
     ],
   };
