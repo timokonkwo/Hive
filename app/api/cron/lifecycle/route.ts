@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { autoAcceptStaleBids } from '@/lib/cron/auto-accept';
 import { autoCompleteStaleReviews } from '@/lib/cron/auto-complete';
+import { recoverStaleInProgressTasks } from '@/lib/cron/recover-stale-in-progress';
 import { fulfillAcceptedBids } from '@/lib/stealth-agents/fulfiller';
 import { logger } from '@/lib/logger';
 
@@ -15,8 +16,9 @@ function getFulfillmentLimit(): number {
  *
  * Handles task lifecycle progression:
  * 1. Accept stale bids
- * 2. Fulfill accepted bids (generate deliverables)
- * 3. Complete stale reviews
+ * 2. Recover stale in-progress assignments
+ * 3. Fulfill accepted bids (generate deliverables)
+ * 4. Complete stale reviews
  *
  * Runs on a separate schedule from task posting.
  * Protected by CRON_SECRET or STEALTH_AGENT_SECRET.
@@ -44,7 +46,15 @@ export async function GET(req: Request) {
     logger.error('[LIFECYCLE] Auto-accept error:', err.message);
   }
 
-  // 2. Fulfill accepted bids (generate deliverables via Gemini)
+  // 2. Recover in-progress tasks whose accepted agent never submitted work
+  try {
+    results.recovery = await recoverStaleInProgressTasks();
+  } catch (err: any) {
+    results.recovery = { error: err.message };
+    logger.error('[LIFECYCLE] Recovery error:', err.message);
+  }
+
+  // 3. Fulfill accepted bids (generate deliverables via Gemini)
   try {
     const limit = getFulfillmentLimit();
     const fulfilled = await fulfillAcceptedBids(limit);
@@ -54,7 +64,7 @@ export async function GET(req: Request) {
     logger.error('[LIFECYCLE] Fulfillment error:', err.message);
   }
 
-  // 3. Complete stale reviews
+  // 4. Complete stale reviews
   try {
     results.autoComplete = await autoCompleteStaleReviews();
   } catch (err: any) {

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { autoAcceptStaleBids } from '@/lib/cron/auto-accept';
 import { autoCompleteStaleReviews } from '@/lib/cron/auto-complete';
+import { recoverStaleInProgressTasks } from '@/lib/cron/recover-stale-in-progress';
 import { logger } from '@/lib/logger';
 
 /**
@@ -8,7 +9,8 @@ import { logger } from '@/lib/logger';
  *
  * Lifecycle cron job that:
  * 1. Auto-accepts the best bid on stale open tasks
- * 2. Auto-completes tasks stuck in "In Review" past the configured review window
+ * 2. Reassigns stale in-progress tasks with no submitted work
+ * 3. Auto-completes tasks stuck in "In Review" past the configured review window
  *
  * Protected by CRON_SECRET or STEALTH_AGENT_SECRET.
  */
@@ -29,12 +31,16 @@ export async function GET(req: NextRequest) {
     // Step 1: Auto-accept stale bids
     const acceptResult = await autoAcceptStaleBids();
 
-    // Step 2: Auto-complete stale reviews
+    // Step 2: Recover in-progress tasks whose accepted agent never submitted work
+    const recoveryResult = await recoverStaleInProgressTasks();
+
+    // Step 3: Auto-complete stale reviews
     const completeResult = await autoCompleteStaleReviews();
 
     return NextResponse.json({
       success: true,
       autoAccept: acceptResult,
+      recovery: recoveryResult,
       autoComplete: completeResult,
       timestamp: new Date().toISOString(),
     });

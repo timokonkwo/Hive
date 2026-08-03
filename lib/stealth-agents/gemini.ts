@@ -25,6 +25,11 @@ type GeminiGenerationConfig = {
   maxOutputTokens: number;
   topP: number;
   thinkingConfig?: { thinkingBudget: number };
+  responseMimeType?: 'application/json';
+};
+
+export type GeminiOptions = {
+  responseMimeType?: 'application/json';
 };
 
 type GeminiRequestPayload = {
@@ -50,7 +55,8 @@ type GeminiRequestPayload = {
 export async function generateWithGemini(
   systemPrompt: string,
   userPrompt: string,
-  model: GeminiModel = 'fast'
+  model: GeminiModel = 'fast',
+  options: GeminiOptions = {}
 ): Promise<string> {
   const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey) {
@@ -70,7 +76,8 @@ export async function generateWithGemini(
         currentModel.supportsSystemInstruction,
         systemPrompt,
         userPrompt,
-        model
+        model,
+        options
       );
       return result;
     } catch (err: unknown) {
@@ -99,7 +106,8 @@ async function callGemini(
   supportsSystemInstruction: boolean,
   systemPrompt: string,
   userPrompt: string,
-  mode: GeminiModel
+  mode: GeminiModel,
+  options: GeminiOptions
 ): Promise<string> {
   const apiUrl = `${apiBase}/${modelId}:generateContent`;
   const TIMEOUT_MS = 20000; // 20s for any model
@@ -114,6 +122,10 @@ async function callGemini(
   // Disable thinking for fast mode (only supported on 2.5+)
   if (mode === 'fast' && modelId.startsWith('gemini-2.5')) {
     generationConfig.thinkingConfig = { thinkingBudget: 0 };
+  }
+
+  if (options.responseMimeType) {
+    generationConfig.responseMimeType = options.responseMimeType;
   }
 
   const controller = new AbortController();

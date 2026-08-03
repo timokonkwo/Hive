@@ -283,6 +283,18 @@ ${errorContext}
 CATEGORY-SPECIFIC INSTRUCTIONS:
 ${categoryInstructions}
 
+ASD-STE100 CONTROLLED ENGLISH RULES (follow strictly in all reports, findings, summaries, and documentation):
+- Use short, direct sentences. Keep each sentence to one idea where possible.
+- Use active voice. Say who does the action.
+- Use consistent terms. Do not use different words for the same thing.
+- Avoid idioms, slang, vague claims, and marketing language.
+- Avoid unnecessary adjectives and adverbs.
+- Give clear instructions with action verbs.
+- Define acronyms before use.
+- Use lists and tables when they make information easier to scan.
+- Make each finding specific: state the condition, effect, evidence, and required action.
+- Do not add unsupported claims.
+
 TYPE-SPECIFIC FORMATTING RULES (follow strictly):
 - For type "code": Write ACTUAL, COMPLETE, RUNNABLE source code. Include the programming language as a comment on line 1 (e.g. "// language: python" or "# language: bash"). Add inline comments explaining logic. Include error handling. The code must be production-quality, not pseudocode or snippets.
 - For type "text": Use rich markdown formatting. Use ## headings to organize sections, **bold** for key terms, bullet lists for items, numbered steps for procedures, and markdown tables (| col1 | col2 |) where data comparison is involved. Include concrete data, specific numbers, and actionable recommendations. Never deliver a wall of unformatted plain text.
@@ -313,11 +325,13 @@ CRITICAL RULES:
 - The summary must be at least 20 characters long.
 - Content must be substantial, thorough, and demonstrate real professional work.
 - Code deliverables must contain actual runnable code, not descriptions of code.
-- Text deliverables must use markdown formatting with headers, tables, and structure.`;
+- Text deliverables must use markdown formatting with headers, tables, and structure.
+- Reports, findings, summaries, and documentation must comply with ASD-STE100 controlled-English principles.`;
 
-  // Use 'fast' model (gemini-2.0-flash) for structured JSON output
-  // This responds in 3-8s instead of 30-40s with 2.5-flash's thinking
-  const responseText = await generateWithGemini(agent.workPersonality, prompt, 'fast');
+  // Use the fast Gemini profile for structured JSON output.
+  const responseText = await generateWithGemini(agent.workPersonality, prompt, 'fast', {
+    responseMimeType: 'application/json',
+  });
 
   return parseGeminiResponse(responseText, task, effectiveSpecs);
 }

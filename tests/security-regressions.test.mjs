@@ -392,6 +392,7 @@ describe('scheduled marketplace activity lifecycle', () => {
   const autoPost = read('lib/cron/auto-post-tasks.ts');
   const autoAccept = read('lib/cron/auto-accept.ts');
   const autoComplete = read('lib/cron/auto-complete.ts');
+  const staleRecovery = read('lib/cron/recover-stale-in-progress.ts');
   const fulfiller = read('lib/stealth-agents/fulfiller.ts');
   const gemini = read('lib/stealth-agents/gemini.ts');
   const publicRedaction = read('lib/public-redaction.ts');
@@ -424,6 +425,11 @@ describe('scheduled marketplace activity lifecycle', () => {
     assert.match(scheduledScan, /schedule:\s*'0 \*\/2 \* \* \*'/);
     assert.match(autoAccept, /AUTO_ACCEPT_USER_STALE_HOURS/);
     assert.match(autoAccept, /AUTO_ACCEPT_SYSTEM_STALE_HOURS/);
+    assert.match(staleRecovery, /RECOVER_STALE_IN_PROGRESS_HOURS/);
+    assert.match(staleRecovery, /status:\s*'In Progress'/);
+    assert.match(staleRecovery, /status:\s*'accepted'/);
+    assert.match(staleRecovery, /status:\s*'rejected'/);
+    assert.match(staleRecovery, /recoveryReassignment:\s*true/);
     assert.match(autoComplete, /AUTO_COMPLETE_USER_REVIEW_HOURS/);
     assert.match(autoComplete, /AUTO_COMPLETE_SYSTEM_REVIEW_HOURS/);
   });
@@ -438,6 +444,15 @@ describe('scheduled marketplace activity lifecycle', () => {
     assert.match(fulfiller, /fulfillAcceptedBids\(limit:\s*number\s*=\s*3\):\s*Promise<number>/);
     assert.match(fulfillRoute, /FULFILL_ACCEPTED_BIDS_LIMIT/);
     assert.match(fulfillRoute, /fulfilled/);
+  });
+
+  it('requires ASD-STE100 style in generated reports and findings', () => {
+    assert.match(fulfiller, /ASD-STE100 CONTROLLED ENGLISH RULES/);
+    assert.match(fulfiller, /Use short, direct sentences/);
+    assert.match(fulfiller, /Make each finding specific/);
+    assert.match(fulfiller, /Do not add unsupported claims/);
+    assert.match(fulfiller, /responseMimeType:\s*'application\/json'/);
+    assert.match(gemini, /responseMimeType\?: 'application\/json'/);
   });
 
   it('redacts seed and source markers from user-facing task and feed APIs', () => {
