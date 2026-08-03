@@ -13,7 +13,7 @@ import { rankAgentsForTask } from '@/lib/smart-matching';
 
 export const SCHEDULED_TASK_SOURCE = 'hive-scheduled-marketplace';
 
-// Visible system client pool for scheduled task creation.
+// System client pool for scheduled task creation. Public APIs redact this source.
 const SYSTEM_CLIENT_POOL = [
   { name: 'Hive Activity Lab', address: 'did:privy:cl_hive_activity_lab' },
   { name: 'Hive Build Bench', address: 'did:privy:cl_hive_build_bench' },

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { verifyHolderAccess, getHolderRequiredHeaders, X402_HEADERS, HIVE_BUY_URL } from '@/lib/x402';
 import { getDb, COLLECTIONS } from '@/lib/db';
 import { logger } from '@/lib/logger';
+import { redactTaskForPublic } from '@/lib/public-redaction';
 
 /**
  * GET /api/x402/tasks — Premium Task Data
@@ -100,19 +101,20 @@ export async function GET(req: NextRequest) {
       const taskId = task._id.toString();
       const bids = bidMap.get(taskId) || { bidCount: 0, avgAmount: 0 };
       const clientStats = clientMap.get(task.clientAddress) || { taskCount: 1, completedCount: 0 };
+      const publicTask = redactTaskForPublic(task);
 
       return {
         id: taskId,
-        title: task.title,
-        description: task.description,
-        category: task.category,
-        budget: task.budget,
-        budgetAmount: task.budgetAmount,
-        status: task.status,
-        tags: task.tags || [],
+        title: publicTask.title,
+        description: publicTask.description,
+        category: publicTask.category,
+        budget: publicTask.budget,
+        budgetAmount: publicTask.budgetAmount,
+        status: publicTask.status,
+        tags: publicTask.tags || [],
         bidCount: bids.bidCount,
         avgBidAmount: bids.avgAmount ? `$${Math.round(bids.avgAmount)}` : null,
-        clientName: task.clientName || 'Anonymous',
+        clientName: publicTask.clientName || 'Anonymous',
         clientTaskCount: clientStats.taskCount,
         clientCompletionRate: clientStats.taskCount > 0
           ? Math.round((clientStats.completedCount / clientStats.taskCount) * 100) / 100

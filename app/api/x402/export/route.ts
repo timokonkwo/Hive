@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { verifyHolderAccess, getHolderRequiredHeaders, X402_HEADERS, HIVE_BUY_URL } from '@/lib/x402';
 import { getDb, COLLECTIONS } from '@/lib/db';
 import { logger } from '@/lib/logger';
+import { redactTaskForPublic } from '@/lib/public-redaction';
 
 /**
  * GET /api/x402/export — Bulk Data Export
@@ -69,23 +70,26 @@ export async function GET(req: NextRequest) {
       ]).toArray();
       const bidMap = new Map(bidCounts.map(b => [b._id, b.count]));
 
-      result.tasks = tasks.map(t => ({
-        id: t._id.toString(),
-        title: t.title,
-        description: t.description,
-        category: t.category,
-        budget: t.budget,
-        budgetAmount: t.budgetAmount,
-        status: t.status,
-        tags: t.tags || [],
-        clientAddress: t.clientAddress,
-        clientName: t.clientName,
-        assignedAgent: t.assignedAgent,
-        assignedAgentName: t.assignedAgentName,
-        bidCount: bidMap.get(t._id.toString()) || 0,
-        createdAt: t.createdAt,
-        updatedAt: t.updatedAt,
-      }));
+      result.tasks = tasks.map(t => {
+        const publicTask = redactTaskForPublic(t);
+        const id = t._id.toString();
+        return {
+          id,
+          title: publicTask.title,
+          description: publicTask.description,
+          category: publicTask.category,
+          budget: publicTask.budget,
+          budgetAmount: publicTask.budgetAmount,
+          status: publicTask.status,
+          tags: publicTask.tags || [],
+          clientName: publicTask.clientName,
+          assignedAgent: publicTask.assignedAgent,
+          assignedAgentName: publicTask.assignedAgentName,
+          bidCount: bidMap.get(id) || 0,
+          createdAt: publicTask.createdAt,
+          updatedAt: publicTask.updatedAt,
+        };
+      });
       result.taskCount = result.tasks.length;
     }
 

@@ -6,6 +6,7 @@ import { authenticateClient } from "@/lib/client-auth";
 import { verifiedClientOwnsResource } from "@/lib/client-ownership";
 import { verifyAdmin } from "@/lib/admin-auth";
 import { logger } from '@/lib/logger';
+import { redactTaskForPublic } from "@/lib/public-redaction";
 
 // GET /api/tasks/[id] — Get single task with bid count
 export async function GET(
@@ -88,10 +89,13 @@ export async function GET(
       }
     }
 
+    const publicTask = redactTaskForPublic(task);
+    const publicTaskId = task._id.toString();
+
     return NextResponse.json({
-      ...task,
-      id: task._id.toString(),
-      url: `https://uphive.xyz/marketplace/${task._id.toString()}`,
+      ...publicTask,
+      id: publicTaskId,
+      url: `https://uphive.xyz/marketplace/${publicTaskId}`,
       _id: undefined,
       proposalsCount,
       tokenLaunch,

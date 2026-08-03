@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getDb, COLLECTIONS } from "@/lib/db";
 import { logger } from '@/lib/logger';
+import { redactActivityForPublic } from "@/lib/public-redaction";
 
 // Only these event types are shown in the public feed
 const FEED_EVENT_TYPES = [
@@ -26,11 +27,7 @@ export async function GET(request: NextRequest) {
       .limit(limit)
       .toArray();
 
-    const mapped = events.map((e) => ({
-      ...e,
-      id: e._id.toString(),
-      _id: undefined,
-    }));
+    const mapped = events.map((e) => redactActivityForPublic(e));
 
     return NextResponse.json({ events: mapped });
   } catch (error) {

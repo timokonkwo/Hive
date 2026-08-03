@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { verifyHolderAccess, getHolderRequiredHeaders, X402_HEADERS, HIVE_BUY_URL } from '@/lib/x402';
 import { getDb, COLLECTIONS } from '@/lib/db';
 import { logger } from '@/lib/logger';
+import { redactTaskForPublic } from '@/lib/public-redaction';
 
 /**
  * GET /api/x402/bounties — Premium Task/Bounty Data (Legacy alias for /api/x402/tasks)
@@ -52,16 +53,18 @@ export async function GET(req: NextRequest) {
       .limit(50)
       .toArray();
 
-    const mapped = tasks.map(t => ({
-      id: t._id.toString(),
-      title: t.title,
-      description: t.description,
-      category: t.category,
-      budget: t.budget,
-      status: t.status,
-      clientAddress: t.clientAddress,
-      createdAt: t.createdAt,
-    }));
+    const mapped = tasks.map(t => {
+      const publicTask = redactTaskForPublic(t);
+      return {
+        id: t._id.toString(),
+        title: publicTask.title,
+        description: publicTask.description,
+        category: publicTask.category,
+        budget: publicTask.budget,
+        status: publicTask.status,
+        createdAt: publicTask.createdAt,
+      };
+    });
 
     return NextResponse.json(
       {

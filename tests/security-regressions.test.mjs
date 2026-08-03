@@ -393,12 +393,20 @@ describe('scheduled marketplace activity lifecycle', () => {
   const autoAccept = read('lib/cron/auto-accept.ts');
   const autoComplete = read('lib/cron/auto-complete.ts');
   const fulfiller = read('lib/stealth-agents/fulfiller.ts');
+  const gemini = read('lib/stealth-agents/gemini.ts');
+  const publicRedaction = read('lib/public-redaction.ts');
+  const tasksRoute = read('app/api/tasks/route.ts');
+  const taskDetailRoute = read('app/api/tasks/[id]/route.ts');
+  const feedRoute = read('app/api/feed/route.ts');
+  const x402Tasks = read('app/api/x402/tasks/route.ts');
+  const x402Export = read('app/api/x402/export/route.ts');
+  const x402Bounties = read('app/api/x402/bounties/route.ts');
   const fulfillRoute = read('app/api/cron/fulfill/route.ts');
   const scheduledTasks = read('netlify/functions/scheduled-tasks.mts');
   const scheduledLifecycle = read('netlify/functions/scheduled-lifecycle.mts');
   const scheduledScan = read('netlify/functions/scheduled-scan.mts');
 
-  it('posts visible system-seeded marketplace tasks on a capped daily cadence', () => {
+  it('stores auditable scheduled-task metadata on a capped daily cadence', () => {
     assert.match(autoPost, /SCHEDULED_TASK_SOURCE\s*=\s*'hive-scheduled-marketplace'/);
     assert.match(autoPost, /SYSTEM_CLIENT_POOL/);
     assert.match(autoPost, /Hive Activity Lab/);
@@ -426,5 +434,26 @@ describe('scheduled marketplace activity lifecycle', () => {
     assert.match(fulfiller, /fulfillAcceptedBids\(limit:\s*number\s*=\s*3\):\s*Promise<number>/);
     assert.match(fulfillRoute, /FULFILL_ACCEPTED_BIDS_LIMIT/);
     assert.match(fulfillRoute, /fulfilled/);
+  });
+
+  it('redacts seed and source markers from user-facing task and feed APIs', () => {
+    assert.match(publicRedaction, /INTERNAL_TASK_FIELDS/);
+    assert.match(publicRedaction, /'systemGenerated'/);
+    assert.match(publicRedaction, /'activitySource'/);
+    assert.match(publicRedaction, /'creationSurface'/);
+    assert.match(publicRedaction, /'humanVerified'/);
+    assert.match(publicRedaction, /SAFE_ACTIVITY_METADATA_KEYS/);
+    assert.match(tasksRoute, /redactTaskForPublic/);
+    assert.match(taskDetailRoute, /redactTaskForPublic/);
+    assert.match(feedRoute, /redactActivityForPublic/);
+    assert.match(x402Tasks, /redactTaskForPublic/);
+    assert.match(x402Export, /redactTaskForPublic/);
+    assert.match(x402Bounties, /redactTaskForPublic/);
+  });
+
+  it('uses current Gemini fallback models for marketplace automation', () => {
+    assert.match(gemini, /id:\s*'gemini-3\.5-flash'/);
+    assert.match(gemini, /id:\s*'gemini-3\.5-flash-lite'/);
+    assert.doesNotMatch(gemini, /gemini-2\.5-flash-lite/);
   });
 });

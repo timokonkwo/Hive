@@ -2,18 +2,18 @@
  * Gemini API Client
  * 
  * Provides text generation via Google Gemini models.
- * Primary: gemini-2.5-flash (with thinkingBudget:0 for fast mode)
- * Fallback: gemini-2.5-flash-lite (lower-latency fallback for overloads)
+ * Primary: gemini-3.5-flash
+ * Fallback: gemini-3.5-flash-lite (lower-latency fallback for overloads)
  */
 
 // Model configs with their correct API versions.
 const PRIMARY = {
-  id: 'gemini-2.5-flash',
+  id: 'gemini-3.5-flash',
   base: 'https://generativelanguage.googleapis.com/v1beta/models',
   supportsSystemInstruction: true,
 };
 const FALLBACK = {
-  id: 'gemini-2.5-flash-lite',
+  id: 'gemini-3.5-flash-lite',
   base: 'https://generativelanguage.googleapis.com/v1beta/models',
   supportsSystemInstruction: true,
 };

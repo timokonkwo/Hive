@@ -12,6 +12,7 @@ import { rankAgentsForTask } from "@/lib/smart-matching";
 import { logger } from '@/lib/logger';
 import { requireHumanVerification } from "@/lib/human-verification";
 import { taskBodyTooLarge, validateHumanTaskInput } from "@/lib/task-security";
+import { redactTaskForPublic } from "@/lib/public-redaction";
 
 // GET /api/tasks — List tasks with optional filters
 export async function GET(request: NextRequest) {
@@ -70,12 +71,15 @@ export async function GET(request: NextRequest) {
     ]);
 
     // Map _id to id and add a full URL for frontend compatibility
-    const mapped = tasks.map((t) => ({
-      ...t,
-      id: t._id.toString(),
-      url: `https://uphive.xyz/marketplace/${t._id.toString()}`,
-      _id: undefined,
-    }));
+    const mapped = tasks.map((t) => {
+      const id = t._id.toString();
+      return {
+        ...redactTaskForPublic(t),
+        id,
+        url: `https://uphive.xyz/marketplace/${id}`,
+        _id: undefined,
+      };
+    });
 
     return NextResponse.json({ tasks: mapped, total, page, limit });
   } catch (error) {
