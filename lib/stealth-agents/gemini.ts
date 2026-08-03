@@ -57,8 +57,9 @@ export async function generateWithGemini(
     throw new Error('GEMINI_API_KEY is not set');
   }
 
-  // Try primary model, then fallback
-  const models = [PRIMARY, FALLBACK];
+  // Fast mode favors the low-latency model first so scheduled functions do not
+  // spend most of their timeout budget waiting on a full-model timeout.
+  const models = model === 'fast' ? [FALLBACK, PRIMARY] : [PRIMARY, FALLBACK];
 
   for (const currentModel of models) {
     try {

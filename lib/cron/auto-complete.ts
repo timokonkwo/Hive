@@ -42,7 +42,82 @@ function isSystemGeneratedTask(task: unknown): boolean {
     (typeof doc.clientAddress === 'string' && doc.clientAddress.startsWith('did:privy:cl_'));
 }
 
+async function reconcileSubmittedWorkInProgress(db: Awaited<ReturnType<typeof getDb>>): Promise<number> {
+  const stuckSubmissions = await db.collection(COLLECTIONS.SUBMISSIONS).aggregate([
+    { $match: { status: 'Submitted' } },
+    {
+      $addFields: {
+        taskObjectId: {
+          $convert: {
+            input: '$taskId',
+            to: 'objectId',
+            onError: null,
+            onNull: null,
+          },
+        },
+      },
+    },
+    {
+      $lookup: {
+        from: COLLECTIONS.TASKS,
+        localField: 'taskObjectId',
+        foreignField: '_id',
+        as: 'task',
+      },
+    },
+    { $unwind: '$task' },
+    { $match: { 'task.status': 'In Progress' } },
+    { $limit: 30 },
+  ]).toArray();
+
+  let reconciled = 0;
+  const now = new Date();
+
+  for (const submission of stuckSubmissions) {
+    const task = submission.task;
+    const taskId = submission.taskId;
+
+    if (!task?._id || typeof taskId !== 'string') continue;
+
+    const taskResult = await db.collection(COLLECTIONS.TASKS).updateOne(
+      { _id: task._id, status: 'In Progress' },
+      {
+        $set: {
+          status: 'In Review',
+          updatedAt: now,
+        },
+      }
+    );
+
+    if (taskResult.modifiedCount === 0) continue;
+
+    const bidQuery = submission.bidId && ObjectId.isValid(submission.bidId)
+      ? { _id: new ObjectId(submission.bidId) }
+      : {
+          taskId,
+          agentId: submission.agentId,
+          status: { $in: ['accepted', 'WorkSubmitted'] },
+        };
+
+    await db.collection(COLLECTIONS.BIDS).updateOne(
+      bidQuery,
+      {
+        $set: {
+          status: 'WorkSubmitted',
+          updatedAt: now,
+        },
+      }
+    );
+
+    reconciled++;
+    console.log(`[AUTO-COMPLETE] Reconciled submitted work for "${task.title}" into In Review`);
+  }
+
+  return reconciled;
+}
+
 export interface AutoCompleteResult {
+  tasksReconciled: number;
   tasksCompleted: number;
   tasksRejected: number;
   errors: string[];
@@ -50,32 +125,18 @@ export interface AutoCompleteResult {
 
 export async function autoCompleteStaleReviews(): Promise<AutoCompleteResult> {
   const db = await getDb();
-  const result: AutoCompleteResult = { tasksCompleted: 0, tasksRejected: 0, errors: [] };
+  const result: AutoCompleteResult = { tasksReconciled: 0, tasksCompleted: 0, tasksRejected: 0, errors: [] };
 
   const userStaleThreshold = new Date(Date.now() - USER_REVIEW_TIMEOUT_MS);
   const systemStaleThreshold = new Date(Date.now() - SYSTEM_REVIEW_TIMEOUT_MS);
 
-  // Find tasks in "In Review" status with submitted work older than the configured timeout.
+  result.tasksReconciled = await reconcileSubmittedWorkInProgress(db);
+
+  // Find tasks in "In Review" status. The submitted-work age check below decides eligibility.
   const staleTasks = await db
     .collection(COLLECTIONS.TASKS)
     .find({
       status: 'In Review',
-      $or: [
-        { updatedAt: { $lt: userStaleThreshold } },
-        {
-          $and: [
-            { updatedAt: { $lt: systemStaleThreshold } },
-            {
-              $or: [
-                { systemGenerated: true },
-                { creationSurface: 'scheduled-seed' },
-                { activitySource: SCHEDULED_TASK_SOURCE },
-                { clientAddress: { $regex: /^did:privy:cl_/ } },
-              ],
-            },
-          ],
-        },
-      ],
     })
     .limit(30)
     .toArray();
@@ -95,6 +156,11 @@ export async function autoCompleteStaleReviews(): Promise<AutoCompleteResult> {
 
       if (!submission) continue;
 
+      const isHiveOwnedTask = isSystemGeneratedTask(task);
+      const submittedAt = new Date(submission.updatedAt || submission.createdAt || task.updatedAt || 0);
+      const reviewThreshold = isHiveOwnedTask ? systemStaleThreshold : userStaleThreshold;
+      if (!(submittedAt < reviewThreshold)) continue;
+
       // Get the accepted/WorkSubmitted bid
       const bid = await db.collection(COLLECTIONS.BIDS).findOne({
         taskId,
@@ -107,7 +173,6 @@ export async function autoCompleteStaleReviews(): Promise<AutoCompleteResult> {
       const agentName = bid.agentName || task.assignedAgent || 'Agent';
 
       // Check if this is an internal (Hive-owned) submission on a Hive-owned task
-      const isHiveOwnedTask = isSystemGeneratedTask(task);
       let isHiveOwnedAgent = false;
       let agentDoc: any = null;
       if (agentId && ObjectId.isValid(agentId)) {

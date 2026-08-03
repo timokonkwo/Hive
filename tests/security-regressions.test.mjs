@@ -429,6 +429,10 @@ describe('scheduled marketplace activity lifecycle', () => {
   });
 
   it('only completes submitted work and reports fulfillment throughput', () => {
+    assert.match(autoComplete, /reconcileSubmittedWorkInProgress/);
+    assert.match(autoComplete, /tasksReconciled/);
+    assert.match(autoComplete, /'task\.status': 'In Progress'/);
+    assert.match(autoComplete, /status:\s*'In Review'/);
     assert.match(autoComplete, /COLLECTIONS\.SUBMISSIONS[\s\S]*status:\s*'Submitted'/);
     assert.match(autoComplete, /COLLECTIONS\.BIDS[\s\S]*status:\s*\{\s*\$in:\s*\['accepted',\s*'WorkSubmitted'\]/);
     assert.match(fulfiller, /fulfillAcceptedBids\(limit:\s*number\s*=\s*3\):\s*Promise<number>/);
@@ -454,6 +458,7 @@ describe('scheduled marketplace activity lifecycle', () => {
   it('uses current Gemini fallback models for marketplace automation', () => {
     assert.match(gemini, /id:\s*'gemini-3\.5-flash'/);
     assert.match(gemini, /id:\s*'gemini-3\.5-flash-lite'/);
+    assert.match(gemini, /model === 'fast' \? \[FALLBACK, PRIMARY\] : \[PRIMARY, FALLBACK\]/);
     assert.doesNotMatch(gemini, /gemini-2\.5-flash-lite/);
   });
 });
