@@ -4,13 +4,19 @@ import { autoCompleteStaleReviews } from '@/lib/cron/auto-complete';
 import { fulfillAcceptedBids } from '@/lib/stealth-agents/fulfiller';
 import { logger } from '@/lib/logger';
 
+function getFulfillmentLimit(): number {
+  const value = Number.parseInt(process.env.FULFILL_ACCEPTED_BIDS_LIMIT || '', 10);
+  if (!Number.isFinite(value)) return 3;
+  return Math.min(Math.max(value, 1), 6);
+}
+
 /**
  * GET /api/cron/lifecycle
  *
  * Handles task lifecycle progression:
- * 1. Accept stale bids (72h+ open tasks)
+ * 1. Accept stale bids
  * 2. Fulfill accepted bids (generate deliverables)
- * 3. Complete stale reviews (1h+ in review)
+ * 3. Complete stale reviews
  *
  * Runs on a separate schedule from task posting.
  * Protected by CRON_SECRET or STEALTH_AGENT_SECRET.
@@ -40,8 +46,9 @@ export async function GET(req: Request) {
 
   // 2. Fulfill accepted bids (generate deliverables via Gemini)
   try {
-    await fulfillAcceptedBids();
-    results.fulfillment = { success: true };
+    const limit = getFulfillmentLimit();
+    const fulfilled = await fulfillAcceptedBids(limit);
+    results.fulfillment = { success: true, fulfilled, limit };
   } catch (err: any) {
     results.fulfillment = { error: err.message };
     logger.error('[LIFECYCLE] Fulfillment error:', err.message);

@@ -12,7 +12,16 @@ import { getDb, COLLECTIONS } from '@/lib/db';
 import { ObjectId } from 'mongodb';
 import { calculateReputation } from '@/lib/reputation';
 
-const REVIEW_TIMEOUT_MS = 48 * 60 * 60 * 1000; // 48 hours
+const SCHEDULED_TASK_SOURCE = 'hive-scheduled-marketplace';
+
+function getIntEnv(name: string, fallback: number, min: number, max: number): number {
+  const value = Number.parseInt(process.env[name] || '', 10);
+  if (!Number.isFinite(value)) return fallback;
+  return Math.min(Math.max(value, min), max);
+}
+
+const USER_REVIEW_TIMEOUT_MS = getIntEnv('AUTO_COMPLETE_USER_REVIEW_HOURS', 48, 6, 168) * 60 * 60 * 1000;
+const SYSTEM_REVIEW_TIMEOUT_MS = getIntEnv('AUTO_COMPLETE_SYSTEM_REVIEW_HOURS', 6, 1, 72) * 60 * 60 * 1000;
 const REJECTION_RATE = 0.20; // 20% of internal submissions get rejected
 
 const REJECTION_REASONS = [
@@ -24,6 +33,15 @@ const REJECTION_REASONS = [
   { category: 'poor_quality', reason: 'Some of the analysis lacks supporting data and citations. Please strengthen the evidence behind your conclusions.' },
 ];
 
+function isSystemGeneratedTask(task: unknown): boolean {
+  if (!task || typeof task !== 'object') return false;
+  const doc = task as Record<string, unknown>;
+  return doc.systemGenerated === true ||
+    doc.creationSurface === 'scheduled-seed' ||
+    doc.activitySource === SCHEDULED_TASK_SOURCE ||
+    (typeof doc.clientAddress === 'string' && doc.clientAddress.startsWith('did:privy:cl_'));
+}
+
 export interface AutoCompleteResult {
   tasksCompleted: number;
   tasksRejected: number;
@@ -34,14 +52,30 @@ export async function autoCompleteStaleReviews(): Promise<AutoCompleteResult> {
   const db = await getDb();
   const result: AutoCompleteResult = { tasksCompleted: 0, tasksRejected: 0, errors: [] };
 
-  const staleThreshold = new Date(Date.now() - REVIEW_TIMEOUT_MS);
+  const userStaleThreshold = new Date(Date.now() - USER_REVIEW_TIMEOUT_MS);
+  const systemStaleThreshold = new Date(Date.now() - SYSTEM_REVIEW_TIMEOUT_MS);
 
-  // Find tasks in "In Review" status with a submission older than 1 hour
+  // Find tasks in "In Review" status with submitted work older than the configured timeout.
   const staleTasks = await db
     .collection(COLLECTIONS.TASKS)
     .find({
       status: 'In Review',
-      updatedAt: { $lt: staleThreshold },
+      $or: [
+        { updatedAt: { $lt: userStaleThreshold } },
+        {
+          $and: [
+            { updatedAt: { $lt: systemStaleThreshold } },
+            {
+              $or: [
+                { systemGenerated: true },
+                { creationSurface: 'scheduled-seed' },
+                { activitySource: SCHEDULED_TASK_SOURCE },
+                { clientAddress: { $regex: /^did:privy:cl_/ } },
+              ],
+            },
+          ],
+        },
+      ],
     })
     .limit(30)
     .toArray();
@@ -73,7 +107,7 @@ export async function autoCompleteStaleReviews(): Promise<AutoCompleteResult> {
       const agentName = bid.agentName || task.assignedAgent || 'Agent';
 
       // Check if this is an internal (Hive-owned) submission on a Hive-owned task
-      const isHiveOwnedTask = typeof task.clientAddress === 'string' && task.clientAddress.startsWith('did:privy:cl_');
+      const isHiveOwnedTask = isSystemGeneratedTask(task);
       let isHiveOwnedAgent = false;
       let agentDoc: any = null;
       if (agentId && ObjectId.isValid(agentId)) {
@@ -131,6 +165,8 @@ export async function autoCompleteStaleReviews(): Promise<AutoCompleteResult> {
             rejectionCategory: rejection.category,
             reason: rejection.reason,
             assignedAgent: agentName,
+            systemGenerated: isHiveOwnedTask,
+            source: isHiveOwnedTask ? SCHEDULED_TASK_SOURCE : 'client-review-timeout',
           },
           createdAt: now,
         });
@@ -183,6 +219,8 @@ export async function autoCompleteStaleReviews(): Promise<AutoCompleteResult> {
             satisfaction: rating,
             comment,
             tags: [],
+            systemGenerated: isHiveOwnedTask,
+            source: isHiveOwnedTask ? SCHEDULED_TASK_SOURCE : 'client-review-timeout',
             createdAt: now,
           });
         } catch (e: any) {
@@ -235,6 +273,8 @@ export async function autoCompleteStaleReviews(): Promise<AutoCompleteResult> {
           taskTitle: task.title,
           assignedAgent: agentName,
           rating,
+          systemGenerated: isHiveOwnedTask,
+          source: isHiveOwnedTask ? SCHEDULED_TASK_SOURCE : 'client-review-timeout',
         },
         createdAt: now,
       });

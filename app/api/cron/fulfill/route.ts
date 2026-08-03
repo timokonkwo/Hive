@@ -2,6 +2,12 @@ import { NextResponse } from 'next/server';
 import { fulfillAcceptedBids } from '@/lib/stealth-agents/fulfiller';
 import { logger } from '@/lib/logger';
 
+function getFulfillmentLimit(): number {
+  const value = Number.parseInt(process.env.FULFILL_ACCEPTED_BIDS_LIMIT || '', 10);
+  if (!Number.isFinite(value)) return 3;
+  return Math.min(Math.max(value, 1), 6);
+}
+
 /**
  * GET /api/cron/fulfill
  *
@@ -25,10 +31,13 @@ export async function GET(req: Request) {
   }
 
   try {
-    logger.info('[FULFILL] Starting fulfillment run');
-    await fulfillAcceptedBids();
+    const limit = getFulfillmentLimit();
+    logger.info(`[FULFILL] Starting fulfillment run (limit=${limit})`);
+    const fulfilled = await fulfillAcceptedBids(limit);
     return NextResponse.json({
       success: true,
+      fulfilled,
+      limit,
       timestamp: new Date().toISOString(),
     });
   } catch (err: any) {

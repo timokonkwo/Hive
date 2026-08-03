@@ -6,9 +6,9 @@ import { logger } from '@/lib/logger';
 /**
  * GET /api/cron/auto-accept
  *
- * Hourly cron job that:
- * 1. Auto-accepts the best bid on tasks open for 48+ hours
- * 2. Auto-completes tasks stuck in "In Review" for 1+ hour
+ * Lifecycle cron job that:
+ * 1. Auto-accepts the best bid on stale open tasks
+ * 2. Auto-completes tasks stuck in "In Review" past the configured review window
  *
  * Protected by CRON_SECRET or STEALTH_AGENT_SECRET.
  */
@@ -26,10 +26,10 @@ export async function GET(req: NextRequest) {
   }
 
   try {
-    // Step 1: Auto-accept stale bids (48h+ open tasks)
+    // Step 1: Auto-accept stale bids
     const acceptResult = await autoAcceptStaleBids();
 
-    // Step 2: Auto-complete stale reviews (1h+ in review)
+    // Step 2: Auto-complete stale reviews
     const completeResult = await autoCompleteStaleReviews();
 
     return NextResponse.json({

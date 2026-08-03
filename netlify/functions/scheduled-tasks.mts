@@ -2,7 +2,8 @@ import type { Config } from '@netlify/functions';
 
 /**
  * Scheduled Function: Task Posting
- * Runs at 8 AM and 8 PM UTC daily (1 task per run = 2 tasks/day).
+ * Runs at 8 AM and 8 PM UTC daily.
+ * The API route controls the per-run count and 24-hour cap.
  *
  * Only posts a task. Scanning, bidding, lifecycle, and fulfillment
  * are handled by their own schedulers:
@@ -36,5 +37,5 @@ export default async () => {
 };
 
 export const config: Config = {
-  schedule: '0 8 */3 * *',
+  schedule: '0 8,20 * * *',
 };

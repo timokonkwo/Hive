@@ -5,8 +5,8 @@ import { logger } from '@/lib/logger';
 /**
  * GET /api/cron/auto-post
  *
- * Creates 2-3 scheduled tasks with varied content.
- * Designed to run twice daily (every 12 hours).
+ * Creates capped, clearly system-seeded scheduled tasks with varied content.
+ * Designed to run twice daily.
  * Protected by CRON_SECRET or STEALTH_AGENT_SECRET.
  */
 export async function GET(req: NextRequest) {

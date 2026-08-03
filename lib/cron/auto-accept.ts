@@ -1,7 +1,7 @@
 /**
  * Auto-Accept Stale Bids
  * 
- * If a task has been Open for 72+ hours and has at least one pending bid,
+ * If a task has been Open long enough and has at least one pending bid,
  * accept the bid from the agent with the highest reputation.
  * Keeps the pipeline flowing when clients are unresponsive.
  */
@@ -9,7 +9,25 @@
 import { getDb, COLLECTIONS } from '@/lib/db';
 import { ObjectId } from 'mongodb';
 
-const STALE_THRESHOLD_MS = 72 * 60 * 60 * 1000; // 72 hours
+const SCHEDULED_TASK_SOURCE = 'hive-scheduled-marketplace';
+
+function getIntEnv(name: string, fallback: number, min: number, max: number): number {
+  const value = Number.parseInt(process.env[name] || '', 10);
+  if (!Number.isFinite(value)) return fallback;
+  return Math.min(Math.max(value, min), max);
+}
+
+const USER_STALE_THRESHOLD_MS = getIntEnv('AUTO_ACCEPT_USER_STALE_HOURS', 72, 24, 168) * 60 * 60 * 1000;
+const SYSTEM_STALE_THRESHOLD_MS = getIntEnv('AUTO_ACCEPT_SYSTEM_STALE_HOURS', 24, 1, 72) * 60 * 60 * 1000;
+
+function isSystemGeneratedTask(task: unknown): boolean {
+  if (!task || typeof task !== 'object') return false;
+  const doc = task as Record<string, unknown>;
+  return doc.systemGenerated === true ||
+    doc.creationSurface === 'scheduled-seed' ||
+    doc.activitySource === SCHEDULED_TASK_SOURCE ||
+    (typeof doc.clientAddress === 'string' && doc.clientAddress.startsWith('did:privy:cl_'));
+}
 
 export interface AutoAcceptResult {
   tasksProcessed: number;
@@ -21,17 +39,34 @@ export async function autoAcceptStaleBids(): Promise<AutoAcceptResult> {
   const db = await getDb();
   const result: AutoAcceptResult = { tasksProcessed: 0, bidsAccepted: 0, errors: [] };
 
-  const staleThreshold = new Date(Date.now() - STALE_THRESHOLD_MS);
+  const userStaleThreshold = new Date(Date.now() - USER_STALE_THRESHOLD_MS);
+  const systemStaleThreshold = new Date(Date.now() - SYSTEM_STALE_THRESHOLD_MS);
+  const maxTasksPerRun = getIntEnv('AUTO_ACCEPT_TASKS_PER_RUN', 5, 1, 20);
 
-  // Find open tasks created more than 48 hours ago that have proposals
+  // Find open tasks that have proposals and are stale enough for their source.
   const staleTasks = await db
     .collection(COLLECTIONS.TASKS)
     .find({
       status: 'Open',
-      createdAt: { $lt: staleThreshold },
       proposalsCount: { $gt: 0 },
+      $or: [
+        { createdAt: { $lt: userStaleThreshold } },
+        {
+          $and: [
+            { createdAt: { $lt: systemStaleThreshold } },
+            {
+              $or: [
+                { systemGenerated: true },
+                { creationSurface: 'scheduled-seed' },
+                { activitySource: SCHEDULED_TASK_SOURCE },
+                { clientAddress: { $regex: /^did:privy:cl_/ } },
+              ],
+            },
+          ],
+        },
+      ],
     })
-    .limit(3) // Process max 3 per run to stay within timeout
+    .limit(maxTasksPerRun)
     .toArray();
 
   console.log(`[AUTO-ACCEPT] Found ${staleTasks.length} stale task(s) with bids`);
@@ -74,15 +109,16 @@ export async function autoAcceptStaleBids(): Promise<AutoAcceptResult> {
       const bestBid = bidsWithRep[0].bid;
 
       // Accept the best bid
+      const now = new Date();
       await db.collection(COLLECTIONS.BIDS).updateOne(
         { _id: bestBid._id },
-        { $set: { status: 'accepted', updatedAt: new Date() } }
+        { $set: { status: 'accepted', updatedAt: now } }
       );
 
       // Reject other pending bids
       await db.collection(COLLECTIONS.BIDS).updateMany(
         { taskId, _id: { $ne: bestBid._id }, status: 'Pending' },
-        { $set: { status: 'rejected', updatedAt: new Date() } }
+        { $set: { status: 'rejected', updatedAt: now } }
       );
 
       // Update task status
@@ -92,13 +128,15 @@ export async function autoAcceptStaleBids(): Promise<AutoAcceptResult> {
           $set: {
             status: 'In Progress',
             assignedAgent: bestBid.agentId,
+            assignedAgentId: bestBid.agentId,
             assignedAgentName: bestBid.agentName || null,
-            updatedAt: new Date(),
+            updatedAt: now,
           },
         }
       );
 
       // Log activity — attributed to the task's client
+      const systemGenerated = isSystemGeneratedTask(task);
       await db.collection(COLLECTIONS.ACTIVITY).insertOne({
         type: 'ProposalAccepted',
         taskId: task._id,
@@ -108,8 +146,11 @@ export async function autoAcceptStaleBids(): Promise<AutoAcceptResult> {
           agentName: bestBid.agentName,
           agentId: bestBid.agentId,
           bidAmount: bestBid.amount,
+          autoAccepted: true,
+          systemGenerated,
+          source: systemGenerated ? SCHEDULED_TASK_SOURCE : 'client-stale-bid',
         },
-        createdAt: new Date(),
+        createdAt: now,
       });
 
       result.bidsAccepted++;

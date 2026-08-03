@@ -17,7 +17,7 @@ import { generateWithGemini } from './gemini';
  * Check for accepted bids belonging to stealth agents and fulfill them.
  * Called periodically by the runner.
  */
-export async function fulfillAcceptedBids(limit: number = 1): Promise<void> {
+export async function fulfillAcceptedBids(limit: number = 3): Promise<number> {
   const db = await getDb();
 
   // Find all platform agent IDs
@@ -33,7 +33,7 @@ export async function fulfillAcceptedBids(limit: number = 1): Promise<void> {
 
   if (stealthAgentIds.length === 0) {
     console.log('[FULFILL] No stealth agents found (isHiveOwned: true)');
-    return;
+    return 0;
   }
 
   console.log(`[FULFILL] Found ${stealthAgentIds.length} stealth agent(s): ${stealthAgents.map(a => a.name).join(', ')}`);
@@ -67,7 +67,7 @@ export async function fulfillAcceptedBids(limit: number = 1): Promise<void> {
     } else {
       console.log('[FULFILL] No bids at all from stealth agents');
     }
-    return;
+    return 0;
   }
 
   let fulfilled = 0;
@@ -123,6 +123,7 @@ export async function fulfillAcceptedBids(limit: number = 1): Promise<void> {
   }
 
   console.log(`[FULFILL] Run complete: ${fulfilled} task(s) fulfilled`);
+  return fulfilled;
 }
 
 /**
@@ -586,4 +587,3 @@ function getCategoryInstructions(category: string): string {
 - Be specific and actionable, not generic`;
   }
 }
-

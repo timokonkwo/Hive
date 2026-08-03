@@ -387,3 +387,44 @@ describe('Solana browser transaction routing', () => {
     assert.doesNotMatch(swapWidget, /encoding:\s*"base58"/);
   });
 });
+
+describe('scheduled marketplace activity lifecycle', () => {
+  const autoPost = read('lib/cron/auto-post-tasks.ts');
+  const autoAccept = read('lib/cron/auto-accept.ts');
+  const autoComplete = read('lib/cron/auto-complete.ts');
+  const fulfiller = read('lib/stealth-agents/fulfiller.ts');
+  const fulfillRoute = read('app/api/cron/fulfill/route.ts');
+  const scheduledTasks = read('netlify/functions/scheduled-tasks.mts');
+  const scheduledLifecycle = read('netlify/functions/scheduled-lifecycle.mts');
+  const scheduledScan = read('netlify/functions/scheduled-scan.mts');
+
+  it('posts visible system-seeded marketplace tasks on a capped daily cadence', () => {
+    assert.match(autoPost, /SCHEDULED_TASK_SOURCE\s*=\s*'hive-scheduled-marketplace'/);
+    assert.match(autoPost, /SYSTEM_CLIENT_POOL/);
+    assert.match(autoPost, /Hive Activity Lab/);
+    assert.doesNotMatch(autoPost, /alexreed|jordan\.t|priya_s/);
+    assert.match(autoPost, /AUTO_POST_TASKS_PER_RUN/);
+    assert.match(autoPost, /AUTO_POST_MAX_PER_WINDOW/);
+    assert.match(autoPost, /systemGenerated:\s*true/);
+    assert.match(autoPost, /creationSurface:\s*'scheduled-seed'/);
+    assert.match(autoPost, /humanVerified:\s*false/);
+    assert.match(scheduledTasks, /schedule:\s*'0 8,20 \* \* \*'/);
+  });
+
+  it('keeps lifecycle automation frequent enough to prevent multi-day stalls', () => {
+    assert.match(scheduledLifecycle, /schedule:\s*'0 \*\/3 \* \* \*'/);
+    assert.match(scheduledScan, /schedule:\s*'0 \*\/2 \* \* \*'/);
+    assert.match(autoAccept, /AUTO_ACCEPT_USER_STALE_HOURS/);
+    assert.match(autoAccept, /AUTO_ACCEPT_SYSTEM_STALE_HOURS/);
+    assert.match(autoComplete, /AUTO_COMPLETE_USER_REVIEW_HOURS/);
+    assert.match(autoComplete, /AUTO_COMPLETE_SYSTEM_REVIEW_HOURS/);
+  });
+
+  it('only completes submitted work and reports fulfillment throughput', () => {
+    assert.match(autoComplete, /COLLECTIONS\.SUBMISSIONS[\s\S]*status:\s*'Submitted'/);
+    assert.match(autoComplete, /COLLECTIONS\.BIDS[\s\S]*status:\s*\{\s*\$in:\s*\['accepted',\s*'WorkSubmitted'\]/);
+    assert.match(fulfiller, /fulfillAcceptedBids\(limit:\s*number\s*=\s*3\):\s*Promise<number>/);
+    assert.match(fulfillRoute, /FULFILL_ACCEPTED_BIDS_LIMIT/);
+    assert.match(fulfillRoute, /fulfilled/);
+  });
+});

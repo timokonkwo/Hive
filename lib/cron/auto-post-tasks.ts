@@ -1,48 +1,32 @@
 /**
  * Auto-Post Tasks
  * 
- * Creates and publishes unique tasks on a schedule using Gemini.
- * Each run generates a fresh task — never repeats the same title.
- * Budget range: $0.50–$3 USDC, weighted toward $1.
+ * Creates and publishes unique system-seeded tasks on a schedule using Gemini.
+ * Each run generates fresh, useful marketplace work while marking it as
+ * scheduled Hive activity instead of pretending it came from an outside client.
+ * Budget range: $0.50-$3 USDC, weighted toward $1.
  */
 
 import { getDb, COLLECTIONS } from '@/lib/db';
 import { generateWithGemini } from '@/lib/stealth-agents/gemini';
 import { rankAgentsForTask } from '@/lib/smart-matching';
 
-// Client pool for scheduled task creation
-const CLIENT_POOL = [
-  { name: 'alexreed', address: 'did:privy:cl_alexreed' },
-  { name: 'jordan.t', address: 'did:privy:cl_jordant' },
-  { name: 'priya_s', address: 'did:privy:cl_priyas' },
-  { name: 'marcelo.dev', address: 'did:privy:cl_marcelodev' },
-  { name: 'sarahk', address: 'did:privy:cl_sarahk' },
-  { name: 'benwright', address: 'did:privy:cl_benwright' },
-  { name: 'dan.okoro', address: 'did:privy:cl_danokoro' },
-  { name: 'tina.w', address: 'did:privy:cl_tinaw' },
-  { name: 'mikechen', address: 'did:privy:cl_mikechen' },
-  { name: 'olawale_', address: 'did:privy:cl_olawale' },
-  { name: 'emilyjones', address: 'did:privy:cl_emilyjones' },
-  { name: 'raj.p', address: 'did:privy:cl_rajp' },
-  { name: 'karla.m', address: 'did:privy:cl_karlam' },
-  { name: 'yusuf_a', address: 'did:privy:cl_yusufa' },
-  { name: 'lucas.h', address: 'did:privy:cl_lucash' },
-  { name: 'chioma.n', address: 'did:privy:cl_chioman' },
-  { name: 'jamespark', address: 'did:privy:cl_jamespark' },
-  { name: 'natalief', address: 'did:privy:cl_natalief' },
-  { name: 'omar.kh', address: 'did:privy:cl_omarkh' },
-  { name: 'sofiav', address: 'did:privy:cl_sofiav' },
-  { name: 'kwame.b', address: 'did:privy:cl_kwameb' },
-  { name: 'hannah_r', address: 'did:privy:cl_hannahr' },
-  { name: 'davide.c', address: 'did:privy:cl_davidec' },
-  { name: 'amara.o', address: 'did:privy:cl_amarao' },
-  { name: 'ryanl', address: 'did:privy:cl_ryanl' },
-  { name: 'mei.lin', address: 'did:privy:cl_meilin' },
-  { name: 'tobi_e', address: 'did:privy:cl_tobie' },
-  { name: 'isabelle.f', address: 'did:privy:cl_isabellef' },
-  { name: 'kenji.t', address: 'did:privy:cl_kenjit' },
-  { name: 'aisha.d', address: 'did:privy:cl_aishad' },
+export const SCHEDULED_TASK_SOURCE = 'hive-scheduled-marketplace';
+
+// Visible system client pool for scheduled task creation.
+const SYSTEM_CLIENT_POOL = [
+  { name: 'Hive Activity Lab', address: 'did:privy:cl_hive_activity_lab' },
+  { name: 'Hive Build Bench', address: 'did:privy:cl_hive_build_bench' },
+  { name: 'Hive Research Desk', address: 'did:privy:cl_hive_research_desk' },
+  { name: 'Hive QA Queue', address: 'did:privy:cl_hive_qa_queue' },
+  { name: 'Hive Ops Studio', address: 'did:privy:cl_hive_ops_studio' },
 ];
+
+function getIntEnv(name: string, fallback: number, min: number, max: number): number {
+  const value = Number.parseInt(process.env[name] || '', 10);
+  if (!Number.isFinite(value)) return fallback;
+  return Math.min(Math.max(value, min), max);
+}
 
 // Categories with descriptions and example tasks to guide Gemini
 const CATEGORIES = [
@@ -329,14 +313,15 @@ RULES:
 - Title: concise, action-oriented, under 80 characters
 - Description: Use markdown formatting. Start with 1-2 sentences of context, then a bullet list of specific deliverables. Use **bold** for key terms. A reader should know exactly what work is expected and what to deliver.
 - Tags: 2-4 relevant tags
-- Be specific and realistic — real clients posting real work
+- Be specific and realistic as useful seed work for an active marketplace
+- Do NOT invent a named outside company, customer, or private dataset
 - Do NOT mention AI, agents, or Hive in the task itself
 
 RESPOND IN EXACTLY THIS JSON FORMAT (no markdown, no code fences):
 {"title": "...", "description": "...", "tags": ["...", "..."]}`;
 
     const response = await generateWithGemini(
-      'You generate realistic freelance task listings. Be specific and practical. No filler.',
+      'You generate useful freelance task listings for a clearly system-seeded marketplace queue. Be specific, practical, and transparent. No filler.',
       prompt
     );
 
@@ -446,17 +431,29 @@ export async function autoPostTasks(): Promise<AutoPostResult> {
   const db = await getDb();
   const result: AutoPostResult = { tasksCreated: 0, taskIds: [], agentBids: [], errors: [] };
 
-  // Guard: max 1 auto-posted task every 3 days (72 hours)
-  const seventyTwoHoursAgo = new Date(Date.now() - 72 * 60 * 60 * 1000);
+  const tasksPerRun = getIntEnv('AUTO_POST_TASKS_PER_RUN', 2, 1, 4);
+  const postWindowHours = getIntEnv('AUTO_POST_WINDOW_HOURS', 24, 1, 168);
+  const maxTasksPerWindow = getIntEnv('AUTO_POST_MAX_PER_WINDOW', 6, 1, 12);
+  const windowStart = new Date(Date.now() - postWindowHours * 60 * 60 * 1000);
+
+  // Guard: keep scheduled activity steady without flooding the marketplace.
   const autoPostedRecently = await db
     .collection(COLLECTIONS.TASKS)
     .countDocuments({
-      clientAddress: { $regex: /^did:privy:cl_/ },
-      createdAt: { $gte: seventyTwoHoursAgo },
+      createdAt: { $gte: windowStart },
+      $or: [
+        { systemGenerated: true },
+        { creationSurface: 'scheduled-seed' },
+        { activitySource: SCHEDULED_TASK_SOURCE },
+        { clientAddress: { $regex: /^did:privy:cl_/ } },
+      ],
     });
 
-  if (autoPostedRecently >= 1) {
-    console.log(`[AUTO-POST] Already posted ${autoPostedRecently} tasks in the last 72 hours, skipping`);
+  const remainingWindowCapacity = Math.max(0, maxTasksPerWindow - autoPostedRecently);
+  const tasksToCreate = Math.min(tasksPerRun, remainingWindowCapacity);
+
+  if (tasksToCreate === 0) {
+    console.log(`[AUTO-POST] Already posted ${autoPostedRecently} scheduled task(s) in the last ${postWindowHours}h, skipping`);
     return result;
   }
 
@@ -470,131 +467,147 @@ export async function autoPostTasks(): Promise<AutoPostResult> {
     .toArray();
   const recentTitles = recentTasks.map(t => t.title).filter(Boolean);
 
-  // Pick a category and generate a unique task
-  const category = pickCategory();
+  for (let i = 0; i < tasksToCreate; i++) {
+    // Pick a category and generate a unique task
+    const category = pickCategory();
 
-  try {
-    const generated = await generateUniqueTask(category, recentTitles);
+    try {
+      const generated = await generateUniqueTask(category, recentTitles);
 
-    if (!generated.title) {
-      result.errors.push('Generated task had empty title');
-      return result;
-    }
+      if (!generated.title) {
+        result.errors.push('Generated task had empty title');
+        continue;
+      }
 
-    const client = CLIENT_POOL[Math.floor(Math.random() * CLIENT_POOL.length)];
+      recentTitles.push(generated.title);
+      const client = SYSTEM_CLIENT_POOL[Math.floor(Math.random() * SYSTEM_CLIENT_POOL.length)];
 
-    // Budget weighted toward $1: 50% -> $1, 15% -> $0.50, 35% -> $1-$3
-    const roll = Math.random();
-    let budgetAmount: number;
-    if (roll < 0.50) {
-      budgetAmount = 1;
-    } else if (roll < 0.65) {
-      budgetAmount = 0.5;
-    } else {
-      budgetAmount = 1 + Math.floor(Math.random() * 3);
-    }
-    const budget = `$${budgetAmount} USDC`;
+      // Budget weighted toward $1: 50% -> $1, 15% -> $0.50, 35% -> $1-$3
+      const roll = Math.random();
+      let budgetAmount: number;
+      if (roll < 0.50) {
+        budgetAmount = 1;
+      } else if (roll < 0.65) {
+        budgetAmount = 0.5;
+      } else {
+        budgetAmount = 1 + Math.floor(Math.random() * 3);
+      }
+      const budget = `$${budgetAmount} USDC`;
 
-    // ─── Direct Routing: instant match to best agent ───
-    const matches = await rankAgentsForTask(
-      db,
-      {
+      // Direct Routing: instant match to best agent
+      const matches = await rankAgentsForTask(
+        db,
+        {
+          title: generated.title,
+          description: generated.description,
+          category: generated.resolvedCategory,
+          requirements: '',
+          tags: generated.tags,
+          budget,
+          budgetAmount,
+        },
+        { limit: 5 }
+      );
+
+      const bestMatch = matches.length > 0 ? matches[0] : null;
+      const now = new Date();
+
+      const task = {
         title: generated.title,
         description: generated.description,
         category: generated.resolvedCategory,
-        requirements: '',
         tags: generated.tags,
+        requirements: '',
         budget,
         budgetAmount,
-      },
-      { limit: 5 }
-    );
-
-    const bestMatch = matches.length > 0 ? matches[0] : null;
-
-    const task = {
-      title: generated.title,
-      description: generated.description,
-      category: generated.resolvedCategory,
-      tags: generated.tags,
-      requirements: '',
-      budget,
-      budgetAmount,
-      status: bestMatch ? 'In Progress' : 'Open',
-      clientAddress: client.address,
-      clientName: client.name,
-      assignedAgent: bestMatch?.agent?.name || null,
-      assignedAgentId: bestMatch?.agentId || null,
-      proposalsCount: bestMatch ? 1 : 0,
-      tokenConfig: null,
-      deliverableSpecs: getDeliverableSpecs(generated.resolvedCategory),
-      instantMatch: !!bestMatch,
-      matchScore: bestMatch?.score || null,
-      matchConfidence: bestMatch?.confidence || null,
-      createdAt: new Date(),
-      updatedAt: new Date(),
-    };
-
-    const insertResult = await db.collection(COLLECTIONS.TASKS).insertOne(task);
-    const taskId = insertResult.insertedId.toString();
-    result.taskIds.push(taskId);
-
-    // Create auto-accepted routing record if matched
-    if (bestMatch) {
-      const bid = {
-        taskId,
-        agentId: bestMatch.agentId,
-        agentName: bestMatch.agent.name,
-        agentAddress: bestMatch.agent.solanaAddress || null,
-        amount: budget,
-        timeEstimate: '2-4 days',
-        coverLetter: `Matched automatically by Hive with ${bestMatch.confidence} confidence (${bestMatch.score}/100). ${bestMatch.reasons.join(' ')}`,
-        status: 'accepted',
-        autoMatched: true,
-        matchScore: bestMatch.score,
-        matchReasons: bestMatch.reasons,
-        createdAt: new Date(),
+        status: bestMatch ? 'In Progress' : 'Open',
+        clientAddress: client.address,
+        clientName: client.name,
+        assignedAgent: bestMatch?.agentId || null,
+        assignedAgentId: bestMatch?.agentId || null,
+        assignedAgentName: bestMatch?.agent?.name || null,
+        proposalsCount: bestMatch ? 1 : 0,
+        tokenConfig: null,
+        deliverableSpecs: getDeliverableSpecs(generated.resolvedCategory),
+        instantMatch: !!bestMatch,
+        matchScore: bestMatch?.score || null,
+        matchConfidence: bestMatch?.confidence || null,
+        systemGenerated: true,
+        activitySource: SCHEDULED_TASK_SOURCE,
+        creationSurface: 'scheduled-seed',
+        humanVerified: false,
+        createdAt: now,
+        updatedAt: now,
       };
 
-      await db.collection(COLLECTIONS.BIDS).insertOne(bid);
-      result.agentBids.push(`${bestMatch.agent.name} (${bestMatch.score}/100)`);
+      const insertResult = await db.collection(COLLECTIONS.TASKS).insertOne(task);
+      const taskId = insertResult.insertedId.toString();
+      result.taskIds.push(taskId);
 
-      // Log match activity
-      await db.collection(COLLECTIONS.ACTIVITY).insertOne({
-        type: 'BidAccepted',
-        taskId: insertResult.insertedId,
-        actorName: bestMatch.agent.name,
-        metadata: {
-          taskTitle: generated.title,
-          agentName: bestMatch.agent.name,
+      // Create auto-accepted routing record if matched
+      if (bestMatch) {
+        const bid = {
+          taskId,
           agentId: bestMatch.agentId,
+          agentName: bestMatch.agent.name,
+          agentAddress: bestMatch.agent.solanaAddress || null,
+          amount: budget,
+          timeEstimate: '2-4 days',
+          coverLetter: `Matched automatically by Hive with ${bestMatch.confidence} confidence (${bestMatch.score}/100). ${bestMatch.reasons.join(' ')}`,
+          status: 'accepted',
           autoMatched: true,
+          matchScore: bestMatch.score,
+          matchReasons: bestMatch.reasons,
+          systemGenerated: true,
+          activitySource: SCHEDULED_TASK_SOURCE,
+          createdAt: now,
+          updatedAt: now,
+        };
+
+        await db.collection(COLLECTIONS.BIDS).insertOne(bid);
+        result.agentBids.push(`${bestMatch.agent.name} (${bestMatch.score}/100)`);
+
+        // Log match activity
+        await db.collection(COLLECTIONS.ACTIVITY).insertOne({
+          type: 'BidAccepted',
+          taskId: insertResult.insertedId,
+          actorName: bestMatch.agent.name,
+          metadata: {
+            taskTitle: generated.title,
+            agentName: bestMatch.agent.name,
+            agentId: bestMatch.agentId,
+            autoMatched: true,
+            systemGenerated: true,
+            source: SCHEDULED_TASK_SOURCE,
+          },
+          createdAt: now,
+        });
+      }
+
+      // Log task creation activity
+      await db.collection(COLLECTIONS.ACTIVITY).insertOne({
+        type: 'TaskCreated',
+        taskId: insertResult.insertedId,
+        actorAddress: client.address,
+        actorName: client.name,
+        metadata: {
+          title: generated.title,
+          category: generated.resolvedCategory,
+          budget,
+          instantMatch: !!bestMatch,
+          systemGenerated: true,
+          source: SCHEDULED_TASK_SOURCE,
         },
-        createdAt: new Date(),
+        createdAt: now,
       });
+
+      result.tasksCreated++;
+      const matchInfo = bestMatch ? ` -> instant matched to ${bestMatch.agent.name} (${bestMatch.score}/100)` : ' (no match, posted as Open)';
+      console.log(`[AUTO-POST] Created "${generated.title}" [${generated.resolvedCategory}] by ${client.name} ($${budgetAmount} USDC)${matchInfo}`);
+    } catch (error: any) {
+      result.errors.push(`Task generation error: ${error.message}`);
+      console.error(`[AUTO-POST] Error:`, error.message);
     }
-
-    // Log task creation activity
-    await db.collection(COLLECTIONS.ACTIVITY).insertOne({
-      type: 'TaskCreated',
-      taskId: insertResult.insertedId,
-      actorAddress: client.address,
-      actorName: client.name,
-      metadata: {
-        title: generated.title,
-        category: generated.resolvedCategory,
-        budget,
-        instantMatch: !!bestMatch,
-      },
-      createdAt: new Date(),
-    });
-
-    result.tasksCreated++;
-    const matchInfo = bestMatch ? ` -> instant matched to ${bestMatch.agent.name} (${bestMatch.score}/100)` : ' (no match, posted as Open)';
-    console.log(`[AUTO-POST] Created "${generated.title}" [${generated.resolvedCategory}] by ${client.name} ($${budgetAmount} USDC)${matchInfo}`);
-  } catch (error: any) {
-    result.errors.push(`Task generation error: ${error.message}`);
-    console.error(`[AUTO-POST] Error:`, error.message);
   }
 
   return result;
