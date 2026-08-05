@@ -116,8 +116,107 @@ async function reconcileSubmittedWorkInProgress(db: Awaited<ReturnType<typeof ge
   return reconciled;
 }
 
+async function reconcileApprovedWorkInProgress(db: Awaited<ReturnType<typeof getDb>>): Promise<number> {
+  const approvedSubmissions = await db.collection(COLLECTIONS.SUBMISSIONS).aggregate([
+    { $match: { status: 'Approved' } },
+    {
+      $addFields: {
+        taskObjectId: {
+          $convert: {
+            input: '$taskId',
+            to: 'objectId',
+            onError: null,
+            onNull: null,
+          },
+        },
+      },
+    },
+    {
+      $lookup: {
+        from: COLLECTIONS.TASKS,
+        localField: 'taskObjectId',
+        foreignField: '_id',
+        as: 'task',
+      },
+    },
+    { $unwind: '$task' },
+    { $match: { 'task.status': 'In Progress' } },
+    { $limit: 30 },
+  ]).toArray();
+
+  let reconciled = 0;
+  const now = new Date();
+
+  for (const submission of approvedSubmissions) {
+    const task = submission.task;
+    const taskId = submission.taskId;
+
+    if (!task?._id || typeof taskId !== 'string') continue;
+
+    const taskResult = await db.collection(COLLECTIONS.TASKS).updateOne(
+      { _id: task._id, status: 'In Progress' },
+      {
+        $set: {
+          status: 'Completed',
+          completedAt: task.completedAt || submission.updatedAt || submission.createdAt || now,
+          updatedAt: now,
+        },
+      }
+    );
+
+    if (taskResult.modifiedCount === 0) continue;
+
+    const bidQuery = submission.bidId && ObjectId.isValid(submission.bidId)
+      ? { _id: new ObjectId(submission.bidId) }
+      : {
+          taskId,
+          agentId: submission.agentId,
+          status: { $in: ['accepted', 'WorkSubmitted'] },
+        };
+
+    await db.collection(COLLECTIONS.BIDS).updateOne(
+      bidQuery,
+      {
+        $set: {
+          status: 'Completed',
+          updatedAt: now,
+        },
+      }
+    );
+
+    const taskIdValues: any[] = [taskId];
+    if (ObjectId.isValid(taskId)) taskIdValues.push(new ObjectId(taskId));
+    const existingActivity = await db.collection(COLLECTIONS.ACTIVITY).findOne({
+      type: 'TaskCompleted',
+      taskId: { $in: taskIdValues },
+    });
+
+    if (!existingActivity) {
+      await db.collection(COLLECTIONS.ACTIVITY).insertOne({
+        type: 'TaskCompleted',
+        taskId,
+        actorName: task.clientName || 'Client',
+        metadata: {
+          taskTitle: task.title,
+          assignedAgent: submission.agentName || task.assignedAgentName || task.assignedAgent,
+          reconciledFromApprovedSubmission: true,
+          systemGenerated: isSystemGeneratedTask(task),
+          source: isSystemGeneratedTask(task) ? SCHEDULED_TASK_SOURCE : 'approved-work-reconcile',
+        },
+        createdAt: now,
+      });
+    }
+
+    reconciled++;
+    console.log(`[AUTO-COMPLETE] Reconciled approved work for "${task.title}" into Completed`);
+  }
+
+  return reconciled;
+}
+
 export interface AutoCompleteResult {
   tasksReconciled: number;
+  tasksApprovedReconciled: number;
   tasksCompleted: number;
   tasksRejected: number;
   errors: string[];
@@ -125,11 +224,18 @@ export interface AutoCompleteResult {
 
 export async function autoCompleteStaleReviews(): Promise<AutoCompleteResult> {
   const db = await getDb();
-  const result: AutoCompleteResult = { tasksReconciled: 0, tasksCompleted: 0, tasksRejected: 0, errors: [] };
+  const result: AutoCompleteResult = {
+    tasksReconciled: 0,
+    tasksApprovedReconciled: 0,
+    tasksCompleted: 0,
+    tasksRejected: 0,
+    errors: [],
+  };
 
   const userStaleThreshold = new Date(Date.now() - USER_REVIEW_TIMEOUT_MS);
   const systemStaleThreshold = new Date(Date.now() - SYSTEM_REVIEW_TIMEOUT_MS);
 
+  result.tasksApprovedReconciled = await reconcileApprovedWorkInProgress(db);
   result.tasksReconciled = await reconcileSubmittedWorkInProgress(db);
 
   // Find tasks in "In Review" status. The submitted-work age check below decides eligibility.

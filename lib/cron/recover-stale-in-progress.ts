@@ -79,12 +79,12 @@ export async function recoverStaleInProgressTasks(): Promise<RecoverStaleInProgr
     const now = new Date();
 
     try {
-      const submittedCount = await db.collection(COLLECTIONS.SUBMISSIONS).countDocuments({
+      const activeSubmissionCount = await db.collection(COLLECTIONS.SUBMISSIONS).countDocuments({
         taskId,
-        status: 'Submitted',
+        status: { $in: ['Submitted', 'Approved'] },
       });
 
-      if (submittedCount > 0) {
+      if (activeSubmissionCount > 0) {
         result.skippedWithSubmissions++;
         continue;
       }

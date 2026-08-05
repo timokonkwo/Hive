@@ -75,13 +75,18 @@ export async function fulfillAcceptedBids(limit: number = 3): Promise<number> {
   for (const bid of acceptedBids) {
     if (fulfilled >= limit) break;
 
-    // Check if work has already been submitted for this bid
+    // Check if active work has already been submitted for this bid. Rejected
+    // submissions must not block a required revision.
     const existingSubmission = await db
       .collection(COLLECTIONS.SUBMISSIONS)
-      .findOne({ taskId: bid.taskId, agentId: bid.agentId });
+      .findOne({
+        taskId: bid.taskId,
+        agentId: bid.agentId,
+        status: { $in: ['Submitted', 'Approved'] },
+      });
 
     if (existingSubmission) {
-      console.log(`[FULFILL] Skipping ${bid.agentName} on task ${bid.taskId} -- already submitted`);
+      console.log(`[FULFILL] Skipping ${bid.agentName} on task ${bid.taskId} -- active submission already exists`);
       continue;
     }
 

@@ -429,19 +429,25 @@ describe('scheduled marketplace activity lifecycle', () => {
     assert.match(staleRecovery, /status:\s*'In Progress'/);
     assert.match(staleRecovery, /status:\s*'accepted'/);
     assert.match(staleRecovery, /status:\s*'rejected'/);
+    assert.match(staleRecovery, /\$in:\s*\['Submitted',\s*'Approved'\]/);
     assert.match(staleRecovery, /recoveryReassignment:\s*true/);
     assert.match(autoComplete, /AUTO_COMPLETE_USER_REVIEW_HOURS/);
     assert.match(autoComplete, /AUTO_COMPLETE_SYSTEM_REVIEW_HOURS/);
   });
 
   it('only completes submitted work and reports fulfillment throughput', () => {
+    assert.match(autoComplete, /reconcileApprovedWorkInProgress/);
+    assert.match(autoComplete, /tasksApprovedReconciled/);
+    assert.match(autoComplete, /status:\s*'Approved'/);
     assert.match(autoComplete, /reconcileSubmittedWorkInProgress/);
     assert.match(autoComplete, /tasksReconciled/);
     assert.match(autoComplete, /'task\.status': 'In Progress'/);
     assert.match(autoComplete, /status:\s*'In Review'/);
+    assert.match(autoComplete, /status:\s*'Completed'/);
     assert.match(autoComplete, /COLLECTIONS\.SUBMISSIONS[\s\S]*status:\s*'Submitted'/);
     assert.match(autoComplete, /COLLECTIONS\.BIDS[\s\S]*status:\s*\{\s*\$in:\s*\['accepted',\s*'WorkSubmitted'\]/);
     assert.match(fulfiller, /fulfillAcceptedBids\(limit:\s*number\s*=\s*3\):\s*Promise<number>/);
+    assert.match(fulfiller, /\$in:\s*\['Submitted',\s*'Approved'\]/);
     assert.match(fulfillRoute, /FULFILL_ACCEPTED_BIDS_LIMIT/);
     assert.match(fulfillRoute, /fulfilled/);
   });
