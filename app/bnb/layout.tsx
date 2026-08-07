@@ -1,5 +1,4 @@
 import type { Metadata } from "next";
-import "./bnb.css";
 
 export const metadata: Metadata = {
   title: "Hive Agents",

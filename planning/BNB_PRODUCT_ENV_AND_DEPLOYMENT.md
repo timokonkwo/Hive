@@ -9,6 +9,8 @@ Production uses two new deployments:
 
 The existing Hive site at `https://uphive.xyz` stays separate.
 
+On the `bnb` branch, the site root is the BNB product. The temporary Netlify URL and `https://bnb.uphive.xyz` must both open the BNB marketplace at `/`.
+
 ## 1. Create The BNB Netlify Site
 
 In Netlify:
@@ -88,7 +90,7 @@ https://bnb.uphive.xyz/status
 https://bnb.uphive.xyz/api/bnb/runtime
 ```
 
-The code in `middleware.ts` maps the clean subdomain URLs to the internal `/bnb` routes. The main `https://uphive.xyz` website is not changed by this subdomain routing.
+The `bnb` branch renders the BNB app at `/`. The code in `middleware.ts` also maps clean subdomain URLs like `/agents` and `/match` to the internal `/bnb` routes. The main `https://uphive.xyz` website is not changed by this subdomain routing.
 
 ## 3. Deploy The Render Worker
 

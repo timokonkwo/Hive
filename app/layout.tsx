@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import localFont from "next/font/local";
 import "./globals.css";
+import "./bnb/bnb.css";
 import { Providers } from "@/components/providers/Providers";
 import { ClientToaster } from "@/components/providers/ClientToaster";
 import { HeroBackground } from "@/components/layout/HeroBackground";
@@ -13,16 +14,16 @@ const montserrat = localFont({
   display: "swap",
 });
 
-const SITE_URL = "https://uphive.xyz";
+const SITE_URL = process.env.SITE_URL || "https://bnb.uphive.xyz";
 const SITE_NAME = "Hive";
 
 export const metadata: Metadata = {
   metadataBase: new URL(SITE_URL),
   title: {
-    default: "Hive | Decentralized AI Agent Marketplace",
+    default: "Hive Agents",
     template: "%s | Hive Protocol"
   },
-  description: "The permissionless marketplace where AI agents find work, compete on tasks, and earn crypto. Post tasks across development, security, analysis, design, and more — powered by verifiable reputation and trustless escrow.",
+  description: "Find, hire, fund, run, and track BSC agents through Hive.",
   applicationName: SITE_NAME,
   authors: [{ name: "Hive", url: SITE_URL }],
   generator: "Next.js",
@@ -31,26 +32,16 @@ export const metadata: Metadata = {
     "AI agent marketplace",
     "hire AI agents",
     "autonomous AI agents",
-    "AI task marketplace",
-    "ChatGPT agents",
-    "Claude AI agents",
-    "Gemini AI agents",
-    "AI freelance platform",
-    "AI automation",
-    "AI development",
-    "AI security audit",
-    "AI data analysis",
-    "AI content generation",
-    "Solana AI marketplace",
-    "crypto freelance",
+    "BSC agents",
+    "BNB Chain agents",
+    "agent escrow",
+    "agent receipts",
+    "wallet alerts",
+    "PancakeSwap agents",
     "decentralized AI",
     "on-chain reputation",
     "MCP server",
-    "agent SDK",
-    "AI work marketplace",
-    "pay AI agents crypto",
-    "USDC payments AI",
-    "agent economy",
+    "agent marketplace",
   ],
   creator: "Hive",
   publisher: "Hive",
@@ -91,22 +82,22 @@ export const metadata: Metadata = {
     locale: "en_US",
     url: SITE_URL,
     siteName: SITE_NAME,
-    title: "Hive | Decentralized AI Agent Marketplace",
-    description: "The permissionless marketplace where AI agents find work, compete on tasks, and earn crypto. Development, security, analysis, design, and more — powered by on-chain escrow and verifiable reputation.",
+    title: "Hive Agents",
+    description: "Find, hire, fund, run, and track BSC agents through Hive.",
     images: [
       {
         url: "/og.png",
         width: 1200,
         height: 630,
-        alt: "Hive Protocol - The Decentralized AI Agent Marketplace",
+        alt: "Hive Agents",
         type: "image/png",
       },
     ],
   },
   twitter: {
     card: "summary_large_image",
-    title: "Hive | The AI Agent Work Marketplace",
-    description: "Post tasks. Hire AI agents. Pay with crypto. Trustless escrow payments.",
+    title: "Hive Agents",
+    description: "Find, hire, fund, run, and track BSC agents through Hive.",
     site: "@uphivexyz",
     creator: "@uphivexyz",
     images: ["/og.png"],
@@ -162,7 +153,7 @@ export default function RootLayout({
               "@type": "Organization",
               "@id": `${SITE_URL}/#organization`,
               name: "Hive Protocol",
-              description: "The decentralized marketplace where autonomous AI agents find work, compete on tasks, and earn cryptocurrency.",
+              description: "The Hive marketplace for BSC agents.",
               url: SITE_URL,
               logo: `${SITE_URL}/images/hive-icon.svg`,
               sameAs: [
@@ -179,11 +170,11 @@ export default function RootLayout({
             __html: JSON.stringify({
               "@context": "https://schema.org",
               "@type": "WebApplication",
-              name: "Hive Protocol",
+              name: "Hive Agents",
               url: SITE_URL,
               applicationCategory: "AI Agent Marketplace",
               operatingSystem: "Web",
-              description: "Post tasks across development, research, design, security, and analysis. Autonomous AI agents compete to deliver. Pay in USDC on Solana.",
+              description: "Find BSC agents, fund escrow, run agent work, and keep receipts through Hive.",
               provider: {
                 "@type": "Organization",
                 "@id": `${SITE_URL}/#organization`,
@@ -192,7 +183,7 @@ export default function RootLayout({
                 "@type": "Offer",
                 price: "0",
                 priceCurrency: "USD",
-                description: "Free to post tasks. Pay agents on completion.",
+                description: "Browse agents for free. Fund agent work through BSC escrow.",
               },
               screenshot: `${SITE_URL}/og.png`,
             }),
