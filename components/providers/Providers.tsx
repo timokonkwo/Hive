@@ -4,15 +4,16 @@ import { PrivyProvider } from "@privy-io/react-auth";
 import { toSolanaWalletConnectors } from "@privy-io/react-auth/solana";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { WagmiProvider, createConfig, http } from "wagmi";
-import { mainnet } from "wagmi/chains";
+import { bsc, mainnet } from "wagmi/chains";
 import { useState } from "react";
 import { ThemeProvider } from "./ThemeProvider";
 import { HolderProvider } from "./HolderContext";
 
 const wagmiConfig = createConfig({
-  chains: [mainnet],
+  chains: [mainnet, bsc],
   transports: {
     [mainnet.id]: http(),
+    [bsc.id]: http(process.env.NEXT_PUBLIC_BNB_BSC_RPC_URL || undefined),
   },
 });
 
@@ -34,7 +35,7 @@ export function Providers({ children }: { children: React.ReactNode }) {
           },
           loginMethods: ['wallet', 'email', 'google'],
           defaultChain: mainnet,
-          supportedChains: [mainnet],
+          supportedChains: [mainnet, bsc],
           externalWallets: {
             solana: {
               connectors: solanaConnectors,

@@ -125,7 +125,69 @@ Real-time activity feed showing new tasks, agent registrations, proposals, and c
 `,
 };
 
+const BNB_SUBDOMAIN_HOSTS = new Set(['bnb.uphive.xyz']);
+
+function normalizeHost(host: string | null) {
+  return (host || '').split(':')[0]?.toLowerCase() || '';
+}
+
+function isBnbSubdomainRequest(request: NextRequest) {
+  return BNB_SUBDOMAIN_HOSTS.has(normalizeHost(request.headers.get('host')));
+}
+
+function shouldLeaveBnbPathAlone(pathname: string) {
+  return (
+    pathname.startsWith('/api/') ||
+    pathname === '/api' ||
+    pathname.startsWith('/_next/') ||
+    pathname.startsWith('/images/') ||
+    pathname.startsWith('/fonts/') ||
+    pathname.startsWith('/.well-known/') ||
+    pathname === '/favicon.ico' ||
+    pathname === '/robots.txt' ||
+    pathname === '/sitemap.xml' ||
+    pathname === '/site.webmanifest' ||
+    pathname === '/llms.txt' ||
+    pathname === '/llms-full.txt' ||
+    pathname === '/og.png' ||
+    /\.(?:css|js|map|png|jpg|jpeg|gif|webp|svg|ico|txt|xml|json|webmanifest)$/i.test(pathname)
+  );
+}
+
+function routeBnbSubdomain(request: NextRequest) {
+  if (!isBnbSubdomainRequest(request)) {
+    return null;
+  }
+
+  const pathname = request.nextUrl.pathname;
+
+  if (shouldLeaveBnbPathAlone(pathname)) {
+    return null;
+  }
+
+  const url = request.nextUrl.clone();
+
+  if (pathname === '/bnb') {
+    url.pathname = '/';
+    return NextResponse.redirect(url, 308);
+  }
+
+  if (pathname.startsWith('/bnb/')) {
+    url.pathname = pathname.slice('/bnb'.length) || '/';
+    return NextResponse.redirect(url, 308);
+  }
+
+  url.pathname = pathname === '/' ? '/bnb' : `/bnb${pathname}`;
+  return NextResponse.rewrite(url);
+}
+
 export function middleware(request: NextRequest) {
+  const bnbSubdomainResponse = routeBnbSubdomain(request);
+
+  if (bnbSubdomainResponse) {
+    return bnbSubdomainResponse;
+  }
+
   const accept = request.headers.get('accept') || '';
 
   // Only intercept if the agent explicitly requests markdown
@@ -157,16 +219,8 @@ export function middleware(request: NextRequest) {
 }
 
 export const config = {
-  // Only run on page routes, not API/static
+  // Run on pages so bnb.uphive.xyz can serve the BNB app without breaking API/static assets.
   matcher: [
-    '/',
-    '/marketplace',
-    '/agents',
-    '/docs',
-    '/leaderboard',
-    '/roadmap',
-    '/token',
-    '/agent/register',
-    '/feed',
+    '/((?!api|_next/static|_next/image|favicon.ico).*)',
   ],
 };

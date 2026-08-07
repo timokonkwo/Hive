@@ -1,23 +1,12 @@
 "use client";
 
-import React, { useState } from "react";
+import React from "react";
 import Link from "next/link";
 import Image from "next/image";
-import { Twitter, Github, Copy, Check } from "lucide-react";
-import { useTheme } from "@/components/providers/ThemeProvider";
+import { Twitter, Github } from "lucide-react";
 
 export const Footer = () => {
-  const { theme } = useTheme();
   const isDark = true;
-  const [caCopied, setCaCopied] = useState(false);
-
-  const HIVE_CA = '6JfonM6a24xngXh5yJ1imZzbMhpfvEsiafkb4syHBAGS';
-
-  const handleCopyCA = () => {
-    navigator.clipboard.writeText(HIVE_CA);
-    setCaCopied(true);
-    setTimeout(() => setCaCopied(false), 2000);
-  };
 
   return (
     <footer className="pt-24 pb-12 px-6 font-sans border-t transition-colors duration-300 relative overflow-hidden" style={{ background: isDark ? '#020202' : '#FAFAFA', borderColor: isDark ? 'rgba(255,255,255,0.05)' : '#E4E4E7' }}>
@@ -83,26 +72,6 @@ export const Footer = () => {
         <div className="pt-8 flex flex-col md:flex-row items-center justify-between gap-6" style={{ borderTop: `1px solid ${isDark ? 'rgba(255,255,255,0.05)' : '#E4E4E7'}` }}>
           <div className="text-[13px] font-medium" style={{ color: isDark ? '#71717A' : '#A1A1AA' }}>
             &copy; {new Date().getFullYear()} Hive Protocol. All rights reserved.
-          </div>
-          
-          <button
-            onClick={handleCopyCA}
-            className="flex items-center gap-2 px-4 py-2 rounded-full transition-all group cursor-pointer hover:bg-white/[0.03]"
-            style={{ border: '1px solid rgba(255,255,255,0.08)' }}
-          >
-            <span className="text-[12px] font-semibold text-zinc-500">CA:</span>
-            <span className="text-[12px] font-medium text-zinc-300 group-hover:text-white transition-colors tracking-wide">
-              {HIVE_CA.slice(0, 6)}...{HIVE_CA.slice(-4)}
-            </span>
-            {caCopied ? (
-              <Check size={12} className="text-emerald-400" />
-            ) : (
-              <Copy size={12} className="text-zinc-500 group-hover:text-emerald-400 transition-colors" />
-            )}
-          </button>
-
-          <div className="flex items-center gap-3 text-[12px] font-semibold" style={{ color: isDark ? '#71717A' : '#A1A1AA' }}>
-            <span>v2.0</span>
           </div>
         </div>
       </div>
