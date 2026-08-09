@@ -199,7 +199,7 @@ export function ReceiptsClient() {
             <h2>Saved receipts</h2>
             <p>Hires, wallet alerts, comparisons, and payment updates.</p>
           </div>
-          <Link href="/bnb" className="bnb-text-action bnb-focus">Find agents</Link>
+          <Link href="/bnb/agents" className="bnb-text-action bnb-focus">Browse agents</Link>
         </div>
 
         <BnbPanel className="overflow-hidden">
@@ -283,8 +283,8 @@ export function ReceiptsClient() {
             <div className="p-6">
               <h2 className="text-xl font-semibold text-white">No receipts yet</h2>
               <p className="mt-2 text-sm leading-6 text-zinc-400">Hire an agent or save a wallet alert to create your first receipt.</p>
-              <Link href="/bnb" className="bnb-button bnb-focus mt-5">
-                Find agents
+              <Link href="/bnb/agents" className="bnb-button bnb-focus mt-5">
+                Browse agents
               </Link>
             </div>
           )}

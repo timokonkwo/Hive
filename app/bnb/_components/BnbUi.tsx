@@ -2,25 +2,24 @@ import Image from "next/image";
 import Link from "next/link";
 import type { ReactNode } from "react";
 import {
-  Activity,
   ArrowRight,
+  BadgeCheck,
   BarChart3,
-  Clock3,
   ExternalLink,
-  WalletCards,
-  type LucideIcon,
 } from "lucide-react";
 import { Footer } from "@/components/layout/Footer";
 import type { BnbAgentCategory, BnbAgentProfile, BnbPartnerTrackSummary, BnbScoreBreakdown } from "@/lib/bnb/types";
 
 const categoryLabels: Record<BnbAgentCategory, string> = {
   Rebalancing: "Rebalancing",
-  "Grid Trading": "Grid trading",
-  "Yield Optimisation": "Yield",
-  "Health Factor Monitoring": "Risk watch",
+  "Grid Trading": "Grid Trading",
+  "Yield Optimisation": "Yield Optimisation",
+  "Health Factor Monitoring": "Health Factor",
 };
 
-export function BnbShell({ children }: { children: ReactNode }) {
+type BnbNavItem = "home" | "agents" | "receipts" | "verify";
+
+export function BnbShell({ children, active = "home" }: { children: ReactNode; active?: BnbNavItem }) {
   return (
     <main className="bnb-shell">
       <div className="bnb-frame">
@@ -28,13 +27,13 @@ export function BnbShell({ children }: { children: ReactNode }) {
           <BnbContainer className="bnb-header-inner">
             <Brand />
             <nav className="bnb-nav" aria-label="Hive navigation">
-              <BnbNavLink href="/bnb/agents">Agents</BnbNavLink>
-              <BnbNavLink href="/bnb/match">Hire</BnbNavLink>
-              <BnbNavLink href="/bnb/report">Receipts</BnbNavLink>
-              <BnbNavLink href="/bnb/status">BSC</BnbNavLink>
+              <BnbNavLink href="/bnb/agents" active={active === "agents"}>Agents</BnbNavLink>
+              <BnbNavLink href="/bnb/report" active={active === "receipts"}>Receipts</BnbNavLink>
+              <BnbNavLink href="/bnb/status" active={active === "verify"}>Verify</BnbNavLink>
             </nav>
-            <Link href="/bnb/match" className="bnb-button bnb-focus">
-              Hire agent
+            <Link href="/bnb/match" className="bnb-button bnb-button-secondary bnb-focus">
+              <span className="bnb-desktop-label">Hire agent</span>
+              <span className="bnb-mobile-label">Hire</span>
             </Link>
           </BnbContainer>
         </header>
@@ -49,21 +48,21 @@ export function BnbShell({ children }: { children: ReactNode }) {
 
 function Brand({ compact = false }: { compact?: boolean }) {
   return (
-    <Link href="/bnb" className="bnb-brand bnb-focus">
+    <Link href="/" className="bnb-brand bnb-focus">
       <span className="bnb-brand-mark">
         <Image src="/images/hive-icon.svg" width={22} height={22} alt="" priority />
       </span>
-      <span>
-        <span className="block text-sm font-medium">Hive</span>
-        {!compact ? <span className="block text-xs text-zinc-500">Agent marketplace</span> : null}
+      <span className="bnb-brand-copy">
+        <span className="bnb-brand-name">Hive</span>
+        {!compact ? <span className="bnb-brand-context">BNB Chain</span> : null}
       </span>
     </Link>
   );
 }
 
-function BnbNavLink({ href, children }: { href: string; children: ReactNode }) {
+function BnbNavLink({ href, active, children }: { href: string; active?: boolean; children: ReactNode }) {
   return (
-    <Link href={href} className="bnb-nav-link bnb-focus">
+    <Link href={href} className="bnb-nav-link bnb-focus" data-active={active ? "true" : undefined}>
       {children}
     </Link>
   );
@@ -81,17 +80,19 @@ export function BnbHero({
 }: {
   title: string;
   body: string;
-  kicker?: string;
+  kicker?: string | null;
   children?: ReactNode;
 }) {
   return (
     <section className="bnb-hero">
       <BnbContainer className={`bnb-hero-inner ${children ? "bnb-hero-grid" : ""}`}>
         <div>
-          <div className="bnb-kicker">
-            <span>{kicker}</span>
-          </div>
-          <h1 className="bnb-title">{title}</h1>
+          {kicker ? (
+            <div className="bnb-kicker">
+              <span>{kicker}</span>
+            </div>
+          ) : null}
+          <h1 className={`bnb-title ${!kicker ? "bnb-title-no-kicker" : ""}`}>{title}</h1>
           <p className="bnb-body">{body}</p>
         </div>
         {children ? <div>{children}</div> : null}
@@ -132,50 +133,49 @@ export function CategoryChip({ category }: { category: BnbAgentCategory }) {
 }
 
 export function StatusBadge({ agent }: { agent: BnbAgentProfile }) {
-  const label = agent.activationStatus === "callable" ? "Ready" : agent.activationStatus === "request" ? "Ask first" : "Listed";
+  const label = statusLabel(agent);
   return <span className={`bnb-chip ${agent.activationStatus === "callable" ? "bnb-chip-active" : ""}`}>{label}</span>;
 }
 
 export function AgentCard({ agent }: { agent: BnbAgentProfile }) {
-  const score = agent.scoreBreakdown?.total || 0;
-  const price = agent.services.find((service) => service.price)?.price || "Price set by agent";
+  const price = priceLabel(agent);
+  const canHire = canHireAgent(agent);
+  const description = listingDescription(agent);
 
   return (
     <article className="bnb-agent-row">
-      <div>
-        <div className="flex flex-wrap gap-2">
-          <CategoryChip category={agent.category} />
-          <StatusBadge agent={agent} />
-        </div>
-        <h3 className="mt-3 text-xl font-semibold text-white">{agent.name}</h3>
-        <p className="mt-2 max-w-2xl text-sm leading-6 text-zinc-400">{agent.description}</p>
-        <div className="mt-4 grid gap-2 text-sm text-zinc-500 sm:grid-cols-3">
-          <InlineData icon={WalletCards} label="Price" value={price} />
-          <InlineData icon={Activity} label="Feedback" value={`${agent.feedback.positive}/${agent.feedback.count}`} />
-          <InlineData icon={Clock3} label="Freshness" value={freshnessLabel(agent.lastActivity)} />
+      <div className="bnb-agent-main">
+        <h3 className="bnb-agent-name">
+          <Link href={`/bnb/agents/${agent.chainId}/${agent.tokenId}`} className="bnb-focus">
+            {agent.name}
+          </Link>
+          {agent.sourceFreshness.source === "8004scan" ? (
+            <BadgeCheck aria-label="ERC-8004 identity verified" className="bnb-verified-mark" size={16} />
+          ) : null}
+        </h3>
+        <p className="bnb-agent-meta">{categoryLabels[agent.category]} · {statusLabel(agent)}</p>
+        {description ? <p className="bnb-agent-description">{description}</p> : null}
+        <div className="bnb-agent-facts">
+          <span>{freshnessLabel(agent.lastActivity)}</span>
+          {agent.feedback.count > 0 ? <span>{reviewLabel(agent)}</span> : null}
+          {hasPrice(agent) ? <span>{price}</span> : null}
         </div>
       </div>
-      <div className="bnb-score">
-        <div className="bnb-score-value">{score}</div>
-        <div className="text-xs text-zinc-500">Score</div>
-        <Link href={`/bnb/activate?chainId=${agent.chainId}&tokenId=${agent.tokenId}`} className="bnb-button bnb-focus mt-3">
-          Hire
+      <div className="bnb-agent-side">
+        <Link href={`/bnb/agents/${agent.chainId}/${agent.tokenId}`} className="bnb-button-dark bnb-focus">
+          View profile
         </Link>
-        <Link href={`/bnb/agents/${agent.chainId}/${agent.tokenId}`} className="bnb-text-action bnb-focus">
-          Details
-        </Link>
+        {canHire ? (
+          <Link href={`/bnb/activate?chainId=${agent.chainId}&tokenId=${encodeURIComponent(agent.tokenId)}`} className="bnb-button-dark bnb-focus">
+            Hire
+          </Link>
+        ) : (
+          <Link href={`/bnb/match?intent=${encodeURIComponent(`Contact ${agent.name}`)}`} className="bnb-button-dark bnb-focus">
+            Request access
+          </Link>
+        )}
       </div>
     </article>
-  );
-}
-
-function InlineData({ icon: Icon, label, value }: { icon: LucideIcon; label: string; value: string }) {
-  return (
-    <div className="flex items-center gap-2">
-      <Icon aria-hidden="true" size={14} />
-      <span>{label}</span>
-      <span className="bnb-mono text-zinc-200">{value}</span>
-    </div>
   );
 }
 
@@ -212,8 +212,8 @@ export function ScoreGrid({ score }: { score?: BnbScoreBreakdown }) {
             <span>{label}</span>
             <span className="bnb-mono text-zinc-200">{value}/{max}</span>
           </div>
-          <div className="h-2 overflow-hidden rounded-full bg-zinc-800">
-            <div className="h-full rounded-full bg-emerald-400" style={{ width: `${Math.min(100, Math.round((value / max) * 100))}%` }} />
+          <div className="bnb-score-meter">
+            <div style={{ width: `${Math.min(100, Math.round((value / max) * 100))}%` }} />
           </div>
         </div>
       ))}
@@ -223,10 +223,10 @@ export function ScoreGrid({ score }: { score?: BnbScoreBreakdown }) {
 
 export function EmptyState({ title, body }: { title: string; body: string }) {
   return (
-    <div className="bnb-panel p-8 text-center">
-      <BarChart3 aria-hidden="true" size={28} className="mx-auto text-zinc-500" />
-      <h2 className="mt-4 text-xl font-semibold text-white">{title}</h2>
-      <p className="mx-auto mt-2 max-w-lg text-sm leading-6 text-zinc-400">{body}</p>
+    <div className="bnb-empty-state">
+      <BarChart3 aria-hidden="true" size={28} />
+      <h2>{title}</h2>
+      <p>{body}</p>
     </div>
   );
 }
@@ -247,9 +247,80 @@ export function shortAddress(address: string) {
 
 export function freshnessLabel(value: string) {
   const time = Date.parse(value);
-  if (!Number.isFinite(time)) return "Needs check";
+  if (!Number.isFinite(time)) return "Needs verification";
   const days = Math.floor((Date.now() - time) / (24 * 60 * 60 * 1000));
   if (days <= 0) return "Today";
-  if (days === 1) return "1 day";
-  return `${days} days`;
+  if (days === 1) return "1 day ago";
+  return `${days} days ago`;
+}
+
+export function priceLabel(agent: BnbAgentProfile) {
+  return agent.services.find((service) => service.price)?.price || "Price on request";
+}
+
+export function hasPrice(agent: BnbAgentProfile) {
+  return Boolean(agent.services.find((service) => service.price));
+}
+
+export function reviewLabel(agent: BnbAgentProfile) {
+  if (agent.feedback.count <= 0) return "No reviews yet";
+  if (agent.feedback.positive === agent.feedback.count) return `${agent.feedback.count} positive`;
+  return `${agent.feedback.positive} of ${agent.feedback.count} positive`;
+}
+
+export function sourceLabel(agent: BnbAgentProfile) {
+  if (agent.sourceFreshness.source === "8004scan") return "Data from 8004scan";
+  if (agent.sourceFreshness.source === "configured") return "Configured in Hive";
+  return "Hive registry data";
+}
+
+export function canHireAgent(agent: BnbAgentProfile) {
+  return agent.activationStatus !== "discoverable" && /^0x[a-fA-F0-9]{40}$/.test(agent.agentWallet);
+}
+
+export function statusLabel(agent: BnbAgentProfile) {
+  if (agent.activationStatus === "callable") return "Available";
+  if (agent.activationStatus === "request") return "Request access";
+  return "Unavailable";
+}
+
+export function listingDescription(agent: BnbAgentProfile) {
+  const description = agent.description.trim();
+  const generatedFallbacks = [
+    "ERC-8004 BSC agent indexed through 8004scan.",
+    "Configured BSC agent.",
+  ];
+
+  if (generatedFallbacks.includes(description)) return "";
+  if (/^[\w.-]+\.agent on TermiX Platform$/i.test(description)) return "";
+  return description;
+}
+
+export function identityLabel(agent: BnbAgentProfile) {
+  if (agent.sourceFreshness.source === "8004scan") return `ERC-8004 #${agent.tokenId}`;
+  return `Agent ID ${agent.tokenId}`;
+}
+
+export function platformLabel(agent: BnbAgentProfile) {
+  if (agent.description.toLowerCase().includes("termix")) return "TermiX Platform";
+  return agent.description;
+}
+
+export function getAgentIntegrations(agent: BnbAgentProfile) {
+  const haystack = [
+    agent.category,
+    agent.capabilities.join(" "),
+    agent.services.map((service) => `${service.name} ${service.type}`).join(" "),
+  ].join(" ").toLowerCase();
+  const integrations = ["BNB Smart Chain"];
+
+  if (haystack.includes("pancake")) integrations.push("PancakeSwap");
+  if (haystack.includes("altana") || (agent.a2aSupport && (haystack.includes("wallet") || haystack.includes("health")))) {
+    integrations.push("Altana permissions");
+  }
+  if (agent.sourceFreshness.source === "8004scan") integrations.push("ERC-8004");
+  if (agent.mcpSupport) integrations.push("MCP");
+  if (agent.a2aSupport) integrations.push("A2A");
+
+  return Array.from(new Set(integrations));
 }

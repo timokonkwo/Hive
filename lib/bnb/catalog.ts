@@ -13,14 +13,32 @@ import {
 } from "@/lib/bnb/types";
 
 const BSC_CHAIN_ID = 56;
+export const BNB_REGISTERED_AGENT_FLOOR = 200_000;
 const DEFAULT_REGISTRY = "0x8004scan-bsc-registry";
 const DEFAULT_FETCHED_AT = "2026-08-06T00:00:00.000Z";
+
+export type BnbAgentNetworkStats = {
+  totalAgents: number;
+  totalFeedbacks: number;
+  averageFeedbackScore?: number;
+  updatedAt: string;
+};
 
 const categoryKeywords: Record<BnbAgentCategory, string[]> = {
   Rebalancing: ["rebalance", "range", "lp", "liquidity", "position", "portfolio"],
   "Grid Trading": ["grid", "strategy", "range", "trading", "volatility", "bot"],
   "Yield Optimisation": ["yield", "apr", "farm", "vault", "staking", "route"],
   "Health Factor Monitoring": ["health", "liquidation", "borrow", "loan", "venus", "risk"],
+};
+
+const searchAliases: Record<string, string[]> = {
+  lp: ["liquidity", "pool", "position", "range", "pancakeswap"],
+  liquidity: ["lp", "pool", "range", "rebalance", "pancakeswap"],
+  liquidation: ["health", "borrow", "loan", "venus", "collateral"],
+  lending: ["health", "borrow", "loan", "venus", "collateral"],
+  farm: ["yield", "apr", "vault", "staking", "pancakeswap"],
+  route: ["yield", "swap", "pancakeswap"],
+  grid: ["strategy", "trading", "range", "volatility"],
 };
 
 const localBnbAgents: BnbAgentProfile[] = [
@@ -319,6 +337,16 @@ function inferCategory(text: string): BnbAgentCategory {
   return "Yield Optimisation";
 }
 
+function expandSearchText(value: string) {
+  const normalized = value.toLowerCase();
+  const words = normalized
+    .split(/[^a-z0-9]+/)
+    .map((word) => word.trim())
+    .filter(Boolean);
+  const aliases = words.flatMap((word) => searchAliases[word] || []);
+  return Array.from(new Set([...words, ...aliases])).join(" ");
+}
+
 function serviceType(name: string): BnbAgentService["type"] {
   const normalized = name.toLowerCase();
   if (normalized.includes("erc8183") || normalized.includes("8183")) return "erc8183";
@@ -362,6 +390,31 @@ function get8004Headers() {
 
 function get8004BaseUrl() {
   return (process.env.BNB_8004SCAN_API_BASE || "https://8004scan.io/api/v1/public").replace(/\/$/, "");
+}
+
+function get8004TimeoutMs() {
+  const timeout = Number(process.env.BNB_8004SCAN_TIMEOUT_MS || 3500);
+  if (!Number.isFinite(timeout)) return 3500;
+  return Math.min(Math.max(timeout, 1000), 10000);
+}
+
+async function fetch8004Json(url: URL | string, revalidate: number) {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), get8004TimeoutMs());
+
+  try {
+    const response = await fetch(url, {
+      headers: get8004Headers(),
+      next: { revalidate },
+      signal: controller.signal,
+    });
+    if (!response.ok) return null;
+    return response.json() as Promise<unknown>;
+  } catch {
+    return null;
+  } finally {
+    clearTimeout(timeout);
+  }
 }
 
 function rawAgentsFromPayload(payload: unknown) {
@@ -512,23 +565,51 @@ function getBaseBnbAgents() {
   return [];
 }
 
-async function fetch8004Agents(limit: number): Promise<BnbAgentProfile[]> {
+async function fetch8004Agents(limit: number, sort?: string | null): Promise<BnbAgentProfile[]> {
   if (process.env.BNB_8004SCAN_LIVE !== "true") return [];
 
   const url = new URL(`${get8004BaseUrl()}/agents`);
   url.searchParams.set("chainId", String(BSC_CHAIN_ID));
   url.searchParams.set("limit", String(Math.min(Math.max(limit, 1), 100)));
+  if (sort === "recommended" || sort === "feedback" || sort === "reviews") {
+    url.searchParams.set("sortBy", "total_feedbacks");
+  }
 
   try {
-    const response = await fetch(url, { headers: get8004Headers(), next: { revalidate: 300 } });
-    if (!response.ok) return [];
-    const payload = await response.json();
+    const payload = await fetch8004Json(url, 300);
+    if (!payload) return [];
 
     return rawAgentsFromPayload(payload)
       .map(normalize8004Agent)
       .filter((agent): agent is BnbAgentProfile => Boolean(agent));
   } catch {
     return [];
+  }
+}
+
+async function fetch8004NetworkStats(): Promise<BnbAgentNetworkStats | null> {
+  if (process.env.BNB_8004SCAN_LIVE !== "true") return null;
+
+  try {
+    const payload = await fetch8004Json(`${get8004BaseUrl()}/stats`, 300);
+    if (!payload) return null;
+    const data = asRecord(asRecord(payload).data);
+    const chainStats = Array.isArray(data.chain_stats) ? data.chain_stats : [];
+    const bscStats = asRecord(chainStats.find((item) => Number(asRecord(item).chain_id) === BSC_CHAIN_ID));
+    const totalAgents = Number(bscStats.total_agents ?? 0);
+    const totalFeedbacks = Number(bscStats.total_feedbacks ?? 0);
+    const averageFeedbackScore = Number(bscStats.average_feedback_score ?? 0);
+
+    if (!Number.isFinite(totalAgents) || totalAgents <= 0) return null;
+
+    return {
+      totalAgents,
+      totalFeedbacks: Number.isFinite(totalFeedbacks) ? totalFeedbacks : 0,
+      ...(Number.isFinite(averageFeedbackScore) && averageFeedbackScore > 0 ? { averageFeedbackScore } : {}),
+      updatedAt: new Date().toISOString(),
+    };
+  } catch {
+    return null;
   }
 }
 
@@ -542,9 +623,8 @@ async function fetch8004SearchAgents(q: string, limit: number): Promise<BnbAgent
   url.searchParams.set("limit", String(Math.min(Math.max(limit, 1), 50)));
 
   try {
-    const response = await fetch(url, { headers: get8004Headers(), next: { revalidate: 180 } });
-    if (!response.ok) return [];
-    const payload = await response.json();
+    const payload = await fetch8004Json(url, 180);
+    if (!payload) return [];
 
     return rawAgentsFromPayload(payload)
       .map(normalize8004Agent)
@@ -555,17 +635,18 @@ async function fetch8004SearchAgents(q: string, limit: number): Promise<BnbAgent
 }
 
 function scoreFit(agent: BnbAgentProfile, intent: string, category?: string | null) {
+  const expandedIntent = `${intent} ${expandSearchText(intent)}`;
   const intentWords = new Set(
-    intent
+    expandedIntent
       .split(/[^a-z0-9]+/)
       .map((word) => word.trim())
       .filter((word) => word.length >= 3)
   );
   const categoryScore = category && agent.category === category ? 26 : 8;
-  const categoryMatches = categoryKeywords[agent.category].filter((keyword) => intent.includes(keyword)).length;
+  const categoryMatches = categoryKeywords[agent.category].filter((keyword) => expandedIntent.includes(keyword)).length;
   const capabilityMatches = agent.capabilities.filter((capability) => {
     const normalized = capability.toLowerCase();
-    if (intent.includes(normalized) || intent.includes(normalized.replace(/-/g, " "))) return true;
+    if (expandedIntent.includes(normalized) || expandedIntent.includes(normalized.replace(/-/g, " "))) return true;
     return normalized
       .split(/[^a-z0-9]+/)
       .some((word) => word.length >= 3 && intentWords.has(word));
@@ -608,6 +689,7 @@ function matchesQuery(agent: BnbAgentProfile, query: BnbAgentQuery) {
   if (!query.q) return true;
 
   const needle = query.q.toLowerCase();
+  const expandedNeedle = expandSearchText(needle);
   const haystack = [
     agent.name,
     agent.description,
@@ -618,10 +700,14 @@ function matchesQuery(agent: BnbAgentProfile, query: BnbAgentQuery) {
     agent.services.map((service) => service.name).join(" "),
   ].join(" ").toLowerCase();
 
-  return haystack.includes(needle);
+  if (haystack.includes(needle)) return true;
+  return expandedNeedle
+    .split(" ")
+    .filter((word) => word.length >= 3)
+    .some((word) => haystack.includes(word));
 }
 
-function sortAgents(agents: BnbAgentProfile[], sort?: string | null) {
+function sortAgents(agents: BnbAgentProfile[], sort?: string | null, q?: string | null) {
   const sorted = [...agents];
   if (sort === "freshness") {
     return sorted.sort((a, b) => Date.parse(b.lastActivity) - Date.parse(a.lastActivity));
@@ -629,11 +715,29 @@ function sortAgents(agents: BnbAgentProfile[], sort?: string | null) {
   if (sort === "feedback") {
     return sorted.sort((a, b) => b.feedback.score - a.feedback.score || b.feedback.count - a.feedback.count);
   }
+  if (sort === "reviews") {
+    return sorted.sort((a, b) => b.feedback.count - a.feedback.count || b.feedback.score - a.feedback.score);
+  }
+  if (sort === "newest") {
+    return sorted.sort((a, b) => Date.parse(b.sourceFreshness.fetchedAt) - Date.parse(a.sourceFreshness.fetchedAt));
+  }
   if (sort === "activation") {
     const rank: Record<BnbActivationStatus, number> = { callable: 3, request: 2, discoverable: 1 };
     return sorted.sort((a, b) => rank[b.activationStatus] - rank[a.activationStatus]);
   }
-  return sorted.sort((a, b) => (b.scoreBreakdown?.total || 0) - (a.scoreBreakdown?.total || 0));
+  if (q?.trim()) {
+    return sorted.sort((a, b) => (
+      (b.scoreBreakdown?.total || 0) - (a.scoreBreakdown?.total || 0) ||
+      b.feedback.count - a.feedback.count ||
+      b.feedback.score - a.feedback.score
+    ));
+  }
+  return sorted.sort((a, b) => (
+    b.feedback.count - a.feedback.count ||
+    b.feedback.score - a.feedback.score ||
+    (b.scoreBreakdown?.total || 0) - (a.scoreBreakdown?.total || 0) ||
+    Date.parse(b.lastActivity) - Date.parse(a.lastActivity)
+  ));
 }
 
 function uniqueAgents(agents: BnbAgentProfile[]) {
@@ -648,8 +752,9 @@ function uniqueAgents(agents: BnbAgentProfile[]) {
 
 export async function listBnbAgents(query: BnbAgentQuery = {}) {
   const limit = Math.min(Math.max(query.limit || 24, 1), 100);
+  const sort = query.sort || "recommended";
   const [liveAgents, semanticAgents] = await Promise.all([
-    fetch8004Agents(limit),
+    fetch8004Agents(limit, sort),
     query.q ? fetch8004SearchAgents(query.q, limit) : Promise.resolve([]),
   ]);
   const agents = uniqueAgents([...getBaseBnbAgents(), ...semanticAgents, ...liveAgents])
@@ -659,7 +764,27 @@ export async function listBnbAgents(query: BnbAgentQuery = {}) {
       scoreBreakdown: scoreBnbAgent(agent, query.q || "", query.category),
     }));
 
-  return sortAgents(agents, query.sort).slice(0, limit);
+  return sortAgents(agents, sort, query.q).slice(0, limit);
+}
+
+export function getBnbRegisteredAgentLabel() {
+  return "200k+ registered on BSC";
+}
+
+export function formatBnbAgentCount(total: number) {
+  if (!Number.isFinite(total) || total <= 0) return "200k+";
+  if (total >= 1_000_000) return `${Math.floor(total / 1_000_000)}m+`;
+  if (total >= 1_000) return `${Math.floor(total / 1_000)}k+`;
+  return String(total);
+}
+
+export async function getBnbAgentNetworkStats() {
+  const stats = await fetch8004NetworkStats();
+  return stats || {
+    totalAgents: BNB_REGISTERED_AGENT_FLOOR,
+    totalFeedbacks: 0,
+    updatedAt: new Date().toISOString(),
+  };
 }
 
 export async function getBnbAgent(chainId: string | number, tokenId: string) {

@@ -1,6 +1,7 @@
 import { Search } from "lucide-react";
 import { getBnbCategories, matchBnbAgents } from "@/lib/bnb/catalog";
 import { AgentCard, BnbContainer, BnbHero, BnbPanel, BnbShell, EmptyState } from "@/app/bnb/_components/BnbUi";
+import { BnbSelect } from "@/app/bnb/_components/BnbSelect";
 
 type SearchParams = Promise<Record<string, string | string[] | undefined>>;
 
@@ -14,12 +15,16 @@ export default async function BnbMatchPage({ searchParams }: { searchParams: Sea
   const category = paramValue(params.category);
   const categories = getBnbCategories();
   const matches = intent ? await matchBnbAgents(intent, category, 6) : [];
+  const categoryOptions = [
+    { value: "", label: "Any category" },
+    ...categories.map((item) => ({ value: item, label: item === "Health Factor Monitoring" ? "Health Factor" : item })),
+  ];
 
   return (
     <BnbShell>
       <BnbHero
         title="Hire from a task"
-        body="Describe what you need. Hive returns agents that fit the job."
+        body="Describe the work. Hive returns agents that fit the job."
       />
       <BnbContainer className="bnb-section">
         <form className="bnb-composer" action="/bnb/match">
@@ -34,15 +39,15 @@ export default async function BnbMatchPage({ searchParams }: { searchParams: Sea
             />
           </label>
           <div className="mt-3 flex flex-col gap-3 sm:flex-row">
-            <select name="category" defaultValue={category || ""} className="bnb-select" aria-label="Preferred category">
-              <option value="">Any category</option>
-              {categories.map((item) => (
-                <option key={item} value={item}>{item}</option>
-              ))}
-            </select>
+            <BnbSelect
+              name="category"
+              defaultValue={category || ""}
+              options={categoryOptions}
+              ariaLabel="Preferred category"
+            />
             <button className="bnb-button bnb-focus" type="submit">
               <Search aria-hidden="true" size={16} />
-              Find agents
+              Search agents
             </button>
           </div>
         </form>
@@ -56,10 +61,10 @@ export default async function BnbMatchPage({ searchParams }: { searchParams: Sea
                 ))}
               </BnbPanel>
             ) : (
-              <EmptyState title="No matches yet" body="Try a broader intent or remove the category filter." />
+              <EmptyState title="No agents found" body="Try a broader task or remove the category filter." />
             )
           ) : (
-            <EmptyState title="Describe a task" body="Matching agents appear here after you submit the task." />
+            <EmptyState title="Start with the work" body="Enter a task to see matching agents." />
           )}
         </section>
       </BnbContainer>

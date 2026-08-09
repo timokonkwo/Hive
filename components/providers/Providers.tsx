@@ -10,10 +10,10 @@ import { ThemeProvider } from "./ThemeProvider";
 import { HolderProvider } from "./HolderContext";
 
 const wagmiConfig = createConfig({
-  chains: [mainnet, bsc],
+  chains: [bsc, mainnet],
   transports: {
-    [mainnet.id]: http(),
     [bsc.id]: http(process.env.NEXT_PUBLIC_BNB_BSC_RPC_URL || undefined),
+    [mainnet.id]: http(),
   },
 });
 
@@ -34,8 +34,8 @@ export function Providers({ children }: { children: React.ReactNode }) {
             walletChainType: "ethereum-and-solana",
           },
           loginMethods: ['wallet', 'email', 'google'],
-          defaultChain: mainnet,
-          supportedChains: [mainnet, bsc],
+          defaultChain: bsc,
+          supportedChains: [bsc, mainnet],
           externalWallets: {
             solana: {
               connectors: solanaConnectors,

@@ -6,6 +6,7 @@ import { ClipboardCheck } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { useAuthFetch } from "@/hooks/useAuthFetch";
 import type { BnbTermixCapture } from "@/lib/bnb/types";
+import { BnbSelect } from "@/app/bnb/_components/BnbSelect";
 
 type CaptureResponse = {
   status: string;
@@ -14,12 +15,20 @@ type CaptureResponse = {
   message: string;
 };
 
+const verdictOptions = [
+  { value: "pending", label: "Pending verification" },
+  { value: "agent_better", label: "Agent better" },
+  { value: "equal", label: "Equal" },
+  { value: "manual_better", label: "Manual better" },
+];
+
 export function TermixCaptureForm({ captures }: { captures: BnbTermixCapture[] }) {
   const [result, setResult] = useState<CaptureResponse | null>(null);
   const [error, setError] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const { authenticated, login, ready } = useAuth();
   const authFetch = useAuthFetch();
+  const captureOptions = captures.map((capture) => ({ value: capture.id, label: capture.title }));
 
   async function submitCapture(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -63,15 +72,12 @@ export function TermixCaptureForm({ captures }: { captures: BnbTermixCapture[] }
       <div className="mt-5 grid gap-4">
         <label className="block">
           <span className="bnb-label">Comparison type</span>
-          <select
+          <BnbSelect
             name="caseId"
-            className="bnb-select"
-            required
-          >
-            {captures.map((capture) => (
-              <option key={capture.id} value={capture.id}>{capture.title}</option>
-            ))}
-          </select>
+            options={captureOptions}
+            ariaLabel="Comparison type"
+            disabled={captureOptions.length === 0}
+          />
         </label>
 
         <label className="block">
@@ -125,15 +131,12 @@ export function TermixCaptureForm({ captures }: { captures: BnbTermixCapture[] }
 
         <label className="block">
           <span className="bnb-label">Verdict</span>
-          <select
+          <BnbSelect
             name="verdict"
-            className="bnb-select"
-          >
-            <option value="pending">Pending verification</option>
-            <option value="agent_better">Agent better</option>
-            <option value="equal">Equal</option>
-            <option value="manual_better">Manual better</option>
-          </select>
+            defaultValue="pending"
+            options={verdictOptions}
+            ariaLabel="Verdict"
+          />
         </label>
 
         <label className="block">

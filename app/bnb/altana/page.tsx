@@ -10,9 +10,9 @@ export default function BnbAltanaPage() {
   return (
     <BnbShell>
       <BnbHero
-        kicker="Hive"
+        kicker="Autonomy and permissions"
         title="Wallet alerts"
-        body="Let an agent watch a wallet or position and notify you when something needs attention."
+        body="Give an agent scoped permission to watch a wallet or position, then revoke it when you no longer need it."
       />
 
       <BnbContainer className="bnb-section grid gap-6 lg:grid-cols-[minmax(0,1fr)_380px]">
@@ -35,9 +35,11 @@ export default function BnbAltanaPage() {
                   <h3 className="mt-3 text-xl font-semibold text-white">{alert.title}</h3>
                   <p className="mt-2 max-w-2xl text-sm leading-6 text-zinc-400">{alert.summary}</p>
                 </div>
-                <div className="bnb-score">
-                  <div className="text-sm font-semibold text-emerald-300">{alert.spendCap}</div>
-                  <div className="text-xs text-zinc-500">Budget</div>
+                <div className="bnb-agent-side">
+                  <div className="bnb-score-compact">
+                    <span>Spend cap</span>
+                    <strong>{alert.spendCap}</strong>
+                  </div>
                 </div>
               </article>
             ))}

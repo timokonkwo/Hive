@@ -807,6 +807,117 @@ Phase 7 files touched:
 
 ---
 
+## 18.7 Partner and BNB Capability Audit
+
+Refresh date: August 9, 2026.
+
+Sources checked:
+
+- BNB Chain Build the Era article: the marketplace must help users browse, compare, hire, and understand how agents performed. It names four reference categories: monitoring, grid trading, health factor, and yield.
+- BNB Chain AI Agent Solutions: BNB Chain positions ERC-8004 identity, ERC-8183 commerce, BAP-578, and x402 as the agent stack. It also lists BNBAgent SDK, Virtuals ACP, Agent0 SDK, and 8004scan as ecosystem tools.
+- BNB Agent SDK docs: ERC-8004 covers identity and discoverable profiles. ERC-8183 covers jobs, escrow, delivery, evaluation, dispute, and settlement.
+- Agent.family / TermiX: TermiX emphasizes job posting, service listings, escrow, deliverable hashes, challenge windows, final settlement, reputation, and agent-owned `.agent` identities.
+- BNB Chain wallets page: Altana is an agentic wallet path with onchain spending limits, time-bounded session keys, passkey recovery, MCP, SDK, and API support.
+- PancakeSwap AI: PancakeSwap provides agent-facing skills for swap planning, liquidity planning, farming planning, deep links, token verification, prices, APY, and BNB Smart Chain support across V2, V3, Infinity, Infinity Stable, and StableSwap.
+
+Current coverage:
+
+| Capability | Current Hive coverage | Gap |
+|:--|:--|:--|
+| ERC-8004 identity | Live 8004scan ingestion, verified mark, agent profile links, BSC-only agent directory. | Add richer owner history, metadata freshness, and profile source confidence. |
+| Discovery | Search, category filters, availability filters, sorting, pagination, save, and compare. | Add capability aliases for more BNB/PancakeSwap terms and restore result state after returning from profiles. |
+| Marketplace comparison | Save and compare agents. Directory hides raw protocol noise. | Compare panel should stay focused on category, availability, reviews, and pricing. Full protocol data belongs on profile. |
+| ERC-8183 commerce | Escrow contract, hire records, payment/release/refund paths, settlement routes, and receipt records exist. | Add direct BNBAgent SDK compatibility checks for provider endpoints and job lifecycle states. |
+| x402 payments | Runtime/env support exists. | Add per-agent x402 endpoint detection, stablecoin pricing display, and pre-hire fee preview. |
+| TermiX alignment | Report and comparison record surfaces capture manual-vs-agent work. | Add first-class Agent Advantage workflows for code/security, data/research, and DeFi tasks. Show time, cost, output, and settlement proof. Do not label TermiX as an integration unless a real TermiX API is connected. |
+| Agent.family inspiration | Hive now supports agent discovery and hiring, but not open briefs or provider listing flows. | Add Open Briefs, service listings, provider profile publishing, deliverable hash display, challenge window status, and reputation updates from completed jobs. |
+| Altana wallet permissions | Session grant/revoke records and revocation UI exist. | Replace template-heavy session UI with a clear hire-step permission screen: spend cap, expiry, allowed contracts, allowed assets, revoke status, explorer link. |
+| PancakeSwap | Pair analyzer and PancakeSwap job paths exist. | Add agent capability tags for swap planning, LP planning, farming planning, pool assessment, APY comparison, fee-tier/range suggestions, and PancakeSwap deep links. |
+| BNB-native user trust | BSC chain defaults, BSC RPC, BscScan/8004scan links, and BNB page styling exist. | Add BNB Smart Chain chain badge, BNB gold accent only for chain context, and remove backend metrics from user copy. |
+
+Implementation plan:
+
+### P0: Clean the marketplace surface
+
+- Remove public copy that exposes internal or raw backend counts such as feedback-record totals.
+- Keep the hero focused on the job: find agents, compare them, and hire the right one.
+- Use BNB gold only for BNB context: chain badge, active category edge, and subtle outline states.
+- Keep Hive green as the primary product action color.
+- Keep 8004scan out of directory rows unless shown as a verified mark.
+
+### P1: Make discovery useful for BNB agent work
+
+- Expand search aliases for PancakeSwap terms: swap, route, pool, V2, V3, Infinity, StableSwap, fee tier, APY, APR, LP range, farm, CAKE.
+- Expand search aliases for lending and health-factor terms: Venus, liquidation, collateral, borrow, risk, alert, threshold.
+- Add task-entry deep links that preserve query, category, and filters.
+- Keep category tabs as navigation only. Do not show partial category totals as if they are network totals.
+
+### P1: Upgrade comparison
+
+- Keep comparison to fields that help choose who to inspect: category, availability, reviews, and pricing.
+- Make each compared agent name a link to the profile.
+- Move protocol support, source platform, ERC-8004 ID, owner, endpoint, and raw identifiers to profile pages.
+- Add compare-from-profile so users can build a shortlist while inspecting agents.
+
+### P1: Add BNB Agent SDK compatibility
+
+- Detect ERC-8183 provider endpoints where available.
+- Show a profile-level compatibility block: identity, job endpoint, escrow support, delivery support, dispute support, payment method.
+- Add a hire preview with budget, token, estimated fee, dispute window, expected deliverable, and settlement route before wallet signing.
+
+### P1: Deepen PancakeSwap value
+
+- Add PancakeSwap capability badges only when supported by data.
+- Support three task templates: swap plan, liquidity plan, and farming plan.
+- For swap plan: verify token contracts, fetch price, produce PancakeSwap deep link, and require user confirmation before execution.
+- For liquidity plan: compare V2, V3, Infinity, Infinity Stable, and StableSwap support where data is available.
+- For farming plan: compare APR/APY, CAKE incentives, pool liquidity, and risk notes.
+- Save every output as a receipt with inputs, agent, price, route, and final user decision.
+
+### P1: Deepen Altana value
+
+- Replace abstract session templates with a permission review screen inside hiring.
+- Require explicit spend cap, expiry, asset scope, contract scope, and revocation path before activation.
+- Store session hash, transaction hash, expiry, cap, revoke transaction, and current status.
+- Show Altana only on agents/tasks where wallet autonomy is relevant.
+
+### P2: Add Agent.family and TermiX-style marketplace depth
+
+- Add Open Briefs for users who do not know which agent to hire.
+- Let agents quote on a brief when a callable endpoint exists.
+- Add service listing pages for agent providers: service type, price, accepted tokens, expected turnaround, deliverable format.
+- Add deliverable hash and challenge window fields to receipts.
+- Add an Agent Advantage report generator that compares manual path, agent path, time, cost, output quality, and settlement proof.
+
+### P2: Add reputation that users can understand
+
+- Stop exposing a black-box score in directory rows.
+- Profile pages can show reputation with explanation: completed hires, reviews, disputes, delivery time, and source data.
+- Recommended ranking should explain one reason when the data supports it, such as "Strong match for PancakeSwap liquidity planning" or "Reviewed agent with recent activity."
+
+### P2: Add network-scale discovery without pretending Hive indexed everything
+
+- Keep network total as context: registered BSC agents.
+- Keep directory totals scoped to the current indexed/search result set.
+- Add server-side pagination against 8004scan if the public API supports cursor or offset.
+- Add cache storage so Hive can build category counts from indexed records over time instead of from the first 100 records.
+
+### P3: Production polish
+
+- Add loading skeletons for directory, profiles, compare panel, and hire preview.
+- Add error recovery for 8004scan and RPC timeouts.
+- Add mobile wallet checks for BNB Chain before any transaction step.
+- Add analytics for search, filter, profile open, save, compare, hire preview, wallet connect, escrow funding, and receipt completion.
+- Add admin review tools for hiding malformed or unsafe agent listings.
+
+Definition of done:
+
+- A normal user can search, filter, save, compare, open a profile, review terms, connect on BNB Chain, hire or request an agent, and see a receipt.
+- PancakeSwap tasks produce a useful plan or deep link, not just a partner mention.
+- Altana appears as a permission and revocation flow, not as a generic partner card.
+- TermiX appears through measured agent advantage, not as a fake integration.
+- 8004scan remains the trust source for identity and reputation data, not the product users feel they are using directly.
+
 ## 18. Developer Guardrails: Tone, Design, and Writing Rules
 
 This section applies to every developer, designer, and writer who touches the BNB submission. Follow these rules without exception.

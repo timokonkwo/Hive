@@ -7,6 +7,7 @@ import type { Hex } from "viem";
 import { useAuth } from "@/hooks/useAuth";
 import { useAuthFetch } from "@/hooks/useAuthFetch";
 import type { BnbAgentProfile } from "@/lib/bnb/types";
+import { BnbSelect } from "@/app/bnb/_components/BnbSelect";
 
 type PaymentRequest =
   | {
@@ -76,6 +77,14 @@ type ActivationResponse = {
   record?: ActivationRecordView;
 };
 
+const taskOptions = [
+  { value: "Rebalance LP position", label: "Rebalance LP position" },
+  { value: "Create grid strategy", label: "Create grid strategy" },
+  { value: "Compare yield routes", label: "Compare yield routes" },
+  { value: "Monitor health factor", label: "Monitor health factor" },
+  { value: "Audit token or pool", label: "Audit token or pool" },
+];
+
 export function ActivationForm({ agent }: { agent: BnbAgentProfile }) {
   const [taskTemplate, setTaskTemplate] = useState("Rebalance LP position");
   const [taskDetails, setTaskDetails] = useState("");
@@ -88,11 +97,30 @@ export function ActivationForm({ agent }: { agent: BnbAgentProfile }) {
   const [result, setResult] = useState<ActivationResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [paymentHash, setPaymentHash] = useState("");
-  const { authenticated, login, ready } = useAuth();
+  const { authenticated, login, ready, connectWallet } = useAuth();
   const { address, chainId } = useAccount();
   const { sendTransactionAsync } = useSendTransaction();
   const { switchChainAsync } = useSwitchChain();
   const authFetch = useAuthFetch();
+
+  async function ensureBscWallet() {
+    if (!authenticated) {
+      login();
+      return false;
+    }
+
+    if (!address) {
+      await connectWallet();
+      setError("Connect a BNB Chain wallet to continue.");
+      return false;
+    }
+
+    if (chainId !== bsc.id) {
+      await switchChainAsync({ chainId: bsc.id });
+    }
+
+    return true;
+  }
 
   async function submitActivation(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -101,8 +129,8 @@ export function ActivationForm({ agent }: { agent: BnbAgentProfile }) {
     setResult(null);
 
     try {
-      if (!authenticated) {
-        login();
+      const walletReady = await ensureBscWallet();
+      if (!walletReady) {
         return;
       }
 
@@ -133,17 +161,14 @@ export function ActivationForm({ agent }: { agent: BnbAgentProfile }) {
 
   async function fundEscrow() {
     if (!result || result.paymentRequest.status !== "ready") return;
-    if (!authenticated || !address) {
-      login();
-      return;
-    }
 
     setFunding(true);
     setError(null);
 
     try {
-      if (chainId !== bsc.id) {
-        await switchChainAsync({ chainId: bsc.id });
+      const walletReady = await ensureBscWallet();
+      if (!walletReady) {
+        return;
       }
 
       const hash = await sendTransactionAsync({
@@ -197,17 +222,14 @@ export function ActivationForm({ agent }: { agent: BnbAgentProfile }) {
 
   async function settleEscrow(action: "release" | "refund") {
     if (!result) return;
-    if (!authenticated || !address) {
-      login();
-      return;
-    }
 
     setSettling(action);
     setError(null);
 
     try {
-      if (chainId !== bsc.id) {
-        await switchChainAsync({ chainId: bsc.id });
+      const walletReady = await ensureBscWallet();
+      if (!walletReady) {
+        return;
       }
 
       const prepareResponse = await authFetch("/api/bnb/activate/settlement", {
@@ -259,13 +281,7 @@ export function ActivationForm({ agent }: { agent: BnbAgentProfile }) {
       <div className="grid gap-4">
         <label>
           <span className="bnb-label">Task</span>
-          <select value={taskTemplate} onChange={(event) => setTaskTemplate(event.target.value)} className="bnb-select">
-            <option>Rebalance LP position</option>
-            <option>Create grid strategy</option>
-            <option>Compare yield routes</option>
-            <option>Monitor health factor</option>
-            <option>Audit token or pool</option>
-          </select>
+          <BnbSelect value={taskTemplate} onChange={setTaskTemplate} options={taskOptions} ariaLabel="Task" />
         </label>
         <label>
           <span className="bnb-label">Work details</span>
@@ -284,9 +300,12 @@ export function ActivationForm({ agent }: { agent: BnbAgentProfile }) {
           <span className="bnb-label">Expiry</span>
           <input value={expiry} onChange={(event) => setExpiry(event.target.value)} className="bnb-input" />
         </label>
-        <button type="submit" disabled={loading} className="bnb-button bnb-focus disabled:cursor-not-allowed disabled:opacity-60">
-          {loading ? "Saving..." : authenticated ? "Save hire" : ready ? "Sign in to hire" : "Loading..."}
+        <button type="submit" disabled={loading || !ready} className="bnb-button bnb-focus disabled:cursor-not-allowed disabled:opacity-60">
+          {loading ? "Saving..." : hireButtonLabel({ authenticated, address, chainId })}
         </button>
+        {authenticated && address && chainId !== bsc.id ? (
+          <p className="bnb-field-note">Wallet must be on BNB Smart Chain.</p>
+        ) : null}
       </div>
 
       {error ? <div className="bnb-error mt-4 p-4 text-sm">{error}</div> : null}
@@ -320,7 +339,7 @@ export function ActivationForm({ agent }: { agent: BnbAgentProfile }) {
               disabled={funding || !ready}
               className="bnb-button bnb-focus mt-4 w-full disabled:cursor-not-allowed disabled:opacity-60"
             >
-              {funding ? "Confirming..." : authenticated ? `Fund escrow (${result.paymentRequest.amountLabel})` : "Connect wallet"}
+              {funding ? "Confirming..." : `Fund escrow (${result.paymentRequest.amountLabel})`}
             </button>
           ) : result.paymentRequest.status !== "ready" ? (
             <p className="mt-4 text-sm leading-6 text-zinc-300">{result.paymentRequest.reason}</p>
@@ -368,4 +387,19 @@ function DataRow({ label, value }: { label: string; value: string }) {
       <dd className="break-all text-right bnb-mono text-zinc-200">{value}</dd>
     </div>
   );
+}
+
+function hireButtonLabel({
+  authenticated,
+  address,
+  chainId,
+}: {
+  authenticated: boolean;
+  address?: string;
+  chainId?: number;
+}) {
+  if (!authenticated) return "Sign in to hire";
+  if (!address) return "Connect BNB wallet";
+  if (chainId !== bsc.id) return "Switch to BNB Chain";
+  return "Create hire";
 }

@@ -9,6 +9,7 @@ import { Bell } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { useAuthFetch } from "@/hooks/useAuthFetch";
 import type { BnbAltanaSessionTemplate } from "@/lib/bnb/types";
+import { BnbSelect } from "@/app/bnb/_components/BnbSelect";
 
 type GrantRequest =
   | {
@@ -42,6 +43,7 @@ export function AltanaSessionForm({ templates }: { templates: BnbAltanaSessionTe
   const { sendTransactionAsync } = useSendTransaction();
   const { switchChainAsync } = useSwitchChain();
   const authFetch = useAuthFetch();
+  const templateOptions = templates.map((template) => ({ value: template.id, label: template.title }));
 
   async function submitSession(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -124,15 +126,12 @@ export function AltanaSessionForm({ templates }: { templates: BnbAltanaSessionTe
       <div className="mt-5 grid gap-4">
         <label className="block">
           <span className="bnb-label">Alert type</span>
-          <select
+          <BnbSelect
             name="templateId"
-            className="bnb-select"
-            required
-          >
-            {templates.map((template) => (
-              <option key={template.id} value={template.id}>{template.title}</option>
-            ))}
-          </select>
+            options={templateOptions}
+            ariaLabel="Alert type"
+            disabled={templateOptions.length === 0}
+          />
         </label>
 
         <label className="block">

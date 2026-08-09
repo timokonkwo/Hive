@@ -10,7 +10,7 @@ export default function BnbPancakeSwapPage() {
   return (
     <BnbShell>
       <BnbHero
-        kicker="Hive"
+        kicker="PancakeSwap capability"
         title="PancakeSwap agents"
         body="Hire an agent to rank yield routes, review LP ranges, or watch a farm."
       />
@@ -42,12 +42,12 @@ export default function BnbPancakeSwapPage() {
                 <p className="mt-2 max-w-2xl text-sm leading-6 text-zinc-400">{job.agentOutput}</p>
                 <p className="mt-3 text-sm leading-6 text-zinc-500">{job.decisionMetric}</p>
               </div>
-              <div className="bnb-score">
-                <div className="text-sm font-semibold text-emerald-300">
-                  {job.scoring.find((item) => item.label === "Target cost")?.value || "Set budget"}
+              <div className="bnb-agent-side">
+                <div className="bnb-score-compact">
+                  <span>Starting price</span>
+                  <strong>{job.scoring.find((item) => item.label === "Target cost")?.value || "Set"}</strong>
                 </div>
-                <div className="text-xs text-zinc-500">Starting price</div>
-                <Link href={job.activationHref} className="bnb-button bnb-focus mt-3">
+                <Link href={job.activationHref} className="bnb-button-dark bnb-focus">
                   Hire agent <ArrowRight aria-hidden="true" size={15} />
                 </Link>
               </div>

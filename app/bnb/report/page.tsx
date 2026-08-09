@@ -3,9 +3,9 @@ import { ReceiptsClient } from "./ReceiptsClient";
 
 export default function BnbReportPage() {
   return (
-    <BnbShell>
+    <BnbShell active="receipts">
       <BnbHero
-        kicker="Hive"
+        kicker="Private history"
         title="Receipts"
         body="Your saved hires, wallet alerts, comparisons, and escrow payments."
       />
