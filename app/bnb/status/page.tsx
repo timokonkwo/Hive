@@ -1,7 +1,10 @@
 import Link from "next/link";
 import { Search } from "lucide-react";
+import { isAddress } from "viem";
 import { getBscAddressSummary } from "@/lib/bnb/chain";
 import { listBnbAgents } from "@/lib/bnb/catalog";
+import { canHireBnbAgent } from "@/lib/bnb/runtime";
+import { CopyValueButton } from "@/app/bnb/_components/CopyValueButton";
 import {
   BnbContainer,
   BnbHero,
@@ -11,6 +14,7 @@ import {
   ExternalTextLink,
   StatusBadge,
   freshnessLabel,
+  listingDescription,
   shortAddress,
 } from "@/app/bnb/_components/BnbUi";
 
@@ -99,19 +103,28 @@ export default async function BnbStatusPage({ searchParams }: { searchParams: Se
               <div className="flex flex-wrap gap-2">
                 <CategoryChip category={matchedAgent.category} />
                 <StatusBadge agent={matchedAgent} />
-                <span className="bnb-chip bnb-chip-gold">BNB Smart Chain</span>
               </div>
               <h2 className="mt-4 text-xl font-semibold text-white">{matchedAgent.name}</h2>
-              <p className="mt-2 text-sm leading-6 text-zinc-400">{matchedAgent.description}</p>
+              {listingDescription(matchedAgent) ? (
+                <p className="mt-2 text-sm leading-6 text-zinc-400">{listingDescription(matchedAgent)}</p>
+              ) : null}
               <dl className="mt-5">
                 <DataRow label="ERC-8004 ID" value={matchedAgent.tokenId} />
-                <DataRow label="Owner" value={shortAddress(matchedAgent.ownerAddress)} />
-                <DataRow label="Agent wallet" value={shortAddress(matchedAgent.agentWallet)} />
+                {isAddress(matchedAgent.ownerAddress) ? (
+                  <DataRow label="Wallet owner" value={shortAddress(matchedAgent.ownerAddress)} copyValue={matchedAgent.ownerAddress} />
+                ) : null}
+                {isAddress(matchedAgent.agentWallet) ? (
+                  <DataRow label="Agent wallet" value={shortAddress(matchedAgent.agentWallet)} copyValue={matchedAgent.agentWallet} />
+                ) : null}
                 <DataRow label="Last active" value={freshnessLabel(matchedAgent.lastActivity)} />
               </dl>
               <div className="mt-5 flex flex-wrap gap-3">
-                <Link href={`/bnb/agents/${matchedAgent.chainId}/${matchedAgent.tokenId}`} className="bnb-button-dark bnb-focus">View agent</Link>
-                <Link href={`/bnb/activate?chainId=${matchedAgent.chainId}&tokenId=${encodeURIComponent(matchedAgent.tokenId)}`} className="bnb-button bnb-focus">Hire agent</Link>
+                <Link href={`/bnb/agents/${matchedAgent.chainId}/${encodeURIComponent(matchedAgent.tokenId)}`} className="bnb-button-dark bnb-focus">View agent</Link>
+                {canHireBnbAgent(matchedAgent) ? (
+                  <Link href={`/bnb/activate?chainId=${matchedAgent.chainId}&tokenId=${encodeURIComponent(matchedAgent.tokenId)}`} className="bnb-button bnb-focus">Hire agent</Link>
+                ) : (
+                  <Link href={`/bnb/agents/${matchedAgent.chainId}/${encodeURIComponent(matchedAgent.tokenId)}#request-access`} className="bnb-button bnb-focus">Request access</Link>
+                )}
               </div>
             </BnbPanel>
           ) : null}
@@ -134,11 +147,14 @@ export default async function BnbStatusPage({ searchParams }: { searchParams: Se
   );
 }
 
-function DataRow({ label, value }: { label: string; value: string }) {
+function DataRow({ label, value, copyValue }: { label: string; value: string; copyValue?: string }) {
   return (
     <div className="bnb-data-row">
       <dt>{label}</dt>
-      <dd className="max-w-[65%] break-words text-right bnb-mono text-zinc-200">{value}</dd>
+      <dd className="bnb-data-value">
+        <span>{value}</span>
+        {copyValue ? <CopyValueButton value={copyValue} label={label.toLowerCase()} /> : null}
+      </dd>
     </div>
   );
 }

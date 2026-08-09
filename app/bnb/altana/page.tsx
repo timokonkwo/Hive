@@ -10,9 +10,9 @@ export default function BnbAltanaPage() {
   return (
     <BnbShell>
       <BnbHero
-        kicker="Autonomy and permissions"
+        kicker="Wallet permissions"
         title="Wallet alerts"
-        body="Give an agent scoped permission to watch a wallet or position, then revoke it when you no longer need it."
+        body="Let an agent watch a wallet or position within limits you set."
       />
 
       <BnbContainer className="bnb-section grid gap-6 lg:grid-cols-[minmax(0,1fr)_380px]">
@@ -20,7 +20,7 @@ export default function BnbAltanaPage() {
           <div className="bnb-list-head">
             <div>
               <h2>Choose what to watch</h2>
-              <p>Start with a common wallet job, then set the wallet and trigger.</p>
+              <p>Select an alert, set the wallet, and save it.</p>
             </div>
           </div>
 
@@ -57,7 +57,7 @@ export default function BnbAltanaPage() {
               Manage alerts
             </div>
             <p className="mt-2 text-sm leading-6 text-zinc-400">
-              Saved alerts appear in Receipts. Stop an alert from the receipt when you no longer need it.
+              Saved alerts appear in Account Activity. Stop an alert there when you no longer need it.
             </p>
           </div>
         </aside>

@@ -739,6 +739,10 @@ This section tracks implementation progress on the `bnb` branch. Mark units comp
 | Phase 7: Research refresh and micro-feature audit | Complete | Re-checked current BNB requirements, audited against the product, and implemented semantic search, user-owned receipts, wallet-alert management, comparison records, PancakeSwap job paths, and BSC address checks. |
 | Phase 8: Auth and escrow hardening | Complete | Added Privy-gated write APIs, user-scoped receipts, signed-in client forms, BSC wallet support, native BNB escrow transaction construction, and the `HiveBscAgentEscrow` contract. |
 | Phase 9: Real execution and settlement | Complete | Removed silent production fallbacks, made live/configured agents the production source, added BSC runtime status, PancakeSwap RPC pair analysis, backend agent execution, escrow release/refund transactions, onchain session grant/revoke transactions, BNB MCP tools, and Forge deploy scripts. |
+| Phase 10: Marketplace decision flow | Complete | Added profile-level hire compatibility, compare-from-profile, and pre-signing hire preview. Typecheck, focused lint, diff-check, and production build passed. |
+| Phase 11: Stateful access requests and runtime gates | Complete | Added owner-scoped access request records, `/api/bnb/access-request`, profile/activate request forms, receipt visibility, request cancellation, stricter callable-only hire routing, and shared runtime readiness checks. |
+| Phase 12: Retry safety and verification hardening | Complete | Added hire-run idempotency, escrow settlement guards, Altana session readiness gating, BNB product regression tests, targeted security scans, and contract test verification. |
+| Phase 13: Product flow repair and UI cleanup | Complete | Wired Privy auth to Wagmi through `@privy-io/wagmi`, added wallet management to hire/settlement/session actions, aligned agent directory rows, removed unsupported profile fields and filler copy, made endpoint-less live indexed agents request-only, and verified the current build. |
 
 Latest verification:
 
@@ -756,6 +760,17 @@ Latest verification:
 - Phase 8 mobile screenshots were reviewed for `/bnb`, `/bnb/altana`, and `/bnb/report`; the receipts page correctly shows a signed-out auth state.
 - `npm run typecheck` passed after Phase 9.
 - Phase 9 changed the production behavior: local agents are hidden in production unless `BNB_SHOW_LOCAL_AGENTS=true`, and production writes fail loudly when MongoDB is unavailable.
+- Phase 10 production push `389db99` shipped the redesigned BNB marketplace, dark custom dropdowns, simplified directory rows, mobile viewport fixes, top-reviewed default ordering, profile-linked comparison, and BNB partner capability audit.
+- `npm run typecheck`, focused BNB lint, `git diff --check`, and `npm run build` passed after Phase 10 profile compatibility, compare-from-profile, and hire-preview work. The build still shows the existing local sitemap MongoDB DNS refusal.
+- `npm test` passed with 52 tests after Phase 12, including the new BNB access-request, hire eligibility, runtime gating, receipt-management, live-discovery, and stale-copy regressions.
+- `npm run typecheck`, focused BNB ESLint, `git diff --check`, and `npm run build` passed after Phase 12. The build still shows the existing non-fatal sitemap MongoDB SRV refusal in the local environment.
+- `forge test --offline --match-path test/bnb/HiveBscContracts.t.sol` passed with 6 BNB contract tests after Phase 12.
+- Targeted BNB security scans confirmed user-facing BNB writes use Privy auth, rate limits, and `client.userId` ownership. The only BNB route that accepts `clientAddress` from a body is the worker callback, and it is gated by `BNB_AGENT_WORKER_CALLBACK_SECRET`.
+- Built-server smoke checks returned HTTP 200 for `/bnb`, `/bnb/agents`, and `/bnb/report`; `/api/bnb/runtime` returned ready BNB storage/chain/session actions; unauthenticated BNB write APIs returned 401; `/api/bnb/agents?limit=2` returned live 8004scan BSC agents after the slow sorted-query fallback was removed.
+- `npm test` passed with 56 tests after Phase 13.
+- `npm run typecheck`, focused BNB ESLint, `git diff --check`, and `npm run build` passed after Phase 13. The build still shows the existing non-fatal MetaMask SDK optional dependency warning and local sitemap MongoDB SRV refusal.
+- Built-server smoke checks on port 3001 returned HTTP 200 for `/bnb/agents` and `/api/bnb/agents?limit=5`. The live agents API now marks indexed agents with no callable endpoint as `request`, preventing dead hire CTAs.
+- Rendered `/bnb/agents` HTML was scanned after Phase 13 and did not contain the removed placeholder/profile-copy strings: `Marketplace signals`, `Why Hive ranks`, `Price on request`, `No reviews yet`, `Data from 8004scan`, `Hive score`, `feedback records`, `BNB Agent Studio`, or `Top reviewed agents`.
 
 Deployment prerequisites still owned by the operator:
 

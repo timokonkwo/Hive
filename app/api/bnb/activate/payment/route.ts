@@ -14,7 +14,7 @@ export async function POST(request: NextRequest) {
 
   const client = await authenticateClient(request);
   if (!client) {
-    return NextResponse.json({ error: "Sign in to update this receipt." }, { status: 401 });
+    return NextResponse.json({ error: "Sign in to update this payment." }, { status: 401 });
   }
 
   const body = await request.json().catch(() => ({}));
@@ -35,11 +35,11 @@ export async function POST(request: NextRequest) {
     if (error instanceof BnbStorageError) {
       return NextResponse.json({ error: error.message }, { status: 503 });
     }
-    return NextResponse.json({ error: error instanceof Error ? error.message : "Payment receipt was not updated." }, { status: 500 });
+    return NextResponse.json({ error: error instanceof Error ? error.message : "Payment record was not updated." }, { status: 500 });
   }
 
   if (!record) {
-    return NextResponse.json({ error: "Hire receipt was not found" }, { status: 404 });
+    return NextResponse.json({ error: "Hire record was not found" }, { status: 404 });
   }
 
   return NextResponse.json({

@@ -2,8 +2,9 @@
 
 import { PrivyProvider } from "@privy-io/react-auth";
 import { toSolanaWalletConnectors } from "@privy-io/react-auth/solana";
+import { WagmiProvider, createConfig } from "@privy-io/wagmi";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { WagmiProvider, createConfig, http } from "wagmi";
+import { http } from "wagmi";
 import { bsc, mainnet } from "wagmi/chains";
 import { useState } from "react";
 import { ThemeProvider } from "./ThemeProvider";

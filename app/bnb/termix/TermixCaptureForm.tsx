@@ -4,7 +4,7 @@ import { useState } from "react";
 import Link from "next/link";
 import { ClipboardCheck } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
-import { useAuthFetch } from "@/hooks/useAuthFetch";
+import { useBnbAuthFetch } from "@/hooks/useBnbAuthFetch";
 import type { BnbTermixCapture } from "@/lib/bnb/types";
 import { BnbSelect } from "@/app/bnb/_components/BnbSelect";
 
@@ -27,24 +27,21 @@ export function TermixCaptureForm({ captures }: { captures: BnbTermixCapture[] }
   const [error, setError] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const { authenticated, login, ready } = useAuth();
-  const authFetch = useAuthFetch();
+  const { authFetch } = useBnbAuthFetch();
   const captureOptions = captures.map((capture) => ({ value: capture.id, label: capture.title }));
 
   async function submitCapture(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    setSubmitting(true);
     setError("");
     setResult(null);
 
+    if (!ensureProtectedSession({ authenticated, login })) return;
+
+    setSubmitting(true);
     const formData = new FormData(event.currentTarget);
     const payload = Object.fromEntries(formData.entries());
 
     try {
-      if (!authenticated) {
-        login();
-        return;
-      }
-
       const response = await authFetch("/api/bnb/termix/capture", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -154,7 +151,7 @@ export function TermixCaptureForm({ captures }: { captures: BnbTermixCapture[] }
           <textarea
             name="agentOutput"
             rows={3}
-            placeholder="Summarize the agent answer, checklist, or receipt."
+            placeholder="Summarize the agent answer, checklist, or work record."
             className="bnb-textarea"
           />
         </label>
@@ -207,10 +204,10 @@ export function TermixCaptureForm({ captures }: { captures: BnbTermixCapture[] }
 
         <button
           type="submit"
-          disabled={submitting}
+          disabled={submitting || !ready}
           className="bnb-button bnb-focus disabled:cursor-not-allowed disabled:opacity-70"
         >
-          {submitting ? "Saving..." : authenticated ? "Save comparison" : ready ? "Sign in to save" : "Loading..."}
+          {captureButtonLabel({ submitting, authenticated, ready })}
         </button>
       </div>
 
@@ -218,13 +215,43 @@ export function TermixCaptureForm({ captures }: { captures: BnbTermixCapture[] }
       {result ? (
         <div className="bnb-success mt-4 p-4">
           <div className="text-sm font-semibold text-emerald-300">Comparison saved</div>
-          <div className="mt-1 break-all font-mono text-xs text-zinc-200">Receipt {result.receiptId}</div>
+          <div className="mt-1 break-all font-mono text-xs text-zinc-200">Record {result.recordId}</div>
           <p className="mt-2 text-sm leading-6 text-zinc-300">{result.message}</p>
-          <Link href="/bnb/report" className="bnb-text-action bnb-focus mt-3">
-            Open receipts
+          <Link href="/bnb/account#activity" className="bnb-text-action bnb-focus mt-3">
+            Open activity
           </Link>
         </div>
       ) : null}
     </form>
   );
+}
+
+function captureButtonLabel({
+  submitting,
+  authenticated,
+  ready,
+}: {
+  submitting: boolean;
+  authenticated: boolean;
+  ready: boolean;
+}) {
+  if (submitting) return "Saving...";
+  if (!ready) return "Loading...";
+  if (!authenticated) return "Sign in to save";
+  return "Save comparison";
+}
+
+function ensureProtectedSession({
+  authenticated,
+  login,
+}: {
+  authenticated: boolean;
+  login: () => void;
+}) {
+  if (!authenticated) {
+    login();
+    return false;
+  }
+
+  return true;
 }

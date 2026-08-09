@@ -42,6 +42,14 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Hire receipt was not found" }, { status: 404 });
     }
 
+    if (record.status === "released" || record.status === "refunded") {
+      return NextResponse.json({ error: "This escrow receipt is already closed." }, { status: 409 });
+    }
+
+    if (action === "release" && record.work?.status !== "completed") {
+      return NextResponse.json({ error: "Agent work must be completed before release." }, { status: 409 });
+    }
+
     if (!transactionHash) {
       return NextResponse.json({
         status: "ready",

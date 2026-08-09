@@ -56,45 +56,65 @@ export async function authenticateClient(req: NextRequest): Promise<VerifiedClie
       return null;
     }
 
-    // Extract token from Authorization header or privy-token cookie
-    let token: string | null = null;
+    // Extract Privy-issued tokens from Authorization, verified identity header, or cookies.
+    // Do not accept raw user IDs from client headers.
+    const tokens: string[] = [];
 
     const authHeader = req.headers.get('authorization');
     if (authHeader?.startsWith('Bearer ')) {
-      token = authHeader.slice(7);
+      tokens.push(authHeader.slice(7));
     }
 
-    if (!token) {
-      // Fall back to cookie (Privy stores token as "privy-token" cookie)
-      const cookie = req.cookies.get('privy-token');
-      token = cookie?.value || null;
+    const identityHeader = req.headers.get('x-privy-identity-token');
+    if (identityHeader) {
+      tokens.push(identityHeader);
     }
 
-    if (!token) {
+    const accessCookie = req.cookies.get('privy-token')?.value;
+    const identityCookie = req.cookies.get('privy-id-token')?.value;
+    if (accessCookie) {
+      tokens.push(accessCookie);
+    }
+    if (identityCookie) {
+      tokens.push(identityCookie);
+    }
+
+    const uniqueTokens = [...new Set(tokens.filter(Boolean))];
+    if (uniqueTokens.length === 0) {
       return null;
     }
 
     // Verify the JWT against Privy's JWKS
     const jwks = getJWKS();
-    const { payload } = await jwtVerify(token, jwks, {
-      issuer: 'privy.io',
-      audience: PRIVY_APP_ID,
-    });
+    let lastError: any = null;
+    for (const token of uniqueTokens) {
+      try {
+        const { payload } = await jwtVerify(token, jwks, {
+          issuer: 'privy.io',
+          audience: PRIVY_APP_ID,
+        });
 
-    const userId = payload.sub;
-    if (!userId) {
-      return null;
+        const userId = payload.sub;
+        if (!userId) {
+          continue;
+        }
+
+        return {
+          userId,
+          // The userId (did:privy:...) is the canonical identity.
+          address: userId,
+          sessionId: (payload as any).sid || '',
+          expiresAt: payload.exp || 0,
+        };
+      } catch (verificationError: any) {
+        lastError = verificationError;
+      }
     }
 
-    return {
-      userId,
-      // The userId (did:privy:...) is the canonical identity
-      // The frontend can also send a wallet address in the body,
-      // but we only trust it if the Privy token is valid
-      address: userId,
-      sessionId: (payload as any).sid || '',
-      expiresAt: payload.exp || 0,
-    };
+    if (lastError?.code !== 'ERR_JWT_EXPIRED') {
+      logger.error('Client auth verification failed', { tag: 'AUTH', error: lastError?.message });
+    }
+    return null;
   } catch (error: any) {
     // JWT verification failed — invalid, expired, or tampered token
     if (error?.code !== 'ERR_JWT_EXPIRED') {

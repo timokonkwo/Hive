@@ -9,9 +9,9 @@ export default function BnbTermixPage() {
   return (
     <BnbShell>
       <BnbHero
-        kicker="Agent Advantage"
-        title="Measure agent outcomes"
-        body="Record time, cost, output quality, and the final decision when agent work is compared with another workflow."
+        kicker="TermiX"
+        title="Work comparisons"
+        body="Save side-by-side records for manual checks and agent results."
       />
 
       <BnbContainer className="bnb-section grid gap-6 lg:grid-cols-[minmax(0,1fr)_380px]">
@@ -19,7 +19,7 @@ export default function BnbTermixPage() {
           <div className="bnb-list-head">
             <div>
               <h2>Comparison types</h2>
-              <p>Use these when you want a clean record of what changed after using an agent.</p>
+              <p>Choose the record type, then save the result.</p>
             </div>
           </div>
 
@@ -32,9 +32,6 @@ export default function BnbTermixPage() {
                     <span>{comparison.target}</span>
                   </div>
                   <h2 className="mt-3 text-xl font-semibold text-white">{comparison.title}</h2>
-                  <p className="mt-2 max-w-2xl text-sm leading-6 text-zinc-400">
-                    Save the manual result, agent result, time spent, cost, and quality notes in one receipt.
-                  </p>
                 </div>
                 <div className="bnb-agent-side">
                   <div className="bnb-score-compact">

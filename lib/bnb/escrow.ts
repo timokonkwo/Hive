@@ -160,6 +160,10 @@ function nativeBnbAmountWei(value: string) {
   }
 }
 
+export function isNativeBnbBudget(value: string) {
+  return nativeBnbAmountWei(value) !== null;
+}
+
 function expiryToUnix(value: string) {
   const trimmed = value.trim().toLowerCase();
   const relative = trimmed.match(/^(\d+)\s*(minute|minutes|hour|hours|day|days|week|weeks)$/);

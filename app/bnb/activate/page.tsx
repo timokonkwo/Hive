@@ -1,6 +1,8 @@
 import { notFound } from "next/navigation";
 import { getBnbAgent } from "@/lib/bnb/catalog";
+import { canHireBnbAgent } from "@/lib/bnb/runtime";
 import { BnbContainer, BnbHero, BnbPanel, BnbShell, CategoryChip, StatusBadge } from "@/app/bnb/_components/BnbUi";
+import { RequestAccessForm } from "@/app/bnb/_components/RequestAccessForm";
 import { ActivationForm } from "./ActivationForm";
 
 type SearchParams = Promise<Record<string, string | string[] | undefined>>;
@@ -17,12 +19,22 @@ export default async function BnbActivatePage({ searchParams }: { searchParams: 
 
   const agent = await getBnbAgent(chainId, tokenId);
   if (!agent) notFound();
+  const canHire = canHireBnbAgent(agent);
 
   return (
     <BnbShell>
-      <BnbHero title={`Hire ${agent.name}`} body="Set the task, spend cap, and expiry before the agent starts work." />
+      <BnbHero
+        title={canHire ? `Hire ${agent.name}` : `Request access to ${agent.name}`}
+        body={canHire ? "Set the task, spend cap, and expiry before the agent starts work." : "Send the work details and keep the request in Activity."}
+      />
       <BnbContainer className="bnb-section grid gap-8 lg:grid-cols-[1fr_320px]">
-        <ActivationForm agent={agent} />
+        {canHire ? (
+          <ActivationForm agent={agent} />
+        ) : (
+          <BnbPanel className="p-5">
+            <RequestAccessForm agent={agent} />
+          </BnbPanel>
+        )}
 
         <aside className="content-start">
           <BnbPanel className="p-5">
@@ -32,9 +44,11 @@ export default async function BnbActivatePage({ searchParams }: { searchParams: 
             </div>
             <h2 className="mt-5 text-xl font-semibold text-white">{agent.name}</h2>
             <p className="mt-2 text-sm leading-6 text-zinc-400">{agent.description}</p>
-            <div className="bnb-warning mt-5 p-4 text-sm leading-6">
-              Wallet confirmation is required before any paid work. The receipt keeps the task, cap, and expiry.
-            </div>
+            {canHire ? (
+              <div className="bnb-warning mt-5 p-4 text-sm leading-6">
+                Wallet confirmation is required before any paid work. The hire record keeps the task, cap, and expiry.
+              </div>
+            ) : null}
           </BnbPanel>
         </aside>
       </BnbContainer>

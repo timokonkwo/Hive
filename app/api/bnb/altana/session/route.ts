@@ -3,6 +3,7 @@ import { authenticateClient } from "@/lib/client-auth";
 import { BnbTransactionVerificationError } from "@/lib/bnb/errors";
 import { getBnbAgent, getBnbAltanaSessionTemplates } from "@/lib/bnb/catalog";
 import { enforceBnbRateLimit } from "@/lib/bnb/rate-limit";
+import { getBnbRuntimeReadiness } from "@/lib/bnb/runtime";
 import { buildBnbSessionGrantRequest } from "@/lib/bnb/session";
 import { BnbStorageError, confirmBnbAltanaSessionGrant, createBnbAltanaSessionRecord } from "@/lib/bnb/records";
 
@@ -63,6 +64,14 @@ export async function POST(request: NextRequest) {
 
   if (!templateId) {
     return NextResponse.json({ error: "Choose an alert type." }, { status: 400 });
+  }
+
+  const readiness = getBnbRuntimeReadiness();
+  if (!readiness.actions.canGrantSession) {
+    const error = readiness.storage.ready
+      ? "BNB session registry is not configured."
+      : "BNB record storage is not configured.";
+    return NextResponse.json({ error }, { status: 503 });
   }
 
   const template = getBnbAltanaSessionTemplates().find((item) => item.id === templateId);

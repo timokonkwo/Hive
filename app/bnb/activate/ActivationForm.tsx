@@ -1,11 +1,13 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useMemo, useState, type FormEvent } from "react";
+import { useWallets, type ConnectedWallet } from "@privy-io/react-auth";
+import { useSetActiveWallet } from "@privy-io/wagmi";
 import { bsc } from "wagmi/chains";
 import { useAccount, useSendTransaction, useSwitchChain } from "wagmi";
 import type { Hex } from "viem";
 import { useAuth } from "@/hooks/useAuth";
-import { useAuthFetch } from "@/hooks/useAuthFetch";
+import { useBnbAuthFetch } from "@/hooks/useBnbAuthFetch";
 import type { BnbAgentProfile } from "@/lib/bnb/types";
 import { BnbSelect } from "@/app/bnb/_components/BnbSelect";
 
@@ -94,6 +96,8 @@ export function ActivationForm({ agent }: { agent: BnbAgentProfile }) {
   const [funding, setFunding] = useState(false);
   const [running, setRunning] = useState(false);
   const [settling, setSettling] = useState<"release" | "refund" | null>(null);
+  const [walletAction, setWalletAction] = useState("");
+  const [walletError, setWalletError] = useState("");
   const [result, setResult] = useState<ActivationResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [paymentHash, setPaymentHash] = useState("");
@@ -101,7 +105,53 @@ export function ActivationForm({ agent }: { agent: BnbAgentProfile }) {
   const { address, chainId } = useAccount();
   const { sendTransactionAsync } = useSendTransaction();
   const { switchChainAsync } = useSwitchChain();
-  const authFetch = useAuthFetch();
+  const { wallets, ready: walletsReady } = useWallets();
+  const { setActiveWallet } = useSetActiveWallet();
+  const { authFetch } = useBnbAuthFetch();
+  const evmWallets = useMemo(
+    () => wallets.filter((wallet): wallet is ConnectedWallet => wallet.type === "ethereum"),
+    [wallets],
+  );
+  const activeWallet = evmWallets.find((wallet) => sameAddress(wallet.address, address));
+
+  useEffect(() => {
+    if (!authenticated || address || evmWallets.length === 0) return;
+    setActiveWallet(evmWallets[0]).catch(() => undefined);
+  }, [address, authenticated, evmWallets, setActiveWallet]);
+
+  function openWalletConnector() {
+    setWalletError("");
+    connectWallet({
+      walletChainType: "ethereum-only",
+      description: "Connect the wallet you want to use for BNB Smart Chain transactions.",
+    });
+  }
+
+  async function useWallet(wallet: ConnectedWallet) {
+    setWalletAction(`wallet:${wallet.address}`);
+    setWalletError("");
+
+    try {
+      await setActiveWallet(wallet);
+    } catch (walletSetError) {
+      setWalletError(walletSetError instanceof Error ? walletSetError.message : "Could not switch wallet.");
+    } finally {
+      setWalletAction("");
+    }
+  }
+
+  async function switchToBsc() {
+    setWalletAction("switch");
+    setWalletError("");
+
+    try {
+      await switchChainAsync({ chainId: bsc.id });
+    } catch (switchError) {
+      setWalletError(switchError instanceof Error ? switchError.message : "Could not switch to BNB Smart Chain.");
+    } finally {
+      setWalletAction("");
+    }
+  }
 
   async function ensureBscWallet() {
     if (!authenticated) {
@@ -110,7 +160,7 @@ export function ActivationForm({ agent }: { agent: BnbAgentProfile }) {
     }
 
     if (!address) {
-      await connectWallet();
+      openWalletConnector();
       setError("Connect a BNB Chain wallet to continue.");
       return false;
     }
@@ -122,18 +172,15 @@ export function ActivationForm({ agent }: { agent: BnbAgentProfile }) {
     return true;
   }
 
-  async function submitActivation(event: React.FormEvent<HTMLFormElement>) {
+  async function submitActivation(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    setLoading(true);
     setError(null);
     setResult(null);
 
-    try {
-      const walletReady = await ensureBscWallet();
-      if (!walletReady) {
-        return;
-      }
+    if (!ensureProtectedSession({ authenticated, login })) return;
 
+    setLoading(true);
+    try {
       const response = await authFetch("/api/bnb/activate", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -144,7 +191,6 @@ export function ActivationForm({ agent }: { agent: BnbAgentProfile }) {
           taskDetails,
           spendCap,
           expiry,
-          clientAddress: address,
         }),
       });
       const payload = await response.json();
@@ -161,6 +207,7 @@ export function ActivationForm({ agent }: { agent: BnbAgentProfile }) {
 
   async function fundEscrow() {
     if (!result || result.paymentRequest.status !== "ready") return;
+    if (!ensureProtectedSession({ authenticated, login })) return;
 
     setFunding(true);
     setError(null);
@@ -187,7 +234,7 @@ export function ActivationForm({ agent }: { agent: BnbAgentProfile }) {
       });
       const payload = await response.json();
       if (!response.ok) {
-        throw new Error(payload.error || "Payment was sent, but the receipt could not be updated.");
+        throw new Error(payload.error || "Payment was sent, but the record could not be updated.");
       }
       setResult((current) => current ? { ...current, status: payload.status, message: payload.message, record: payload.record } : current);
     } catch (fundingError) {
@@ -199,6 +246,7 @@ export function ActivationForm({ agent }: { agent: BnbAgentProfile }) {
 
   async function runAgent() {
     if (!result) return;
+    if (!ensureProtectedSession({ authenticated, login })) return;
     setRunning(true);
     setError(null);
 
@@ -222,6 +270,7 @@ export function ActivationForm({ agent }: { agent: BnbAgentProfile }) {
 
   async function settleEscrow(action: "release" | "refund") {
     if (!result) return;
+    if (!ensureProtectedSession({ authenticated, login })) return;
 
     setSettling(action);
     setError(null);
@@ -261,7 +310,7 @@ export function ActivationForm({ agent }: { agent: BnbAgentProfile }) {
       });
       const payload = await confirmResponse.json();
       if (!confirmResponse.ok) {
-        throw new Error(payload.error || "Escrow transaction was sent, but the receipt could not be updated.");
+        throw new Error(payload.error || "Escrow transaction was sent, but the record could not be updated.");
       }
 
       setResult((current) => current ? { ...current, status: payload.status, message: payload.message, record: payload.record } : current);
@@ -275,10 +324,27 @@ export function ActivationForm({ agent }: { agent: BnbAgentProfile }) {
   const funded = result?.record?.payment?.transactionStatus === "success" || result?.status === "payment_confirmed" || result?.status === "work_completed";
   const completed = result?.record?.work?.status === "completed" || result?.status === "work_completed";
   const closed = result?.status === "released" || result?.status === "refunded";
+  const previewRows = getHirePreviewRows({ agent, taskTemplate, spendCap, expiry });
 
   return (
     <form onSubmit={submitActivation} className="bnb-panel p-5" aria-busy={loading}>
       <div className="grid gap-4">
+        <WalletPanel
+          authenticated={authenticated}
+          ready={ready}
+          walletsReady={walletsReady}
+          address={address}
+          chainId={chainId}
+          activeWallet={activeWallet}
+          wallets={evmWallets}
+          action={walletAction}
+          error={walletError}
+          onLogin={login}
+          onConnect={openWalletConnector}
+          onUseWallet={useWallet}
+          onSwitchChain={switchToBsc}
+        />
+
         <label>
           <span className="bnb-label">Task</span>
           <BnbSelect value={taskTemplate} onChange={setTaskTemplate} options={taskOptions} ariaLabel="Task" />
@@ -300,12 +366,26 @@ export function ActivationForm({ agent }: { agent: BnbAgentProfile }) {
           <span className="bnb-label">Expiry</span>
           <input value={expiry} onChange={(event) => setExpiry(event.target.value)} className="bnb-input" />
         </label>
-        <button type="submit" disabled={loading || !ready} className="bnb-button bnb-focus disabled:cursor-not-allowed disabled:opacity-60">
-          {loading ? "Saving..." : hireButtonLabel({ authenticated, address, chainId })}
+
+        <div className="bnb-hire-preview">
+          <div>
+            <h2>Review before signing</h2>
+            <p>Saving creates the hire record. Escrow funding happens next.</p>
+          </div>
+          <dl>
+            {previewRows.map((row) => (
+              <DataRow key={row.label} label={row.label} value={row.value} />
+            ))}
+          </dl>
+        </div>
+
+        <button
+          type="submit"
+          disabled={loading || !ready}
+          className="bnb-button bnb-focus disabled:cursor-not-allowed disabled:opacity-60"
+        >
+          {loading ? "Saving..." : hireButtonLabel({ authenticated })}
         </button>
-        {authenticated && address && chainId !== bsc.id ? (
-          <p className="bnb-field-note">Wallet must be on BNB Smart Chain.</p>
-        ) : null}
       </div>
 
       {error ? <div className="bnb-error mt-4 p-4 text-sm">{error}</div> : null}
@@ -317,7 +397,7 @@ export function ActivationForm({ agent }: { agent: BnbAgentProfile }) {
           </div>
           <p className="mt-2 text-sm leading-6 text-zinc-200">{result.message}</p>
           <dl className="mt-4">
-            <DataRow label="Receipt" value={result.receiptId} />
+            <DataRow label="Record" value={result.receiptId} />
             <DataRow label="Task" value={result.limits.task} />
             <DataRow label="Budget" value={result.limits.budget} />
             <DataRow label="Expires" value={result.limits.expires} />
@@ -389,17 +469,189 @@ function DataRow({ label, value }: { label: string; value: string }) {
   );
 }
 
+function WalletPanel({
+  authenticated,
+  ready,
+  walletsReady,
+  address,
+  chainId,
+  activeWallet,
+  wallets,
+  action,
+  error,
+  onLogin,
+  onConnect,
+  onUseWallet,
+  onSwitchChain,
+}: {
+  authenticated: boolean;
+  ready: boolean;
+  walletsReady: boolean;
+  address?: string;
+  chainId?: number;
+  activeWallet?: ConnectedWallet;
+  wallets: ConnectedWallet[];
+  action: string;
+  error: string;
+  onLogin: () => void;
+  onConnect: () => void;
+  onUseWallet: (wallet: ConnectedWallet) => void;
+  onSwitchChain: () => void;
+}) {
+  const onBsc = chainId === bsc.id;
+
+  return (
+    <div className="bnb-wallet-panel">
+      <div className="bnb-wallet-head">
+        <div>
+          <h2>Wallet</h2>
+          <p>{walletSummary({ authenticated, walletsReady, address, chainId })}</p>
+        </div>
+        <span className={`bnb-chip ${authenticated && address && onBsc ? "bnb-chip-active" : ""}`}>
+          {authenticated && address && onBsc ? "Ready" : authenticated ? "Needs wallet" : "Signed out"}
+        </span>
+      </div>
+
+      {!authenticated ? (
+        <button type="button" className="bnb-button-dark bnb-focus" onClick={onLogin} disabled={!ready}>
+          Sign in
+        </button>
+      ) : null}
+
+      {authenticated && walletsReady && wallets.length === 0 ? (
+        <button type="button" className="bnb-button-dark bnb-focus" onClick={onConnect}>
+          Connect wallet
+        </button>
+      ) : null}
+
+      {authenticated && wallets.length > 0 ? (
+        <div className="bnb-wallet-list">
+          {wallets.map((wallet) => {
+            const active = sameAddress(wallet.address, address);
+            return (
+              <button
+                key={`${wallet.walletClientType}:${wallet.address}`}
+                type="button"
+                className="bnb-wallet-row bnb-focus"
+                data-active={active ? "true" : undefined}
+                onClick={() => onUseWallet(wallet)}
+                disabled={action === `wallet:${wallet.address}`}
+              >
+                <span>
+                  <strong>{wallet.meta?.name || wallet.walletClientType || "Wallet"}</strong>
+                  <small>{shortAddress(wallet.address)}</small>
+                </span>
+                <span>{active ? "Active" : action === `wallet:${wallet.address}` ? "Switching..." : "Use"}</span>
+              </button>
+            );
+          })}
+        </div>
+      ) : null}
+
+      {authenticated && address ? (
+        <div className="bnb-wallet-actions">
+          {chainId !== bsc.id ? (
+            <button type="button" className="bnb-button bnb-focus" onClick={onSwitchChain} disabled={action === "switch"}>
+              {action === "switch" ? "Switching..." : "Switch to BNB Chain"}
+            </button>
+          ) : null}
+          <button type="button" className="bnb-button-dark bnb-focus" onClick={onConnect}>
+            {activeWallet ? "Change wallet" : "Connect wallet"}
+          </button>
+        </div>
+      ) : null}
+
+      {error ? <p className="bnb-form-error">{error}</p> : null}
+    </div>
+  );
+}
+
 function hireButtonLabel({
   authenticated,
+}: {
+  authenticated: boolean;
+}) {
+  if (!authenticated) return "Sign in to hire";
+  return "Create hire";
+}
+
+function ensureProtectedSession({
+  authenticated,
+  login,
+}: {
+  authenticated: boolean;
+  login: () => void;
+}) {
+  if (!authenticated) {
+    login();
+    return false;
+  }
+
+  return true;
+}
+
+function walletSummary({
+  authenticated,
+  walletsReady,
   address,
   chainId,
 }: {
   authenticated: boolean;
+  walletsReady: boolean;
   address?: string;
   chainId?: number;
 }) {
-  if (!authenticated) return "Sign in to hire";
-  if (!address) return "Connect BNB wallet";
-  if (chainId !== bsc.id) return "Switch to BNB Chain";
-  return "Create hire";
+  if (!authenticated) return "Sign in before saving a hire.";
+  if (!walletsReady) return "Loading wallets.";
+  if (!address) return "Connect a wallet when you are ready to fund escrow.";
+  if (chainId !== bsc.id) return `${shortAddress(address)} is connected on another network.`;
+  return `${shortAddress(address)} is connected on BNB Smart Chain.`;
+}
+
+function sameAddress(a?: string, b?: string) {
+  return Boolean(a && b && a.toLowerCase() === b.toLowerCase());
+}
+
+function shortAddress(value: string) {
+  return value.length > 12 ? `${value.slice(0, 6)}...${value.slice(-4)}` : value;
+}
+
+function getHirePreviewRows({
+  agent,
+  taskTemplate,
+  spendCap,
+  expiry,
+}: {
+  agent: BnbAgentProfile;
+  taskTemplate: string;
+  spendCap: string;
+  expiry: string;
+}) {
+  const service = agent.services.find((item) => item.price) || agent.services[0];
+  const fee = service?.price || "";
+  const rows = [
+    { label: "Agent", value: agent.name },
+    { label: "Work", value: taskTemplate },
+    { label: "Budget", value: spendCap },
+    { label: "Time limit", value: expiry },
+    { label: "Payment", value: "BNB escrow" },
+    { label: "Expected output", value: expectedOutput(taskTemplate) },
+    { label: "Settlement", value: "Release or refund" },
+  ];
+
+  if (fee) {
+    rows.splice(3, 0, { label: "Agent fee", value: fee });
+  }
+
+  return rows;
+}
+
+function expectedOutput(taskTemplate: string) {
+  const normalized = taskTemplate.toLowerCase();
+  if (normalized.includes("rebalance")) return "LP range recommendation";
+  if (normalized.includes("grid")) return "Grid strategy plan";
+  if (normalized.includes("yield")) return "Ranked route report";
+  if (normalized.includes("health")) return "Health factor alert";
+  if (normalized.includes("audit")) return "Risk report";
+  return "Agent result and work record";
 }

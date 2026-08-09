@@ -5,6 +5,7 @@ import { getBnbAgent } from "@/lib/bnb/catalog";
 import { readBnbEscrowPayment } from "@/lib/bnb/escrow";
 import { readBnbSessionGrant, readBnbSessionRevoke } from "@/lib/bnb/session";
 import type {
+  BnbAccessRequestRecord,
   BnbActivationRecord,
   BnbAgentProfile,
   BnbAltanaSessionRecord,
@@ -15,10 +16,15 @@ import type {
   BnbTermixComparisonRecord,
 } from "@/lib/bnb/types";
 
-type BnbStoredRecord = BnbActivationRecord | BnbTermixComparisonRecord | BnbAltanaSessionRecord;
+type BnbStoredRecord =
+  | BnbActivationRecord
+  | BnbAccessRequestRecord
+  | BnbTermixComparisonRecord
+  | BnbAltanaSessionRecord;
 
 type ProcessRecordStore = {
   activations: BnbActivationRecord[];
+  accessRequests: BnbAccessRequestRecord[];
   termixComparisons: BnbTermixComparisonRecord[];
   altanaSessions: BnbAltanaSessionRecord[];
 };
@@ -38,6 +44,7 @@ function getProcessStore() {
   if (!globalForBnbRecords.__hiveBnbRecords) {
     globalForBnbRecords.__hiveBnbRecords = {
       activations: [],
+      accessRequests: [],
       termixComparisons: [],
       altanaSessions: [],
     };
@@ -156,6 +163,48 @@ export async function createBnbActivationRecord({
 
   return saveBnbRecord(COLLECTIONS.BNB_ACTIVATIONS, record, (stored) => {
     getProcessStore().activations.unshift(stored);
+  });
+}
+
+export async function createBnbAccessRequestRecord({
+  agent,
+  task,
+  budget,
+  deadline,
+  contactPreference,
+  clientAddress,
+}: {
+  agent: BnbAgentProfile;
+  task: string;
+  budget?: string;
+  deadline?: string;
+  contactPreference?: string;
+  clientAddress?: string;
+}) {
+  const now = new Date().toISOString();
+  const record: BnbAccessRequestRecord = {
+    recordType: "access_request",
+    recordId: randomUUID(),
+    receiptId: `hive-access-${agent.tokenId}-${Date.now()}`,
+    status: "requested",
+    createdAt: now,
+    updatedAt: now,
+    ...(clientAddress ? { clientAddress } : {}),
+    agent: {
+      chainId: agent.chainId,
+      tokenId: agent.tokenId,
+      name: agent.name,
+      activationStatus: agent.activationStatus,
+      agentWallet: agent.agentWallet,
+    },
+    task,
+    ...(budget ? { budget } : {}),
+    ...(deadline ? { deadline } : {}),
+    ...(contactPreference ? { contactPreference } : {}),
+  };
+
+  return saveBnbRecord(COLLECTIONS.BNB_ACCESS_REQUESTS, record, (stored) => {
+    getProcessStore().accessRequests.unshift(stored);
   });
 }
 
@@ -621,18 +670,129 @@ export async function updateBnbActivationRecord({
   return updated;
 }
 
+export async function getBnbAccessRequestRecord({
+  recordId,
+  clientAddress,
+}: {
+  recordId: string;
+  clientAddress?: string;
+}) {
+  if (hasDatabaseConfig()) {
+    try {
+      const db = await getDb();
+      const record = await db
+        .collection<BnbAccessRequestRecord & { _id?: unknown }>(COLLECTIONS.BNB_ACCESS_REQUESTS)
+        .findOne({ $or: [{ recordId }, { receiptId: recordId }], ...(clientAddress ? { clientAddress } : {}) });
+
+      return record ? stripMongoId(record) : null;
+    } catch (error) {
+      if (!canUseProcessStorage()) {
+        const message = error instanceof Error ? error.message : "Database read failed.";
+        throw new BnbStorageError(`Access request could not be loaded: ${message}`);
+      }
+    }
+  }
+
+  if (!canUseProcessStorage()) {
+    throw new BnbStorageError("Access request storage is not configured.");
+  }
+
+  const record = getProcessStore().accessRequests.find((item) => {
+    if (item.recordId !== recordId && item.receiptId !== recordId) return false;
+    return clientAddress ? item.clientAddress === clientAddress : true;
+  });
+
+  return record || null;
+}
+
+export async function updateBnbAccessRequestRecord({
+  recordId,
+  clientAddress,
+  patch,
+}: {
+  recordId: string;
+  clientAddress?: string;
+  patch: Partial<BnbAccessRequestRecord>;
+}) {
+  const update = {
+    ...patch,
+    updatedAt: new Date().toISOString(),
+  };
+
+  if (hasDatabaseConfig()) {
+    try {
+      const db = await getDb();
+      const updated = await db
+        .collection<BnbAccessRequestRecord & { _id?: unknown }>(COLLECTIONS.BNB_ACCESS_REQUESTS)
+        .findOneAndUpdate(
+          { $or: [{ recordId }, { receiptId: recordId }], ...(clientAddress ? { clientAddress } : {}) },
+          { $set: update },
+          { returnDocument: "after" }
+        );
+
+      if (updated) return stripMongoId(updated);
+    } catch (error) {
+      if (!canUseProcessStorage()) {
+        const message = error instanceof Error ? error.message : "Database update failed.";
+        throw new BnbStorageError(`Access request was not updated: ${message}`);
+      }
+    }
+  }
+
+  if (!canUseProcessStorage()) {
+    throw new BnbStorageError("Access request storage is not configured.");
+  }
+
+  const processStore = getProcessStore();
+  const recordIndex = processStore.accessRequests.findIndex((record) => {
+    if (record.recordId !== recordId && record.receiptId !== recordId) return false;
+    return clientAddress ? record.clientAddress === clientAddress : true;
+  });
+  if (recordIndex === -1) return null;
+
+  const updated = {
+    ...processStore.accessRequests[recordIndex],
+    ...update,
+  };
+  processStore.accessRequests[recordIndex] = updated;
+  return updated;
+}
+
+export async function cancelBnbAccessRequestRecord({
+  recordId,
+  clientAddress,
+  cancelReason,
+}: {
+  recordId: string;
+  clientAddress?: string;
+  cancelReason?: string;
+}) {
+  const now = new Date().toISOString();
+  return updateBnbAccessRequestRecord({
+    recordId,
+    clientAddress,
+    patch: {
+      status: "cancelled",
+      cancelledAt: now,
+      ...(cancelReason ? { cancelReason } : {}),
+    },
+  });
+}
+
 export async function listBnbRecords(limit = 25, ownerId?: string): Promise<BnbRecordsSnapshot> {
   const boundedLimit = Math.min(Math.max(limit, 1), 100);
 
-  const [activations, termixComparisons, altanaSessions] = await Promise.all([
+  const [activations, accessRequests, termixComparisons, altanaSessions] = await Promise.all([
     listBnbCollection<BnbActivationRecord>(COLLECTIONS.BNB_ACTIVATIONS, boundedLimit, ownerId),
+    listBnbCollection<BnbAccessRequestRecord>(COLLECTIONS.BNB_ACCESS_REQUESTS, boundedLimit, ownerId),
     listBnbCollection<BnbTermixComparisonRecord>(COLLECTIONS.BNB_TERMIX_COMPARISONS, boundedLimit, ownerId),
     listBnbCollection<BnbAltanaSessionRecord>(COLLECTIONS.BNB_ALTANA_SESSIONS, boundedLimit, ownerId),
   ]);
 
-  if (activations && termixComparisons && altanaSessions) {
+  if (activations && accessRequests && termixComparisons && altanaSessions) {
     return {
       activations,
+      accessRequests,
       termixComparisons,
       altanaSessions,
       storage: "database",
@@ -643,6 +803,7 @@ export async function listBnbRecords(limit = 25, ownerId?: string): Promise<BnbR
   const processStore = getProcessStore();
   return {
     activations: processStore.activations.filter((record) => !ownerId || record.clientAddress === ownerId).slice(0, boundedLimit),
+    accessRequests: processStore.accessRequests.filter((record) => !ownerId || record.clientAddress === ownerId).slice(0, boundedLimit),
     termixComparisons: processStore.termixComparisons.filter((record) => !ownerId || record.clientAddress === ownerId).slice(0, boundedLimit),
     altanaSessions: processStore.altanaSessions.filter((record) => !ownerId || record.clientAddress === ownerId).slice(0, boundedLimit),
     storage: "process",

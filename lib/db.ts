@@ -49,6 +49,7 @@ export const COLLECTIONS = {
   DISPUTES: "disputes",
   DISPUTE_VOTES: "dispute_votes",
   BNB_ACTIVATIONS: "bnb_activations",
+  BNB_ACCESS_REQUESTS: "bnb_access_requests",
   BNB_TERMIX_COMPARISONS: "bnb_termix_comparisons",
   BNB_ALTANA_SESSIONS: "bnb_altana_sessions",
 } as const;

@@ -120,7 +120,12 @@ body:has(.bnb-shell) {
   scrollbar-width: none;
 }
 
-.bnb-header-inner > .bnb-button {
+.bnb-header-actions {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
   justify-self: end;
 }
 
@@ -390,6 +395,42 @@ body:has(.bnb-shell) {
   border-color: var(--bnb-gold-line);
   background: var(--bnb-elevated);
   color: var(--bnb-text);
+}
+
+.bnb-account-button {
+  display: inline-flex;
+  min-height: 38px;
+  max-width: 100%;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  border: 1px solid var(--bnb-line);
+  border-radius: 8px;
+  background: var(--bnb-muted);
+  padding: 0 12px;
+  color: var(--bnb-text-soft);
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1;
+  text-decoration: none;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.bnb-account-button:hover,
+.bnb-account-button[data-active="true"] {
+  border-color: var(--bnb-gold-line);
+  background: var(--bnb-gold-soft);
+  color: #f7d76b;
+}
+
+button.bnb-account-button:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+.bnb-account-mobile-label {
+  display: none;
 }
 
 .bnb-mobile-label {
@@ -714,6 +755,181 @@ body:has(.bnb-shell) {
   border-bottom: 0;
 }
 
+.bnb-data-value {
+  display: inline-flex;
+  max-width: 65%;
+  min-width: 0;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  color: var(--bnb-text-soft);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 12px;
+  overflow-wrap: anywhere;
+  text-align: right;
+}
+
+.bnb-data-value span {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.bnb-account-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(320px, 380px);
+  gap: 18px;
+  align-items: start;
+}
+
+.bnb-account-panel {
+  padding: 20px;
+}
+
+.bnb-account-panel h2 {
+  color: var(--bnb-text);
+  font-size: 20px;
+  font-weight: 600;
+  line-height: 1.2;
+}
+
+.bnb-account-panel p {
+  margin-top: 6px;
+  color: var(--bnb-text-muted);
+  font-size: 14px;
+  line-height: 1.6;
+}
+
+.bnb-account-auth {
+  display: grid;
+  max-width: 560px;
+  gap: 16px;
+}
+
+.bnb-account-auth .bnb-button {
+  width: fit-content;
+}
+
+.bnb-account-icon {
+  display: grid;
+  width: 40px;
+  height: 40px;
+  place-items: center;
+  border: 1px solid var(--bnb-hive-line);
+  border-radius: 8px;
+  background: var(--bnb-hive-soft);
+  color: var(--bnb-hive-hover);
+}
+
+.bnb-account-panel-head {
+  display: flex;
+  align-items: start;
+  justify-content: space-between;
+  gap: 14px;
+}
+
+.bnb-account-panel-head svg {
+  color: var(--bnb-text-muted);
+}
+
+.bnb-account-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 18px;
+}
+
+.bnb-account-wallets,
+.bnb-account-empty {
+  display: grid;
+  gap: 10px;
+  margin-top: 18px;
+}
+
+.bnb-account-empty {
+  border: 1px solid var(--bnb-line);
+  border-radius: 8px;
+  background: var(--bnb-elevated);
+  padding: 14px;
+}
+
+.bnb-account-wallet-row {
+  display: flex;
+  min-height: 58px;
+  width: 100%;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  border: 1px solid var(--bnb-line);
+  border-radius: 8px;
+  background: var(--bnb-elevated);
+  padding: 12px;
+  color: var(--bnb-text-muted);
+  text-align: left;
+  cursor: pointer;
+}
+
+.bnb-account-wallet-row:hover,
+.bnb-account-wallet-row[data-active="true"] {
+  border-color: var(--bnb-hive-line);
+  background: var(--bnb-hive-soft);
+  color: var(--bnb-text);
+}
+
+.bnb-account-wallet-row span {
+  display: inline-flex;
+  min-width: 0;
+  align-items: center;
+  gap: 6px;
+}
+
+.bnb-account-wallet-row span:first-child {
+  display: grid;
+  gap: 4px;
+}
+
+.bnb-account-wallet-row strong {
+  color: var(--bnb-text);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.bnb-account-wallet-row small {
+  color: var(--bnb-text-muted);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 12px;
+  overflow-wrap: anywhere;
+}
+
+.bnb-account-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 14px;
+  margin-top: 18px;
+}
+
+.bnb-account-activity {
+  padding-bottom: 64px;
+}
+
+.bnb-copy-button {
+  display: inline-grid;
+  flex: 0 0 auto;
+  width: 26px;
+  height: 26px;
+  place-items: center;
+  border: 1px solid var(--bnb-line);
+  border-radius: 7px;
+  background: var(--bnb-elevated);
+  color: var(--bnb-text-muted);
+  cursor: pointer;
+}
+
+.bnb-copy-button:hover,
+.bnb-copy-button[data-copied="true"] {
+  border-color: var(--bnb-hive-line);
+  color: var(--bnb-hive-hover);
+}
+
 .bnb-mono {
   font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
   font-size: 12px;
@@ -853,6 +1069,797 @@ body:has(.bnb-shell) {
   gap: 10px;
 }
 
+.bnb-profile-compare {
+  display: grid;
+  gap: 10px;
+}
+
+.bnb-profile-compare .bnb-button-dark {
+  width: 100%;
+}
+
+.bnb-profile-compare .bnb-button-dark:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+.bnb-profile-page {
+  display: grid;
+  gap: 24px;
+}
+
+.bnb-profile-hero {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(230px, 300px);
+  gap: 28px;
+  align-items: end;
+  border-bottom: 1px solid var(--bnb-line);
+  padding-bottom: 28px;
+}
+
+.bnb-profile-copy {
+  min-width: 0;
+}
+
+.bnb-profile-back {
+  display: inline-flex;
+  margin-bottom: 18px;
+  color: var(--bnb-text-muted);
+  font-size: 13px;
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.bnb-profile-back:hover {
+  color: var(--bnb-hive-hover);
+}
+
+.bnb-profile-meta-line {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  color: var(--bnb-text-muted);
+  font-size: 13px;
+}
+
+.bnb-profile-meta-line span {
+  display: inline-flex;
+  min-height: 24px;
+  align-items: center;
+  gap: 6px;
+}
+
+.bnb-profile-verified {
+  color: #f7d76b;
+}
+
+.bnb-profile-copy h1 {
+  margin-top: 12px;
+  max-width: 840px;
+  color: var(--bnb-text);
+  font-size: 56px;
+  font-weight: 500;
+  letter-spacing: 0;
+  line-height: 1;
+  overflow-wrap: anywhere;
+}
+
+.bnb-profile-copy p {
+  margin-top: 18px;
+  max-width: 760px;
+  color: var(--bnb-text-muted);
+  font-size: 16px;
+  line-height: 1.75;
+}
+
+.bnb-profile-hero-actions {
+  display: grid;
+  gap: 10px;
+  align-content: end;
+}
+
+.bnb-profile-hero-actions > .bnb-button,
+.bnb-profile-action-panel .bnb-button {
+  width: 100%;
+}
+
+.bnb-profile-summary-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.bnb-profile-summary-item {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+  border: 1px solid var(--bnb-line);
+  border-radius: 8px;
+  background: var(--bnb-surface);
+  padding: 14px;
+}
+
+.bnb-profile-summary-item span {
+  color: var(--bnb-text-dim);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.bnb-profile-summary-item strong {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--bnb-text);
+  font-size: 16px;
+  font-weight: 500;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.bnb-profile-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(300px, 360px);
+  gap: 18px;
+  align-items: start;
+}
+
+.bnb-profile-main,
+.bnb-profile-sidebar {
+  display: grid;
+  min-width: 0;
+  gap: 18px;
+}
+
+.bnb-profile-panel {
+  padding: 18px;
+}
+
+.bnb-profile-panel h2 {
+  color: var(--bnb-text);
+  font-size: 17px;
+  font-weight: 600;
+  line-height: 1.3;
+}
+
+.bnb-profile-panel p {
+  margin-top: 10px;
+  color: var(--bnb-text-muted);
+  font-size: 14px;
+  line-height: 1.7;
+}
+
+.bnb-profile-action-panel {
+  display: grid;
+  gap: 14px;
+}
+
+.bnb-profile-capability-list {
+  margin-top: 16px;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  list-style: none;
+  padding: 0;
+}
+
+.bnb-profile-capability-list li {
+  min-width: 0;
+  border: 1px solid var(--bnb-line);
+  border-radius: 8px;
+  background: rgba(221, 255, 220, 0.025);
+  padding: 10px 12px;
+  color: var(--bnb-text-soft);
+  font-size: 13px;
+  line-height: 1.4;
+}
+
+.bnb-profile-table-panel {
+  overflow: hidden;
+}
+
+.bnb-profile-table-wrap {
+  margin-top: 14px;
+  overflow-x: auto;
+}
+
+.bnb-profile-table {
+  width: 100%;
+  min-width: 560px;
+  border-collapse: collapse;
+  color: var(--bnb-text-muted);
+  font-size: 13px;
+}
+
+.bnb-profile-table th,
+.bnb-profile-table td {
+  border-bottom: 1px solid var(--bnb-line);
+  padding: 12px 10px;
+  text-align: left;
+  vertical-align: top;
+}
+
+.bnb-profile-table tr:last-child td {
+  border-bottom: 0;
+}
+
+.bnb-profile-table th {
+  color: var(--bnb-text-soft);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.bnb-profile-feedback-grid,
+.bnb-profile-data-list {
+  margin-top: 14px;
+}
+
+.bnb-profile-note {
+  color: var(--bnb-text-muted);
+}
+
+.bnb-profile-link-list {
+  margin-top: 16px;
+  display: grid;
+  gap: 10px;
+}
+
+.bnb-agent-profile {
+  display: grid;
+  gap: 28px;
+}
+
+.bnb-agent-profile-header {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(260px, 320px);
+  gap: 36px;
+  align-items: end;
+  border-bottom: 1px solid var(--bnb-line);
+  padding-bottom: 30px;
+}
+
+.bnb-agent-profile-intro {
+  min-width: 0;
+}
+
+.bnb-agent-profile-back {
+  display: inline-flex;
+  margin-bottom: 22px;
+  color: var(--bnb-text-muted);
+  font-size: 13px;
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.bnb-agent-profile-back:hover {
+  color: var(--bnb-hive-hover);
+}
+
+.bnb-agent-profile-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 12px;
+  color: var(--bnb-text-muted);
+  font-size: 13px;
+}
+
+.bnb-agent-profile-meta span {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.bnb-agent-profile-meta span + span::before {
+  width: 3px;
+  height: 3px;
+  border-radius: 50%;
+  background: var(--bnb-line-strong);
+  content: "";
+}
+
+.bnb-agent-profile-verified {
+  color: #f7d76b;
+}
+
+.bnb-agent-profile-intro h1 {
+  margin-top: 12px;
+  max-width: 880px;
+  color: var(--bnb-text);
+  font-size: 58px;
+  font-weight: 500;
+  letter-spacing: 0;
+  line-height: 1;
+  overflow-wrap: anywhere;
+}
+
+.bnb-agent-profile-intro p {
+  margin-top: 18px;
+  max-width: 760px;
+  color: var(--bnb-text-muted);
+  font-size: 16px;
+  line-height: 1.75;
+}
+
+.bnb-agent-profile-start {
+  display: grid;
+  gap: 12px;
+  border: 1px solid var(--bnb-line-strong);
+  border-top-color: var(--bnb-gold-line);
+  border-radius: 8px;
+  background: var(--bnb-surface);
+  padding: 14px;
+}
+
+.bnb-agent-profile-start > span {
+  color: var(--bnb-text-muted);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.bnb-agent-profile-start > .bnb-button,
+.bnb-agent-profile-start .bnb-button-dark {
+  width: 100%;
+}
+
+.bnb-agent-profile-facts {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  border: 1px solid var(--bnb-line);
+  border-radius: 8px;
+  background: var(--bnb-surface);
+  overflow: hidden;
+}
+
+.bnb-agent-profile-facts div {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+  border-right: 1px solid var(--bnb-line);
+  padding: 14px 16px;
+}
+
+.bnb-agent-profile-facts div:last-child {
+  border-right: 0;
+}
+
+.bnb-agent-profile-facts span {
+  color: var(--bnb-text-dim);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.bnb-agent-profile-facts strong {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--bnb-text);
+  font-size: 15px;
+  font-weight: 500;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.bnb-agent-profile-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(300px, 360px);
+  gap: 34px;
+  align-items: start;
+}
+
+.bnb-agent-profile-main,
+.bnb-agent-profile-rail {
+  display: grid;
+  min-width: 0;
+  gap: 26px;
+}
+
+.bnb-agent-profile-section {
+  display: grid;
+  gap: 16px;
+  border-top: 1px solid var(--bnb-line);
+  padding-top: 22px;
+}
+
+.bnb-agent-profile-section:first-child {
+  border-top: 0;
+  padding-top: 0;
+}
+
+.bnb-agent-profile-section h2,
+.bnb-agent-rail-block h2,
+.bnb-agent-technical summary {
+  color: var(--bnb-text);
+  font-size: 18px;
+  font-weight: 600;
+  line-height: 1.25;
+}
+
+.bnb-agent-profile-section p {
+  margin: 0;
+  color: var(--bnb-text-muted);
+  font-size: 14px;
+  line-height: 1.7;
+}
+
+.bnb-agent-capabilities {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px 18px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.bnb-agent-capabilities li {
+  position: relative;
+  min-width: 0;
+  padding-left: 16px;
+  color: var(--bnb-text-soft);
+  font-size: 14px;
+  line-height: 1.55;
+}
+
+.bnb-agent-capabilities li::before {
+  position: absolute;
+  top: 10px;
+  left: 0;
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: #f0b90b;
+  content: "";
+}
+
+.bnb-agent-services-wrap {
+  overflow-x: auto;
+  border: 1px solid var(--bnb-line);
+  border-radius: 8px;
+  background: var(--bnb-surface);
+}
+
+.bnb-agent-services {
+  width: 100%;
+  min-width: 560px;
+  border-collapse: collapse;
+  color: var(--bnb-text-muted);
+  font-size: 13px;
+}
+
+.bnb-agent-services th,
+.bnb-agent-services td {
+  border-bottom: 1px solid var(--bnb-line);
+  padding: 13px 14px;
+  text-align: left;
+  vertical-align: top;
+}
+
+.bnb-agent-services tr:last-child td {
+  border-bottom: 0;
+}
+
+.bnb-agent-services th {
+  color: var(--bnb-text-soft);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.bnb-agent-services td:first-child {
+  color: var(--bnb-text);
+}
+
+.bnb-agent-feedback,
+.bnb-agent-identity-list {
+  margin: 0;
+}
+
+.bnb-agent-profile-rail {
+  position: sticky;
+  top: 92px;
+}
+
+.bnb-agent-rail-block,
+.bnb-agent-technical {
+  border: 1px solid var(--bnb-line);
+  border-radius: 8px;
+  background: var(--bnb-surface);
+  padding: 16px;
+}
+
+.bnb-agent-request-block {
+  padding: 0;
+  overflow: hidden;
+}
+
+.bnb-agent-request-block .bnb-request-form {
+  padding: 16px;
+}
+
+.bnb-agent-rail-block h2 {
+  margin-bottom: 12px;
+}
+
+.bnb-agent-profile-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-top: 16px;
+}
+
+.bnb-agent-technical {
+  color: var(--bnb-text-muted);
+}
+
+.bnb-agent-technical summary {
+  cursor: pointer;
+}
+
+.bnb-agent-technical[open] summary {
+  margin-bottom: 12px;
+}
+
+.bnb-agent-profile-shell {
+  display: grid;
+  gap: 28px;
+}
+
+.bnb-agent-cover {
+  border-bottom: 1px solid var(--bnb-line);
+  padding-bottom: 30px;
+}
+
+.bnb-agent-back {
+  display: inline-flex;
+  margin-bottom: 22px;
+  color: var(--bnb-text-muted);
+  font-size: 13px;
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.bnb-agent-back:hover {
+  color: var(--bnb-hive-hover);
+}
+
+.bnb-agent-cover-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(250px, 320px);
+  gap: 34px;
+  align-items: end;
+}
+
+.bnb-agent-cover-main {
+  min-width: 0;
+}
+
+.bnb-agent-meta-line {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 12px;
+  align-items: center;
+  color: var(--bnb-text-muted);
+  font-size: 13px;
+}
+
+.bnb-agent-meta-line span {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.bnb-agent-meta-line span + span::before {
+  width: 3px;
+  height: 3px;
+  border-radius: 50%;
+  background: var(--bnb-line-strong);
+  content: "";
+}
+
+.bnb-agent-verified {
+  color: #f7d76b;
+}
+
+.bnb-agent-cover-main h1 {
+  margin-top: 12px;
+  max-width: 920px;
+  color: var(--bnb-text);
+  font-size: 58px;
+  font-weight: 500;
+  letter-spacing: 0;
+  line-height: 1;
+  overflow-wrap: anywhere;
+}
+
+.bnb-agent-cover-main p {
+  margin-top: 18px;
+  max-width: 820px;
+  color: var(--bnb-text-muted);
+  font-size: 16px;
+  line-height: 1.75;
+}
+
+.bnb-agent-cover-actions {
+  display: grid;
+  gap: 12px;
+  align-content: end;
+}
+
+.bnb-agent-cover-actions > .bnb-button,
+.bnb-agent-cover-actions .bnb-button-dark {
+  width: 100%;
+}
+
+.bnb-agent-fact-strip {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  overflow: hidden;
+  border: 1px solid var(--bnb-line);
+  border-radius: 8px;
+  background: var(--bnb-surface);
+}
+
+.bnb-agent-fact-strip div {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+  border-right: 1px solid var(--bnb-line);
+  padding: 14px 16px;
+}
+
+.bnb-agent-fact-strip div:last-child {
+  border-right: 0;
+}
+
+.bnb-agent-fact-strip span {
+  color: var(--bnb-text-dim);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.bnb-agent-fact-strip strong {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--bnb-text);
+  font-size: 15px;
+  font-weight: 500;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.bnb-agent-work-panel {
+  display: grid;
+  grid-template-columns: minmax(0, 0.8fr) minmax(360px, 1.2fr);
+  gap: 26px;
+  align-items: start;
+  border: 1px solid var(--bnb-line-strong);
+  border-top-color: var(--bnb-gold-line);
+  border-radius: 8px;
+  background: var(--bnb-surface);
+  padding: 20px;
+}
+
+.bnb-agent-work-copy {
+  min-width: 0;
+}
+
+.bnb-agent-work-copy span {
+  color: #f7d76b;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.bnb-agent-work-copy h2 {
+  margin-top: 8px;
+  color: var(--bnb-text);
+  font-size: 24px;
+  font-weight: 600;
+  line-height: 1.2;
+}
+
+.bnb-agent-work-copy p {
+  margin-top: 10px;
+  max-width: 560px;
+  color: var(--bnb-text-muted);
+  font-size: 14px;
+  line-height: 1.7;
+}
+
+.bnb-agent-work-action {
+  min-width: 0;
+}
+
+.bnb-agent-work-action > .bnb-button {
+  width: 100%;
+}
+
+.bnb-agent-work-action .bnb-request-form {
+  gap: 14px;
+}
+
+.bnb-agent-profile-sections {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 30px 42px;
+  align-items: start;
+}
+
+.bnb-agent-detail-section {
+  min-width: 0;
+  border-top: 1px solid var(--bnb-line);
+  padding-top: 20px;
+}
+
+.bnb-agent-about,
+.bnb-agent-services-section {
+  grid-column: 1 / -1;
+}
+
+.bnb-agent-detail-section h2,
+.bnb-agent-detail-section summary {
+  color: var(--bnb-text);
+  font-size: 18px;
+  font-weight: 600;
+  line-height: 1.25;
+}
+
+.bnb-agent-detail-section p {
+  margin-top: 12px;
+  max-width: 920px;
+  color: var(--bnb-text-muted);
+  font-size: 14px;
+  line-height: 1.75;
+}
+
+.bnb-agent-capability-list {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px 18px;
+  margin-top: 18px;
+  padding: 0;
+  list-style: none;
+}
+
+.bnb-agent-capability-list li {
+  position: relative;
+  min-width: 0;
+  padding-left: 16px;
+  color: var(--bnb-text-soft);
+  font-size: 14px;
+  line-height: 1.55;
+}
+
+.bnb-agent-capability-list li::before {
+  position: absolute;
+  top: 10px;
+  left: 0;
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: #f0b90b;
+  content: "";
+}
+
+.bnb-agent-data-list {
+  margin-top: 14px;
+}
+
+.bnb-agent-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-top: 16px;
+}
+
+.bnb-agent-technical-details {
+  color: var(--bnb-text-muted);
+}
+
+.bnb-agent-technical-details summary {
+  cursor: pointer;
+}
+
+.bnb-agent-technical-details[open] summary {
+  margin-bottom: 12px;
+}
+
 .bnb-score-compact {
   display: grid;
   grid-template-columns: 1fr auto;
@@ -904,6 +1911,113 @@ body:has(.bnb-shell) {
 
 .bnb-composer:focus-within {
   border-color: var(--bnb-hive-line);
+}
+
+.bnb-hire-preview {
+  display: grid;
+  gap: 12px;
+  border: 1px solid var(--bnb-line);
+  border-radius: 8px;
+  background: rgba(221, 255, 220, 0.025);
+  padding: 14px;
+}
+
+.bnb-hire-preview h2 {
+  color: var(--bnb-text);
+  font-size: 16px;
+  font-weight: 500;
+}
+
+.bnb-hire-preview p {
+  margin-top: 4px;
+  color: var(--bnb-text-muted);
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.bnb-wallet-panel {
+  display: grid;
+  gap: 12px;
+  border: 1px solid var(--bnb-line);
+  border-radius: 8px;
+  background: rgba(221, 255, 220, 0.025);
+  padding: 14px;
+}
+
+.bnb-wallet-head {
+  display: flex;
+  align-items: start;
+  justify-content: space-between;
+  gap: 14px;
+}
+
+.bnb-wallet-head h2 {
+  color: var(--bnb-text);
+  font-size: 16px;
+  font-weight: 500;
+}
+
+.bnb-wallet-head p {
+  margin-top: 4px;
+  color: var(--bnb-text-muted);
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.bnb-wallet-list {
+  display: grid;
+  gap: 8px;
+}
+
+.bnb-wallet-row {
+  display: flex;
+  min-height: 48px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  border: 1px solid var(--bnb-line);
+  border-radius: 8px;
+  background: var(--bnb-elevated);
+  padding: 8px 10px;
+  color: var(--bnb-text-muted);
+  cursor: pointer;
+  text-align: left;
+}
+
+.bnb-wallet-row:hover,
+.bnb-wallet-row[data-active="true"] {
+  border-color: var(--bnb-hive-line);
+  color: var(--bnb-text);
+}
+
+.bnb-wallet-row:disabled {
+  cursor: not-allowed;
+  opacity: 0.58;
+}
+
+.bnb-wallet-row span:first-child {
+  display: grid;
+  min-width: 0;
+}
+
+.bnb-wallet-row strong {
+  overflow: hidden;
+  color: var(--bnb-text);
+  font-size: 13px;
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.bnb-wallet-row small,
+.bnb-wallet-row span:last-child {
+  color: var(--bnb-text-muted);
+  font-size: 12px;
+}
+
+.bnb-wallet-actions {
+  display: grid;
+  gap: 8px;
 }
 
 .bnb-input,
@@ -1090,6 +2204,78 @@ body:has(.bnb-shell) {
   line-height: 1.5;
 }
 
+.bnb-request-form {
+  display: grid;
+  gap: 14px;
+  min-width: 0;
+}
+
+.bnb-request-form h2 {
+  color: var(--bnb-text);
+  font-size: 18px;
+  font-weight: 600;
+  line-height: 1.25;
+}
+
+.bnb-request-form p {
+  color: var(--bnb-text-muted);
+  font-size: 14px;
+  line-height: 1.6;
+}
+
+.bnb-request-form label {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+}
+
+.bnb-request-form label > span {
+  color: var(--bnb-text-soft);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.bnb-request-form textarea.bnb-input {
+  min-height: 120px;
+  resize: vertical;
+  padding: 12px;
+}
+
+.bnb-request-receipt {
+  display: grid;
+  gap: 8px;
+  border: 1px solid var(--bnb-line);
+  border-radius: 8px;
+  background: rgba(221, 255, 220, 0.025);
+  padding: 12px;
+}
+
+.bnb-request-receipt div {
+  display: flex;
+  min-width: 0;
+  justify-content: space-between;
+  gap: 12px;
+  color: var(--bnb-text-muted);
+  font-size: 12px;
+}
+
+.bnb-request-receipt dd {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  color: var(--bnb-text);
+  text-align: right;
+}
+
+.bnb-form-error {
+  border: 1px solid rgba(248, 113, 113, 0.3);
+  border-radius: 8px;
+  background: rgba(127, 29, 29, 0.18);
+  padding: 10px 12px;
+  color: #fecaca;
+  font-size: 13px;
+  line-height: 1.5;
+}
+
 .bnb-filter-panel {
   border: 1px solid var(--bnb-line);
   border-radius: 8px;
@@ -1247,10 +2433,10 @@ body:has(.bnb-shell) {
 
 .bnb-directory-row {
   display: grid;
-  grid-template-columns: minmax(210px, 0.9fr) minmax(320px, 1.2fr) minmax(168px, 0.58fr) 260px;
-  gap: 20px;
-  align-items: stretch;
-  min-height: 124px;
+  grid-template-columns: minmax(190px, 0.9fr) minmax(260px, 1.2fr) minmax(150px, 0.55fr) minmax(220px, 240px);
+  gap: 18px;
+  align-items: center;
+  min-height: 132px;
   border-bottom: 1px solid var(--bnb-line);
   padding: 18px;
 }
@@ -1264,13 +2450,12 @@ body:has(.bnb-shell) {
 }
 
 .bnb-directory-identity,
-.bnb-directory-summary,
-.bnb-directory-metadata {
+.bnb-directory-summary {
   display: flex;
   flex-direction: column;
   justify-content: center;
   min-width: 0;
-  min-height: 64px;
+  min-height: 70px;
 }
 
 .bnb-directory-identity h2 {
@@ -1304,6 +2489,7 @@ body:has(.bnb-shell) {
 
 .bnb-directory-summary p {
   min-height: 40px;
+  max-height: 40px;
   color: var(--bnb-text-muted);
   font-size: 13px;
   line-height: 1.55;
@@ -1311,6 +2497,10 @@ body:has(.bnb-shell) {
   overflow: hidden;
   -webkit-box-orient: vertical;
   -webkit-line-clamp: 2;
+}
+
+.bnb-directory-summary-spacer {
+  visibility: hidden;
 }
 
 .bnb-directory-summary span {
@@ -1323,6 +2513,10 @@ body:has(.bnb-shell) {
 }
 
 .bnb-directory-metadata {
+  display: grid;
+  min-width: 0;
+  min-height: 70px;
+  align-content: center;
   gap: 7px;
   color: var(--bnb-text-muted);
   font-size: 13px;
@@ -1334,10 +2528,14 @@ body:has(.bnb-shell) {
   white-space: nowrap;
 }
 
+.bnb-directory-meta-empty {
+  visibility: hidden;
+}
+
 .bnb-directory-actions {
   display: grid;
   min-width: 0;
-  width: 260px;
+  width: 100%;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   align-content: center;
   justify-self: end;
@@ -1397,8 +2595,13 @@ body:has(.bnb-shell) {
 .bnb-directory-actions .bnb-button-dark,
 .bnb-directory-actions .bnb-link-button,
 .bnb-directory-actions .bnb-row-action {
+  min-height: 38px;
   width: 100%;
   min-width: 0;
+  padding-right: 10px;
+  padding-left: 10px;
+  overflow: hidden;
+  text-overflow: ellipsis;
   white-space: nowrap;
 }
 
@@ -1522,7 +2725,7 @@ body:has(.bnb-shell) {
 .bnb-compare-tray {
   position: fixed;
   left: 50%;
-  bottom: 20px;
+  bottom: calc(20px + env(safe-area-inset-bottom));
   z-index: 35;
   display: flex;
   width: fit-content;
@@ -1551,21 +2754,24 @@ body:has(.bnb-shell) {
 .bnb-compare-panel {
   position: fixed;
   right: 24px;
-  bottom: 86px;
+  bottom: calc(86px + env(safe-area-inset-bottom));
   z-index: 45;
-  width: min(760px, calc(100vw - 48px));
+  width: min(860px, calc(100vw - 48px));
+  max-height: calc(100vh - 140px);
+  overflow: hidden;
   padding: 14px;
   box-shadow: 0 20px 80px rgba(0, 0, 0, 0.38);
 }
 
 .bnb-compare-table-wrap {
   margin-top: 12px;
-  overflow-x: auto;
+  max-height: calc(100vh - 230px);
+  overflow: auto;
 }
 
 .bnb-compare-table {
   width: 100%;
-  min-width: 560px;
+  min-width: 720px;
   border-collapse: collapse;
   color: var(--bnb-text-muted);
   font-size: 13px;
@@ -1577,6 +2783,7 @@ body:has(.bnb-shell) {
   padding: 10px;
   text-align: left;
   vertical-align: top;
+  overflow-wrap: anywhere;
 }
 
 .bnb-compare-table th {
@@ -1719,6 +2926,170 @@ body:has(.bnb-shell) {
   line-height: 1.5;
 }
 
+.bnb-agent-profile-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 320px;
+  gap: 34px;
+  align-items: start;
+}
+
+.bnb-agent-profile-maincol {
+  display: grid;
+  min-width: 0;
+  gap: 24px;
+}
+
+.bnb-agent-action-col {
+  position: sticky;
+  top: 92px;
+  min-width: 0;
+}
+
+.bnb-agent-heading {
+  border-bottom: 1px solid var(--bnb-line);
+  padding-bottom: 28px;
+}
+
+.bnb-agent-heading h1 {
+  margin-top: 12px;
+  max-width: 900px;
+  color: var(--bnb-text);
+  font-size: 56px;
+  font-weight: 500;
+  letter-spacing: 0;
+  line-height: 1;
+  overflow-wrap: anywhere;
+}
+
+.bnb-agent-heading p {
+  margin-top: 18px;
+  max-width: 820px;
+  color: var(--bnb-text-muted);
+  font-size: 16px;
+  line-height: 1.75;
+}
+
+.bnb-agent-action-card {
+  display: grid;
+  gap: 14px;
+  border: 1px solid var(--bnb-line-strong);
+  border-top-color: var(--bnb-gold-line);
+  border-radius: 8px;
+  background: var(--bnb-surface);
+  padding: 16px;
+}
+
+.bnb-agent-action-card span {
+  color: #f7d76b;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.bnb-agent-action-card h2 {
+  margin-top: 8px;
+  color: var(--bnb-text);
+  font-size: 20px;
+  font-weight: 600;
+  line-height: 1.25;
+}
+
+.bnb-agent-action-card p {
+  margin-top: 8px;
+  color: var(--bnb-text-muted);
+  font-size: 13px;
+  line-height: 1.65;
+}
+
+.bnb-agent-action-card > .bnb-button,
+.bnb-agent-action-card .bnb-button-dark {
+  width: 100%;
+}
+
+.bnb-agent-section {
+  min-width: 0;
+  border-top: 1px solid var(--bnb-line);
+  padding-top: 22px;
+}
+
+.bnb-agent-section h2,
+.bnb-agent-section summary {
+  color: var(--bnb-text);
+  font-size: 18px;
+  font-weight: 600;
+  line-height: 1.25;
+}
+
+.bnb-agent-section p {
+  margin-top: 12px;
+  max-width: 900px;
+  color: var(--bnb-text-muted);
+  font-size: 14px;
+  line-height: 1.75;
+}
+
+.bnb-agent-identity-grid {
+  margin-top: 14px;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0 18px;
+}
+
+.bnb-dialog-scrim {
+  position: fixed;
+  inset: 0;
+  z-index: 90;
+  display: grid;
+  place-items: center;
+  background: rgba(0, 0, 0, 0.68);
+  padding: 20px;
+}
+
+.bnb-request-dialog {
+  width: min(640px, calc(100vw - 40px));
+  max-height: min(86vh, 760px);
+  overflow-y: auto;
+  border: 1px solid var(--bnb-line-strong);
+  border-radius: 8px;
+  background: var(--bnb-bg);
+  box-shadow: 0 24px 90px rgba(0, 0, 0, 0.52);
+}
+
+.bnb-request-dialog-head {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  display: flex;
+  align-items: start;
+  justify-content: space-between;
+  gap: 16px;
+  border-bottom: 1px solid var(--bnb-line);
+  background: var(--bnb-bg);
+  padding: 18px;
+}
+
+.bnb-request-dialog-head span {
+  display: block;
+  max-width: 480px;
+  overflow: hidden;
+  color: var(--bnb-text-muted);
+  font-size: 12px;
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.bnb-request-dialog-head h2 {
+  margin-top: 6px;
+  color: var(--bnb-text);
+  font-size: 22px;
+  font-weight: 600;
+  line-height: 1.2;
+}
+
+.bnb-request-dialog .bnb-request-form {
+  padding: 18px;
+}
+
 .bnb-success {
   border: 1px solid var(--bnb-hive-line);
   border-radius: 8px;
@@ -1750,7 +3121,7 @@ body:has(.bnb-shell) {
   }
 
   .bnb-directory-actions {
-    width: min(260px, 100%);
+    width: 100%;
     justify-self: start;
   }
 }
@@ -1784,9 +3155,14 @@ body:has(.bnb-shell) {
     padding: 12px 16px;
   }
 
-  .bnb-header-inner > .bnb-button {
+  .bnb-header-actions {
     grid-column: 2;
     grid-row: 1;
+    justify-self: end;
+  }
+
+  .bnb-header-actions .bnb-button,
+  .bnb-account-button {
     min-height: 38px;
     padding: 0 12px;
     width: auto;
@@ -1814,6 +3190,10 @@ body:has(.bnb-shell) {
     margin-left: auto;
     padding-right: 16px;
     padding-left: 16px;
+  }
+
+  .bnb-account-layout {
+    grid-template-columns: minmax(0, 1fr);
   }
 
   .bnb-container,
@@ -1856,7 +3236,76 @@ body:has(.bnb-shell) {
   .bnb-toolbar,
   .bnb-layout,
   .bnb-home-hero,
-  .bnb-ecosystem-panel {
+  .bnb-ecosystem-panel,
+  .bnb-profile-hero,
+  .bnb-profile-layout,
+  .bnb-profile-summary-grid,
+  .bnb-agent-profile-header,
+  .bnb-agent-profile-grid,
+  .bnb-agent-cover-grid,
+  .bnb-agent-work-panel,
+  .bnb-agent-profile-sections {
+    grid-template-columns: 1fr;
+  }
+
+  .bnb-profile-hero {
+    align-items: start;
+  }
+
+  .bnb-agent-profile-header {
+    align-items: start;
+    gap: 22px;
+  }
+
+  .bnb-agent-profile-intro h1 {
+    font-size: 44px;
+    line-height: 1.05;
+  }
+
+  .bnb-agent-cover-grid {
+    align-items: start;
+  }
+
+  .bnb-agent-cover-main h1 {
+    font-size: 44px;
+    line-height: 1.05;
+  }
+
+  .bnb-agent-cover-actions {
+    width: 100%;
+  }
+
+  .bnb-agent-about,
+  .bnb-agent-services-section {
+    grid-column: auto;
+  }
+
+  .bnb-agent-work-panel {
+    gap: 18px;
+  }
+
+  .bnb-agent-profile-start {
+    width: 100%;
+  }
+
+  .bnb-agent-profile-rail {
+    position: static;
+  }
+
+  .bnb-agent-capabilities {
+    grid-template-columns: 1fr;
+  }
+
+  .bnb-profile-copy h1 {
+    font-size: 44px;
+    line-height: 1.05;
+  }
+
+  .bnb-profile-hero-actions {
+    width: 100%;
+  }
+
+  .bnb-profile-capability-list {
     grid-template-columns: 1fr;
   }
 
@@ -1950,6 +3399,7 @@ body:has(.bnb-shell) {
 
   .bnb-directory-summary p {
     min-height: 0;
+    max-height: 40px;
   }
 
   .bnb-directory-metadata {
@@ -1989,8 +3439,13 @@ body:has(.bnb-shell) {
 
   .bnb-compare-panel {
     right: 16px;
-    bottom: 92px;
+    bottom: calc(92px + env(safe-area-inset-bottom));
     width: calc(100vw - 32px);
+    max-height: calc(100vh - 132px);
+  }
+
+  .bnb-compare-table-wrap {
+    max-height: calc(100vh - 224px);
   }
 
   .bnb-saved-row {
@@ -2049,6 +3504,14 @@ body:has(.bnb-shell) {
     display: inline;
   }
 
+  .bnb-account-desktop-label {
+    display: none;
+  }
+
+  .bnb-account-mobile-label {
+    display: inline;
+  }
+
   .bnb-header-inner {
     grid-template-columns: minmax(0, 1fr) auto;
     gap: 9px 10px;
@@ -2083,10 +3546,21 @@ body:has(.bnb-shell) {
     max-width: calc(100vw - 32px);
   }
 
-  .bnb-header-inner > .bnb-button {
+  .bnb-header-actions {
+    gap: 6px;
+  }
+
+  .bnb-header-actions .bnb-button,
+  .bnb-account-button {
     min-width: 68px;
     padding-right: 12px;
     padding-left: 12px;
+  }
+
+  .bnb-account-button span {
+    max-width: 78px;
+    overflow: hidden;
+    text-overflow: ellipsis;
   }
 
   .bnb-brand {
@@ -2106,6 +3580,95 @@ body:has(.bnb-shell) {
 
   .bnb-title {
     font-size: 34px;
+  }
+
+  .bnb-profile-copy h1 {
+    font-size: 34px;
+    line-height: 1.08;
+  }
+
+  .bnb-agent-profile {
+    gap: 22px;
+  }
+
+  .bnb-agent-profile-intro h1 {
+    font-size: 34px;
+    line-height: 1.08;
+  }
+
+  .bnb-agent-cover-main h1 {
+    font-size: 34px;
+    line-height: 1.08;
+  }
+
+  .bnb-agent-cover-main p {
+    font-size: 15px;
+  }
+
+  .bnb-agent-fact-strip {
+    grid-template-columns: 1fr;
+  }
+
+  .bnb-agent-fact-strip div {
+    border-right: 0;
+    border-bottom: 1px solid var(--bnb-line);
+  }
+
+  .bnb-agent-fact-strip div:last-child {
+    border-bottom: 0;
+  }
+
+  .bnb-agent-fact-strip strong {
+    white-space: normal;
+  }
+
+  .bnb-agent-work-panel {
+    padding: 16px;
+  }
+
+  .bnb-agent-capability-list {
+    grid-template-columns: 1fr;
+  }
+
+  .bnb-agent-profile-intro p {
+    font-size: 15px;
+  }
+
+  .bnb-agent-profile-facts {
+    grid-template-columns: 1fr;
+  }
+
+  .bnb-agent-profile-facts div {
+    border-right: 0;
+    border-bottom: 1px solid var(--bnb-line);
+  }
+
+  .bnb-agent-profile-facts div:last-child {
+    border-bottom: 0;
+  }
+
+  .bnb-agent-profile-facts strong {
+    white-space: normal;
+  }
+
+  .bnb-agent-services {
+    min-width: 480px;
+  }
+
+  .bnb-profile-copy p {
+    font-size: 15px;
+  }
+
+  .bnb-profile-summary-item strong {
+    white-space: normal;
+  }
+
+  .bnb-profile-panel {
+    padding: 16px;
+  }
+
+  .bnb-profile-table {
+    min-width: 500px;
   }
 
   .bnb-market-facts {
@@ -2137,6 +3700,88 @@ body:has(.bnb-shell) {
   .bnb-receipt-row {
     align-items: start;
     flex-direction: column;
+  }
+
+  .bnb-account-panel-head,
+  .bnb-account-wallet-row {
+    align-items: start;
+    flex-direction: column;
+  }
+
+  .bnb-account-auth .bnb-button,
+  .bnb-account-actions .bnb-button,
+  .bnb-account-actions .bnb-button-dark {
+    width: 100%;
+  }
+}
+
+@media (max-width: 900px) {
+  .bnb-agent-profile-layout {
+    grid-template-columns: 1fr;
+    gap: 26px;
+  }
+
+  .bnb-agent-action-col {
+    position: static;
+    order: -1;
+  }
+
+  .bnb-agent-action-card {
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: center;
+  }
+
+  .bnb-agent-action-card > div {
+    min-width: 0;
+  }
+
+  .bnb-agent-action-card > .bnb-button,
+  .bnb-agent-action-card > button,
+  .bnb-agent-action-card .bnb-profile-compare {
+    grid-column: 1 / -1;
+  }
+
+  .bnb-agent-heading h1 {
+    font-size: 44px;
+    line-height: 1.05;
+  }
+}
+
+@media (max-width: 640px) {
+  .bnb-agent-profile-layout {
+    gap: 22px;
+  }
+
+  .bnb-agent-heading h1 {
+    font-size: 34px;
+    line-height: 1.08;
+  }
+
+  .bnb-agent-heading p {
+    font-size: 15px;
+  }
+
+  .bnb-agent-identity-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .bnb-agent-action-card {
+    grid-template-columns: 1fr;
+  }
+
+  .bnb-dialog-scrim {
+    align-items: stretch;
+    padding: 10px;
+  }
+
+  .bnb-request-dialog {
+    width: 100%;
+    max-height: calc(100vh - 20px);
+  }
+
+  .bnb-request-dialog-head,
+  .bnb-request-dialog .bnb-request-form {
+    padding: 16px;
   }
 }
 

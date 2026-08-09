@@ -26,13 +26,28 @@ type SavedAgent = {
   name: string;
   category: string;
   status: string;
-  price: string;
-  reviews: string;
-  lastActive: string;
-  integrations: string;
+  bestFor?: string;
+  description?: string;
+  price?: string;
+  reviews?: string;
+  averageScore?: string;
+  lastActive?: string;
+  registered?: string;
+  supportedProtocols?: string[];
+  x402?: string;
+  serviceEndpoint?: string;
+  walletStatus?: string;
+  identity?: string;
+  verified?: boolean;
   profileHref: string;
   hireHref: string;
   canHire: boolean;
+};
+
+type ComparisonRow = {
+  label: string;
+  value: (agent: SavedAgent) => string;
+  hasValue?: (agent: SavedAgent) => boolean;
 };
 
 type AgentsDirectoryProps = {
@@ -124,10 +139,11 @@ export function AgentsDirectory({
     return Object.fromEntries(entries);
   }, [agents]);
 
-  const savedList = Object.values(savedAgents);
+  const savedList = Object.values(savedAgents).map(cleanSavedAgent);
   const comparison = compareAgents
     .map((key) => visibleAgentMap[key] || savedAgents[key])
     .filter((agent): agent is SavedAgent => Boolean(agent));
+  const cleanedComparison = comparison.map(cleanSavedAgent);
 
   function setSaved(agent: BnbAgentProfile) {
     const saved = toSavedAgent(agent);
@@ -306,7 +322,7 @@ export function AgentsDirectory({
 
       {totalAgents > 0 ? (
         <nav className="bnb-pagination" aria-label="Agent directory pagination">
-          <span>Showing {start}-{end} of {totalAgents} agents</span>
+          <span>Showing {start}-{end}</span>
           <div>
             <Link
               href={pageHref(Math.max(1, page - 1))}
@@ -362,8 +378,8 @@ export function AgentsDirectory({
         </div>
       ) : null}
 
-      {compareOpen && comparison.length >= 2 ? (
-        <ComparisonPanel agents={comparison} close={() => setCompareOpen(false)} />
+      {compareOpen && cleanedComparison.length >= 2 ? (
+        <ComparisonPanel agents={cleanedComparison} close={() => setCompareOpen(false)} />
       ) : null}
     </div>
   );
@@ -449,6 +465,11 @@ function DirectoryAgentRow({
   const description = listingDescription(agent);
   const canHire = canHireAgent(agent);
   const reason = matchReason(agent, query);
+  const metadata = [
+    freshnessLabel(agent.lastActivity),
+    agent.feedback.count > 0 ? reviewText(agent) : "",
+    hasPrice(agent) ? priceText(agent) : "",
+  ];
 
   return (
     <article className="bnb-directory-row">
@@ -465,14 +486,20 @@ function DirectoryAgentRow({
       </div>
 
       <div className="bnb-directory-summary">
-        {description ? <p>{description}</p> : null}
+        {description ? <p>{description}</p> : <p className="bnb-directory-summary-spacer" aria-hidden="true" />}
         {reason ? <span>{reason}</span> : null}
       </div>
 
       <div className="bnb-directory-metadata">
-        <span>{freshnessLabel(agent.lastActivity)}</span>
-        {agent.feedback.count > 0 ? <span>{reviewText(agent)}</span> : null}
-        {hasPrice(agent) ? <span>{priceText(agent)}</span> : null}
+        {metadata.map((value, index) => (
+          <span
+            key={`${agentKey(agent)}:${index}`}
+            className={value ? undefined : "bnb-directory-meta-empty"}
+            aria-hidden={value ? undefined : "true"}
+          >
+            {value || " "}
+          </span>
+        ))}
       </div>
 
       <div className="bnb-directory-actions">
@@ -494,7 +521,7 @@ function DirectoryAgentRow({
         {canHire ? (
           <Link href={hireHref(agent)} className="bnb-link-button bnb-focus">Hire</Link>
         ) : (
-          <Link href={`/bnb/match?intent=${encodeURIComponent(`Contact ${agent.name}`)}`} className="bnb-link-button bnb-focus">Request</Link>
+          <Link href={`${profileHref(agent)}#request-access`} className="bnb-link-button bnb-focus">Request</Link>
         )}
       </div>
     </article>
@@ -513,11 +540,15 @@ function SavedAgents({ agents, remove }: { agents: SavedAgent[]; remove: (key: s
           <div key={agent.key} className="bnb-saved-row">
             <div>
               <strong>{agent.name}</strong>
-              <span>{agent.category} · {agent.status} · {agent.price}</span>
+              <span>{[agent.category, agent.status, agent.price].filter(Boolean).join(" · ")}</span>
             </div>
             <div>
               <Link href={agent.profileHref} className="bnb-text-action bnb-focus">View</Link>
-              {agent.canHire ? <Link href={agent.hireHref} className="bnb-text-action bnb-focus">Hire</Link> : null}
+              {agent.canHire ? (
+                <Link href={agent.hireHref} className="bnb-text-action bnb-focus">Hire</Link>
+              ) : (
+                <Link href={`${agent.profileHref}#request-access`} className="bnb-text-action bnb-focus">Request</Link>
+              )}
               <button type="button" className="bnb-link-button bnb-focus" onClick={() => remove(agent.key)}>Remove</button>
             </div>
           </div>
@@ -528,12 +559,37 @@ function SavedAgents({ agents, remove }: { agents: SavedAgent[]; remove: (key: s
 }
 
 function ComparisonPanel({ agents, close }: { agents: SavedAgent[]; close: () => void }) {
-  const rows = [
-    ["Category", (agent: SavedAgent) => agent.category],
-    ["Availability", (agent: SavedAgent) => agent.status],
-    ["Reviews", (agent: SavedAgent) => agent.reviews],
-    ["Pricing", (agent: SavedAgent) => agent.price],
-  ] as const;
+  const rows: ComparisonRow[] = [
+    { label: "Best for", value: (agent) => agent.bestFor || agent.category },
+    { label: "Availability", value: (agent) => agent.status },
+    { label: "Feedback", value: (agent) => agent.reviews || "No feedback yet" },
+    {
+      label: "Average score",
+      value: (agent) => agent.averageScore || "Not available",
+      hasValue: (agent) => Boolean(agent.averageScore),
+    },
+    { label: "Last active", value: (agent) => agent.lastActive || "Not available" },
+    {
+      label: "Registered",
+      value: (agent) => agent.registered || "Not available",
+      hasValue: (agent) => Boolean(agent.registered),
+    },
+    {
+      label: "Supported protocols",
+      value: (agent) => agent.supportedProtocols?.length ? agent.supportedProtocols.join(", ") : "Not available",
+      hasValue: (agent) => Boolean(agent.supportedProtocols?.length),
+    },
+    { label: "x402", value: (agent) => agent.x402 || "Not listed" },
+    { label: "Service endpoint", value: (agent) => agent.serviceEndpoint || "Not listed" },
+    {
+      label: "Price",
+      value: (agent) => agent.price || "Not available",
+      hasValue: (agent) => Boolean(agent.price),
+    },
+    { label: "Wallet", value: (agent) => agent.walletStatus || "Not available" },
+    { label: "ERC-8004 identity", value: (agent) => agent.identity || agent.key },
+  ];
+  const visibleRows = rows.filter((row) => !row.hasValue || agents.some((agent) => row.hasValue?.(agent)));
 
   return (
     <div className="bnb-compare-panel" role="dialog" aria-modal="true" aria-label="Compare agents">
@@ -558,11 +614,11 @@ function ComparisonPanel({ agents, close }: { agents: SavedAgent[]; close: () =>
             </tr>
           </thead>
           <tbody>
-            {rows.map(([label, value]) => (
-              <tr key={label}>
-                <th>{label}</th>
+            {visibleRows.map((row) => (
+              <tr key={row.label}>
+                <th>{row.label}</th>
                 {agents.map((agent) => (
-                  <td key={`${agent.key}:${label}`}>{value(agent)}</td>
+                  <td key={`${agent.key}:${row.label}`}>{row.value(agent)}</td>
                 ))}
               </tr>
             ))}
@@ -611,18 +667,43 @@ function toSavedAgent(agent: BnbAgentProfile): SavedAgent {
     name: agent.name,
     category: categoryLabel(agent.category),
     status: statusLabel(agent),
-    price: priceText(agent),
-    reviews: reviewText(agent),
+    bestFor: categoryLabel(agent.category),
+    description: listingDescription(agent),
+    ...(hasPrice(agent) ? { price: priceText(agent) } : {}),
+    reviews: feedbackText(agent),
+    ...(averageScoreText(agent) ? { averageScore: averageScoreText(agent) } : {}),
     lastActive: freshnessLabel(agent.lastActivity),
-    integrations: integrationSummary(agent),
+    ...(registeredLabel(agent) ? { registered: registeredLabel(agent) } : {}),
+    ...(protocolSummary(agent).length > 0 ? { supportedProtocols: protocolSummary(agent) } : {}),
+    x402: agent.x402Support ? "Supported" : "Not listed",
+    serviceEndpoint: agent.services.some((service) => Boolean(service.endpoint)) ? "Available" : "Request access",
+    walletStatus: /^0x[a-fA-F0-9]{40}$/.test(agent.agentWallet) ? "Wallet linked" : "No valid wallet",
+    identity: agent.sourceMetrics?.sourceAgentId || agent.tokenId,
+    verified: agent.sourceMetrics?.verified || agent.sourceFreshness.source === "8004scan",
     profileHref: profileHref(agent),
     hireHref: hireHref(agent),
     canHire: canHireAgent(agent),
   };
 }
 
+function cleanSavedAgent(agent: SavedAgent): SavedAgent {
+  const price = agent.price && agent.price !== "Price on request" ? agent.price : "";
+  const reviews = agent.reviews && agent.reviews !== "No reviews yet" ? agent.reviews : "No feedback yet";
+  return {
+    ...agent,
+    bestFor: agent.bestFor || agent.category,
+    supportedProtocols: Array.isArray(agent.supportedProtocols) ? agent.supportedProtocols.filter(Boolean) : undefined,
+    x402: agent.x402 || "Not listed",
+    serviceEndpoint: agent.serviceEndpoint || "Not listed",
+    walletStatus: agent.walletStatus || "Not available",
+    identity: agent.identity || agent.key,
+    ...(price ? { price } : { price: undefined }),
+    reviews,
+  };
+}
+
 function canHireAgent(agent: BnbAgentProfile) {
-  return agent.activationStatus !== "discoverable" && /^0x[a-fA-F0-9]{40}$/.test(agent.agentWallet);
+  return agent.activationStatus === "callable" && /^0x[a-fA-F0-9]{40}$/.test(agent.agentWallet);
 }
 
 function categoryLabel(category: BnbAgentCategory) {
@@ -645,7 +726,7 @@ function listingDescription(agent: BnbAgentProfile) {
 }
 
 function priceText(agent: BnbAgentProfile) {
-  return agent.services.find((service) => service.price)?.price || "Price on request";
+  return agent.services.find((service) => service.price)?.price || "";
 }
 
 function hasPrice(agent: BnbAgentProfile) {
@@ -653,9 +734,49 @@ function hasPrice(agent: BnbAgentProfile) {
 }
 
 function reviewText(agent: BnbAgentProfile) {
-  if (agent.feedback.count <= 0) return "No reviews yet";
   const rating = agent.feedback.score > 0 ? `${Math.min(5, agent.feedback.score / 20).toFixed(1)} · ` : "";
   return `${rating}${agent.feedback.count} review${agent.feedback.count === 1 ? "" : "s"}`;
+}
+
+function feedbackText(agent: BnbAgentProfile) {
+  if (agent.feedback.count > 0) return reviewText(agent);
+  return "No feedback yet";
+}
+
+function averageScoreText(agent: BnbAgentProfile) {
+  const score = agent.sourceMetrics?.averageScore || agent.feedback.score;
+  if (!Number.isFinite(score) || score <= 0) return "";
+  return `${Math.round(score)}/100`;
+}
+
+function registeredLabel(agent: BnbAgentProfile) {
+  const value = agent.sourceMetrics?.createdAt;
+  if (!value) return "";
+  const time = Date.parse(value);
+  if (!Number.isFinite(time)) return "";
+  return new Intl.DateTimeFormat("en", { month: "short", day: "numeric", year: "numeric" }).format(new Date(time));
+}
+
+function protocolSummary(agent: BnbAgentProfile) {
+  const protocols = [
+    ...(agent.sourceMetrics?.supportedProtocols || []),
+    ...(agent.a2aSupport ? ["A2A"] : []),
+    ...(agent.mcpSupport ? ["MCP"] : []),
+    ...(agent.erc8183Support ? ["ERC-8183"] : []),
+  ];
+
+  return Array.from(new Set(protocols.map(formatProtocol).filter(Boolean)));
+}
+
+function formatProtocol(value: string) {
+  const normalized = value.trim();
+  if (!normalized) return "";
+  const lower = normalized.toLowerCase();
+  if (lower === "a2a") return "A2A";
+  if (lower === "mcp") return "MCP";
+  if (lower === "x402") return "x402";
+  if (lower.includes("8183")) return "ERC-8183";
+  return normalized;
 }
 
 function freshnessLabel(value: string) {
@@ -665,17 +786,6 @@ function freshnessLabel(value: string) {
   if (days <= 0) return "Active today";
   if (days === 1) return "Active 1 day ago";
   return `Active ${days} days ago`;
-}
-
-function integrationSummary(agent: BnbAgentProfile) {
-  const haystack = [
-    agent.capabilities.join(" "),
-    agent.services.map((service) => `${service.name} ${service.type}`).join(" "),
-  ].join(" ").toLowerCase();
-  const integrations = [];
-  if (haystack.includes("pancake")) integrations.push("PancakeSwap");
-  if (haystack.includes("altana")) integrations.push("Altana");
-  return integrations.join(", ");
 }
 
 function matchReason(agent: BnbAgentProfile, query: string) {

@@ -103,7 +103,7 @@ export default async function BnbAgentsPage({ searchParams }: { searchParams: Se
     ? `${filteredAgents.length} agent${filteredAgents.length === 1 ? "" : "s"} for "${q}"`
     : hasFilters
       ? `${filteredAgents.length} agent${filteredAgents.length === 1 ? "" : "s"} match your filters`
-      : "Top reviewed agents";
+      : `${filteredAgents.length} agents shown`;
 
   return (
     <BnbShell active="agents">

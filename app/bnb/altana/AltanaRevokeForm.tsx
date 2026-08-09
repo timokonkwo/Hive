@@ -6,7 +6,7 @@ import { useAccount, useSendTransaction, useSwitchChain } from "wagmi";
 import type { Hex } from "viem";
 import { Ban } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
-import { useAuthFetch } from "@/hooks/useAuthFetch";
+import { useBnbAuthFetch } from "@/hooks/useBnbAuthFetch";
 
 type RevokeRequest =
   | {
@@ -36,28 +36,25 @@ export function AltanaRevokeForm() {
   const [submitting, setSubmitting] = useState(false);
   const [confirming, setConfirming] = useState(false);
   const [lastNote, setLastNote] = useState("");
-  const { authenticated, login, ready } = useAuth();
+  const { authenticated, login, ready, connectWallet } = useAuth();
   const { address, chainId } = useAccount();
   const { sendTransactionAsync } = useSendTransaction();
   const { switchChainAsync } = useSwitchChain();
-  const authFetch = useAuthFetch();
+  const { authFetch } = useBnbAuthFetch();
 
   async function revokeSession(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    setSubmitting(true);
     setError("");
     setResult(null);
 
+    if (!ensureProtectedSession({ authenticated, login })) return;
+
+    setSubmitting(true);
     const formData = new FormData(event.currentTarget);
     const payload = Object.fromEntries(formData.entries());
     setLastNote(typeof payload.revocationNote === "string" ? payload.revocationNote : "");
 
     try {
-      if (!authenticated) {
-        login();
-        return;
-      }
-
       const response = await authFetch("/api/bnb/altana/revoke", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -77,8 +74,12 @@ export function AltanaRevokeForm() {
 
   async function confirmRevoke() {
     if (!result?.revokeRequest || result.revokeRequest.status !== "ready") return;
-    if (!authenticated || !address) {
-      login();
+    if (!ensureProtectedSession({ authenticated, login })) return;
+    if (!address) {
+      connectWallet({
+        walletChainType: "ethereum-only",
+        description: "Connect the wallet you want to use for BNB Smart Chain transactions.",
+      });
       return;
     }
 
@@ -104,7 +105,7 @@ export function AltanaRevokeForm() {
       });
       const data = await response.json();
       if (!response.ok) {
-        throw new Error(data.error || "Revoke transaction was sent, but the receipt could not be updated.");
+        throw new Error(data.error || "Revoke transaction was sent, but the record could not be updated.");
       }
       setResult(data);
     } catch (revokeError) {
@@ -123,13 +124,13 @@ export function AltanaRevokeForm() {
 
       <div className="mt-5 grid gap-4">
         <label className="block">
-          <span className="bnb-label">Receipt ID</span>
+          <span className="bnb-label">Alert ID</span>
           <input
             name="recordId"
             type="text"
             autoComplete="off"
             spellCheck={false}
-            placeholder="Paste record ID"
+            placeholder="Paste alert record ID"
             className="bnb-input"
             required
           />
@@ -147,10 +148,10 @@ export function AltanaRevokeForm() {
 
         <button
           type="submit"
-          disabled={submitting}
+          disabled={submitting || !ready}
           className="bnb-button bnb-button-secondary bnb-focus disabled:cursor-not-allowed disabled:opacity-70"
         >
-          {submitting ? "Stopping..." : authenticated ? "Stop alert" : ready ? "Sign in to stop" : "Loading..."}
+          {revokeButtonLabel({ submitting, authenticated, ready })}
         </button>
       </div>
 
@@ -160,7 +161,7 @@ export function AltanaRevokeForm() {
           <div className="text-sm font-semibold text-emerald-300">
             {result.revokeRequest?.status === "ready" ? "Confirm revoke" : result.status === "stopped" ? "Alert stopped" : "Revoke submitted"}
           </div>
-          <div className="mt-1 break-all font-mono text-xs text-zinc-200">Receipt {result.receiptId}</div>
+          <div className="mt-1 break-all font-mono text-xs text-zinc-200">Record {result.recordId}</div>
           {result.message ? <p className="mt-2 text-sm leading-6 text-zinc-300">{result.message}</p> : null}
           {result.revokeRequest?.status === "ready" ? (
             <button
@@ -178,4 +179,34 @@ export function AltanaRevokeForm() {
       ) : null}
     </form>
   );
+}
+
+function revokeButtonLabel({
+  submitting,
+  authenticated,
+  ready,
+}: {
+  submitting: boolean;
+  authenticated: boolean;
+  ready: boolean;
+}) {
+  if (submitting) return "Stopping...";
+  if (!ready) return "Loading...";
+  if (!authenticated) return "Sign in to stop";
+  return "Stop alert";
+}
+
+function ensureProtectedSession({
+  authenticated,
+  login,
+}: {
+  authenticated: boolean;
+  login: () => void;
+}) {
+  if (!authenticated) {
+    login();
+    return false;
+  }
+
+  return true;
 }

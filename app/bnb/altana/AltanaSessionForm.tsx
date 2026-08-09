@@ -7,7 +7,7 @@ import { useAccount, useSendTransaction, useSwitchChain } from "wagmi";
 import type { Hex } from "viem";
 import { Bell } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
-import { useAuthFetch } from "@/hooks/useAuthFetch";
+import { useBnbAuthFetch } from "@/hooks/useBnbAuthFetch";
 import type { BnbAltanaSessionTemplate } from "@/lib/bnb/types";
 import { BnbSelect } from "@/app/bnb/_components/BnbSelect";
 
@@ -38,27 +38,24 @@ export function AltanaSessionForm({ templates }: { templates: BnbAltanaSessionTe
   const [error, setError] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [granting, setGranting] = useState(false);
-  const { authenticated, login, ready } = useAuth();
+  const { authenticated, login, ready, connectWallet } = useAuth();
   const { address, chainId } = useAccount();
   const { sendTransactionAsync } = useSendTransaction();
   const { switchChainAsync } = useSwitchChain();
-  const authFetch = useAuthFetch();
+  const { authFetch } = useBnbAuthFetch();
   const templateOptions = templates.map((template) => ({ value: template.id, label: template.title }));
 
   async function submitSession(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    setSubmitting(true);
     setError("");
     setResult(null);
 
-    const formData = new FormData(event.currentTarget);
-    const payload = Object.fromEntries(formData.entries());
+    if (!ensureProtectedSession({ authenticated, login })) return;
 
+    setSubmitting(true);
     try {
-      if (!authenticated) {
-        login();
-        return;
-      }
+      const formData = new FormData(event.currentTarget);
+      const payload = Object.fromEntries(formData.entries());
 
       const response = await authFetch("/api/bnb/altana/session", {
         method: "POST",
@@ -79,8 +76,12 @@ export function AltanaSessionForm({ templates }: { templates: BnbAltanaSessionTe
 
   async function grantSession() {
     if (!result?.grantRequest || result.grantRequest.status !== "ready") return;
-    if (!authenticated || !address) {
-      login();
+    if (!ensureProtectedSession({ authenticated, login })) return;
+    if (!address) {
+      connectWallet({
+        walletChainType: "ethereum-only",
+        description: "Connect the wallet you want to use for BNB Smart Chain transactions.",
+      });
       return;
     }
 
@@ -106,7 +107,7 @@ export function AltanaSessionForm({ templates }: { templates: BnbAltanaSessionTe
       });
       const data = await response.json();
       if (!response.ok) {
-        throw new Error(data.error || "Session grant was sent, but the receipt could not be updated.");
+        throw new Error(data.error || "Session grant was sent, but the record could not be updated.");
       }
       setResult(data);
     } catch (grantError) {
@@ -183,10 +184,10 @@ export function AltanaSessionForm({ templates }: { templates: BnbAltanaSessionTe
 
         <button
           type="submit"
-          disabled={submitting}
+          disabled={submitting || !ready}
           className="bnb-button bnb-focus disabled:cursor-not-allowed disabled:opacity-70"
         >
-          {submitting ? "Saving..." : authenticated ? "Save alert" : ready ? "Sign in to save" : "Loading..."}
+          {sessionButtonLabel({ submitting, authenticated, ready })}
         </button>
       </div>
 
@@ -194,7 +195,7 @@ export function AltanaSessionForm({ templates }: { templates: BnbAltanaSessionTe
       {result ? (
         <div className="bnb-success mt-4 p-4">
           <div className="text-sm font-semibold text-emerald-300">Alert saved</div>
-          <div className="mt-1 break-all font-mono text-xs text-zinc-200">Receipt {result.receiptId}</div>
+          <div className="mt-1 break-all font-mono text-xs text-zinc-200">Record {result.recordId}</div>
           <p className="mt-2 text-sm leading-6 text-zinc-300">{result.message}</p>
           {result.grantRequest?.status === "ready" ? (
             <button
@@ -208,11 +209,41 @@ export function AltanaSessionForm({ templates }: { templates: BnbAltanaSessionTe
           ) : result.grantRequest ? (
             <p className="mt-3 text-sm leading-6 text-zinc-300">{result.grantRequest.reason}</p>
           ) : null}
-          <Link href="/bnb/report" className="bnb-text-action bnb-focus mt-3">
-            Open receipts
+          <Link href="/bnb/account#activity" className="bnb-text-action bnb-focus mt-3">
+            Open activity
           </Link>
         </div>
       ) : null}
     </form>
   );
+}
+
+function sessionButtonLabel({
+  submitting,
+  authenticated,
+  ready,
+}: {
+  submitting: boolean;
+  authenticated: boolean;
+  ready: boolean;
+}) {
+  if (submitting) return "Saving...";
+  if (!ready) return "Loading...";
+  if (!authenticated) return "Sign in to save";
+  return "Save alert";
+}
+
+function ensureProtectedSession({
+  authenticated,
+  login,
+}: {
+  authenticated: boolean;
+  login: () => void;
+}) {
+  if (!authenticated) {
+    login();
+    return false;
+  }
+
+  return true;
 }

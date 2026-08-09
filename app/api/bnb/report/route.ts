@@ -9,7 +9,7 @@ export async function GET(request: NextRequest) {
 
   const client = await authenticateClient(request);
   if (!client) {
-    return NextResponse.json({ error: "Sign in to view receipts." }, { status: 401 });
+    return NextResponse.json({ error: "Sign in to view activity." }, { status: 401 });
   }
 
   const { searchParams } = new URL(request.url);
@@ -22,6 +22,6 @@ export async function GET(request: NextRequest) {
     if (error instanceof BnbStorageError) {
       return NextResponse.json({ error: error.message }, { status: 503 });
     }
-    return NextResponse.json({ error: error instanceof Error ? error.message : "Could not load report." }, { status: 500 });
+    return NextResponse.json({ error: error instanceof Error ? error.message : "Could not load activity." }, { status: 500 });
   }
 }

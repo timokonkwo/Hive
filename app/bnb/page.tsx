@@ -114,8 +114,7 @@ export default async function BnbHomePage() {
           <div className="bnb-list-head">
             <div>
               <h2>Recommended agents</h2>
-              <p>Agents you can review and hire now.</p>
-              <p>Ranked by review history, activity, and available registration data.</p>
+              <p>Agents with useful public details.</p>
             </div>
             <Link href="/bnb/agents" className="bnb-text-action bnb-focus">
               View all agents <ArrowRight aria-hidden="true" size={14} />
@@ -152,7 +151,7 @@ export default async function BnbHomePage() {
           <InfoCard
             icon={FileText}
             title="Review the result"
-            body="Hive keeps the hire record, payment details, agent output, and receipt in one place."
+            body="Hive keeps the hire record, payment details, agent output, and final status in one place."
           />
         </section>
 

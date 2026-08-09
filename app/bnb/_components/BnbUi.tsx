@@ -8,7 +8,8 @@ import {
   ExternalLink,
 } from "lucide-react";
 import { Footer } from "@/components/layout/Footer";
-import type { BnbAgentCategory, BnbAgentProfile, BnbPartnerTrackSummary, BnbScoreBreakdown } from "@/lib/bnb/types";
+import { BnbAccountButton } from "@/app/bnb/_components/BnbAccountButton";
+import type { BnbAgentCategory, BnbAgentProfile, BnbPartnerTrackSummary } from "@/lib/bnb/types";
 
 const categoryLabels: Record<BnbAgentCategory, string> = {
   Rebalancing: "Rebalancing",
@@ -17,7 +18,7 @@ const categoryLabels: Record<BnbAgentCategory, string> = {
   "Health Factor Monitoring": "Health Factor",
 };
 
-type BnbNavItem = "home" | "agents" | "receipts" | "verify";
+type BnbNavItem = "home" | "agents" | "verify" | "account";
 
 export function BnbShell({ children, active = "home" }: { children: ReactNode; active?: BnbNavItem }) {
   return (
@@ -28,13 +29,15 @@ export function BnbShell({ children, active = "home" }: { children: ReactNode; a
             <Brand />
             <nav className="bnb-nav" aria-label="Hive navigation">
               <BnbNavLink href="/bnb/agents" active={active === "agents"}>Agents</BnbNavLink>
-              <BnbNavLink href="/bnb/report" active={active === "receipts"}>Receipts</BnbNavLink>
               <BnbNavLink href="/bnb/status" active={active === "verify"}>Verify</BnbNavLink>
             </nav>
-            <Link href="/bnb/match" className="bnb-button bnb-button-secondary bnb-focus">
-              <span className="bnb-desktop-label">Hire agent</span>
-              <span className="bnb-mobile-label">Hire</span>
-            </Link>
+            <div className="bnb-header-actions">
+              <BnbAccountButton active={active === "account"} />
+              <Link href="/bnb/match" className="bnb-button bnb-button-secondary bnb-focus">
+                <span className="bnb-desktop-label">Hire agent</span>
+                <span className="bnb-mobile-label">Hire</span>
+              </Link>
+            </div>
           </BnbContainer>
         </header>
         <div className="bnb-main">
@@ -146,7 +149,7 @@ export function AgentCard({ agent }: { agent: BnbAgentProfile }) {
     <article className="bnb-agent-row">
       <div className="bnb-agent-main">
         <h3 className="bnb-agent-name">
-          <Link href={`/bnb/agents/${agent.chainId}/${agent.tokenId}`} className="bnb-focus">
+          <Link href={`/bnb/agents/${agent.chainId}/${encodeURIComponent(agent.tokenId)}`} className="bnb-focus">
             {agent.name}
           </Link>
           {agent.sourceFreshness.source === "8004scan" ? (
@@ -162,7 +165,7 @@ export function AgentCard({ agent }: { agent: BnbAgentProfile }) {
         </div>
       </div>
       <div className="bnb-agent-side">
-        <Link href={`/bnb/agents/${agent.chainId}/${agent.tokenId}`} className="bnb-button-dark bnb-focus">
+        <Link href={`/bnb/agents/${agent.chainId}/${encodeURIComponent(agent.tokenId)}`} className="bnb-button-dark bnb-focus">
           View profile
         </Link>
         {canHire ? (
@@ -170,7 +173,7 @@ export function AgentCard({ agent }: { agent: BnbAgentProfile }) {
             Hire
           </Link>
         ) : (
-          <Link href={`/bnb/match?intent=${encodeURIComponent(`Contact ${agent.name}`)}`} className="bnb-button-dark bnb-focus">
+          <Link href={`/bnb/agents/${agent.chainId}/${encodeURIComponent(agent.tokenId)}#request-access`} className="bnb-button-dark bnb-focus">
             Request access
           </Link>
         )}
@@ -191,33 +194,6 @@ export function PartnerTrackCard({ track }: { track: BnbPartnerTrackSummary }) {
       </div>
       <p className="mt-3 text-sm leading-6 text-zinc-400">{track.userProblem}</p>
     </Link>
-  );
-}
-
-export function ScoreGrid({ score }: { score?: BnbScoreBreakdown }) {
-  if (!score) return null;
-  const rows = [
-    ["Fit", score.fit, 35],
-    ["Trust", score.trust, 25],
-    ["Hire flow", score.activation, 20],
-    ["Activity", score.activity, 10],
-    ["Risk", score.risk, 10],
-  ] as const;
-
-  return (
-    <div className="grid gap-3">
-      {rows.map(([label, value, max]) => (
-        <div key={label}>
-          <div className="mb-1 flex items-center justify-between text-xs text-zinc-500">
-            <span>{label}</span>
-            <span className="bnb-mono text-zinc-200">{value}/{max}</span>
-          </div>
-          <div className="bnb-score-meter">
-            <div style={{ width: `${Math.min(100, Math.round((value / max) * 100))}%` }} />
-          </div>
-        </div>
-      ))}
-    </div>
   );
 }
 
@@ -255,7 +231,7 @@ export function freshnessLabel(value: string) {
 }
 
 export function priceLabel(agent: BnbAgentProfile) {
-  return agent.services.find((service) => service.price)?.price || "Price on request";
+  return agent.services.find((service) => service.price)?.price || "";
 }
 
 export function hasPrice(agent: BnbAgentProfile) {
@@ -263,19 +239,13 @@ export function hasPrice(agent: BnbAgentProfile) {
 }
 
 export function reviewLabel(agent: BnbAgentProfile) {
-  if (agent.feedback.count <= 0) return "No reviews yet";
+  if (agent.feedback.count <= 0) return "";
   if (agent.feedback.positive === agent.feedback.count) return `${agent.feedback.count} positive`;
   return `${agent.feedback.positive} of ${agent.feedback.count} positive`;
 }
 
-export function sourceLabel(agent: BnbAgentProfile) {
-  if (agent.sourceFreshness.source === "8004scan") return "Data from 8004scan";
-  if (agent.sourceFreshness.source === "configured") return "Configured in Hive";
-  return "Hive registry data";
-}
-
 export function canHireAgent(agent: BnbAgentProfile) {
-  return agent.activationStatus !== "discoverable" && /^0x[a-fA-F0-9]{40}$/.test(agent.agentWallet);
+  return agent.activationStatus === "callable" && /^0x[a-fA-F0-9]{40}$/.test(agent.agentWallet);
 }
 
 export function statusLabel(agent: BnbAgentProfile) {
@@ -296,31 +266,18 @@ export function listingDescription(agent: BnbAgentProfile) {
   return description;
 }
 
-export function identityLabel(agent: BnbAgentProfile) {
-  if (agent.sourceFreshness.source === "8004scan") return `ERC-8004 #${agent.tokenId}`;
-  return `Agent ID ${agent.tokenId}`;
-}
-
-export function platformLabel(agent: BnbAgentProfile) {
-  if (agent.description.toLowerCase().includes("termix")) return "TermiX Platform";
-  return agent.description;
-}
-
 export function getAgentIntegrations(agent: BnbAgentProfile) {
   const haystack = [
     agent.category,
     agent.capabilities.join(" "),
     agent.services.map((service) => `${service.name} ${service.type}`).join(" "),
   ].join(" ").toLowerCase();
-  const integrations = ["BNB Smart Chain"];
+  const integrations: string[] = [];
 
   if (haystack.includes("pancake")) integrations.push("PancakeSwap");
   if (haystack.includes("altana") || (agent.a2aSupport && (haystack.includes("wallet") || haystack.includes("health")))) {
-    integrations.push("Altana permissions");
+    integrations.push("Altana");
   }
-  if (agent.sourceFreshness.source === "8004scan") integrations.push("ERC-8004");
-  if (agent.mcpSupport) integrations.push("MCP");
-  if (agent.a2aSupport) integrations.push("A2A");
 
   return Array.from(new Set(integrations));
 }

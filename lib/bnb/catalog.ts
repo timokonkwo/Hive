@@ -159,7 +159,7 @@ const localBnbAgents: BnbAgentProfile[] = [
     chainId: BSC_CHAIN_ID,
     tokenId: "hive-audit-lens",
     name: "Audit Lens",
-    description: "Checks token and pool risk signals before a trader interacts with a BSC asset.",
+    description: "Checks token and pool risk before a trader interacts with a BSC asset.",
     category: "Health Factor Monitoring",
     ownerAddress: "0x7A3d00000000000000000000000000000000BEE9",
     agentWallet: "0x7A3d00000000000000000000000000000000BE10",
@@ -273,7 +273,7 @@ export const bnbTermixCaptures: BnbTermixCapture[] = [
   },
   {
     id: "agent-response-quality",
-    title: "Agent response quality capture",
+    title: "Agent result review",
     target: "Any TermiX task prompt",
   },
 ];
@@ -281,7 +281,7 @@ export const bnbTermixCaptures: BnbTermixCapture[] = [
 export const bnbAltanaSessionTemplates: BnbAltanaSessionTemplate[] = [
   {
     id: "health-factor-watch",
-    title: "Limited health-factor watch",
+    title: "Health factor alert",
     agentTokenId: "hive-health-sentinel",
     summary: "Watch a lending position and alert when the health factor gets too low.",
     spendCap: "0.01 BNB",
@@ -289,7 +289,7 @@ export const bnbAltanaSessionTemplates: BnbAltanaSessionTemplate[] = [
   },
   {
     id: "yield-scan-only",
-    title: "Yield scan only",
+    title: "Yield route alert",
     agentTokenId: "hive-yield-scout",
     summary: "Watch selected farms and alert when a route needs review.",
     spendCap: "0.005 BNB",
@@ -297,7 +297,7 @@ export const bnbAltanaSessionTemplates: BnbAltanaSessionTemplate[] = [
   },
   {
     id: "lp-rebalance-request",
-    title: "LP rebalance request",
+    title: "LP range alert",
     agentTokenId: "hive-range-guard",
     summary: "Watch an LP position and alert when the range needs review.",
     spendCap: "0.01 BNB",
@@ -315,6 +315,11 @@ function asRecord(value: unknown): Record<string, unknown> {
 
 function textFrom(value: unknown, fallback = "") {
   return typeof value === "string" && value.trim() ? value.trim() : fallback;
+}
+
+function numberFrom(value: unknown) {
+  const number = Number(value);
+  return Number.isFinite(number) ? number : undefined;
 }
 
 function arrayFrom(value: unknown): string[] {
@@ -442,11 +447,12 @@ function normalize8004Agent(raw: unknown): BnbAgentProfile | null {
 
   const description = textFrom(record.description ?? record.bio ?? record.summary, "ERC-8004 BSC agent indexed through 8004scan.");
   const capabilities = arrayFrom(record.capabilities ?? record.skills ?? record.tags);
+  const supportedProtocols = arrayFrom(record.supported_protocols);
   const protocolServices = normalizeServices(record.supported_protocols);
-  const x402Service = record.x402_supported === true || record.x402Support === true
+  const x402Service: BnbAgentService[] = record.x402_supported === true || record.x402Support === true
     ? [{ name: "x402", type: "x402" as const }]
     : [];
-  const services = [
+  const services: BnbAgentService[] = [
     ...normalizeServices(record.services ?? record.endpoints),
     ...protocolServices,
     ...x402Service,
@@ -458,8 +464,9 @@ function normalize8004Agent(raw: unknown): BnbAgentProfile | null {
   const ownerAddress = textFrom(record.ownerAddress ?? record.owner ?? record.owner_address, "Unknown");
   const registryAddress = textFrom(record.identityRegistry ?? record.registry ?? record.contract_address, DEFAULT_REGISTRY);
   const agentWallet = textFrom(record.agentWallet ?? record.wallet ?? record.walletAddress ?? record.owner_address, ownerAddress);
-  const feedbackCount = Number(record.feedbackCount ?? record.feedback_count ?? record.total_feedbacks ?? 0) || 0;
-  const averageScore = Number(record.feedbackScore ?? record.score ?? record.average_score ?? record.total_score ?? 0) || 0;
+  const feedbackCount = numberFrom(record.feedbackCount ?? record.feedback_count ?? record.total_feedbacks) || 0;
+  const averageScore = numberFrom(record.feedbackScore ?? record.score ?? record.average_score ?? record.total_score) || 0;
+  const hasCallableEndpoint = services.some((service) => Boolean(service.endpoint));
 
   return {
     chainId: Number.isFinite(chainId) ? chainId : BSC_CHAIN_ID,
@@ -472,24 +479,37 @@ function normalize8004Agent(raw: unknown): BnbAgentProfile | null {
     identityRegistry: registryAddress,
     metadataUri: textFrom(record.metadataUri ?? record.metadata_uri, undefined),
     services,
-    capabilities: capabilities.length > 0 ? capabilities : arrayFrom(record.supported_protocols),
+    capabilities: capabilities.length > 0 ? capabilities : supportedProtocols,
     x402Support: serviceNames.includes("x402"),
     erc8183Support: serviceNames.includes("erc8183") || serviceNames.includes("8183"),
     mcpSupport: serviceNames.includes("mcp"),
     a2aSupport: serviceNames.includes("a2a"),
     feedback: {
       count: feedbackCount,
-      positive: Number(record.positiveFeedback ?? record.positive_feedback ?? feedbackCount) || 0,
+      positive: numberFrom(record.positiveFeedback ?? record.positive_feedback ?? feedbackCount) || 0,
       score: averageScore,
       summary: textFrom(record.feedbackSummary ?? record.feedback_summary, "No feedback summary yet."),
     },
     lastActivity: textFrom(record.lastActivity ?? record.updatedAt ?? record.updated_at, fetchedAt),
-    activationStatus: services.length > 0 ? "callable" : "discoverable",
+    activationStatus: hasCallableEndpoint ? "callable" : "request",
     sourceFreshness: {
       source: "8004scan",
       fetchedAt,
       stale: false,
       note: "Live record normalized from 8004scan public API.",
+    },
+    sourceMetrics: {
+      sourceAgentId: textFrom(record.agent_id ?? record.agentId ?? record.id, undefined),
+      verified: Boolean(record.is_verified ?? record.verified),
+      starCount: numberFrom(record.star_count ?? record.starCount),
+      rank: numberFrom(record.rank),
+      networkRank: numberFrom(record.network_rank ?? record.networkRank),
+      healthScore: numberFrom(record.health_score ?? record.healthScore),
+      totalScore: numberFrom(record.total_score ?? record.totalScore),
+      averageScore: numberFrom(record.average_score ?? record.averageScore),
+      createdAt: textFrom(record.created_at ?? record.createdAt, undefined),
+      updatedAt: textFrom(record.updated_at ?? record.updatedAt, undefined),
+      supportedProtocols,
     },
   };
 }
@@ -569,11 +589,11 @@ async function fetch8004Agents(limit: number, sort?: string | null): Promise<Bnb
   if (process.env.BNB_8004SCAN_LIVE !== "true") return [];
 
   const url = new URL(`${get8004BaseUrl()}/agents`);
+  const fetchLimit = sort === "recommended" || sort === "feedback" || sort === "reviews"
+    ? Math.max(limit, 80)
+    : limit;
   url.searchParams.set("chainId", String(BSC_CHAIN_ID));
-  url.searchParams.set("limit", String(Math.min(Math.max(limit, 1), 100)));
-  if (sort === "recommended" || sort === "feedback" || sort === "reviews") {
-    url.searchParams.set("sortBy", "total_feedbacks");
-  }
+  url.searchParams.set("limit", String(Math.min(Math.max(fetchLimit, 1), 100)));
 
   try {
     const payload = await fetch8004Json(url, 300);
@@ -675,7 +695,7 @@ export function scoreBnbAgent(agent: BnbAgentProfile, intent = "", category?: st
         ? "Ask the agent before hiring."
         : "Listed, but no service endpoint is available yet.",
     agent.feedback.count > 0
-      ? `${agent.feedback.positive}/${agent.feedback.count} positive feedback signals.`
+      ? `${agent.feedback.positive}/${agent.feedback.count} positive reviews.`
       : "No feedback yet.",
     recent ? "Recent activity detected." : "Activity freshness needs verification.",
   ];

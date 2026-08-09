@@ -10,9 +10,9 @@ export default function BnbPancakeSwapPage() {
   return (
     <BnbShell>
       <BnbHero
-        kicker="PancakeSwap capability"
+        kicker="PancakeSwap"
         title="PancakeSwap agents"
-        body="Hire an agent to rank yield routes, review LP ranges, or watch a farm."
+        body="Check a pair or hire an agent for yield routes, LP ranges, and farm monitoring."
       />
 
       <BnbContainer className="bnb-section">
@@ -40,7 +40,6 @@ export default function BnbPancakeSwapPage() {
                 </div>
                 <h2 className="mt-3 text-xl font-semibold text-white">{job.title}</h2>
                 <p className="mt-2 max-w-2xl text-sm leading-6 text-zinc-400">{job.agentOutput}</p>
-                <p className="mt-3 text-sm leading-6 text-zinc-500">{job.decisionMetric}</p>
               </div>
               <div className="bnb-agent-side">
                 <div className="bnb-score-compact">

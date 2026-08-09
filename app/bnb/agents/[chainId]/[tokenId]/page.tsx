@@ -1,27 +1,32 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { ArrowRight, ShieldCheck } from "lucide-react";
+import { ArrowRight, BadgeCheck } from "lucide-react";
+import { isAddress } from "viem";
 import { getBnbAgent } from "@/lib/bnb/catalog";
-import type { BnbAgentProfile } from "@/lib/bnb/types";
+import type { BnbAgentCategory, BnbAgentProfile, BnbAgentService } from "@/lib/bnb/types";
+import { ProfileCompareAction } from "./ProfileCompareAction";
+import { RequestAccessDialog } from "./RequestAccessDialog";
+import { CopyValueButton } from "@/app/bnb/_components/CopyValueButton";
 import {
   BnbContainer,
-  BnbHero,
-  BnbPanel,
-  BnbSectionHeader,
   BnbShell,
-  CategoryChip,
   ExternalTextLink,
-  ScoreGrid,
-  StatusBadge,
   canHireAgent,
   freshnessLabel,
-  getAgentIntegrations,
+  hasPrice,
+  listingDescription,
   priceLabel,
   reviewLabel,
-  listingDescription,
-  sourceLabel,
   shortAddress,
+  statusLabel,
 } from "@/app/bnb/_components/BnbUi";
+
+const categoryLabels: Record<BnbAgentCategory, string> = {
+  Rebalancing: "Rebalancing",
+  "Grid Trading": "Grid Trading",
+  "Yield Optimisation": "Yield Optimisation",
+  "Health Factor Monitoring": "Health Factor",
+};
 
 export default async function BnbAgentDetailPage({
   params,
@@ -31,152 +36,211 @@ export default async function BnbAgentDetailPage({
   const { chainId, tokenId } = await params;
   const agent = await getBnbAgent(chainId, tokenId);
   if (!agent) notFound();
+
   const description = listingDescription(agent);
+  const canHire = canHireAgent(agent);
+  const hasReviews = agent.feedback.count > 0;
+  const visibleCapabilities = agent.capabilities.filter(isSpecificCapability);
+  const visibleServices = agent.services.filter(hasUsableService);
+  const protocols = protocolSummary(agent);
+  const ownerAddress = isAddress(agent.ownerAddress) ? agent.ownerAddress : "";
+  const agentWallet = isAddress(agent.agentWallet) ? agent.agentWallet : "";
+  const verified = agent.sourceMetrics?.verified || agent.sourceFreshness.source === "8004scan";
+  const facts = [
+    { label: "Availability", value: statusLabel(agent) },
+    { label: "Last active", value: freshnessLabel(agent.lastActivity) },
+    ...(hasPrice(agent) ? [{ label: "Price", value: priceLabel(agent) }] : []),
+    ...(hasReviews ? [{ label: "Feedback", value: reviewLabel(agent) }] : []),
+  ];
 
   return (
     <BnbShell active="agents">
-      <BnbHero title={agent.name} body={description || "Registered BNB Chain agent."} kicker="Agent profile">
-        <BnbPanel className="p-5">
-          <div className="flex flex-wrap gap-2">
-            <CategoryChip category={agent.category} />
-            <StatusBadge agent={agent} />
-            <span className="bnb-chip bnb-chip-gold">BNB Smart Chain</span>
-          </div>
-          <div className="mt-5 grid gap-3">
-            <DataRow label="Price" value={priceLabel(agent)} />
-            <DataRow label="Reviews" value={reviewLabel(agent)} />
-            <DataRow label="Last active" value={freshnessLabel(agent.lastActivity)} />
-          </div>
-        </BnbPanel>
-      </BnbHero>
+      <BnbContainer className="bnb-section bnb-agent-profile-layout">
+        <main className="bnb-agent-profile-maincol">
+          <Link href="/bnb/agents" className="bnb-agent-back bnb-focus">
+            Agents
+          </Link>
 
-      <BnbContainer className="bnb-section grid gap-8 lg:grid-cols-[1fr_320px]">
-        <section className="grid gap-8">
-          <section>
-            <BnbSectionHeader eyebrow="Overview" title="What this agent does" />
-            <BnbPanel className="p-5">
-              {description ? (
-                <p className="text-sm leading-6 text-zinc-300">{description}</p>
-              ) : (
-                <p className="text-sm leading-6 text-zinc-400">Service description unavailable.</p>
-              )}
-              <div className="mt-5 flex flex-wrap gap-2">
-                {getAgentIntegrations(agent).map((integration) => (
-                  <span key={integration} className={integration === "BNB Smart Chain" ? "bnb-chip bnb-chip-gold" : "bnb-chip"}>
-                    {integration}
-                  </span>
-                ))}
+          <section className="bnb-agent-heading">
+            <div className="bnb-agent-meta-line">
+              <span>{categoryLabels[agent.category]}</span>
+              <span>{statusLabel(agent)}</span>
+              {verified ? (
+                <span className="bnb-agent-verified">
+                  <BadgeCheck aria-hidden="true" size={16} />
+                  Verified
+                </span>
+              ) : null}
+            </div>
+            <h1>{agent.name}</h1>
+            {description ? <p>{description}</p> : null}
+          </section>
+
+          <section className="bnb-agent-fact-strip" aria-label="Agent facts">
+            {facts.map((fact) => (
+              <div key={fact.label}>
+                <span>{fact.label}</span>
+                <strong>{fact.value}</strong>
               </div>
-            </BnbPanel>
+            ))}
           </section>
 
-          <section>
-            <BnbSectionHeader eyebrow="Pricing" title="Available services" />
-            <BnbPanel className="overflow-hidden">
-              {agent.services.length > 0 ? agent.services.map((service) => (
-                <div key={`${service.name}:${service.type}`} className="border-b border-zinc-800 p-4 last:border-b-0">
-                  <div className="flex flex-wrap items-start justify-between gap-3">
-                    <div>
-                      <h3 className="text-lg font-semibold text-white">{service.name}</h3>
-                      <p className="mt-1 text-sm text-zinc-500">{service.type.toUpperCase()}</p>
-                    </div>
-                    <span className="bnb-chip">{service.price || "Price not set"}</span>
-                  </div>
-                  {service.endpoint ? <p className="mt-3 break-all bnb-mono text-zinc-500">{service.endpoint}</p> : null}
-                </div>
-              )) : (
-                <p className="p-4 text-sm text-zinc-500">No service details yet.</p>
-              )}
-            </BnbPanel>
-          </section>
-
-          <section>
-            <BnbSectionHeader eyebrow="Performance" title="Marketplace signals" />
-            <BnbPanel className="p-5">
-              <dl className="grid gap-1 sm:grid-cols-3">
-                <DataRow label="Reviews" value={reviewLabel(agent)} />
-                <DataRow label="Positive feedback" value={positiveFeedbackLabel(agent)} />
-                <DataRow label="Last active" value={freshnessLabel(agent.lastActivity)} />
-              </dl>
-              {agent.feedback.summary ? <p className="mt-4 text-sm leading-6 text-zinc-400">{agent.feedback.summary}</p> : null}
-            </BnbPanel>
-          </section>
-
-          <section>
-            <BnbSectionHeader eyebrow="Selection" title="Why Hive ranks this agent" />
-            <BnbPanel className="p-4">
-              <ul className="grid gap-3">
-                {(agent.scoreBreakdown?.explanations || []).map((reason) => (
-                  <li key={reason} className="flex gap-3 text-sm leading-6 text-zinc-400">
-                    <ShieldCheck aria-hidden="true" size={16} className="mt-1 shrink-0 text-emerald-400" />
-                    {reason}
-                  </li>
+          <section className="bnb-agent-section">
+            <h2>About</h2>
+            {description ? <p>{description}</p> : <p>This agent has not added a profile description yet.</p>}
+            {visibleCapabilities.length > 0 ? (
+              <ul className="bnb-agent-capability-list">
+                {visibleCapabilities.map((capability) => (
+                  <li key={capability}>{formatCapability(capability)}</li>
                 ))}
               </ul>
-            </BnbPanel>
+            ) : null}
           </section>
 
-          <section>
-            <BnbSectionHeader eyebrow="Capabilities" title="Tasks this agent handles" />
-            <div className="flex flex-wrap gap-2">
-              {agent.capabilities.map((capability) => (
-                <span key={capability} className="bnb-chip">{capability}</span>
-              ))}
-            </div>
-          </section>
-        </section>
+          {visibleServices.length > 0 ? (
+            <section className="bnb-agent-section">
+              <h2>Services</h2>
+              <div className="bnb-agent-services-wrap">
+                <table className="bnb-agent-services">
+                  <thead>
+                    <tr>
+                      <th>Service</th>
+                      <th>Price</th>
+                      <th>Endpoint</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {visibleServices.map((service) => (
+                      <tr key={`${service.name}:${service.type}`}>
+                        <td>{formatCapability(service.name)}</td>
+                        <td>{service.price || "Not listed"}</td>
+                        <td>{service.endpoint ? "Available" : "Not listed"}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </section>
+          ) : null}
 
-        <aside className="grid content-start gap-5">
-          <BnbPanel className="p-5">
-            <h2 className="text-lg font-semibold text-white">Selection signals</h2>
-            <p className="mt-2 text-sm leading-6 text-zinc-500">
-              Based on category fit, reviews, hire readiness, recent activity, and risk checks.
-            </p>
-            <div className="mt-4">
-              <ScoreGrid score={agent.scoreBreakdown} />
-            </div>
-          </BnbPanel>
-
-          <BnbPanel className="p-5">
-            <h2 className="text-lg font-semibold text-white">Onchain identity</h2>
-            <dl className="mt-4">
+          <section className="bnb-agent-section">
+            <h2>Identity</h2>
+            <dl className="bnb-agent-identity-grid">
               <DataRow label="Network" value="BNB Smart Chain" />
-              <DataRow label="ERC-8004 ID" value={agent.tokenId} />
-              <DataRow label="Owner" value={shortAddress(agent.ownerAddress)} />
-              <DataRow label="Agent wallet" value={shortAddress(agent.agentWallet)} />
-              <DataRow label="Source" value={sourceLabel(agent)} />
+              <DataRow label="ERC-8004 ID" value={agent.sourceMetrics?.sourceAgentId || agent.tokenId} />
+              {ownerAddress ? <DataRow label="Wallet owner" value={shortAddress(ownerAddress)} copyValue={ownerAddress} /> : null}
+              {agentWallet ? <DataRow label="Agent wallet" value={shortAddress(agentWallet)} copyValue={agentWallet} /> : null}
             </dl>
-            <div className="mt-5 grid gap-3">
-              <ExternalTextLink href={`https://8004scan.io/agents/${agent.chainId}/${agent.tokenId}`}>View on 8004scan</ExternalTextLink>
-              <ExternalTextLink href={`https://bscscan.com/address/${agent.agentWallet}`}>View wallet on BscScan</ExternalTextLink>
+            <div className="bnb-agent-links">
+              <ExternalTextLink href={`https://8004scan.io/agents/${agent.chainId}/${agent.tokenId}`}>8004scan</ExternalTextLink>
+              {agentWallet ? <ExternalTextLink href={`https://bscscan.com/address/${agentWallet}`}>BscScan</ExternalTextLink> : null}
             </div>
-          </BnbPanel>
+          </section>
 
-          {canHireAgent(agent) ? (
-            <Link href={`/bnb/activate?chainId=${agent.chainId}&tokenId=${encodeURIComponent(agent.tokenId)}`} className="bnb-button bnb-focus">
-              Hire agent <ArrowRight aria-hidden="true" size={16} />
-            </Link>
-          ) : (
-            <Link href={`/bnb/match?intent=${encodeURIComponent(`Contact ${agent.name}`)}`} className="bnb-button bnb-focus">
-              Request access <ArrowRight aria-hidden="true" size={16} />
-            </Link>
-          )}
+          {hasReviews ? (
+            <section className="bnb-agent-section">
+              <h2>Feedback</h2>
+              <dl className="bnb-agent-identity-grid">
+                <DataRow label="Feedback" value={reviewLabel(agent)} />
+                <DataRow label="Positive" value={positiveFeedbackLabel(agent)} />
+                <DataRow label="Last active" value={freshnessLabel(agent.lastActivity)} />
+              </dl>
+              {agent.feedback.summary ? <p>{agent.feedback.summary}</p> : null}
+            </section>
+          ) : null}
+
+          {(protocols.length > 0 || agent.x402Support || visibleServices.length > 0) ? (
+            <details className="bnb-agent-section bnb-agent-technical-details">
+              <summary>Technical details</summary>
+              <dl className="bnb-agent-identity-grid">
+                {protocols.length > 0 ? <DataRow label="Protocols" value={protocols.join(", ")} /> : null}
+                <DataRow label="x402" value={agent.x402Support ? "Supported" : "Not listed"} />
+                {visibleServices.length > 0 ? <DataRow label="Endpoint" value={visibleServices.some((service) => service.endpoint) ? "Available" : "Not listed"} /> : null}
+              </dl>
+            </details>
+          ) : null}
+        </main>
+
+        <aside className="bnb-agent-action-col">
+          <section className="bnb-agent-action-card">
+            <div>
+              <span>{canHire ? "Available" : "Request required"}</span>
+              <h2>{canHire ? "Hire this agent" : "Request access"}</h2>
+              <p>
+                {canHire
+                  ? "Set the work, budget, and time limit before the agent starts."
+                  : "Send the job details and track the request from your account."}
+              </p>
+            </div>
+
+            {canHire ? (
+              <Link href={`/bnb/activate?chainId=${agent.chainId}&tokenId=${encodeURIComponent(agent.tokenId)}`} className="bnb-button bnb-focus">
+                Hire agent <ArrowRight aria-hidden="true" size={16} />
+              </Link>
+            ) : (
+              <RequestAccessDialog agent={agent} />
+            )}
+
+            <ProfileCompareAction agent={agent} />
+          </section>
         </aside>
       </BnbContainer>
     </BnbShell>
   );
 }
 
-function DataRow({ label, value }: { label: string; value: string }) {
+function DataRow({ label, value, copyValue }: { label: string; value: string; copyValue?: string }) {
   return (
     <div className="bnb-data-row">
       <dt>{label}</dt>
-      <dd className="max-w-[65%] break-words text-right bnb-mono text-zinc-200">{value}</dd>
+      <dd className="bnb-data-value">
+        <span>{value}</span>
+        {copyValue ? <CopyValueButton value={copyValue} label={label.toLowerCase()} /> : null}
+      </dd>
     </div>
   );
 }
 
 function positiveFeedbackLabel(agent: BnbAgentProfile) {
-  if (agent.feedback.count <= 0) return "No reviews yet";
   return `${agent.feedback.positive} of ${agent.feedback.count}`;
+}
+
+function hasUsableService(service: BnbAgentService) {
+  return Boolean(service.price || service.endpoint);
+}
+
+function isSpecificCapability(capability: string) {
+  const normalized = capability.trim().toLowerCase();
+  if (!normalized) return false;
+  return !["web", "api", "http", "https", "unknown"].includes(normalized);
+}
+
+function protocolSummary(agent: BnbAgentProfile) {
+  const protocols = [
+    ...(agent.sourceMetrics?.supportedProtocols || []),
+    ...(agent.a2aSupport ? ["A2A"] : []),
+    ...(agent.mcpSupport ? ["MCP"] : []),
+    ...(agent.erc8183Support ? ["ERC-8183"] : []),
+  ];
+
+  return Array.from(new Set(protocols.map(formatProtocol).filter(Boolean)));
+}
+
+function formatProtocol(value: string) {
+  const normalized = value.trim();
+  if (!normalized) return "";
+  const lower = normalized.toLowerCase();
+  if (lower === "a2a") return "A2A";
+  if (lower === "mcp") return "MCP";
+  if (lower === "x402") return "x402";
+  if (lower.includes("8183")) return "ERC-8183";
+  return normalized;
+}
+
+function formatCapability(value: string) {
+  return value
+    .replace(/[-_]+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim()
+    .replace(/\b\w/g, (letter) => letter.toUpperCase());
 }

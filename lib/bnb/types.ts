@@ -57,6 +57,19 @@ export type BnbAgentProfile = {
     stale: boolean;
     note: string;
   };
+  sourceMetrics?: {
+    sourceAgentId?: string;
+    verified?: boolean;
+    starCount?: number;
+    rank?: number;
+    networkRank?: number;
+    healthScore?: number;
+    totalScore?: number;
+    averageScore?: number;
+    createdAt?: string;
+    updatedAt?: string;
+    supportedProtocols?: string[];
+  };
 };
 
 export type BnbAgentQuery = {
@@ -179,6 +192,25 @@ export type BnbActivationRecord = {
   storage?: BnbRecordStorage;
 };
 
+export type BnbAccessRequestRecord = {
+  recordType: "access_request";
+  recordId: string;
+  receiptId: string;
+  status: "requested" | "cancelled" | "converted_to_hire";
+  createdAt: string;
+  updatedAt: string;
+  clientAddress?: string;
+  agent: Pick<BnbAgentProfile, "chainId" | "tokenId" | "name" | "activationStatus" | "agentWallet">;
+  task: string;
+  budget?: string;
+  deadline?: string;
+  contactPreference?: string;
+  cancelReason?: string;
+  cancelledAt?: string;
+  convertedActivationRecordId?: string;
+  storage?: BnbRecordStorage;
+};
+
 export type BnbTermixComparisonRecord = {
   recordType: "comparison";
   recordId: string;
@@ -242,6 +274,7 @@ export type BnbAltanaSessionRecord = {
 
 export type BnbRecordsSnapshot = {
   activations: BnbActivationRecord[];
+  accessRequests: BnbAccessRequestRecord[];
   termixComparisons: BnbTermixComparisonRecord[];
   altanaSessions: BnbAltanaSessionRecord[];
   storage: "database" | "process";
