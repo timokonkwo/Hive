@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { authenticateClient } from "@/lib/client-auth";
+import { getBnbAgent } from "@/lib/bnb/catalog";
+import { runBnbAgentAdapter } from "@/lib/bnb/adapters/registry";
 import { runBnbAgentWork } from "@/lib/bnb/agent-runner";
 import { enforceBnbRateLimit } from "@/lib/bnb/rate-limit";
 import { BnbStorageError, getBnbActivationRecord, updateBnbActivationRecord } from "@/lib/bnb/records";
@@ -69,8 +71,10 @@ export async function POST(request: NextRequest) {
     });
 
     try {
-      const workerResult = hasBnbAgentWorker() ? await runBnbAgentWorkOnWorker(record) : null;
-      const work = workerResult ? workerResult.work : await runBnbAgentWork(record);
+      const agent = await getBnbAgent(record.agent.chainId, record.agent.tokenId);
+      const adapterWork = agent ? await runBnbAgentAdapter(agent, record) : null;
+      const workerResult = adapterWork ? null : hasBnbAgentWorker() ? await runBnbAgentWorkOnWorker(record) : null;
+      const work = adapterWork || (workerResult ? workerResult.work : await runBnbAgentWork(record));
       const isComplete = work.status === "completed";
       const updated = await updateBnbActivationRecord({
         recordId,

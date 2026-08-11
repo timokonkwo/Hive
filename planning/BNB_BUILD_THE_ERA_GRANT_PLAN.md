@@ -743,6 +743,7 @@ This section tracks implementation progress on the `bnb` branch. Mark units comp
 | Phase 11: Stateful access requests and runtime gates | Complete | Added owner-scoped access request records, `/api/bnb/access-request`, profile/activate request forms, receipt visibility, request cancellation, stricter callable-only hire routing, and shared runtime readiness checks. |
 | Phase 12: Retry safety and verification hardening | Complete | Added hire-run idempotency, escrow settlement guards, Altana session readiness gating, BNB product regression tests, targeted security scans, and contract test verification. |
 | Phase 13: Product flow repair and UI cleanup | Complete | Wired Privy auth to Wagmi through `@privy-io/wagmi`, added wallet management to hire/settlement/session actions, aligned agent directory rows, removed unsupported profile fields and filler copy, made endpoint-less live indexed agents request-only, and verified the current build. |
+| Phase 14: Execution adapters and network-scale discovery | Complete | Added execution states, current-page 8004scan detail hydration, source-backed pagination beyond the first 100 agents, stable category navigation without sampled counts, MCP and A2A adapter preflight/run paths, SSRF-safe endpoint fetching, server-side hire revalidation, and adapter-backed job execution. |
 
 Latest verification:
 
@@ -768,6 +769,8 @@ Latest verification:
 - Targeted BNB security scans confirmed user-facing BNB writes use Privy auth, rate limits, and `client.userId` ownership. The only BNB route that accepts `clientAddress` from a body is the worker callback, and it is gated by `BNB_AGENT_WORKER_CALLBACK_SECRET`.
 - Built-server smoke checks returned HTTP 200 for `/bnb`, `/bnb/agents`, and `/bnb/report`; `/api/bnb/runtime` returned ready BNB storage/chain/session actions; unauthenticated BNB write APIs returned 401; `/api/bnb/agents?limit=2` returned live 8004scan BSC agents after the slow sorted-query fallback was removed.
 - `npm test` passed with 56 tests after Phase 13.
+- `npm test` passed with 62 tests after Phase 14, including execution-state, source pagination, endpoint hydration, MCP/A2A adapter, and SSRF-safe fetch regressions.
+- `npm run typecheck`, `npm run lint -- --quiet`, and `npm run build` passed after Phase 14. The build still shows existing non-fatal warnings for MetaMask SDK optional React Native storage, bigint pure-JS fallback, and local sitemap MongoDB SRV refusal.
 - `npm run typecheck`, focused BNB ESLint, `git diff --check`, and `npm run build` passed after Phase 13. The build still shows the existing non-fatal MetaMask SDK optional dependency warning and local sitemap MongoDB SRV refusal.
 - Built-server smoke checks on port 3001 returned HTTP 200 for `/bnb/agents` and `/api/bnb/agents?limit=5`. The live agents API now marks indexed agents with no callable endpoint as `request`, preventing dead hire CTAs.
 - Rendered `/bnb/agents` HTML was scanned after Phase 13 and did not contain the removed placeholder/profile-copy strings: `Marketplace signals`, `Why Hive ranks`, `Price on request`, `No reviews yet`, `Data from 8004scan`, `Hive score`, `feedback records`, `BNB Agent Studio`, or `Top reviewed agents`.
@@ -932,6 +935,49 @@ Definition of done:
 - Altana appears as a permission and revocation flow, not as a generic partner card.
 - TermiX appears through measured agent advantage, not as a fake integration.
 - 8004scan remains the trust source for identity and reputation data, not the product users feel they are using directly.
+
+## 18.8 Live Agent Ranking Repair
+
+Status: Complete.
+
+The marketplace must rank real BSC agents from the live source before local fallback agents. Hive should not show a random first page of registrations and call it recommended.
+
+### Source Ingestion
+
+- Use 8004scan as the primary BSC source when `BNB_8004SCAN_LIVE=true`.
+- Send API keys with the documented `X-API-Key` header.
+- Merge several live source slices:
+  - `sortBy=total_score&sortOrder=desc`
+  - `sortBy=stars&sortOrder=desc`
+  - `sortBy=created_at&sortOrder=desc`
+  - semantic `/agents/search` when the user enters a query.
+- Keep configured Hive agents as an override/fallback, not as the default replacement for live data.
+- Deduplicate by `chainId:tokenId`.
+
+### Ranking Model
+
+Default ranking should be:
+
+1. BSC mainnet eligibility.
+2. Category and task relevance.
+3. Reviews and average score.
+4. 8004scan total score and stars.
+5. Callable/protocol readiness.
+6. Recent activity.
+7. Profile completeness.
+
+For searches, relevance must outrank popularity. For the homepage, reputation and source score should lead so clear, reviewed agents appear first.
+
+### Completion Tracker
+
+| Unit | Status | Notes |
+|:--|:--|:--|
+| Fix 8004scan API key header | Complete | Replaced Bearer auth with documented `X-API-Key`. |
+| Fetch ranked live source slices | Complete | Merges score, stars, newest, list-search, and semantic-search responses. |
+| Normalize review/source metrics | Complete | Preserves feedback count, average score, star count, health score, source score, and updated time. |
+| Replace recommendation scoring | Complete | Uses relevance, reputation, source score, readiness, freshness, and completeness. |
+| Apply ranking to home and directory | Complete | Homepage uses clear top agents; directory uses recommended by default and shows network-scale context. |
+| Add regression tests | Complete | Locks API params, ranking weights, source fields, and fallback behavior. |
 
 ## 18. Developer Guardrails: Tone, Design, and Writing Rules
 

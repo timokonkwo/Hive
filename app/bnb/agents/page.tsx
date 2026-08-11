@@ -1,6 +1,7 @@
-import { formatBnbAgentCount, getBnbAgentNetworkStats, getBnbCategories, listBnbAgents } from "@/lib/bnb/catalog";
-import { BnbContainer, BnbHero, BnbShell } from "@/app/bnb/_components/BnbUi";
-import type { BnbActivationStatus, BnbAgentCategory, BnbAgentProfile } from "@/lib/bnb/types";
+import { formatBnbAgentCount, getBnbCategories, listBnbAgentsPage } from "@/lib/bnb/catalog";
+import { BnbContainer, BnbPageHeader, BnbShell } from "@/app/bnb/_components/BnbUi";
+import type { BnbAgentCategory, BnbAgentProfile, BnbExecutionStatus } from "@/lib/bnb/types";
+import { bnbCategoryLabel } from "@/lib/bnb/display";
 import { AgentsDirectory } from "./AgentsDirectory";
 
 type SearchParams = Promise<Record<string, string | string[] | undefined>>;
@@ -11,23 +12,22 @@ function paramValue(value: string | string[] | undefined) {
   return Array.isArray(value) ? value[0] : value;
 }
 
-function normalizePage(value: string | undefined, pageCount: number) {
+function normalizePage(value: string | undefined) {
   const page = Number(value || 1);
   if (!Number.isFinite(page)) return 1;
-  return Math.min(Math.max(Math.trunc(page), 1), Math.max(1, pageCount));
+  return Math.max(Math.trunc(page), 1);
 }
 
 function normalizeStatus(value: string | undefined): string {
-  if (value === "callable") return "available";
-  if (value === "discoverable") return "unavailable";
-  if (value === "available" || value === "request" || value === "unavailable") return value;
+  if (value === "callable" || value === "available") return "ready_to_run";
+  if (value === "request") return "connectable";
+  if (value === "discoverable") return "listed_only";
+  if (value === "ready_to_run" || value === "connectable" || value === "listed_only" || value === "unavailable") return value;
   return "";
 }
 
-function activationFromStatus(value: string): BnbActivationStatus | null {
-  if (value === "available") return "callable";
-  if (value === "request") return "request";
-  if (value === "unavailable") return "discoverable";
+function executionFromStatus(value: string): BnbExecutionStatus | null {
+  if (value === "ready_to_run" || value === "connectable" || value === "listed_only" || value === "unavailable") return value;
   return null;
 }
 
@@ -48,7 +48,7 @@ function sortForCatalog(value: string) {
 }
 
 function categoryLabel(category: BnbAgentCategory) {
-  return category === "Health Factor Monitoring" ? "Health Factor" : category;
+  return bnbCategoryLabel(category);
 }
 
 function supportsIntegration(agent: BnbAgentProfile, integration?: string | null) {
@@ -73,44 +73,37 @@ export default async function BnbAgentsPage({ searchParams }: { searchParams: Se
   const integration = paramValue(params.integration) || "";
   const categories = getBnbCategories();
   const category = categories.includes(requestedCategory as BnbAgentCategory) ? requestedCategory : "";
-  const activation = activationFromStatus(status);
+  const execution = executionFromStatus(status);
   const catalogSort = sortForCatalog(sort);
   const pageSize = 24;
-  const [listedAgents, networkStats] = await Promise.all([
-    listBnbAgents({
-      q,
-      sort: catalogSort,
-      activation,
-      limit: 100,
-    }),
-    getBnbAgentNetworkStats(),
-  ]);
-  const baseAgents = listedAgents.filter((agent) => supportsIntegration(agent, integration));
+  const page = normalizePage(paramValue(params.page));
+  const result = await listBnbAgentsPage({
+    q,
+    category,
+    sort: catalogSort,
+    execution,
+    limit: pageSize,
+    page,
+  });
+  const networkTotal = result.total || 0;
+  const baseAgents = result.agents.filter((agent) => supportsIntegration(agent, integration));
   const categoryCounts = categories.map((item) => ({
     category: item,
     label: categoryLabel(item),
-    count: baseAgents.filter((agent) => agent.category === item).length,
   }));
-  const filteredAgents = category
-    ? baseAgents.filter((agent) => agent.category === category)
-    : baseAgents;
-  const pageCount = Math.max(1, Math.ceil(filteredAgents.length / pageSize));
-  const page = normalizePage(paramValue(params.page), pageCount);
-  const agents = filteredAgents.slice((page - 1) * pageSize, page * pageSize);
-  const bscAgentCount = formatBnbAgentCount(networkStats.totalAgents);
+  const agents = baseAgents;
   const hasFilters = Boolean(q || category || status || integration || sort !== "recommended");
   const resultLabel = q
-    ? `${filteredAgents.length} agent${filteredAgents.length === 1 ? "" : "s"} for "${q}"`
+    ? `${formatBnbAgentCount(networkTotal)} BSC agents for "${q}"`
     : hasFilters
-      ? `${filteredAgents.length} agent${filteredAgents.length === 1 ? "" : "s"} match your filters`
-      : `${filteredAgents.length} agents shown`;
+      ? `${formatBnbAgentCount(networkTotal)} BSC agents`
+      : `${formatBnbAgentCount(networkTotal)} BSC agents`;
 
   return (
     <BnbShell active="agents">
-      <BnbHero
+      <BnbPageHeader
         title="Agents"
-        body={`Browse agents by capability, availability, and track record. ${bscAgentCount} registered on BSC.`}
-        kicker={null}
+        body="Search agents by capability and availability."
       />
 
       <BnbContainer className="bnb-section">
@@ -121,7 +114,8 @@ export default async function BnbAgentsPage({ searchParams }: { searchParams: Se
           resultLabel={resultLabel}
           page={page}
           pageSize={pageSize}
-          totalAgents={filteredAgents.length}
+          totalAgents={networkTotal}
+          hasMore={result.hasMore}
         />
       </BnbContainer>
     </BnbShell>

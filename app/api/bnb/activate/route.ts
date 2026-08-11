@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { authenticateClient } from "@/lib/client-auth";
 import { getBnbAgent } from "@/lib/bnb/catalog";
+import { hasRunnableBnbAdapter } from "@/lib/bnb/adapters/registry";
 import { buildBnbEscrowPaymentRequest, isNativeBnbBudget } from "@/lib/bnb/escrow";
 import { enforceBnbRateLimit } from "@/lib/bnb/rate-limit";
 import { BnbStorageError, createBnbActivationRecord } from "@/lib/bnb/records";
@@ -31,9 +32,16 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "chainId and tokenId are required" }, { status: 400 });
   }
 
-  const agent = await getBnbAgent(chainId, tokenId);
+  let agent = await getBnbAgent(chainId, tokenId);
   if (!agent) {
     return NextResponse.json({ error: "BNB agent not found" }, { status: 404 });
+  }
+
+  if (agent.executionStatus === "connectable") {
+    const runnable = await hasRunnableBnbAdapter(agent);
+    if (runnable) {
+      agent = { ...agent, executionStatus: "ready_to_run", activationStatus: "callable" };
+    }
   }
 
   const hireBlocker = getBnbHireBlocker(agent);

@@ -1,8 +1,8 @@
 import { notFound } from "next/navigation";
 import { getBnbAgent } from "@/lib/bnb/catalog";
 import { canHireBnbAgent } from "@/lib/bnb/runtime";
-import { BnbContainer, BnbHero, BnbPanel, BnbShell, CategoryChip, StatusBadge } from "@/app/bnb/_components/BnbUi";
-import { RequestAccessForm } from "@/app/bnb/_components/RequestAccessForm";
+import { BnbContainer, BnbPageHeader, BnbPanel, BnbShell, CategoryChip, StatusBadge } from "@/app/bnb/_components/BnbUi";
+import { bnbAgentDisplayName, bnbListingDescription } from "@/lib/bnb/display";
 import { ActivationForm } from "./ActivationForm";
 
 type SearchParams = Promise<Record<string, string | string[] | undefined>>;
@@ -20,19 +20,25 @@ export default async function BnbActivatePage({ searchParams }: { searchParams: 
   const agent = await getBnbAgent(chainId, tokenId);
   if (!agent) notFound();
   const canHire = canHireBnbAgent(agent);
+  const canCheckAndHire = canHire || agent.executionStatus === "connectable";
+  const agentName = bnbAgentDisplayName(agent);
+  const description = bnbListingDescription(agent);
 
   return (
     <BnbShell>
-      <BnbHero
-        title={canHire ? `Hire ${agent.name}` : `Request access to ${agent.name}`}
-        body={canHire ? "Set the task, spend cap, and expiry before the agent starts work." : "Send the work details and keep the request in Activity."}
+      <BnbPageHeader
+        title={canCheckAndHire ? `Hire ${agentName}` : agentName}
+        body={canCheckAndHire ? "Set the task, budget, and time limit before work starts." : "This agent is listed onchain, but Hive cannot run it yet."}
       />
       <BnbContainer className="bnb-section grid gap-8 lg:grid-cols-[1fr_320px]">
-        {canHire ? (
+        {canCheckAndHire ? (
           <ActivationForm agent={agent} />
         ) : (
           <BnbPanel className="p-5">
-            <RequestAccessForm agent={agent} />
+            <h2 className="text-xl font-semibold text-white">Not runnable through Hive</h2>
+            <p className="mt-3 text-sm leading-6 text-zinc-400">
+              Hive can show this agent&apos;s identity and profile, but no supported execution endpoint is available.
+            </p>
           </BnbPanel>
         )}
 
@@ -42,11 +48,11 @@ export default async function BnbActivatePage({ searchParams }: { searchParams: 
               <CategoryChip category={agent.category} />
               <StatusBadge agent={agent} />
             </div>
-            <h2 className="mt-5 text-xl font-semibold text-white">{agent.name}</h2>
-            <p className="mt-2 text-sm leading-6 text-zinc-400">{agent.description}</p>
-            {canHire ? (
+            <h2 className="mt-5 text-xl font-semibold text-white">{agentName}</h2>
+            {description ? <p className="mt-2 text-sm leading-6 text-zinc-400">{description}</p> : null}
+            {canCheckAndHire ? (
               <div className="bnb-warning mt-5 p-4 text-sm leading-6">
-                Wallet confirmation is required before any paid work. The hire record keeps the task, cap, and expiry.
+                Wallet confirmation is required before paid work starts.
               </div>
             ) : null}
           </BnbPanel>

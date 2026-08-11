@@ -1,24 +1,21 @@
 import Link from "next/link";
 import {
   ArrowRight,
-  BadgeCheck,
   BellRing,
-  FileText,
   Grid3X3,
   RefreshCcw,
   Search,
-  ShieldCheck,
   TrendingUp,
-  WalletCards,
   type LucideIcon,
 } from "lucide-react";
-import { formatBnbAgentCount, getBnbAgentNetworkStats, getBnbCategories, listBnbAgents } from "@/lib/bnb/catalog";
+import { getBnbCategories, listBnbAgents } from "@/lib/bnb/catalog";
 import {
   AgentCard,
   BnbContainer,
   BnbPanel,
   BnbShell,
 } from "@/app/bnb/_components/BnbUi";
+import { bnbCategoryLabel, bnbListingDescription } from "@/lib/bnb/display";
 import type { BnbAgentCategory, BnbAgentProfile } from "@/lib/bnb/types";
 
 export const dynamic = "force-dynamic";
@@ -47,16 +44,12 @@ const categoryDetails: Record<BnbAgentCategory, { title: string; body: string; i
 };
 
 export default async function BnbHomePage() {
-  const [agents, networkStats] = await Promise.all([
-    listBnbAgents({ limit: 100, sort: "reviews" }),
-    getBnbAgentNetworkStats(),
-  ]);
+  const agents = await listBnbAgents({ limit: 100, sort: "reviews" });
   const categories = getBnbCategories();
   const reviewedAgents = agents.filter((agent) => agent.feedback.count > 0);
   const recommendedAgents = (reviewedAgents.length >= 3 ? reviewedAgents : agents)
     .filter(isClearRecommendation)
     .slice(0, 6);
-  const bscAgentCount = formatBnbAgentCount(networkStats.totalAgents);
 
   return (
     <BnbShell active="home">
@@ -64,43 +57,32 @@ export default async function BnbHomePage() {
         <section className="bnb-home-hero">
           <div className="bnb-home-copy">
             <div className="bnb-kicker bnb-kicker-neutral">BNB Agent Marketplace</div>
-            <h1 className="bnb-title">Find the right agent for the job</h1>
-            <p className="bnb-body">
-              Browse agents built for BNB Chain. Compare what they do, what they charge, how recently they were active, and how they are registered onchain.
-            </p>
-            <div className="bnb-market-facts" aria-label="BNB agent marketplace coverage">
-              <span>{bscAgentCount} registered on BSC</span>
-            </div>
+            <h1 className="bnb-title">What do you need an agent to do?</h1>
+            <p className="bnb-body">Find and hire agents registered on BNB Chain.</p>
           </div>
 
           <form action="/bnb/match" className="bnb-task-composer">
             <label className="bnb-task-field">
-              <span>What do you need help with?</span>
+              <span>Describe the job</span>
               <div className="bnb-task-input-row">
                 <Search aria-hidden="true" size={18} />
                 <input
                   name="intent"
                   type="search"
-                  placeholder="Describe the task or strategy"
+                  placeholder="Describe a task, strategy, position, or goal"
                   autoComplete="off"
                   className="bnb-task-input"
                 />
               </div>
             </label>
             <button type="submit" className="bnb-button bnb-focus">
-              Search agents
+              Find agents
             </button>
           </form>
         </section>
 
-        <section className="bnb-section-tight">
-          <div className="bnb-section-header">
-            <div>
-              <h2 className="bnb-heading">Browse by task</h2>
-              <p className="bnb-copy">Choose a category to see relevant agents.</p>
-            </div>
-          </div>
-          <div className="bnb-category-grid">
+        <section className="bnb-home-categories" aria-label="Browse by task">
+          <div className="bnb-category-strip">
             {categories.map((category) => (
               <CategoryCard
                 key={category}
@@ -114,7 +96,7 @@ export default async function BnbHomePage() {
           <div className="bnb-list-head">
             <div>
               <h2>Recommended agents</h2>
-              <p>Agents with useful public details.</p>
+              <p>Review current agents with clear activity, pricing, or feedback.</p>
             </div>
             <Link href="/bnb/agents" className="bnb-text-action bnb-focus">
               View all agents <ArrowRight aria-hidden="true" size={14} />
@@ -128,47 +110,11 @@ export default async function BnbHomePage() {
               ))
             ) : (
               <div className="bnb-empty-state">
-                <ShieldCheck aria-hidden="true" size={28} />
                 <h2>Open the agent directory</h2>
-                <p>Search the full BNB agent index by task, capability, availability, and activity.</p>
+                <p>Search by task, capability, availability, and activity.</p>
                 <Link href="/bnb/agents" className="bnb-button-dark bnb-focus">Browse agents</Link>
               </div>
             )}
-          </BnbPanel>
-        </section>
-
-        <section className="bnb-section-tight bnb-grid bnb-grid-3">
-          <InfoCard
-            icon={Search}
-            title="Find an agent"
-            body="Search by task, category, capability, or agent name."
-          />
-          <InfoCard
-            icon={WalletCards}
-            title="Set the job terms"
-            body="Define the work, budget, time limit, and permissions before the agent starts."
-          />
-          <InfoCard
-            icon={FileText}
-            title="Review the result"
-            body="Hive keeps the hire record, payment details, agent output, and final status in one place."
-          />
-        </section>
-
-        <section className="bnb-section-tight">
-          <BnbPanel className="bnb-ecosystem-panel">
-            <div>
-              <h2 className="bnb-heading">Connected to the BNB ecosystem</h2>
-              <p className="bnb-copy">
-                Hive brings agent identity, trading tools, wallet permissions, and work history into the hiring flow.
-              </p>
-            </div>
-            <div className="bnb-capability-grid">
-              <Capability title="PancakeSwap" body="Find agents that work with pools, farms, liquidity positions, swaps, and routing." />
-              <Capability title="Altana" body="Give agents scoped wallet permissions with spending limits and expiry controls." />
-              <Capability title="8004scan" body="Check ERC-8004 registration, identity, and activity data." />
-              <Capability title="Agent performance" body="Review time, cost, and completed work when that information is available from past hires." />
-            </div>
           </BnbPanel>
         </section>
       </BnbContainer>
@@ -177,13 +123,10 @@ export default async function BnbHomePage() {
 }
 
 function isClearRecommendation(agent: BnbAgentProfile) {
-  const description = agent.description.trim().toLowerCase();
-  if (!agent.name || agent.name === `Agent #${agent.tokenId}`) return false;
+  const description = bnbListingDescription(agent).toLowerCase();
   if (!description) return false;
   if (description.includes("limited data available")) return false;
   if (description.includes("placeholder") || description.includes("mock account")) return false;
-  if (description === "erc-8004 bsc agent indexed through 8004scan.") return false;
-  if (/^[\w.-]+\.agent on termix platform$/i.test(agent.description.trim())) return false;
   return true;
 }
 
@@ -197,32 +140,10 @@ function CategoryCard({ category }: { category: BnbAgentCategory }) {
         <Icon aria-hidden="true" size={18} />
       </span>
       <span>
-        <strong>{detail.title}</strong>
+        <strong>{bnbCategoryLabel(category)}</strong>
         <span>{detail.body}</span>
       </span>
-      <em>Browse agents <ArrowRight aria-hidden="true" size={13} /></em>
+      <em>Browse <ArrowRight aria-hidden="true" size={13} /></em>
     </Link>
-  );
-}
-
-function InfoCard({ icon: Icon, title, body }: { icon: LucideIcon; title: string; body: string }) {
-  return (
-    <BnbPanel className="bnb-info-card">
-      <Icon aria-hidden="true" size={18} />
-      <h3>{title}</h3>
-      <p>{body}</p>
-    </BnbPanel>
-  );
-}
-
-function Capability({ title, body }: { title: string; body: string }) {
-  return (
-    <div className="bnb-capability">
-      <BadgeCheck aria-hidden="true" size={16} />
-      <div>
-        <strong>{title}</strong>
-        <span>{body}</span>
-      </div>
-    </div>
   );
 }

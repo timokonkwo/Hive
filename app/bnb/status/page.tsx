@@ -7,16 +7,16 @@ import { canHireBnbAgent } from "@/lib/bnb/runtime";
 import { CopyValueButton } from "@/app/bnb/_components/CopyValueButton";
 import {
   BnbContainer,
-  BnbHero,
+  BnbPageHeader,
   BnbPanel,
   BnbShell,
   CategoryChip,
   ExternalTextLink,
   StatusBadge,
   freshnessLabel,
-  listingDescription,
   shortAddress,
 } from "@/app/bnb/_components/BnbUi";
+import { bnbAgentDisplayName, bnbListingDescription } from "@/lib/bnb/display";
 
 export const dynamic = "force-dynamic";
 
@@ -42,24 +42,23 @@ export default async function BnbStatusPage({ searchParams }: { searchParams: Se
 
   return (
     <BnbShell active="verify">
-      <BnbHero
+      <BnbPageHeader
         title="Verify an agent"
-        body="Check a BNB Chain identity and activity before you hire."
-        kicker="Trust check"
+        body="Check an agent's onchain identity before you hire."
       />
 
-      <BnbContainer className="bnb-section grid gap-8 lg:grid-cols-[minmax(0,1fr)_360px]">
+      <BnbContainer className="bnb-section bnb-verify-layout">
         <section>
           <form action="/bnb/status" className="bnb-composer">
             <label className="block">
-              <span className="bnb-label">Agent or BNB address</span>
+              <span className="bnb-label">Agent name or BNB address</span>
               <input
                 name="address"
                 defaultValue={address}
                 type="text"
                 autoComplete="off"
                 spellCheck={false}
-                placeholder="0x..."
+                placeholder="Agent name, token ID, or 0x..."
                 className="bnb-input"
               />
             </label>
@@ -75,7 +74,7 @@ export default async function BnbStatusPage({ searchParams }: { searchParams: Se
             <BnbPanel className="mt-8 p-5">
               <div className="flex flex-wrap items-start justify-between gap-3">
                 <div>
-                  <h2 className="text-xl font-semibold text-white">Status result</h2>
+                  <h2 className="text-xl font-semibold text-white">Address</h2>
                   <p className="mt-2 break-all bnb-mono text-zinc-500">{summary.address}</p>
                 </div>
                 <span className={`bnb-chip ${summary.valid && !summary.error ? "bnb-chip-active" : ""}`}>
@@ -104,9 +103,9 @@ export default async function BnbStatusPage({ searchParams }: { searchParams: Se
                 <CategoryChip category={matchedAgent.category} />
                 <StatusBadge agent={matchedAgent} />
               </div>
-              <h2 className="mt-4 text-xl font-semibold text-white">{matchedAgent.name}</h2>
-              {listingDescription(matchedAgent) ? (
-                <p className="mt-2 text-sm leading-6 text-zinc-400">{listingDescription(matchedAgent)}</p>
+              <h2 className="mt-4 text-xl font-semibold text-white">{bnbAgentDisplayName(matchedAgent)}</h2>
+              {bnbListingDescription(matchedAgent) ? (
+                <p className="mt-2 text-sm leading-6 text-zinc-400">{bnbListingDescription(matchedAgent)}</p>
               ) : null}
               <dl className="mt-5">
                 <DataRow label="ERC-8004 ID" value={matchedAgent.tokenId} />
@@ -123,25 +122,12 @@ export default async function BnbStatusPage({ searchParams }: { searchParams: Se
                 {canHireBnbAgent(matchedAgent) ? (
                   <Link href={`/bnb/activate?chainId=${matchedAgent.chainId}&tokenId=${encodeURIComponent(matchedAgent.tokenId)}`} className="bnb-button bnb-focus">Hire agent</Link>
                 ) : (
-                  <Link href={`/bnb/agents/${matchedAgent.chainId}/${encodeURIComponent(matchedAgent.tokenId)}#request-access`} className="bnb-button bnb-focus">Request access</Link>
+                  <Link href={`/bnb/agents/${matchedAgent.chainId}/${encodeURIComponent(matchedAgent.tokenId)}#request-access`} className="bnb-button bnb-focus">Request this agent</Link>
                 )}
               </div>
             </BnbPanel>
           ) : null}
         </section>
-
-        <aside className="content-start">
-          <BnbPanel className="p-5">
-            <div className="bnb-eyebrow">What gets checked</div>
-            <h2 className="text-xl font-semibold text-white">Identity and activity</h2>
-            <p className="mt-3 text-sm leading-6 text-zinc-400">
-              Hive checks BNB address validity, account type, balance, transaction activity, and any matching marketplace agent record.
-            </p>
-            <div className="bnb-warning mt-5 p-4 text-sm leading-6">
-              Unavailable data is not the same as unsafe data. Use the result as a starting point before hiring.
-            </div>
-          </BnbPanel>
-        </aside>
       </BnbContainer>
     </BnbShell>
   );

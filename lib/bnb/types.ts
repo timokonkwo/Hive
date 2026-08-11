@@ -9,9 +9,19 @@ export type BnbAgentCategory = (typeof BNB_AGENT_CATEGORIES)[number];
 
 export type BnbActivationStatus = "callable" | "request" | "discoverable";
 
+export type BnbExecutionStatus = "ready_to_run" | "connectable" | "listed_only" | "unavailable";
+
+export type BnbExecutionEndpoint = {
+  adapter: "mcp" | "a2a" | "x402" | "http" | "web";
+  url: string;
+  label: string;
+  verified: boolean;
+  source: "8004scan" | "metadata" | "configured" | "local";
+};
+
 export type BnbAgentService = {
   name: string;
-  type: "erc8183" | "a2a" | "mcp" | "x402" | "http" | "unknown";
+  type: "erc8183" | "a2a" | "mcp" | "x402" | "http" | "web" | "unknown";
   endpoint?: string;
   price?: string;
 };
@@ -50,6 +60,8 @@ export type BnbAgentProfile = {
   };
   lastActivity: string;
   activationStatus: BnbActivationStatus;
+  executionStatus?: BnbExecutionStatus;
+  executionEndpoints?: BnbExecutionEndpoint[];
   scoreBreakdown?: BnbScoreBreakdown;
   sourceFreshness: {
     source: "8004scan" | "configured" | "local";
@@ -76,8 +88,19 @@ export type BnbAgentQuery = {
   category?: string | null;
   q?: string | null;
   activation?: string | null;
+  execution?: string | null;
   sort?: string | null;
   limit?: number;
+  page?: number;
+};
+
+export type BnbAgentPageResult = {
+  agents: BnbAgentProfile[];
+  page: number;
+  pageSize: number;
+  total: number;
+  hasMore: boolean;
+  source: string;
 };
 
 export type BnbPartnerTrack = "TermiX" | "PancakeSwap" | "Altana";
@@ -165,7 +188,7 @@ export type BnbActivationRecord = {
   createdAt: string;
   updatedAt: string;
   clientAddress?: string;
-  agent: Pick<BnbAgentProfile, "chainId" | "tokenId" | "name" | "activationStatus" | "agentWallet">;
+  agent: Pick<BnbAgentProfile, "chainId" | "tokenId" | "name" | "activationStatus" | "executionStatus" | "agentWallet">;
   limits: {
     task: string;
     budget: string;
@@ -200,7 +223,7 @@ export type BnbAccessRequestRecord = {
   createdAt: string;
   updatedAt: string;
   clientAddress?: string;
-  agent: Pick<BnbAgentProfile, "chainId" | "tokenId" | "name" | "activationStatus" | "agentWallet">;
+  agent: Pick<BnbAgentProfile, "chainId" | "tokenId" | "name" | "activationStatus" | "executionStatus" | "agentWallet">;
   task: string;
   budget?: string;
   deadline?: string;

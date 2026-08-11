@@ -6,17 +6,25 @@ import {
   BadgeCheck,
   BarChart3,
   ExternalLink,
+  Github,
+  Twitter,
 } from "lucide-react";
-import { Footer } from "@/components/layout/Footer";
 import { BnbAccountButton } from "@/app/bnb/_components/BnbAccountButton";
 import type { BnbAgentCategory, BnbAgentProfile, BnbPartnerTrackSummary } from "@/lib/bnb/types";
-
-const categoryLabels: Record<BnbAgentCategory, string> = {
-  Rebalancing: "Rebalancing",
-  "Grid Trading": "Grid Trading",
-  "Yield Optimisation": "Yield Optimisation",
-  "Health Factor Monitoring": "Health Factor",
-};
+import {
+  bnbAgentDisplayName,
+  bnbAgentIntegrations,
+  bnbCanHireAgent,
+  bnbCategoryLabel,
+  bnbCategoryLabels,
+  bnbFreshnessLabel,
+  bnbHasPrice,
+  bnbIsVerified,
+  bnbListingDescription,
+  bnbPriceLabel,
+  bnbReviewLabel,
+  bnbStatusLabel,
+} from "@/lib/bnb/display";
 
 type BnbNavItem = "home" | "agents" | "verify" | "account";
 
@@ -29,21 +37,18 @@ export function BnbShell({ children, active = "home" }: { children: ReactNode; a
             <Brand />
             <nav className="bnb-nav" aria-label="Hive navigation">
               <BnbNavLink href="/bnb/agents" active={active === "agents"}>Agents</BnbNavLink>
+              <BnbNavLink href="/bnb/account" active={active === "account"}>My hires</BnbNavLink>
               <BnbNavLink href="/bnb/status" active={active === "verify"}>Verify</BnbNavLink>
             </nav>
             <div className="bnb-header-actions">
               <BnbAccountButton active={active === "account"} />
-              <Link href="/bnb/match" className="bnb-button bnb-button-secondary bnb-focus">
-                <span className="bnb-desktop-label">Hire agent</span>
-                <span className="bnb-mobile-label">Hire</span>
-              </Link>
             </div>
           </BnbContainer>
         </header>
         <div className="bnb-main">
           {children}
         </div>
-        <Footer />
+        <BnbFooter />
       </div>
     </main>
   );
@@ -51,7 +56,7 @@ export function BnbShell({ children, active = "home" }: { children: ReactNode; a
 
 function Brand({ compact = false }: { compact?: boolean }) {
   return (
-    <Link href="/" className="bnb-brand bnb-focus">
+    <Link href="/bnb" className="bnb-brand bnb-focus">
       <span className="bnb-brand-mark">
         <Image src="/images/hive-icon.svg" width={22} height={22} alt="" priority />
       </span>
@@ -104,8 +109,78 @@ export function BnbHero({
   );
 }
 
+export function BnbPageHeader({
+  title,
+  body,
+  action,
+}: {
+  title: string;
+  body?: string;
+  action?: ReactNode;
+}) {
+  return (
+    <section className="bnb-page-header">
+      <BnbContainer className="bnb-page-header-inner">
+        <div>
+          <h1>{title}</h1>
+          {body ? <p>{body}</p> : null}
+        </div>
+        {action ? <div className="bnb-page-header-action">{action}</div> : null}
+      </BnbContainer>
+    </section>
+  );
+}
+
 export function BnbPanel({ children, className = "" }: { children: ReactNode; className?: string }) {
   return <div className={`bnb-panel ${className}`}>{children}</div>;
+}
+
+function BnbFooter() {
+  return (
+    <footer className="bnb-footer">
+      <BnbContainer className="bnb-footer-inner">
+        <div className="bnb-footer-brand">
+          <Link href="/bnb" className="bnb-brand bnb-focus">
+            <span className="bnb-brand-mark">
+              <Image src="/images/hive-icon.svg" width={22} height={22} alt="" />
+            </span>
+            <span className="bnb-brand-copy">
+              <span className="bnb-brand-name">Hive</span>
+              <span className="bnb-brand-context">BNB Chain</span>
+            </span>
+          </Link>
+          <p>Find, hire, and track BNB Chain agents from one workspace.</p>
+        </div>
+
+        <nav className="bnb-footer-links" aria-label="BNB footer navigation">
+          <div>
+            <h2>Marketplace</h2>
+            <Link href="/bnb/agents" className="bnb-focus">Agents</Link>
+            <Link href="/bnb/account" className="bnb-focus">My hires</Link>
+            <Link href="/bnb/status" className="bnb-focus">Verify</Link>
+          </div>
+          <div>
+            <h2>Hive</h2>
+            <Link href="/" className="bnb-focus">Main site</Link>
+            <Link href="/docs" className="bnb-focus">Docs</Link>
+            <Link href="/feedback" className="bnb-focus">Feedback</Link>
+          </div>
+        </nav>
+
+        <div className="bnb-footer-social">
+          <a href="https://x.com/uphivexyz" target="_blank" rel="noopener noreferrer" className="bnb-icon-button bnb-focus" aria-label="Hive on X">
+            <Twitter aria-hidden="true" size={16} />
+          </a>
+          <a href="https://github.com/timokonkwo/Hive" target="_blank" rel="noopener noreferrer" className="bnb-icon-button bnb-focus" aria-label="Hive on GitHub">
+            <Github aria-hidden="true" size={16} />
+          </a>
+        </div>
+      </BnbContainer>
+      <BnbContainer className="bnb-footer-bottom">
+        <span>&copy; {new Date().getFullYear()} Hive Protocol.</span>
+      </BnbContainer>
+    </footer>
+  );
 }
 
 export function BnbSectionHeader({
@@ -132,34 +207,34 @@ export function BnbSectionHeader({
 }
 
 export function CategoryChip({ category }: { category: BnbAgentCategory }) {
-  return <span className="bnb-chip">{categoryLabels[category]}</span>;
+  return <span className="bnb-chip">{bnbCategoryLabels[category]}</span>;
 }
 
 export function StatusBadge({ agent }: { agent: BnbAgentProfile }) {
   const label = statusLabel(agent);
-  return <span className={`bnb-chip ${agent.activationStatus === "callable" ? "bnb-chip-active" : ""}`}>{label}</span>;
+  return <span className={`bnb-chip ${canHireAgent(agent) ? "bnb-chip-active" : ""}`}>{label}</span>;
 }
 
 export function AgentCard({ agent }: { agent: BnbAgentProfile }) {
   const price = priceLabel(agent);
-  const canHire = canHireAgent(agent);
   const description = listingDescription(agent);
+  const displayName = bnbAgentDisplayName(agent);
 
   return (
     <article className="bnb-agent-row">
       <div className="bnb-agent-main">
         <h3 className="bnb-agent-name">
           <Link href={`/bnb/agents/${agent.chainId}/${encodeURIComponent(agent.tokenId)}`} className="bnb-focus">
-            {agent.name}
+            {displayName}
           </Link>
-          {agent.sourceFreshness.source === "8004scan" ? (
+          {bnbIsVerified(agent) ? (
             <BadgeCheck aria-label="ERC-8004 identity verified" className="bnb-verified-mark" size={16} />
           ) : null}
         </h3>
-        <p className="bnb-agent-meta">{categoryLabels[agent.category]} · {statusLabel(agent)}</p>
+        <p className="bnb-agent-meta">{bnbCategoryLabel(agent.category)} · {statusLabel(agent)}</p>
         {description ? <p className="bnb-agent-description">{description}</p> : null}
         <div className="bnb-agent-facts">
-          <span>{freshnessLabel(agent.lastActivity)}</span>
+          {freshnessLabel(agent.lastActivity) ? <span>{freshnessLabel(agent.lastActivity)}</span> : null}
           {agent.feedback.count > 0 ? <span>{reviewLabel(agent)}</span> : null}
           {hasPrice(agent) ? <span>{price}</span> : null}
         </div>
@@ -168,15 +243,6 @@ export function AgentCard({ agent }: { agent: BnbAgentProfile }) {
         <Link href={`/bnb/agents/${agent.chainId}/${encodeURIComponent(agent.tokenId)}`} className="bnb-button-dark bnb-focus">
           View profile
         </Link>
-        {canHire ? (
-          <Link href={`/bnb/activate?chainId=${agent.chainId}&tokenId=${encodeURIComponent(agent.tokenId)}`} className="bnb-button-dark bnb-focus">
-            Hire
-          </Link>
-        ) : (
-          <Link href={`/bnb/agents/${agent.chainId}/${encodeURIComponent(agent.tokenId)}#request-access`} className="bnb-button-dark bnb-focus">
-            Request access
-          </Link>
-        )}
       </div>
     </article>
   );
@@ -222,62 +288,33 @@ export function shortAddress(address: string) {
 }
 
 export function freshnessLabel(value: string) {
-  const time = Date.parse(value);
-  if (!Number.isFinite(time)) return "Needs verification";
-  const days = Math.floor((Date.now() - time) / (24 * 60 * 60 * 1000));
-  if (days <= 0) return "Today";
-  if (days === 1) return "1 day ago";
-  return `${days} days ago`;
+  return bnbFreshnessLabel(value);
 }
 
 export function priceLabel(agent: BnbAgentProfile) {
-  return agent.services.find((service) => service.price)?.price || "";
+  return bnbPriceLabel(agent);
 }
 
 export function hasPrice(agent: BnbAgentProfile) {
-  return Boolean(agent.services.find((service) => service.price));
+  return bnbHasPrice(agent);
 }
 
 export function reviewLabel(agent: BnbAgentProfile) {
-  if (agent.feedback.count <= 0) return "";
-  if (agent.feedback.positive === agent.feedback.count) return `${agent.feedback.count} positive`;
-  return `${agent.feedback.positive} of ${agent.feedback.count} positive`;
+  return bnbReviewLabel(agent);
 }
 
 export function canHireAgent(agent: BnbAgentProfile) {
-  return agent.activationStatus === "callable" && /^0x[a-fA-F0-9]{40}$/.test(agent.agentWallet);
+  return bnbCanHireAgent(agent);
 }
 
 export function statusLabel(agent: BnbAgentProfile) {
-  if (agent.activationStatus === "callable") return "Available";
-  if (agent.activationStatus === "request") return "Request access";
-  return "Unavailable";
+  return bnbStatusLabel(agent);
 }
 
 export function listingDescription(agent: BnbAgentProfile) {
-  const description = agent.description.trim();
-  const generatedFallbacks = [
-    "ERC-8004 BSC agent indexed through 8004scan.",
-    "Configured BSC agent.",
-  ];
-
-  if (generatedFallbacks.includes(description)) return "";
-  if (/^[\w.-]+\.agent on TermiX Platform$/i.test(description)) return "";
-  return description;
+  return bnbListingDescription(agent);
 }
 
 export function getAgentIntegrations(agent: BnbAgentProfile) {
-  const haystack = [
-    agent.category,
-    agent.capabilities.join(" "),
-    agent.services.map((service) => `${service.name} ${service.type}`).join(" "),
-  ].join(" ").toLowerCase();
-  const integrations: string[] = [];
-
-  if (haystack.includes("pancake")) integrations.push("PancakeSwap");
-  if (haystack.includes("altana") || (agent.a2aSupport && (haystack.includes("wallet") || haystack.includes("health")))) {
-    integrations.push("Altana");
-  }
-
-  return Array.from(new Set(integrations));
+  return bnbAgentIntegrations(agent);
 }

@@ -1,14 +1,13 @@
-import { BnbHero, BnbShell } from "@/app/bnb/_components/BnbUi";
+import { BnbPageHeader, BnbShell } from "@/app/bnb/_components/BnbUi";
 import { BnbAccountClient } from "./BnbAccountClient";
 import { ReceiptsClient } from "@/app/bnb/report/ReceiptsClient";
 
 export default function BnbAccountPage() {
   return (
     <BnbShell active="account">
-      <BnbHero
-        kicker="Account"
-        title="Account"
-        body="Manage your BNB wallet, hires, alerts, and payments."
+      <BnbPageHeader
+        title="My hires"
+        body="Manage your wallet, requests, active work, and completed hires."
       />
       <BnbAccountClient />
       <ReceiptsClient embedded />

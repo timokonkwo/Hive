@@ -1,11 +1,10 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { ArrowRight, BadgeCheck } from "lucide-react";
+import { ArrowLeft, ArrowRight, BadgeCheck } from "lucide-react";
 import { isAddress } from "viem";
 import { getBnbAgent } from "@/lib/bnb/catalog";
-import type { BnbAgentCategory, BnbAgentProfile, BnbAgentService } from "@/lib/bnb/types";
+import type { BnbAgentProfile } from "@/lib/bnb/types";
 import { ProfileCompareAction } from "./ProfileCompareAction";
-import { RequestAccessDialog } from "./RequestAccessDialog";
 import { CopyValueButton } from "@/app/bnb/_components/CopyValueButton";
 import {
   BnbContainer,
@@ -14,19 +13,23 @@ import {
   canHireAgent,
   freshnessLabel,
   hasPrice,
-  listingDescription,
   priceLabel,
-  reviewLabel,
   shortAddress,
-  statusLabel,
 } from "@/app/bnb/_components/BnbUi";
-
-const categoryLabels: Record<BnbAgentCategory, string> = {
-  Rebalancing: "Rebalancing",
-  "Grid Trading": "Grid Trading",
-  "Yield Optimisation": "Yield Optimisation",
-  "Health Factor Monitoring": "Health Factor",
-};
+import {
+  bnbAgentDisplayName,
+  bnbAgentIntegrations,
+  bnbAgentSourceName,
+  bnbCategoryLabel,
+  bnbIsVerified,
+  bnbListingDescription,
+  bnbProtocolSummary,
+  bnbReviewLabel,
+  bnbServiceLabel,
+  bnbSpecificCapabilities,
+  bnbStatusLabel,
+  bnbUsableServices,
+} from "@/lib/bnb/display";
 
 export default async function BnbAgentDetailPage({
   params,
@@ -37,34 +40,39 @@ export default async function BnbAgentDetailPage({
   const agent = await getBnbAgent(chainId, tokenId);
   if (!agent) notFound();
 
-  const description = listingDescription(agent);
+  const description = bnbListingDescription(agent);
   const canHire = canHireAgent(agent);
   const hasReviews = agent.feedback.count > 0;
-  const visibleCapabilities = agent.capabilities.filter(isSpecificCapability);
-  const visibleServices = agent.services.filter(hasUsableService);
-  const protocols = protocolSummary(agent);
+  const displayName = bnbAgentDisplayName(agent);
+  const sourceName = bnbAgentSourceName(agent);
+  const visibleCapabilities = bnbSpecificCapabilities(agent).slice(0, 8);
+  const visibleServices = bnbUsableServices(agent);
+  const integrations = bnbAgentIntegrations(agent);
+  const protocols = bnbProtocolSummary(agent);
   const ownerAddress = isAddress(agent.ownerAddress) ? agent.ownerAddress : "";
   const agentWallet = isAddress(agent.agentWallet) ? agent.agentWallet : "";
-  const verified = agent.sourceMetrics?.verified || agent.sourceFreshness.source === "8004scan";
+  const verified = bnbIsVerified(agent);
   const facts = [
-    { label: "Availability", value: statusLabel(agent) },
-    { label: "Last active", value: freshnessLabel(agent.lastActivity) },
+    { label: "Availability", value: bnbStatusLabel(agent) },
+    ...(freshnessLabel(agent.lastActivity) ? [{ label: "Last active", value: freshnessLabel(agent.lastActivity) }] : []),
     ...(hasPrice(agent) ? [{ label: "Price", value: priceLabel(agent) }] : []),
-    ...(hasReviews ? [{ label: "Feedback", value: reviewLabel(agent) }] : []),
+    ...(hasReviews ? [{ label: "Reviews", value: bnbReviewLabel(agent) }] : []),
   ];
+  const canCheck = agent.executionStatus === "connectable";
 
   return (
     <BnbShell active="agents">
-      <BnbContainer className="bnb-section bnb-agent-profile-layout">
-        <main className="bnb-agent-profile-maincol">
-          <Link href="/bnb/agents" className="bnb-agent-back bnb-focus">
-            Agents
-          </Link>
+      <BnbContainer className="bnb-section bnb-agent-detail">
+        <Link href="/bnb/agents" className="bnb-agent-back bnb-focus">
+          <ArrowLeft aria-hidden="true" size={15} />
+          Agents
+        </Link>
 
-          <section className="bnb-agent-heading">
+        <section className="bnb-agent-cover">
+          <div className="bnb-agent-cover-main">
             <div className="bnb-agent-meta-line">
-              <span>{categoryLabels[agent.category]}</span>
-              <span>{statusLabel(agent)}</span>
+              <span>{bnbCategoryLabel(agent.category)}</span>
+              <span>{bnbStatusLabel(agent)}</span>
               {verified ? (
                 <span className="bnb-agent-verified">
                   <BadgeCheck aria-hidden="true" size={16} />
@@ -72,10 +80,26 @@ export default async function BnbAgentDetailPage({
                 </span>
               ) : null}
             </div>
-            <h1>{agent.name}</h1>
+            <h1>{displayName}</h1>
+            {sourceName ? <p className="bnb-agent-source-name">{sourceName}</p> : null}
             {description ? <p>{description}</p> : null}
-          </section>
+          </div>
 
+          <div className="bnb-agent-cover-actions">
+            {canHire || canCheck ? (
+              <Link href={`/bnb/activate?chainId=${agent.chainId}&tokenId=${encodeURIComponent(agent.tokenId)}`} className="bnb-button bnb-focus">
+                {canHire ? "Hire agent" : "Check availability"} <ArrowRight aria-hidden="true" size={16} />
+              </Link>
+            ) : (
+              <Link href={`https://8004scan.io/agents/${agent.chainId}/${agent.tokenId}`} className="bnb-button bnb-focus" target="_blank" rel="noopener noreferrer">
+                View identity <ArrowRight aria-hidden="true" size={16} />
+              </Link>
+            )}
+            <ProfileCompareAction agent={agent} />
+          </div>
+        </section>
+
+        {facts.length > 0 ? (
           <section className="bnb-agent-fact-strip" aria-label="Agent facts">
             {facts.map((fact) => (
               <div key={fact.label}>
@@ -84,106 +108,127 @@ export default async function BnbAgentDetailPage({
               </div>
             ))}
           </section>
+        ) : null}
 
-          <section className="bnb-agent-section">
-            <h2>About</h2>
-            {description ? <p>{description}</p> : <p>This agent has not added a profile description yet.</p>}
-            {visibleCapabilities.length > 0 ? (
-              <ul className="bnb-agent-capability-list">
-                {visibleCapabilities.map((capability) => (
-                  <li key={capability}>{formatCapability(capability)}</li>
-                ))}
-              </ul>
-            ) : null}
-          </section>
-
-          {visibleServices.length > 0 ? (
-            <section className="bnb-agent-section">
-              <h2>Services</h2>
-              <div className="bnb-agent-services-wrap">
-                <table className="bnb-agent-services">
-                  <thead>
-                    <tr>
-                      <th>Service</th>
-                      <th>Price</th>
-                      <th>Endpoint</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {visibleServices.map((service) => (
-                      <tr key={`${service.name}:${service.type}`}>
-                        <td>{formatCapability(service.name)}</td>
-                        <td>{service.price || "Not listed"}</td>
-                        <td>{service.endpoint ? "Available" : "Not listed"}</td>
-                      </tr>
+        <div className="bnb-agent-detail-grid">
+          <main className="bnb-agent-profile-maincol">
+            {description || visibleCapabilities.length > 0 ? (
+              <section className="bnb-agent-section">
+                <h2>Overview</h2>
+                {description ? <p>{description}</p> : null}
+                {visibleCapabilities.length > 0 ? (
+                  <ul className="bnb-agent-capability-list">
+                    {visibleCapabilities.map((capability) => (
+                      <li key={capability}>{capability}</li>
                     ))}
-                  </tbody>
-                </table>
+                  </ul>
+                ) : null}
+              </section>
+            ) : null}
+
+            {visibleServices.length > 0 ? (
+              <section className="bnb-agent-section">
+                <h2>Services</h2>
+                <div className="bnb-agent-services-wrap">
+                  <table className="bnb-agent-services">
+                    <thead>
+                      <tr>
+                        <th>Service</th>
+                        <th>Price</th>
+                        <th>Availability</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {visibleServices.map((service) => (
+                        <tr key={`${service.name}:${service.type}`}>
+                          <td>{bnbServiceLabel(service)}</td>
+                          <td>{service.price || "Not listed"}</td>
+                          <td>{service.endpoint ? "Ready" : bnbStatusLabel(agent)}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </section>
+            ) : null}
+
+            {hasReviews ? (
+              <section className="bnb-agent-section">
+                <h2>Reviews</h2>
+                <dl className="bnb-agent-identity-grid">
+                  <DataRow label="Reviews" value={bnbReviewLabel(agent)} />
+                  <DataRow label="Positive" value={positiveFeedbackLabel(agent)} />
+                  <DataRow label="Last active" value={freshnessLabel(agent.lastActivity)} />
+                </dl>
+                {agent.feedback.summary ? <p>{agent.feedback.summary}</p> : null}
+              </section>
+            ) : null}
+
+            {integrations.length > 0 ? (
+              <section className="bnb-agent-section">
+                <h2>Integrations</h2>
+                <ul className="bnb-agent-capability-list">
+                  {integrations.map((integration) => (
+                    <li key={integration}>{integration}</li>
+                  ))}
+                </ul>
+              </section>
+            ) : null}
+
+            <section className="bnb-agent-section">
+              <h2>Identity</h2>
+              <dl className="bnb-agent-identity-grid">
+                <DataRow label="Network" value="BNB Smart Chain" />
+                <DataRow label="ERC-8004 ID" value={agent.sourceMetrics?.sourceAgentId || agent.tokenId} />
+                {ownerAddress ? <DataRow label="Wallet owner" value={shortAddress(ownerAddress)} copyValue={ownerAddress} /> : null}
+                {agentWallet ? <DataRow label="Agent wallet" value={shortAddress(agentWallet)} copyValue={agentWallet} /> : null}
+              </dl>
+              <div className="bnb-agent-links">
+                <ExternalTextLink href={`https://8004scan.io/agents/${agent.chainId}/${agent.tokenId}`}>8004scan</ExternalTextLink>
+                {agentWallet ? <ExternalTextLink href={`https://bscscan.com/address/${agentWallet}`}>BscScan</ExternalTextLink> : null}
               </div>
             </section>
-          ) : null}
 
-          <section className="bnb-agent-section">
-            <h2>Identity</h2>
-            <dl className="bnb-agent-identity-grid">
-              <DataRow label="Network" value="BNB Smart Chain" />
-              <DataRow label="ERC-8004 ID" value={agent.sourceMetrics?.sourceAgentId || agent.tokenId} />
-              {ownerAddress ? <DataRow label="Wallet owner" value={shortAddress(ownerAddress)} copyValue={ownerAddress} /> : null}
-              {agentWallet ? <DataRow label="Agent wallet" value={shortAddress(agentWallet)} copyValue={agentWallet} /> : null}
-            </dl>
-            <div className="bnb-agent-links">
-              <ExternalTextLink href={`https://8004scan.io/agents/${agent.chainId}/${agent.tokenId}`}>8004scan</ExternalTextLink>
-              {agentWallet ? <ExternalTextLink href={`https://bscscan.com/address/${agentWallet}`}>BscScan</ExternalTextLink> : null}
-            </div>
-          </section>
+            {(protocols.length > 0 || agent.x402Support || visibleServices.length > 0) ? (
+              <details className="bnb-agent-section bnb-agent-technical-details">
+                <summary>Protocol details</summary>
+                <dl className="bnb-agent-identity-grid">
+                  {protocols.length > 0 ? <DataRow label="Protocols" value={protocols.join(", ")} /> : null}
+                  <DataRow label="Payment protocol" value={agent.x402Support ? "x402 supported" : "Not listed"} />
+                  {visibleServices.length > 0 ? <DataRow label="Service endpoint" value={visibleServices.some((service) => service.endpoint) ? "Available" : "Not listed"} /> : null}
+                </dl>
+              </details>
+            ) : null}
+          </main>
 
-          {hasReviews ? (
-            <section className="bnb-agent-section">
-              <h2>Feedback</h2>
-              <dl className="bnb-agent-identity-grid">
-                <DataRow label="Feedback" value={reviewLabel(agent)} />
-                <DataRow label="Positive" value={positiveFeedbackLabel(agent)} />
-                <DataRow label="Last active" value={freshnessLabel(agent.lastActivity)} />
-              </dl>
-              {agent.feedback.summary ? <p>{agent.feedback.summary}</p> : null}
+          <aside className="bnb-agent-action-col">
+            <section className="bnb-agent-action-card">
+              <div>
+                <span>{canHire ? "Ready to run" : canCheck ? "Connectable" : "Listed profile"}</span>
+                <h2>{canHire ? "Hire this agent" : canCheck ? "Check this agent" : "Onchain identity"}</h2>
+                <p>
+                  {canHire
+                    ? "Set the job, budget, and time limit before work starts."
+                    : canCheck
+                      ? "Hive will check the endpoint before creating a hire."
+                      : "This agent is registered, but Hive has no supported endpoint to run it."}
+                </p>
+              </div>
+
+              {canHire || canCheck ? (
+                <Link href={`/bnb/activate?chainId=${agent.chainId}&tokenId=${encodeURIComponent(agent.tokenId)}`} className="bnb-button bnb-focus">
+                  {canHire ? "Hire agent" : "Check availability"} <ArrowRight aria-hidden="true" size={16} />
+                </Link>
+              ) : (
+                <Link href={`https://8004scan.io/agents/${agent.chainId}/${agent.tokenId}`} className="bnb-button bnb-focus" target="_blank" rel="noopener noreferrer">
+                  View identity <ArrowRight aria-hidden="true" size={16} />
+                </Link>
+              )}
+
+              <ProfileCompareAction agent={agent} />
             </section>
-          ) : null}
-
-          {(protocols.length > 0 || agent.x402Support || visibleServices.length > 0) ? (
-            <details className="bnb-agent-section bnb-agent-technical-details">
-              <summary>Technical details</summary>
-              <dl className="bnb-agent-identity-grid">
-                {protocols.length > 0 ? <DataRow label="Protocols" value={protocols.join(", ")} /> : null}
-                <DataRow label="x402" value={agent.x402Support ? "Supported" : "Not listed"} />
-                {visibleServices.length > 0 ? <DataRow label="Endpoint" value={visibleServices.some((service) => service.endpoint) ? "Available" : "Not listed"} /> : null}
-              </dl>
-            </details>
-          ) : null}
-        </main>
-
-        <aside className="bnb-agent-action-col">
-          <section className="bnb-agent-action-card">
-            <div>
-              <span>{canHire ? "Available" : "Request required"}</span>
-              <h2>{canHire ? "Hire this agent" : "Request access"}</h2>
-              <p>
-                {canHire
-                  ? "Set the work, budget, and time limit before the agent starts."
-                  : "Send the job details and track the request from your account."}
-              </p>
-            </div>
-
-            {canHire ? (
-              <Link href={`/bnb/activate?chainId=${agent.chainId}&tokenId=${encodeURIComponent(agent.tokenId)}`} className="bnb-button bnb-focus">
-                Hire agent <ArrowRight aria-hidden="true" size={16} />
-              </Link>
-            ) : (
-              <RequestAccessDialog agent={agent} />
-            )}
-
-            <ProfileCompareAction agent={agent} />
-          </section>
-        </aside>
+          </aside>
+        </div>
       </BnbContainer>
     </BnbShell>
   );
@@ -203,44 +248,4 @@ function DataRow({ label, value, copyValue }: { label: string; value: string; co
 
 function positiveFeedbackLabel(agent: BnbAgentProfile) {
   return `${agent.feedback.positive} of ${agent.feedback.count}`;
-}
-
-function hasUsableService(service: BnbAgentService) {
-  return Boolean(service.price || service.endpoint);
-}
-
-function isSpecificCapability(capability: string) {
-  const normalized = capability.trim().toLowerCase();
-  if (!normalized) return false;
-  return !["web", "api", "http", "https", "unknown"].includes(normalized);
-}
-
-function protocolSummary(agent: BnbAgentProfile) {
-  const protocols = [
-    ...(agent.sourceMetrics?.supportedProtocols || []),
-    ...(agent.a2aSupport ? ["A2A"] : []),
-    ...(agent.mcpSupport ? ["MCP"] : []),
-    ...(agent.erc8183Support ? ["ERC-8183"] : []),
-  ];
-
-  return Array.from(new Set(protocols.map(formatProtocol).filter(Boolean)));
-}
-
-function formatProtocol(value: string) {
-  const normalized = value.trim();
-  if (!normalized) return "";
-  const lower = normalized.toLowerCase();
-  if (lower === "a2a") return "A2A";
-  if (lower === "mcp") return "MCP";
-  if (lower === "x402") return "x402";
-  if (lower.includes("8183")) return "ERC-8183";
-  return normalized;
-}
-
-function formatCapability(value: string) {
-  return value
-    .replace(/[-_]+/g, " ")
-    .replace(/\s+/g, " ")
-    .trim()
-    .replace(/\b\w/g, (letter) => letter.toUpperCase());
 }

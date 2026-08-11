@@ -4,6 +4,7 @@ import { useEffect, useId, useRef, useState } from "react";
 import { ArrowRight, X } from "lucide-react";
 import { RequestAccessForm } from "@/app/bnb/_components/RequestAccessForm";
 import type { BnbAgentProfile } from "@/lib/bnb/types";
+import { bnbAgentDisplayName } from "@/lib/bnb/display";
 
 type RequestAccessDialogProps = {
   agent: Pick<BnbAgentProfile, "chainId" | "tokenId" | "name" | "category">;
@@ -14,6 +15,7 @@ export function RequestAccessDialog({ agent, className = "bnb-button bnb-focus" 
   const [open, setOpen] = useState(false);
   const titleId = useId();
   const closeRef = useRef<HTMLButtonElement>(null);
+  const agentName = bnbAgentDisplayName(agent);
 
   useEffect(() => {
     if (!open) return;
@@ -37,7 +39,7 @@ export function RequestAccessDialog({ agent, className = "bnb-button bnb-focus" 
   return (
     <>
       <button type="button" className={className} onClick={() => setOpen(true)}>
-        Request access <ArrowRight aria-hidden="true" size={16} />
+        Request this agent <ArrowRight aria-hidden="true" size={16} />
       </button>
 
       {open ? (
@@ -51,10 +53,10 @@ export function RequestAccessDialog({ agent, className = "bnb-button bnb-focus" 
           <section className="bnb-request-dialog" role="dialog" aria-modal="true" aria-labelledby={titleId}>
             <div className="bnb-request-dialog-head">
               <div>
-                <span>{agent.name}</span>
-                <h2 id={titleId}>Request access</h2>
+                <span>{agentName}</span>
+                <h2 id={titleId}>Request this agent</h2>
               </div>
-              <button ref={closeRef} type="button" className="bnb-icon-button bnb-focus" onClick={() => setOpen(false)} aria-label="Close request access">
+              <button ref={closeRef} type="button" className="bnb-icon-button bnb-focus" onClick={() => setOpen(false)} aria-label="Close request">
                 <X aria-hidden="true" size={18} />
               </button>
             </div>

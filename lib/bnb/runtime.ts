@@ -18,8 +18,9 @@ function processStorageAllowed() {
   return envFlag("BNB_ALLOW_PROCESS_STORAGE") || (process.env.NODE_ENV !== "production" && !envPresent("MONGODB_URI"));
 }
 
-export function canHireBnbAgent(agent: Pick<BnbAgentProfile, "activationStatus" | "agentWallet">) {
-  return agent.activationStatus === "callable" && isAddress(agent.agentWallet);
+export function canHireBnbAgent(agent: Pick<BnbAgentProfile, "activationStatus" | "executionStatus" | "agentWallet">) {
+  const ready = agent.executionStatus === "ready_to_run" || (!agent.executionStatus && agent.activationStatus === "callable");
+  return ready && isAddress(agent.agentWallet);
 }
 
 export function getBnbRuntimeReadiness() {
@@ -63,7 +64,7 @@ export function getBnbRuntimeReadiness() {
   };
 }
 
-export function getBnbHireBlocker(agent: Pick<BnbAgentProfile, "activationStatus" | "agentWallet">) {
+export function getBnbHireBlocker(agent: Pick<BnbAgentProfile, "activationStatus" | "executionStatus" | "agentWallet">) {
   const readiness = getBnbRuntimeReadiness();
 
   if (!readiness.actions.canCreateHire) {
@@ -71,8 +72,9 @@ export function getBnbHireBlocker(agent: Pick<BnbAgentProfile, "activationStatus
     return "BNB escrow is not configured.";
   }
 
-  if (agent.activationStatus !== "callable") {
-    return "Request access before hiring this agent.";
+  if (agent.executionStatus !== "ready_to_run" && agent.activationStatus !== "callable") {
+    if (agent.executionStatus === "connectable") return "Check this agent's endpoint before hiring.";
+    return "This agent is listed, but Hive cannot run it yet.";
   }
 
   if (!isAddress(agent.agentWallet)) {

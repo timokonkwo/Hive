@@ -151,6 +151,7 @@ export async function createBnbActivationRecord({
       tokenId: agent.tokenId,
       name: agent.name,
       activationStatus: agent.activationStatus,
+      executionStatus: agent.executionStatus,
       agentWallet: agent.agentWallet,
     },
     limits: {
@@ -195,6 +196,7 @@ export async function createBnbAccessRequestRecord({
       tokenId: agent.tokenId,
       name: agent.name,
       activationStatus: agent.activationStatus,
+      executionStatus: agent.executionStatus,
       agentWallet: agent.agentWallet,
     },
     task,

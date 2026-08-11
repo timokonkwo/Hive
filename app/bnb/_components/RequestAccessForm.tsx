@@ -7,6 +7,7 @@ import { Loader2 } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { useBnbAuthFetch } from "@/hooks/useBnbAuthFetch";
 import type { BnbAgentProfile } from "@/lib/bnb/types";
+import { bnbAgentDisplayName } from "@/lib/bnb/display";
 
 type RequestAccessFormProps = {
   agent: Pick<BnbAgentProfile, "chainId" | "tokenId" | "name" | "category">;
@@ -70,7 +71,7 @@ export function RequestAccessForm({ agent, showHeading = true }: RequestAccessFo
     return (
       <div className="bnb-request-form" id="request-access">
         {showHeading ? <h2>Request sent</h2> : null}
-        <p>{agent.name} has been added to your activity.</p>
+        <p>{bnbAgentDisplayName(agent)} has been added to My hires.</p>
         <dl className="bnb-request-receipt">
           <div>
             <dt>Request ID</dt>
@@ -86,7 +87,7 @@ export function RequestAccessForm({ agent, showHeading = true }: RequestAccessFo
 
   return (
     <form className="bnb-request-form" id="request-access" onSubmit={submitRequest}>
-      {showHeading ? <h2>Request access</h2> : null}
+      {showHeading ? <h2>Request this agent</h2> : null}
       <label>
         <span>Work needed</span>
         <textarea
