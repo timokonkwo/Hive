@@ -36,10 +36,10 @@ This tracker is the implementation source of truth for the BNB Agent Studio V2 m
 | Phase 0: Safety Baseline and Config Contract | Complete | Added tracker, env placeholders, runtime readiness, and tests. |
 | Phase 1: Marketplace Readiness Gate | Complete | Centralized readiness and removed non-callable hire/request CTAs. |
 | Phase 2: Agent-Specific Capability Forms | Not started | Render only the selected agent's supported tasks and arguments. |
-| Phase 3: Payment and Run State Repair | Not started | Split zero-price, x402, and escrow flows cleanly. |
+| Phase 3: Payment and Run State Repair | In progress | Zero-price policy is now explicit; remaining x402/escrow UI work is pending. |
 | Phase 4: Reference Studio V2 Agents | Not started | Add one reliable callable agent per required category. |
 | Phase 5: Delivery Formatting and Evidence | Not started | Convert outputs into human summaries and receipt evidence. |
-| Phase 6: 8004scan Pro Data Quality | Not started | Improve live identity, reputation, activity, and freshness data. |
+| Phase 6: 8004scan Pro Data Quality | In progress | Pro key precedence and cache controls are wired; richer profile data remains pending. |
 | Phase 7: Altana Permission Path | Not started | Add scoped grant, session-key transaction proof, and revoke flow. |
 | Phase 8: PancakeSwap Utility | Not started | Add LP, swap, farming, and pool demand workflows. |
 | Phase 9: TermiX Agent Advantage Report | Not started | Capture three real agent-vs-manual comparisons. |
@@ -206,6 +206,22 @@ This tracker is the implementation source of truth for the BNB Agent Studio V2 m
 
 - Users see only actions that are valid for the current auth, wallet, payment, and job state.
 
+### Progress
+
+- Date: 2026-08-19
+- `BNB_ZERO_PRICE_RUNS_ENABLED` now controls the unpriced run policy.
+- Unpriced agents skip escrow by default when zero-price runs are enabled.
+- `BNB_FORCE_ESCROW_FOR_UNPRICED_AGENTS` still overrides free runs when explicitly enabled.
+- Full x402 payment review and paid Studio V2 settlement work remains pending.
+
+### Verification
+
+- `npm test`: passed with 68 tests.
+- `npm run typecheck`: passed.
+- `npm run lint -- --quiet`: passed.
+- `npm run build`: passed.
+- `git diff --check`: passed.
+
 ## Phase 4: Reference Studio V2 Agents
 
 ### Units
@@ -301,6 +317,22 @@ This tracker is the implementation source of truth for the BNB Agent Studio V2 m
 ### Acceptance
 
 - The marketplace gives better hiring context than a flat ERC-8004 explorer.
+
+### Progress
+
+- Date: 2026-08-19
+- `BNB_8004SCAN_PRO_API_KEY` now takes precedence over `BNB_8004SCAN_API_KEY`.
+- `BNB_8004SCAN_TIMEOUT_MS` now defaults to 3000 ms and is bounded from 500 ms to 15000 ms.
+- `BNB_8004SCAN_CACHE_TTL_SECONDS` now controls fetch revalidation and is bounded from 30 seconds to 3600 seconds.
+- Richer owner history, profile source confidence, and expanded reputation display remain pending.
+
+### Verification
+
+- `npm test`: passed with 68 tests.
+- `npm run typecheck`: passed.
+- `npm run lint -- --quiet`: passed.
+- `npm run build`: passed.
+- `git diff --check`: passed.
 
 ## Phase 7: Altana Permission Path
 

@@ -367,6 +367,9 @@ describe('BNB marketplace product flows', () => {
   it('does not require escrow for unpriced public agent runs', () => {
     assert.match(runtime, /export function shouldRequireBnbEscrow/);
     assert.match(runtime, /BNB_AGENT_RUN_REQUIRES_ESCROW/);
+    assert.match(runtime, /BNB_ZERO_PRICE_RUNS_ENABLED/);
+    assert.match(runtime, /function zeroPriceRunsEnabled/);
+    assert.match(runtime, /if \(!listedPayment && zeroPriceRunsEnabled\(\) && !forceEscrowForUnpricedAgents\(\)\) return false/);
     assert.match(runtime, /BNB_FORCE_ESCROW_FOR_UNPRICED_AGENTS/);
     assert.match(runtime, /forceEscrowForUnpricedAgents/);
     assert.match(runtime, /if \(listedPayment\) return configured \?\? true/);
@@ -474,7 +477,11 @@ describe('BNB marketplace product flows', () => {
   });
 
   it('keeps live 8004scan discovery paged beyond the first 100 agents', () => {
-    assert.match(catalog, /headers\["X-API-Key"\]\s*=\s*process\.env\.BNB_8004SCAN_API_KEY/);
+    assert.match(catalog, /process\.env\.BNB_8004SCAN_PRO_API_KEY\?\.trim\(\) \|\| process\.env\.BNB_8004SCAN_API_KEY\?\.trim\(\)/);
+    assert.match(catalog, /headers\["X-API-Key"\]\s*=\s*apiKey/);
+    assert.match(catalog, /function get8004CacheTtlSeconds/);
+    assert.match(catalog, /BNB_8004SCAN_CACHE_TTL_SECONDS/);
+    assert.match(catalog, /next:\s*\{\s*revalidate:\s*get8004CacheTtlSeconds\(revalidate\)\s*\}/);
     assert.match(catalog, /type Bnb8004SortBy = "created_at" \| "stars" \| "name" \| "token_id" \| "total_score"/);
     assert.match(catalog, /export async function listBnbAgentsPage/);
     assert.match(catalog, /const page = Math\.max\(Math\.trunc\(query\.page \|\| 1\),\s*1\)/);

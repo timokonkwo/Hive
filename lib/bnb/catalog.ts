@@ -605,8 +605,9 @@ function activationFromExecution(status: BnbExecutionStatus): BnbActivationStatu
 
 function get8004Headers() {
   const headers: Record<string, string> = { Accept: "application/json" };
-  if (process.env.BNB_8004SCAN_API_KEY) {
-    headers["X-API-Key"] = process.env.BNB_8004SCAN_API_KEY;
+  const apiKey = process.env.BNB_8004SCAN_PRO_API_KEY?.trim() || process.env.BNB_8004SCAN_API_KEY?.trim();
+  if (apiKey) {
+    headers["X-API-Key"] = apiKey;
   }
   return headers;
 }
@@ -616,9 +617,15 @@ function get8004BaseUrl() {
 }
 
 function get8004TimeoutMs() {
-  const timeout = Number(process.env.BNB_8004SCAN_TIMEOUT_MS || 1500);
-  if (!Number.isFinite(timeout)) return 1500;
-  return Math.min(Math.max(timeout, 500), 5000);
+  const timeout = Number(process.env.BNB_8004SCAN_TIMEOUT_MS || 3000);
+  if (!Number.isFinite(timeout)) return 3000;
+  return Math.min(Math.max(timeout, 500), 15000);
+}
+
+function get8004CacheTtlSeconds(fallback: number) {
+  const ttl = Number.parseInt(process.env.BNB_8004SCAN_CACHE_TTL_SECONDS || String(fallback), 10);
+  if (!Number.isFinite(ttl)) return fallback;
+  return Math.min(Math.max(ttl, 30), 3600);
 }
 
 async function fetch8004Json(url: URL | string, revalidate: number) {
@@ -628,7 +635,7 @@ async function fetch8004Json(url: URL | string, revalidate: number) {
   try {
     const response = await fetch(url, {
       headers: get8004Headers(),
-      next: { revalidate },
+      next: { revalidate: get8004CacheTtlSeconds(revalidate) },
       signal: controller.signal,
     });
     if (!response.ok) return null;

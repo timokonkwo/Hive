@@ -8,6 +8,13 @@ function envFlag(name: string) {
   return process.env[name]?.trim() === "true";
 }
 
+function envEnabled(name: string, defaultValue = true) {
+  const value = process.env[name]?.trim().toLowerCase();
+  if (value === "true") return true;
+  if (value === "false") return false;
+  return defaultValue;
+}
+
 function envPresent(name: string) {
   return Boolean(process.env[name]?.trim());
 }
@@ -26,6 +33,10 @@ function configuredEscrowRequirement() {
 
 function forceEscrowForUnpricedAgents() {
   return envFlag("BNB_FORCE_ESCROW_FOR_UNPRICED_AGENTS");
+}
+
+function zeroPriceRunsEnabled() {
+  return envEnabled("BNB_ZERO_PRICE_RUNS_ENABLED", true);
 }
 
 function hasListedPayment(agent: Pick<BnbAgentProfile, "services" | "x402Support">) {
@@ -98,7 +109,9 @@ export function shouldRequireBnbEscrow(agent: Pick<BnbAgentProfile, "services" |
   const listedPayment = hasListedPayment(agent);
   const configured = configuredEscrowRequirement();
   if (configured === false) return false;
+  if (!listedPayment && zeroPriceRunsEnabled() && !forceEscrowForUnpricedAgents()) return false;
   if (listedPayment) return configured ?? true;
+  if (!zeroPriceRunsEnabled()) return configured ?? true;
   return configured === true && forceEscrowForUnpricedAgents();
 }
 
