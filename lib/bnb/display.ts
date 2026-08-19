@@ -1,4 +1,5 @@
 import type { BnbAgentCategory, BnbAgentProfile, BnbAgentService } from "@/lib/bnb/types";
+import { bnbAgentReadinessLabel, isBnbAgentHireable } from "@/lib/bnb/readiness";
 
 export const bnbCategoryLabels: Record<BnbAgentCategory, string> = {
   Rebalancing: "Rebalancing",
@@ -46,17 +47,11 @@ export function bnbCategoryLabel(category: BnbAgentCategory) {
 }
 
 export function bnbStatusLabel(agent: Pick<BnbAgentProfile, "activationStatus" | "executionStatus">) {
-  if (agent.executionStatus === "ready_to_run") return "Ready to run";
-  if (agent.executionStatus === "connectable") return "Connectable";
-  if (agent.executionStatus === "listed_only") return "Listed";
-  if (agent.executionStatus === "unavailable") return "Unavailable";
-  if (agent.activationStatus === "callable") return "Ready to run";
-  return "Listed";
+  return bnbAgentReadinessLabel({ ...agent, agentWallet: "" });
 }
 
 export function bnbCanHireAgent(agent: Pick<BnbAgentProfile, "activationStatus" | "executionStatus" | "agentWallet">) {
-  return (agent.executionStatus === "ready_to_run" || (!agent.executionStatus && agent.activationStatus === "callable"))
-    && /^0x[a-fA-F0-9]{40}$/.test(agent.agentWallet);
+  return isBnbAgentHireable(agent);
 }
 
 export function bnbIsVerified(agent: BnbAgentProfile) {

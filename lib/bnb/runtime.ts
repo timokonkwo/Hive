@@ -1,5 +1,7 @@
 import { isAddress } from "viem";
 import { getHiveBnbNetworkConfig } from "@/lib/bnb/network";
+import { classifyBnbAgentReadiness, isBnbAgentHireable } from "@/lib/bnb/readiness";
+import { getBnbStudioV2Readiness } from "@/lib/bnb/studio-v2";
 import type { BnbAgentProfile } from "@/lib/bnb/types";
 
 function envFlag(name: string) {
@@ -39,12 +41,12 @@ function processStorageAllowed() {
 }
 
 export function canHireBnbAgent(agent: Pick<BnbAgentProfile, "activationStatus" | "executionStatus" | "agentWallet">) {
-  const ready = agent.executionStatus === "ready_to_run" || (!agent.executionStatus && agent.activationStatus === "callable");
-  return ready && isAddress(agent.agentWallet);
+  return isBnbAgentHireable(agent);
 }
 
 export function getBnbRuntimeReadiness() {
   const network = getHiveBnbNetworkConfig();
+  const studioV2 = getBnbStudioV2Readiness();
   const mongoConfigured = envPresent("MONGODB_URI");
   const processFallbackAllowed = processStorageAllowed();
   const storageReady = mongoConfigured || processFallbackAllowed;
@@ -88,6 +90,7 @@ export function getBnbRuntimeReadiness() {
       canGrantSession: storageReady && sessionRegistryConfigured,
       canRunAgent: storageReady,
     },
+    studioV2,
   };
 }
 
@@ -111,9 +114,11 @@ export function getBnbHireBlocker(
     if (requireEscrow) return "BNB escrow is not configured.";
   }
 
-  if (agent.executionStatus !== "ready_to_run" && agent.activationStatus !== "callable") {
-    if (agent.executionStatus === "connectable") return "This agent does not expose a callable endpoint for this job.";
-    return "This agent is listed, but Hive cannot run it yet.";
+  const agentReadiness = classifyBnbAgentReadiness(agent);
+  if (!agentReadiness.canHire) {
+    if (agentReadiness.status === "identity_only") return "This agent does not expose a callable endpoint for this job.";
+    if (agentReadiness.status === "unavailable") return "This agent is unavailable.";
+    return agentReadiness.reason;
   }
 
   if (requireEscrow && !isAddress(agent.agentWallet)) {

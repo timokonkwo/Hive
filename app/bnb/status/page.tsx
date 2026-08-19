@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { Search } from "lucide-react";
 import { isAddress } from "viem";
-import { getBscAddressSummary } from "@/lib/bnb/chain";
+import { get8004scanAgentUrl, getBscAddressSummary } from "@/lib/bnb/chain";
 import { listBnbAgents } from "@/lib/bnb/catalog";
 import { canHireBnbAgent } from "@/lib/bnb/runtime";
 import { CopyValueButton } from "@/app/bnb/_components/CopyValueButton";
@@ -122,7 +122,7 @@ export default async function BnbStatusPage({ searchParams }: { searchParams: Se
                 {canHireBnbAgent(matchedAgent) ? (
                   <Link href={`/bnb/activate?chainId=${matchedAgent.chainId}&tokenId=${encodeURIComponent(matchedAgent.tokenId)}`} className="bnb-button bnb-focus">Hire agent</Link>
                 ) : (
-                  <Link href={`/bnb/agents/${matchedAgent.chainId}/${encodeURIComponent(matchedAgent.tokenId)}#request-access`} className="bnb-button bnb-focus">Request this agent</Link>
+                  <ExternalTextLink href={get8004scanAgentUrl(matchedAgent.chainId, matchedAgent.tokenId)}>View identity</ExternalTextLink>
                 )}
               </div>
             </BnbPanel>

@@ -11,6 +11,8 @@ describe('BNB marketplace product flows', () => {
   const types = read('lib/bnb/types.ts');
   const records = read('lib/bnb/records.ts');
   const runtime = read('lib/bnb/runtime.ts');
+  const readiness = read('lib/bnb/readiness.ts');
+  const studioV2 = read('lib/bnb/studio-v2.ts');
   const network = read('lib/bnb/network.ts');
   const bnbChain = read('lib/bnb/chain.ts');
   const clientChain = read('lib/bnb/client-chain.ts');
@@ -57,6 +59,7 @@ describe('BNB marketplace product flows', () => {
   const adapterRegistry = read('lib/bnb/adapters/registry.ts');
   const mcpAdapter = read('lib/bnb/adapters/mcp.ts');
   const a2aAdapter = read('lib/bnb/adapters/a2a.ts');
+  const envExample = read('.env.example');
 
   it('persists access requests as owner-scoped activity records', () => {
     assert.match(db, /BNB_ACCESS_REQUESTS:\s*"bnb_access_requests"/);
@@ -83,12 +86,26 @@ describe('BNB marketplace product flows', () => {
   });
 
   it('routes only executable agents into escrow hire', () => {
-    assert.match(runtime, /agent\.executionStatus === "ready_to_run"/);
-    assert.match(runtime, /Hive cannot run it yet/);
+    assert.match(readiness, /export function classifyBnbAgentReadiness/);
+    assert.match(readiness, /status:\s*"hireable"/);
+    assert.match(readiness, /status:\s*"identity_only"/);
+    assert.match(readiness, /status:\s*"unavailable"/);
+    assert.match(readiness, /label:\s*"Ready to run"/);
+    assert.match(readiness, /label:\s*"Listed"/);
+    assert.match(readiness, /No callable job endpoint is available/);
+    assert.match(readiness, /agent wallet is not a valid BSC address/i);
+    assert.match(readiness, /export function bnbAgentReadinessLabel/);
+    assert.match(readiness, /agent\.executionStatus === "ready_to_run"/);
+    assert.match(runtime, /isBnbAgentHireable\(agent\)/);
+    assert.match(runtime, /classifyBnbAgentReadiness\(agent\)/);
+    assert.doesNotMatch(runtime, /Hive cannot run it yet/);
     assert.match(runtime, /does not expose a callable endpoint for this job/);
     assert.doesNotMatch(runtime, /Check this agent's endpoint before hiring/);
-    assert.match(display, /agent\.executionStatus === "ready_to_run"/);
+    assert.match(display, /bnbAgentReadinessLabel/);
+    assert.match(display, /isBnbAgentHireable/);
     assert.match(directory, /bnbCanHireAgent/);
+    assert.doesNotMatch(directory, /Connectable/);
+    assert.doesNotMatch(directory, /Listed only/);
     assert.match(profilePage, /canHire \? \(/);
     assert.doesNotMatch(profilePage, /Check and hire/);
     assert.doesNotMatch(profilePage, /Check availability/);
@@ -104,6 +121,8 @@ describe('BNB marketplace product flows', () => {
     assert.doesNotMatch(directory, /agent\.executionStatus === "connectable"/);
     assert.doesNotMatch(directory, /\/bnb\/match\?intent=.*Contact/);
     assert.doesNotMatch(bnbUi, /\/bnb\/match\?intent=.*Contact/);
+    assert.doesNotMatch(statusPage, /Request this agent/);
+    assert.match(statusPage, /get8004scanAgentUrl\(matchedAgent\.chainId,\s*matchedAgent\.tokenId\)/);
   });
 
   it('keeps Privy auth and BNB wallet transactions wired together', () => {
@@ -448,7 +467,7 @@ describe('BNB marketplace product flows', () => {
     assert.doesNotMatch(bnbUi, /components\/layout\/Footer|permissionless marketplace for autonomous agents/);
     assert.match(display, /export function bnbAgentDisplayName/);
     assert.match(display, /export function bnbListingDescription/);
-    assert.match(display, /Ready to run/);
+    assert.match(readiness, /Ready to run/);
     assert.doesNotMatch(display, /Needs approval/);
     assert.match(display, /evoevo ai agent/i);
     assert.doesNotMatch(directory, /Request access/);
@@ -546,8 +565,56 @@ describe('BNB marketplace product flows', () => {
     assert.match(network, /BNB_BSC_CHAIN_ID/);
     assert.match(runtime, /network:\s*network\.network/);
     assert.match(runtime, /chainId:\s*network\.chainId/);
-    assert.match(read('.env.example'), /BNB_NETWORK=testnet/);
-    assert.match(read('.env.example'), /NEXT_PUBLIC_BNB_BSC_CHAIN_ID=97/);
+    assert.match(envExample, /BNB_NETWORK=testnet/);
+    assert.match(envExample, /NEXT_PUBLIC_BNB_BSC_CHAIN_ID=97/);
+  });
+
+  it('documents BNB Agent Studio V2 configuration without exposing secrets at runtime', () => {
+    [
+      'BNB_AGENT_STUDIO_ENABLED',
+      'BNB_AGENT_STUDIO_API_BASE',
+      'BNB_AGENT_STUDIO_API_KEY',
+      'BNB_AGENT_STUDIO_PROJECT_ID',
+      'BNB_AGENT_STUDIO_PAYMASTER_ENABLED',
+      'BNB_8004SCAN_PRO_API_KEY',
+      'BNB_8004SCAN_TIMEOUT_MS',
+      'BNB_8004SCAN_CACHE_TTL_SECONDS',
+      'BNB_ERC8183_ENABLED',
+      'BNB_X402_ENABLED',
+      'BNB_X402_FACILITATOR_URL',
+      'BNB_X402_RECEIVER_WALLET',
+      'BNB_ZERO_PRICE_RUNS_ENABLED',
+      'BNB_REFERENCE_AGENTS_JSON',
+      'BNB_REFERENCE_AGENT_SIGNING_KEY',
+      'BNB_REFERENCE_AGENT_WEBHOOK_SECRET',
+      'BNB_ALTANA_ENABLED',
+      'BNB_ALTANA_API_BASE',
+      'BNB_ALTANA_API_KEY',
+      'BNB_ALTANA_EXPLORER_BASE',
+      'BNB_ALTANA_KEYSTORE_ADDRESS',
+      'BNB_PANCAKESWAP_ENABLED',
+      'BNB_PANCAKESWAP_API_BASE',
+      'BNB_PANCAKESWAP_SUBGRAPH_URL',
+      'BNB_PANCAKESWAP_DEEPLINK_BASE',
+      'BNB_TERMIX_REPORT_ENABLED',
+      'BNB_TERMIX_EVIDENCE_BUCKET_URL',
+      'BNB_MARKETPLACE_ANALYTICS_ENABLED',
+      'BNB_MARKETPLACE_ADMIN_SECRET',
+      'BNB_MARKETPLACE_ERROR_WEBHOOK_URL',
+    ].forEach((name) => assert.match(envExample, new RegExp(`${name}=`)));
+
+    assert.match(studioV2, /export function getBnbStudioV2Readiness/);
+    assert.match(studioV2, /apiConfigured:\s*envPresent\("BNB_AGENT_STUDIO_API_BASE"\) && envPresent\("BNB_AGENT_STUDIO_API_KEY"\)/);
+    assert.match(studioV2, /scanProConfigured:\s*envPresent\("BNB_8004SCAN_PRO_API_KEY"\) \|\| envPresent\("BNB_8004SCAN_API_KEY"\)/);
+    assert.match(studioV2, /boundedInteger\("BNB_8004SCAN_TIMEOUT_MS",\s*3000,\s*500,\s*15000\)/);
+    assert.match(studioV2, /x402FacilitatorConfigured:\s*envPresent\("BNB_X402_FACILITATOR_URL"\)/);
+    assert.match(studioV2, /altanaApiConfigured:\s*envPresent\("BNB_ALTANA_API_BASE"\) && envPresent\("BNB_ALTANA_API_KEY"\)/);
+    assert.match(studioV2, /pancakeSwapSubgraphConfigured:\s*envPresent\("BNB_PANCAKESWAP_SUBGRAPH_URL"\)/);
+    assert.match(studioV2, /errorWebhookConfigured:\s*envPresent\("BNB_MARKETPLACE_ERROR_WEBHOOK_URL"\)/);
+    assert.match(runtime, /getBnbStudioV2Readiness/);
+    assert.match(runtime, /studioV2/);
+    assert.doesNotMatch(runtime, /BNB_AGENT_STUDIO_API_KEY|BNB_ALTANA_API_KEY|BNB_REFERENCE_AGENT_SIGNING_KEY|BNB_MARKETPLACE_ADMIN_SECRET/);
+    assert.doesNotMatch(studioV2, /process\.env\.[A-Z0-9_]+[^?\n]*}/);
   });
 
   it('stores capability-specific job specs and first-class delivery state', () => {
