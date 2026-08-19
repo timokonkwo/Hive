@@ -420,8 +420,12 @@ describe('BNB marketplace product flows', () => {
     assert.match(jobRoute, /status:\s*"not_required" as const/);
     assert.match(activateForm, /paymentRequest\?\.status === "not_required" \? "job" : "payment"/);
     assert.match(activateForm, /paymentRequest\.status === "not_required"/);
+    assert.match(activateForm, /paymentRequired=\{effectivePaymentRequired\}/);
+    assert.match(activateForm, /stageLabel\(stage,\s*paymentRequired\)/);
+    assert.match(activateForm, /return paymentRequired \? "Payment" : "Run"/);
     assert.match(activateForm, /Create job/);
     assert.match(activateForm, /showSettlementActions = !paymentNotRequired && delivered && !closed/);
+    assert.doesNotMatch([activateRoute, jobRoute].join('\n'), /This job does not require payment/);
     assert.doesNotMatch(activateForm, /No escrow payment is required|public endpoint|Start job|Agent is running|Delivery ready|Review the work before releasing payment/);
     assert.match(jobClient, /paymentRequest\?\.status === "not_required"/);
     assert.match(jobClient, /return "Ready"/);
@@ -438,6 +442,8 @@ describe('BNB marketplace product flows', () => {
     assert.match(settlementRoute, /record\.status === "paid"/);
     assert.match(settlementRoute, /record\.status === "released"/);
     assert.match(settlementRoute, /record\.status === "refunded"/);
+    assert.match(settlementRoute, /record\.limits\.walletConfirmationRequired === false \|\| !record\.payment\?\.jobId \|\| record\.payment\.transactionStatus !== "success"/);
+    assert.match(settlementRoute, /This action is not available for this job/);
     assert.match(settlementRoute, /Review the agent delivery before releasing payment/);
     assert.match(settlementRoute, /readBnbEscrowJob/);
     assert.match(settlementRoute, /buildBnbEscrowSettlementRequest\(settlementRecord,\s*action\)/);

@@ -232,6 +232,9 @@ This tracker is the implementation source of truth for the BNB Agent Studio V2 m
 - Free-run activation records now start as `saved` instead of `awaiting_funding`.
 - Escrow fund, release, and refund transaction requests now include bounded gas limits passed to wallet transactions.
 - Run-route copy now reports `Run in progress.` instead of `Agent is running.`.
+- Free-run activation uses a `Run` progress step instead of a payment step.
+- Settlement APIs now reject release/refund attempts unless the record has confirmed escrow funding.
+- Free-run API responses no longer return `This job does not require payment.` as user-facing copy.
 - Full x402 payment review and paid Studio V2 settlement work remains pending.
 
 ### Verification

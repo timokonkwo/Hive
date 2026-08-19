@@ -521,7 +521,7 @@ export function ActivationForm({ agent }: { agent: BnbAgentProfile }) {
 
   return (
     <section className="bnb-hire-wizard" aria-busy={preflightLoading || loading || funding || running || Boolean(settling)}>
-      {stage !== "job" ? <StepRail active={stage} completed={{ details: detailsComplete, preflight: preflightComplete, payment: funded }} /> : null}
+      {stage !== "job" ? <StepRail active={stage} completed={{ details: detailsComplete, preflight: preflightComplete, payment: funded }} paymentRequired={effectivePaymentRequired} /> : null}
 
       <div className="bnb-panel bnb-hire-card">
         {stage === "details" ? (
@@ -666,14 +666,22 @@ export function ActivationForm({ agent }: { agent: BnbAgentProfile }) {
   );
 }
 
-function StepRail({ active, completed }: { active: Exclude<Stage, "job">; completed: Partial<Record<Exclude<Stage, "job">, boolean>> }) {
+function StepRail({
+  active,
+  completed,
+  paymentRequired,
+}: {
+  active: Exclude<Stage, "job">;
+  completed: Partial<Record<Exclude<Stage, "job">, boolean>>;
+  paymentRequired: boolean;
+}) {
   const activeIndex = paymentStages.indexOf(active);
   return (
     <ol className="bnb-hire-steps" aria-label="Hire progress">
       {paymentStages.map((stage, index) => (
         <li key={stage} data-active={stage === active ? "true" : undefined} data-complete={completed[stage] || index < activeIndex ? "true" : undefined}>
           <span>{completed[stage] || index < activeIndex ? <CheckCircle2 aria-hidden="true" size={14} /> : index + 1}</span>
-          <strong>{stageLabel(stage)}</strong>
+          <strong>{stageLabel(stage, paymentRequired)}</strong>
         </li>
       ))}
     </ol>
@@ -1697,10 +1705,10 @@ function nativePriceFromAgent(agent: BnbAgentProfile) {
   return match ? match[1] : "";
 }
 
-function stageLabel(stage: Exclude<Stage, "job">) {
+function stageLabel(stage: Exclude<Stage, "job">, paymentRequired: boolean) {
   if (stage === "details") return "Job";
   if (stage === "preflight") return "Validation";
-  return "Payment";
+  return paymentRequired ? "Payment" : "Run";
 }
 
 function ensureProtectedSession({

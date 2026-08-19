@@ -63,6 +63,10 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "This escrow receipt is already closed." }, { status: 409 });
     }
 
+    if (record.limits.walletConfirmationRequired === false || !record.payment?.jobId || record.payment.transactionStatus !== "success") {
+      return NextResponse.json({ error: "This action is not available for this job." }, { status: 409 });
+    }
+
     if (action === "release" && record.delivery?.status !== "delivered" && record.work?.status !== "completed") {
       return NextResponse.json({ error: "Review the agent delivery before releasing payment." }, { status: 409 });
     }
