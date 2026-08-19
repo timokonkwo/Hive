@@ -662,6 +662,11 @@ describe('BNB marketplace product flows', () => {
     assert.match(studioV2, /altanaApiConfigured:\s*envPresent\("BNB_ALTANA_API_BASE"\) && envPresent\("BNB_ALTANA_API_KEY"\)/);
     assert.match(studioV2, /pancakeSwapSubgraphConfigured:\s*envPresent\("BNB_PANCAKESWAP_SUBGRAPH_URL"\)/);
     assert.match(studioV2, /errorWebhookConfigured:\s*envPresent\("BNB_MARKETPLACE_ERROR_WEBHOOK_URL"\)/);
+    assert.match(catalog, /type ConfiguredBnbAgentEnvName = "BNB_REFERENCE_AGENTS_JSON" \| "BNB_HIVE_AGENTS_JSON"/);
+    assert.match(catalog, /function getConfiguredBnbAgentsFromEnv\(envName:\s*ConfiguredBnbAgentEnvName\)/);
+    assert.match(catalog, /\.\.\.getConfiguredBnbAgentsFromEnv\("BNB_REFERENCE_AGENTS_JSON"\)/);
+    assert.match(catalog, /\.\.\.getConfiguredBnbAgentsFromEnv\("BNB_HIVE_AGENTS_JSON"\)/);
+    assert.match(catalog, /return uniqueAgents\(\[/);
     assert.match(runtime, /getBnbStudioV2Readiness/);
     assert.match(runtime, /studioV2/);
     assert.doesNotMatch(runtime, /BNB_AGENT_STUDIO_API_KEY|BNB_ALTANA_API_KEY|BNB_REFERENCE_AGENT_SIGNING_KEY|BNB_MARKETPLACE_ADMIN_SECRET/);

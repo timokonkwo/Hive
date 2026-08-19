@@ -817,8 +817,10 @@ function normalizeConfiguredAgent(raw: unknown): BnbAgentProfile | null {
   };
 }
 
-function getConfiguredBnbAgents() {
-  const rawJson = process.env.BNB_HIVE_AGENTS_JSON?.trim();
+type ConfiguredBnbAgentEnvName = "BNB_REFERENCE_AGENTS_JSON" | "BNB_HIVE_AGENTS_JSON";
+
+function getConfiguredBnbAgentsFromEnv(envName: ConfiguredBnbAgentEnvName) {
+  const rawJson = process.env[envName]?.trim();
   if (!rawJson) return [];
 
   try {
@@ -830,6 +832,13 @@ function getConfiguredBnbAgents() {
   } catch {
     return [];
   }
+}
+
+function getConfiguredBnbAgents() {
+  return uniqueAgents([
+    ...getConfiguredBnbAgentsFromEnv("BNB_REFERENCE_AGENTS_JSON"),
+    ...getConfiguredBnbAgentsFromEnv("BNB_HIVE_AGENTS_JSON"),
+  ]);
 }
 
 function withDerivedExecution(agent: BnbAgentProfile): BnbAgentProfile {

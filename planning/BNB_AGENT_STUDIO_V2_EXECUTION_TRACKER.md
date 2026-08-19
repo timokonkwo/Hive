@@ -37,7 +37,7 @@ This tracker is the implementation source of truth for the BNB Agent Studio V2 m
 | Phase 1: Marketplace Readiness Gate | Complete | Centralized readiness and removed non-callable hire/request CTAs. |
 | Phase 2: Agent-Specific Capability Forms | Complete | Render only the selected agent's supported tasks and arguments. |
 | Phase 3: Payment and Run State Repair | In progress | Zero-price policy is now explicit; remaining x402/escrow UI work is pending. |
-| Phase 4: Reference Studio V2 Agents | Not started | Add one reliable callable agent per required category. |
+| Phase 4: Reference Studio V2 Agents | In progress | Reference-agent config loading is wired; real Studio V2 agents are pending. |
 | Phase 5: Delivery Formatting and Evidence | In progress | Convert outputs into human summaries and receipt evidence. |
 | Phase 6: 8004scan Pro Data Quality | In progress | Pro key precedence and cache controls are wired; richer profile data remains pending. |
 | Phase 7: Altana Permission Path | Not started | Add scoped grant, session-key transaction proof, and revoke flow. |
@@ -260,6 +260,14 @@ This tracker is the implementation source of truth for the BNB Agent Studio V2 m
 - Range Guard
 - Grid Pilot
 - Reference agent config loader
+
+### Progress
+
+- Date: 2026-08-19
+- `BNB_REFERENCE_AGENTS_JSON` is now loaded by the catalog alongside `BNB_HIVE_AGENTS_JSON`.
+- Reference-agent entries use the same normalization, endpoint derivation, readiness, and dedupe path as other configured agents.
+- `BNB_REFERENCE_AGENTS_JSON` takes precedence over `BNB_HIVE_AGENTS_JSON` for the same chain/token identity.
+- Building, registering, and smoke-testing the four real Studio V2 reference agents remains pending until live endpoint values are supplied.
 
 ### Tests
 
