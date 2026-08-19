@@ -410,9 +410,14 @@ describe('BNB marketplace product flows', () => {
     assert.match(runtime, /if \(!listedPayment && zeroPriceRunsEnabled\(\) && !forceEscrowForUnpricedAgents\(\)\) return false/);
     assert.match(runtime, /BNB_FORCE_ESCROW_FOR_UNPRICED_AGENTS/);
     assert.match(runtime, /forceEscrowForUnpricedAgents/);
+    assert.match(runtime, /function hasPositiveListedPaymentPrice/);
+    assert.match(runtime, /\^0\+\(\?:\\\.0\+\)\?/);
+    assert.doesNotMatch(runtime, /if \(agent\.x402Support\) return true/);
     assert.match(runtime, /if \(listedPayment\) return configured \?\? true/);
     assert.match(runtime, /hasListedPayment\(agent\)/);
     assert.match(display, /export function bnbAgentHasListedPayment/);
+    assert.match(display, /function hasPositiveListedPaymentPrice/);
+    assert.doesNotMatch(display, /if \(agent\.x402Support\) return true/);
     assert.match(activateForm, /bnbAgentHasListedPayment\(agent\)/);
     assert.match(activateForm, /effectivePaymentRequired = listedPaymentRequired \|\| preflightResult\?\.paymentRequired === true \|\| result\?\.paymentRequired === true/);
     assert.match(activateForm, /paymentRequired:\s*effectivePaymentRequired/);

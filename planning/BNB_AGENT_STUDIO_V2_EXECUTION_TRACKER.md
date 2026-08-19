@@ -235,6 +235,7 @@ This tracker is the implementation source of truth for the BNB Agent Studio V2 m
 - Free-run activation uses a `Run` progress step instead of a payment step.
 - Settlement APIs now reject release/refund attempts unless the record has confirmed escrow funding.
 - Free-run API responses no longer return `This job does not require payment.` as user-facing copy.
+- x402 support alone no longer makes an agent paid; the resolver now requires a positive listed price.
 - Full x402 payment review and paid Studio V2 settlement work remains pending.
 
 ### Verification

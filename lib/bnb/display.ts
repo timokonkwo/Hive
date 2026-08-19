@@ -23,7 +23,7 @@ const GENERATED_DESCRIPTION_PATTERNS = [
 
 const GENERIC_CAPABILITIES = new Set(["web", "api", "http", "https", "unknown", "general"]);
 const GENERIC_SERVICE_LABELS = new Set(["api", "discord", "http", "https", "mcp", "telegram", "twitter", "unknown", "web", "website", "x"]);
-const UNLISTED_SERVICE_PRICES = new Set(["", "not listed", "not set", "price not set", "price on request"]);
+const UNLISTED_SERVICE_PRICES = new Set(["", "free", "not listed", "not set", "price not set", "price on request"]);
 
 export function bnbAgentKey(agent: Pick<BnbAgentProfile, "chainId" | "tokenId">) {
   return `${agent.chainId}:${agent.tokenId}`;
@@ -135,11 +135,7 @@ export function bnbUsableServices(agent: Pick<BnbAgentProfile, "services">) {
 }
 
 export function bnbAgentHasListedPayment(agent: Pick<BnbAgentProfile, "services" | "x402Support">) {
-  if (agent.x402Support) return true;
-  return agent.services.some((service) => {
-    const price = normalizeServiceToken(service.price || "");
-    return Boolean(price && !UNLISTED_SERVICE_PRICES.has(price));
-  });
+  return agent.services.some((service) => hasPositiveListedPaymentPrice(service.price || ""));
 }
 
 export function bnbServiceLabel(service: BnbAgentService) {
@@ -150,7 +146,14 @@ function isUserFacingBnbService(service: BnbAgentService) {
   const label = normalizeServiceToken(service.name);
   const price = normalizeServiceToken(service.price || "");
   if (!label || GENERIC_SERVICE_LABELS.has(label)) return false;
-  return Boolean(service.price && !UNLISTED_SERVICE_PRICES.has(price));
+  return hasPositiveListedPaymentPrice(price);
+}
+
+function hasPositiveListedPaymentPrice(value: string) {
+  const price = normalizeServiceToken(value);
+  if (!price || UNLISTED_SERVICE_PRICES.has(price)) return false;
+  if (/^0+(?:\.0+)?(?:\s*(?:t?bnb|bnb|usd|usdc|usdt|busd))?$/.test(price)) return false;
+  return true;
 }
 
 function normalizeServiceToken(value: string) {

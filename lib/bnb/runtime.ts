@@ -40,11 +40,14 @@ function zeroPriceRunsEnabled() {
 }
 
 function hasListedPayment(agent: Pick<BnbAgentProfile, "services" | "x402Support">) {
-  if (agent.x402Support) return true;
-  return agent.services.some((service) => {
-    const price = service.price?.trim().toLowerCase() || "";
-    return Boolean(price && !["not listed", "not set", "price not set", "price on request"].includes(price));
-  });
+  return agent.services.some((service) => hasPositiveListedPaymentPrice(service.price || ""));
+}
+
+function hasPositiveListedPaymentPrice(value: string) {
+  const price = value.replace(/[-_]+/g, " ").replace(/\s+/g, " ").trim().toLowerCase();
+  if (!price || ["free", "not listed", "not set", "price not set", "price on request"].includes(price)) return false;
+  if (/^0+(?:\.0+)?(?:\s*(?:t?bnb|bnb|usd|usdc|usdt|busd))?$/.test(price)) return false;
+  return true;
 }
 
 function processStorageAllowed() {
