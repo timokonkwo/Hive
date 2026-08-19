@@ -8,10 +8,10 @@ import type { Hex } from "viem";
 import { FileText } from "lucide-react";
 import { BnbButtonLoader } from "@/app/bnb/_components/BnbButtonLoader";
 import { BnbContainer, BnbPanel } from "@/app/bnb/_components/BnbUi";
+import { BnbDeliveryView } from "@/app/bnb/_components/BnbDeliveryView";
 import { useAuth } from "@/hooks/useAuth";
 import { useBnbAuthFetch } from "@/hooks/useBnbAuthFetch";
 import { getClientBnbChainId, getClientBnbNativeSymbol } from "@/lib/bnb/client-chain";
-import { formatBnbDeliveryText } from "@/lib/bnb/delivery";
 import { bnbRefundUnavailableReason } from "@/lib/bnb/settlement-state";
 import type { BnbAccessRequestRecord, BnbActivationRecord, BnbRecordsSnapshot } from "@/lib/bnb/types";
 
@@ -300,6 +300,7 @@ export function ReceiptsClient({ embedded = false }: { embedded?: boolean } = {}
                 const closed = record.status === "paid" || record.status === "released" || record.status === "refunded";
                 const running = record.delivery?.status === "running" || record.work?.status === "running" || record.status === "running";
                 const output = record.delivery?.rawOutput || record.work?.output;
+                const dataSources = record.delivery?.dataSources || record.work?.dataSources;
                 const refundBlocker = bnbRefundUnavailableReason(record);
                 const showSettlementActions = !paymentNotRequired && completed && !closed;
                 return (
@@ -311,7 +312,7 @@ export function ReceiptsClient({ embedded = false }: { embedded?: boolean } = {}
                       </Link>
                       <span className="mt-1 block break-all text-sm leading-6 text-zinc-500">{record.limits.task}</span>
                       {output ? (
-                        <pre className="mt-3 whitespace-pre-wrap rounded border border-zinc-800 bg-black/30 p-3 text-xs leading-5 text-zinc-300">{formatBnbDeliveryText(output, record.jobSpec)}</pre>
+                        <BnbDeliveryView output={output} jobSpec={record.jobSpec} dataSources={dataSources} compact className="mt-3" />
                       ) : null}
                     </span>
                     <span className="grid gap-2 justify-items-start sm:justify-items-end">

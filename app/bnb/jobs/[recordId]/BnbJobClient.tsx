@@ -9,10 +9,10 @@ import { ArrowLeft, CreditCard, Play } from "lucide-react";
 import { BnbButtonLoader } from "@/app/bnb/_components/BnbButtonLoader";
 import { BnbContainer, BnbPanel } from "@/app/bnb/_components/BnbUi";
 import { CopyValueButton } from "@/app/bnb/_components/CopyValueButton";
+import { BnbDeliveryView } from "@/app/bnb/_components/BnbDeliveryView";
 import { useAuth } from "@/hooks/useAuth";
 import { useBnbAuthFetch } from "@/hooks/useBnbAuthFetch";
 import { getClientBnbChainId, getClientBnbExplorerAddressUrl, getClientBnbExplorerTxUrl, getClientBnbNativeSymbol } from "@/lib/bnb/client-chain";
-import { formatBnbDeliveryText } from "@/lib/bnb/delivery";
 import { bnbRefundUnavailableReason } from "@/lib/bnb/settlement-state";
 import type { BnbActivationRecord } from "@/lib/bnb/types";
 
@@ -265,7 +265,7 @@ export function BnbJobClient({ recordId }: { recordId: string }) {
   const closed = record.status === "paid" || record.status === "released" || record.status === "refunded";
   const running = record.delivery?.status === "running" || record.work?.status === "running" || record.status === "running";
   const output = record.delivery?.rawOutput || record.work?.output;
-  const deliveryText = formatBnbDeliveryText(output, record.jobSpec);
+  const dataSources = record.delivery?.dataSources || record.work?.dataSources;
   const refundBlocker = bnbRefundUnavailableReason(record);
   const showSettlementActions = !paymentNotRequired && delivered && !closed;
   const fundedExplorerUrl = record.payment?.explorerUrl || (record.payment?.transactionHash ? getClientBnbExplorerTxUrl(record.payment.transactionHash) : "");
@@ -303,7 +303,7 @@ export function BnbJobClient({ recordId }: { recordId: string }) {
 
             <div className="bnb-job-section">
               <h3>Delivery</h3>
-              {output ? <pre>{deliveryText}</pre> : <p>No delivery yet.</p>}
+              {output ? <BnbDeliveryView output={output} jobSpec={record.jobSpec} dataSources={dataSources} /> : <p>No delivery yet.</p>}
               {record.delivery?.error || record.work?.error ? <p className="bnb-form-error">{record.delivery?.error || record.work?.error}</p> : null}
             </div>
           </BnbPanel>

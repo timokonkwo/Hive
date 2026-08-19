@@ -323,7 +323,10 @@ This tracker is the implementation source of truth for the BNB Agent Studio V2 m
 - Date: 2026-08-19
 - Run completion now stores delivery summaries from `formatBnbDeliveryText` instead of raw adapter output.
 - Agent-directory payloads now show a plain-language mismatch result instead of raw arrays.
-- Full evidence receipts, data-source badges, and downloadable records remain pending.
+- Activation, job detail, and account activity now use one shared delivery view.
+- Raw JSON payloads are collapsed under `Technical details`.
+- Delivery data sources are displayed as plain source lines.
+- Downloadable records and richer evidence receipt sections remain pending.
 
 ### Verification
 

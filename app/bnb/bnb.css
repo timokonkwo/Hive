@@ -2377,6 +2377,55 @@ button.bnb-account-button:disabled {
   line-height: 1.6;
 }
 
+.bnb-delivery-box-compact {
+  gap: 8px;
+  padding: 12px;
+}
+
+.bnb-delivery-box-compact pre {
+  max-height: 260px;
+  font-size: 12px;
+  line-height: 1.55;
+}
+
+.bnb-delivery-sources {
+  display: grid;
+  gap: 6px;
+  border-top: 1px solid var(--bnb-line);
+  padding-top: 10px;
+}
+
+.bnb-delivery-sources span,
+.bnb-delivery-technical summary {
+  color: var(--bnb-text-muted);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.bnb-delivery-sources ul {
+  display: grid;
+  gap: 4px;
+  margin: 0;
+  padding-left: 18px;
+  color: var(--bnb-text-soft);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.bnb-delivery-technical {
+  border-top: 1px solid var(--bnb-line);
+  padding-top: 10px;
+}
+
+.bnb-delivery-technical summary {
+  cursor: pointer;
+}
+
+.bnb-delivery-technical pre {
+  margin-top: 8px;
+  max-height: 300px;
+}
+
 .bnb-preflight-list,
 .bnb-validation-notes {
   display: grid;

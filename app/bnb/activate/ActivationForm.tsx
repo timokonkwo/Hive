@@ -9,6 +9,7 @@ import { AlertTriangle, ArrowLeft, CheckCircle2, CreditCard, ExternalLink, Play,
 import Link from "next/link";
 import { BnbButtonLoader } from "@/app/bnb/_components/BnbButtonLoader";
 import { CopyValueButton } from "@/app/bnb/_components/CopyValueButton";
+import { BnbDeliveryView } from "@/app/bnb/_components/BnbDeliveryView";
 import { useAuth } from "@/hooks/useAuth";
 import { useBnbAuthFetch } from "@/hooks/useBnbAuthFetch";
 import type { BnbAgentProfile, BnbHireIntentInput, BnbJobCapability, BnbJobPreflightResult, BnbJobSpec } from "@/lib/bnb/types";
@@ -43,7 +44,6 @@ import {
   getClientBnbExplorerTxUrl,
   getClientBnbNativeSymbol,
 } from "@/lib/bnb/client-chain";
-import { formatBnbDeliveryText } from "@/lib/bnb/delivery";
 import { bnbAgentHasListedPayment } from "@/lib/bnb/display";
 import { bnbRefundUnavailableReason } from "@/lib/bnb/settlement-state";
 import { BnbSelect } from "@/app/bnb/_components/BnbSelect";
@@ -1146,7 +1146,7 @@ function JobStatusPanel({
   onRefund: () => void;
 }) {
   const output = result?.record?.delivery?.rawOutput || result?.record?.work?.output;
-  const deliveryText = formatBnbDeliveryText(output, result?.record?.jobSpec || result?.jobSpec);
+  const dataSources = result?.record?.delivery?.dataSources || result?.record?.work?.dataSources;
   const failed = result?.record?.delivery?.status === "failed" || result?.record?.work?.status === "failed";
   const refundBlocker = result?.record ? bnbRefundUnavailableReason(result.record) : "";
   const jobHref = result?.recordId ? `/bnb/jobs/${encodeURIComponent(result.recordId)}` : `/bnb/agents/${agent.chainId}/${agent.tokenId}`;
@@ -1176,10 +1176,7 @@ function JobStatusPanel({
         body={body}
       />
       {output ? (
-        <div className="bnb-delivery-box">
-          <strong>Delivery</strong>
-          <pre>{deliveryText}</pre>
-        </div>
+        <BnbDeliveryView output={output} jobSpec={result?.record?.jobSpec || result?.jobSpec} dataSources={dataSources} title="Delivery" />
       ) : failed ? (
         <div className="bnb-error p-4 text-sm">{result?.record?.delivery?.error || result?.record?.work?.error || "Agent run failed."}</div>
       ) : (

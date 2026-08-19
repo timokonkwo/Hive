@@ -18,6 +18,7 @@ describe('BNB marketplace product flows', () => {
   const clientChain = read('lib/bnb/client-chain.ts');
   const jobs = read('lib/bnb/jobs.ts');
   const delivery = read('lib/bnb/delivery.ts');
+  const deliveryView = read('app/bnb/_components/BnbDeliveryView.tsx');
   const escrow = read('lib/bnb/escrow.ts');
   const settlementState = read('lib/bnb/settlement-state.ts');
   const catalog = read('lib/bnb/catalog.ts');
@@ -703,8 +704,15 @@ describe('BNB marketplace product flows', () => {
     assert.match(delivery, /formatStructuredPayload/);
     assert.match(delivery, /Protocol mismatch/);
     assert.match(delivery, /healthFactor === "-1"/);
-    assert.match(jobClient, /formatBnbDeliveryText\(output,\s*record\.jobSpec\)/);
-    assert.match(activityClient, /formatBnbDeliveryText\(output,\s*record\.jobSpec\)/);
+    assert.match(deliveryView, /formatBnbDeliveryText\(output,\s*jobSpec\)/);
+    assert.match(deliveryView, /<details className="bnb-delivery-technical">/);
+    assert.match(deliveryView, /Technical details/);
+    assert.match(deliveryView, /uniqueDataSources\(dataSources\)/);
+    assert.match(deliveryView, /technicalPayload\(output\)/);
+    assert.match(activateForm, /<BnbDeliveryView output=\{output\}/);
+    assert.match(jobClient, /<BnbDeliveryView output=\{output\} jobSpec=\{record\.jobSpec\} dataSources=\{dataSources\}/);
+    assert.match(activityClient, /<BnbDeliveryView output=\{output\} jobSpec=\{record\.jobSpec\} dataSources=\{dataSources\} compact/);
+    assert.match(bnbCss, /\.bnb-delivery-technical/);
   });
 
   it('makes saved hires clickable jobs with resumable actions', () => {
