@@ -55,7 +55,6 @@ type SavedAgent = {
   profileHref: string;
   hireHref: string;
   canHire: boolean;
-  canCheck: boolean;
 };
 
 type ComparisonRow = {
@@ -486,6 +485,7 @@ function DirectoryAgentRow({
 }) {
   const description = listingDescription(agent);
   const reason = matchReason(agent, query);
+  const canHire = canHireAgent(agent);
   const metadata = [
     freshnessLabel(agent.lastActivity),
     agent.feedback.count > 0 ? reviewText(agent) : "",
@@ -541,9 +541,9 @@ function DirectoryAgentRow({
           Compare
         </button>
         <Link href={profileHref(agent)} className="bnb-button-dark bnb-focus">View profile</Link>
-        {canHireAgent(agent) || agent.executionStatus === "connectable" ? (
+        {canHire ? (
           <Link href={hireHref(agent)} className="bnb-button bnb-focus">
-            {canHireAgent(agent) ? "Hire" : "Check"}
+            Hire
           </Link>
         ) : null}
       </div>
@@ -569,8 +569,6 @@ function SavedAgents({ agents, remove }: { agents: SavedAgent[]; remove: (key: s
               <Link href={agent.profileHref} className="bnb-text-action bnb-focus">View</Link>
               {agent.canHire ? (
                 <Link href={agent.hireHref} className="bnb-text-action bnb-focus">Hire</Link>
-              ) : agent.canCheck ? (
-                <Link href={agent.hireHref} className="bnb-text-action bnb-focus">Check</Link>
               ) : (
                 <Link href={agent.profileHref} className="bnb-text-action bnb-focus">Profile</Link>
               )}
@@ -716,7 +714,6 @@ function toSavedAgent(agent: BnbAgentProfile): SavedAgent {
     profileHref: profileHref(agent),
     hireHref: hireHref(agent),
     canHire: canHireAgent(agent),
-    canCheck: agent.executionStatus === "connectable",
   };
 }
 

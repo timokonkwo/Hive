@@ -1,8 +1,11 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
+import { useModalStatus } from "@privy-io/react-auth";
+import { useAccount } from "wagmi";
 import { ClipboardCheck } from "lucide-react";
+import { BnbButtonLoader } from "@/app/bnb/_components/BnbButtonLoader";
 import { useAuth } from "@/hooks/useAuth";
 import { useBnbAuthFetch } from "@/hooks/useBnbAuthFetch";
 import type { BnbTermixCapture } from "@/lib/bnb/types";
@@ -26,16 +29,33 @@ export function TermixCaptureForm({ captures }: { captures: BnbTermixCapture[] }
   const [result, setResult] = useState<CaptureResponse | null>(null);
   const [error, setError] = useState("");
   const [submitting, setSubmitting] = useState(false);
+  const [authBusy, setAuthBusy] = useState(false);
   const { authenticated, login, ready } = useAuth();
+  const { address } = useAccount();
+  const { isOpen: privyModalOpen } = useModalStatus();
   const { authFetch } = useBnbAuthFetch();
   const captureOptions = captures.map((capture) => ({ value: capture.id, label: capture.title }));
+
+  useEffect(() => {
+    if (!privyModalOpen) {
+      setAuthBusy(false);
+    }
+  }, [privyModalOpen]);
+
+  function signInWithBnbWallet() {
+    setAuthBusy(true);
+    login({
+      loginMethods: ["wallet"],
+      walletChainType: "ethereum-only",
+    });
+  }
 
   async function submitCapture(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setError("");
     setResult(null);
 
-    if (!ensureProtectedSession({ authenticated, login })) return;
+    if (!ensureProtectedSession({ authenticated, walletAddress: address, login: signInWithBnbWallet })) return;
 
     setSubmitting(true);
     const formData = new FormData(event.currentTarget);
@@ -204,10 +224,12 @@ export function TermixCaptureForm({ captures }: { captures: BnbTermixCapture[] }
 
         <button
           type="submit"
-          disabled={submitting || !ready}
+          disabled={submitting || authBusy || (!ready && !address)}
+          aria-busy={submitting || authBusy}
           className="bnb-button bnb-focus disabled:cursor-not-allowed disabled:opacity-70"
         >
-          {captureButtonLabel({ submitting, authenticated, ready })}
+          {submitting || authBusy ? <BnbButtonLoader /> : null}
+          {captureButtonLabel({ submitting, authenticated, walletAddress: address, ready, authBusy })}
         </button>
       </div>
 
@@ -229,26 +251,33 @@ export function TermixCaptureForm({ captures }: { captures: BnbTermixCapture[] }
 function captureButtonLabel({
   submitting,
   authenticated,
+  walletAddress,
   ready,
+  authBusy,
 }: {
   submitting: boolean;
   authenticated: boolean;
+  walletAddress?: string;
   ready: boolean;
+  authBusy: boolean;
 }) {
+  if (authBusy) return "Opening wallet...";
   if (submitting) return "Saving...";
-  if (!ready) return "Loading...";
-  if (!authenticated) return "Sign in to save";
+  if (!ready && !walletAddress) return "Loading...";
+  if (!authenticated && !walletAddress) return "Sign in to save";
   return "Save comparison";
 }
 
 function ensureProtectedSession({
   authenticated,
+  walletAddress,
   login,
 }: {
   authenticated: boolean;
+  walletAddress?: string;
   login: () => void;
 }) {
-  if (!authenticated) {
+  if (!authenticated && !walletAddress) {
     login();
     return false;
   }

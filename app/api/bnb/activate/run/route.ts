@@ -1,28 +1,49 @@
 import { NextRequest, NextResponse } from "next/server";
-import { authenticateClient } from "@/lib/client-auth";
+import { requireBnbClient } from "@/lib/bnb/auth";
 import { getBnbAgent } from "@/lib/bnb/catalog";
 import { runBnbAgentAdapter } from "@/lib/bnb/adapters/registry";
 import { runBnbAgentWork } from "@/lib/bnb/agent-runner";
+import { withBnbWalletJobContext } from "@/lib/bnb/jobs";
 import { enforceBnbRateLimit } from "@/lib/bnb/rate-limit";
 import { BnbStorageError, getBnbActivationRecord, updateBnbActivationRecord } from "@/lib/bnb/records";
+import { shouldRequireBnbEscrow } from "@/lib/bnb/runtime";
 import { hasBnbAgentWorker, runBnbAgentWorkOnWorker } from "@/lib/bnb/worker";
+import type { BnbActivationRecord } from "@/lib/bnb/types";
 
 function readString(value: unknown) {
   return typeof value === "string" ? value.trim() : "";
 }
 
-function requiresEscrow() {
-  return process.env.BNB_AGENT_RUN_REQUIRES_ESCROW !== "false";
+function readEvmAddress(value: unknown) {
+  const text = readString(value);
+  return /^0x[a-fA-F0-9]{40}$/.test(text) ? text : "";
+}
+
+function executionWalletAddress(request: NextRequest, authAddress: string) {
+  return readEvmAddress(authAddress) || readEvmAddress(request.headers.get("x-hive-bnb-wallet-address"));
+}
+
+function withRunWalletContext(record: BnbActivationRecord, walletAddress: string): BnbActivationRecord {
+  if (!record.jobSpec || !walletAddress) return record;
+  const jobSpec = withBnbWalletJobContext(record.jobSpec, walletAddress);
+  if (jobSpec === record.jobSpec) return record;
+
+  return {
+    ...record,
+    jobSpec,
+    limits: {
+      ...record.limits,
+      task: jobSpec.summary,
+    },
+  };
 }
 
 export async function POST(request: NextRequest) {
   const limited = enforceBnbRateLimit(request, "activate:run", "write");
   if (limited) return limited;
 
-  const client = await authenticateClient(request);
-  if (!client) {
-    return NextResponse.json({ error: "Sign in to run an agent." }, { status: 401 });
-  }
+  const auth = await requireBnbClient(request, "run an agent");
+  if (auth.response) return auth.response;
 
   try {
     const body = await request.json().catch(() => ({}));
@@ -32,38 +53,48 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "recordId is required" }, { status: 400 });
     }
 
-    const record = await getBnbActivationRecord({ recordId, clientAddress: client.userId });
+    const record = await getBnbActivationRecord({ recordId, clientAddress: auth.client.userId });
     if (!record) {
       return NextResponse.json({ error: "Hire receipt was not found" }, { status: 404 });
     }
 
     if (record.work?.status === "completed") {
       return NextResponse.json({
-        status: record.status,
-        message: "Agent work completed.",
+        status: record.status === "work_completed" ? "delivered" : record.status,
+        message: "Agent delivery is ready.",
         record,
         work: record.work,
+        delivery: record.delivery,
       });
     }
 
     if (record.work?.status === "running") {
       return NextResponse.json({
         status: record.status,
-        message: "Agent work is running.",
+        message: "Agent is running.",
         record,
         work: record.work,
+        delivery: record.delivery,
       }, { status: 202 });
     }
 
-    if (requiresEscrow() && record.payment?.transactionStatus !== "success") {
+    const agent = await getBnbAgent(record.agent.chainId, record.agent.tokenId);
+    const escrowRequired = agent ? shouldRequireBnbEscrow(agent) : record.limits.walletConfirmationRequired !== false;
+
+    if (escrowRequired && record.payment?.transactionStatus !== "success") {
       return NextResponse.json({ error: "Fund escrow before running this agent." }, { status: 409 });
     }
 
     await updateBnbActivationRecord({
       recordId,
-      clientAddress: client.userId,
+      clientAddress: auth.client.userId,
       patch: {
+        status: "running",
         work: {
+          status: "running",
+          startedAt: new Date().toISOString(),
+        },
+        delivery: {
           status: "running",
           startedAt: new Date().toISOString(),
         },
@@ -71,25 +102,37 @@ export async function POST(request: NextRequest) {
     });
 
     try {
-      const agent = await getBnbAgent(record.agent.chainId, record.agent.tokenId);
-      const adapterWork = agent ? await runBnbAgentAdapter(agent, record) : null;
-      const workerResult = adapterWork ? null : hasBnbAgentWorker() ? await runBnbAgentWorkOnWorker(record) : null;
-      const work = adapterWork || (workerResult ? workerResult.work : await runBnbAgentWork(record));
+      const executionRecord = withRunWalletContext(record, executionWalletAddress(request, auth.client.address));
+      const adapterWork = agent ? await runBnbAgentAdapter(agent, executionRecord) : null;
+      const workerResult = adapterWork ? null : hasBnbAgentWorker() ? await runBnbAgentWorkOnWorker(executionRecord) : null;
+      const work = adapterWork || (workerResult ? workerResult.work : await runBnbAgentWork(executionRecord));
       const isComplete = work.status === "completed";
       const updated = await updateBnbActivationRecord({
         recordId,
-        clientAddress: client.userId,
+        clientAddress: auth.client.userId,
         patch: {
-          status: isComplete ? "work_completed" : record.status,
+          status: isComplete ? "delivered" : "running",
           work,
+          delivery: {
+            status: isComplete ? "delivered" : "running",
+            summary: work.output?.split("\n").find(Boolean),
+            rawOutput: work.output,
+            dataSources: work.dataSources,
+            adapter: work.adapter,
+            runId: work.runId,
+            startedAt: work.startedAt,
+            completedAt: work.completedAt,
+            error: work.error,
+          },
         },
       });
 
       return NextResponse.json({
-        status: updated?.status || (isComplete ? "work_completed" : record.status),
-        message: isComplete ? "Agent work completed." : "Agent work started.",
+        status: updated?.status || (isComplete ? "delivered" : "running"),
+        message: isComplete ? "Agent delivery is ready." : "Agent is running.",
         record: updated,
         work,
+        delivery: updated?.delivery,
         ...(workerResult?.mode === "async" ? { workerJobId: workerResult.workerJobId } : {}),
       });
     } catch (error) {
@@ -101,8 +144,17 @@ export async function POST(request: NextRequest) {
       };
       const updated = await updateBnbActivationRecord({
         recordId,
-        clientAddress: client.userId,
-        patch: { work },
+        clientAddress: auth.client.userId,
+        patch: {
+          status: "failed",
+          work,
+          delivery: {
+            status: "failed",
+            startedAt: work.startedAt,
+            completedAt: work.completedAt,
+            error: work.error,
+          },
+        },
       });
 
       return NextResponse.json({

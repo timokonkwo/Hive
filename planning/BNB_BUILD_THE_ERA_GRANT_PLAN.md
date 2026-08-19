@@ -744,6 +744,7 @@ This section tracks implementation progress on the `bnb` branch. Mark units comp
 | Phase 12: Retry safety and verification hardening | Complete | Added hire-run idempotency, escrow settlement guards, Altana session readiness gating, BNB product regression tests, targeted security scans, and contract test verification. |
 | Phase 13: Product flow repair and UI cleanup | Complete | Wired Privy auth to Wagmi through `@privy-io/wagmi`, added wallet management to hire/settlement/session actions, aligned agent directory rows, removed unsupported profile fields and filler copy, made endpoint-less live indexed agents request-only, and verified the current build. |
 | Phase 14: Execution adapters and network-scale discovery | Complete | Added execution states, current-page 8004scan detail hydration, source-backed pagination beyond the first 100 agents, stable category navigation without sampled counts, MCP and A2A adapter preflight/run paths, SSRF-safe endpoint fetching, server-side hire revalidation, and adapter-backed job execution. |
+| Phase 15: Testnet hire lifecycle | Complete | Added testnet/mainnet chain configuration, BSC Testnet wallet switching, structured capability-specific job specs, step-by-step hire wizard, clickable job detail pages, delivery records, job-oriented account activity, BSC Testnet escrow/session deployments, and testnet env handoff. |
 
 Latest verification:
 
@@ -771,17 +772,23 @@ Latest verification:
 - `npm test` passed with 56 tests after Phase 13.
 - `npm test` passed with 62 tests after Phase 14, including execution-state, source pagination, endpoint hydration, MCP/A2A adapter, and SSRF-safe fetch regressions.
 - `npm run typecheck`, `npm run lint -- --quiet`, and `npm run build` passed after Phase 14. The build still shows existing non-fatal warnings for MetaMask SDK optional React Native storage, bigint pure-JS fallback, and local sitemap MongoDB SRV refusal.
+- BSC Testnet contracts deployed after Phase 15:
+  - `HiveBscAgentEscrow`: `0xAAA70e3AD453faB26B9ea33E3C7CF4f94ad00c2d`, tx `0xfb713be0752b1a4488cc6247abd8d012d48d593787c3077d723f1a64db4e6d99`.
+  - `HiveBscSessionRegistry`: `0x1DDCd63282CDd4e5531B65902808Ab0673B0Cd02`, tx `0x64584a22a1af993885c7eba539d88dda80b14f55acfec01872086e8c4a7fde5a`.
+  - Runtime bytecode was confirmed at both BSC Testnet addresses.
+- `npm run bnb:testnet:smoke` passed on BSC Testnet after Phase 15. The smoke created a job, funded escrow, ran the agent work, saved delivery, released escrow, verified the onchain job status, and saved final status `paid`.
+  - Smoke account: `0xD1B72614e53d3CD62A5586f64d64b081EE2417CC`.
+  - Smoke record: `13e06884-7e7a-4f11-8617-5860d06214e1`.
+  - Escrow funding tx: `https://testnet.bscscan.com/tx/0x2d98a82d636397ac8c8346682b3e5c5fbad9881e1b33ed6db38a922120e51f22`.
+  - Escrow release tx: `https://testnet.bscscan.com/tx/0x1a220e4221bc2b1068d947f1877cc3a46fb23803d6f9fd624a80b709d166eb0f`.
 - `npm run typecheck`, focused BNB ESLint, `git diff --check`, and `npm run build` passed after Phase 13. The build still shows the existing non-fatal MetaMask SDK optional dependency warning and local sitemap MongoDB SRV refusal.
 - Built-server smoke checks on port 3001 returned HTTP 200 for `/bnb/agents` and `/api/bnb/agents?limit=5`. The live agents API now marks indexed agents with no callable endpoint as `request`, preventing dead hire CTAs.
 - Rendered `/bnb/agents` HTML was scanned after Phase 13 and did not contain the removed placeholder/profile-copy strings: `Marketplace signals`, `Why Hive ranks`, `Price on request`, `No reviews yet`, `Data from 8004scan`, `Hive score`, `feedback records`, `BNB Agent Studio`, or `Top reviewed agents`.
 
 Deployment prerequisites still owned by the operator:
 
-- Deploy `HiveBscAgentEscrow`.
-- Deploy `HiveBscSessionRegistry`.
-- Set `BNB_AGENT_ESCROW_ADDRESS`.
-- Set `BNB_SESSION_REGISTRY_ADDRESS`.
-- Set `BNB_BSC_RPC_URL` and `NEXT_PUBLIC_BNB_BSC_RPC_URL`.
+- Add the BSC Testnet env values from `planning/BNB_PRODUCT_ENV_AND_DEPLOYMENT.md` to Netlify.
+- Redeploy the BNB Netlify site.
 - Set `BNB_HIVE_AGENTS_JSON` or enable verified live 8004scan discovery.
 
 ## 18.6 Research Refresh and Micro-Feature Audit

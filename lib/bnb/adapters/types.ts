@@ -19,15 +19,18 @@ export type BnbAgentExecutionAdapter = {
   id: BnbAdapterId;
   canHandle(agent: BnbAgentProfile): boolean;
   preflight(agent: BnbAgentProfile): Promise<BnbAdapterPreflightResult>;
+  preflightJob?(input: BnbAdapterRunInput): Promise<BnbAdapterPreflightResult>;
   run(input: BnbAdapterRunInput): Promise<BnbAgentWork>;
 };
 
-export function completedAdapterWork(output: string, dataSources: string[], startedAt: string, trace?: string): BnbAgentWork {
+export function completedAdapterWork(output: string, dataSources: string[], startedAt: string, runId?: string, adapter?: string): BnbAgentWork {
   return {
     status: "completed",
     startedAt,
     completedAt: new Date().toISOString(),
-    output: trace ? `${output}\n\nTrace: ${trace}` : output,
+    output,
     dataSources,
+    ...(adapter ? { adapter } : {}),
+    ...(runId ? { runId } : {}),
   };
 }

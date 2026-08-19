@@ -2,14 +2,15 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
-import { useWallets, type ConnectedWallet } from "@privy-io/react-auth";
+import { useModalStatus, useWallets, type ConnectedWallet } from "@privy-io/react-auth";
 import { useSetActiveWallet } from "@privy-io/wagmi";
-import { bsc } from "wagmi/chains";
 import { useAccount, useSwitchChain } from "wagmi";
 import { CheckCircle2, LogOut, UserRound, Wallet } from "lucide-react";
+import { BnbButtonLoader } from "@/app/bnb/_components/BnbButtonLoader";
 import { BnbContainer, BnbPanel } from "@/app/bnb/_components/BnbUi";
 import { CopyValueButton } from "@/app/bnb/_components/CopyValueButton";
 import { useAuth } from "@/hooks/useAuth";
+import { getClientBnbChainId, getClientBnbNativeSymbol } from "@/lib/bnb/client-chain";
 
 type AuthUserView = {
   email?: {
@@ -21,6 +22,7 @@ export function BnbAccountClient() {
   const { authenticated, connectWallet, login, logout, ready, user } = useAuth();
   const { address, chainId } = useAccount();
   const { switchChainAsync } = useSwitchChain();
+  const { isOpen: privyModalOpen } = useModalStatus();
   const { wallets, ready: walletsReady } = useWallets();
   const { setActiveWallet } = useSetActiveWallet();
   const [action, setAction] = useState("");
@@ -32,7 +34,17 @@ export function BnbAccountClient() {
   );
   const account = user as AuthUserView | undefined;
   const email = account?.email?.address || "";
-  const onBnb = chainId === bsc.id;
+  const targetChainId = getClientBnbChainId();
+  const nativeSymbol = getClientBnbNativeSymbol();
+  const onBnb = chainId === targetChainId;
+  const signingIn = action === "login" || privyModalOpen;
+  const connectingWallet = action === "connect" || privyModalOpen;
+
+  useEffect(() => {
+    if (!privyModalOpen && (action === "login" || action === "connect")) {
+      setAction("");
+    }
+  }, [action, privyModalOpen]);
 
   useEffect(() => {
     if (!authenticated || address || evmWallets.length === 0) return;
@@ -40,10 +52,20 @@ export function BnbAccountClient() {
   }, [address, authenticated, evmWallets, setActiveWallet]);
 
   function connectBnbWallet() {
+    setAction("connect");
     setError("");
     connectWallet({
       walletChainType: "ethereum-only",
-      description: "Connect the wallet you want to use on BNB Smart Chain.",
+      description: `Connect the wallet you want to use for ${nativeSymbol}.`,
+    });
+  }
+
+  function signInWithBnbWallet() {
+    setAction("login");
+    setError("");
+    login({
+      loginMethods: ["wallet"],
+      walletChainType: "ethereum-only",
     });
   }
 
@@ -52,7 +74,7 @@ export function BnbAccountClient() {
     setError("");
 
     try {
-      await switchChainAsync({ chainId: bsc.id });
+      await switchChainAsync({ chainId: targetChainId });
     } catch (switchError) {
       setError(switchError instanceof Error ? switchError.message : "Could not switch to BNB Smart Chain.");
     } finally {
@@ -73,7 +95,20 @@ export function BnbAccountClient() {
     }
   }
 
-  if (!ready) {
+  async function signOut() {
+    setAction("logout");
+    setError("");
+
+    try {
+      await logout();
+    } catch (logoutError) {
+      setError(logoutError instanceof Error ? logoutError.message : "Could not sign out.");
+    } finally {
+      setAction("");
+    }
+  }
+
+  if (!ready && !address) {
     return (
       <BnbContainer className="bnb-section">
         <BnbPanel className="bnb-account-panel">
@@ -83,7 +118,7 @@ export function BnbAccountClient() {
     );
   }
 
-  if (!authenticated) {
+  if (!authenticated && !address) {
     return (
       <BnbContainer className="bnb-section">
         <BnbPanel className="bnb-account-panel bnb-account-auth">
@@ -92,8 +127,9 @@ export function BnbAccountClient() {
           </div>
           <h2>Sign in to Hive</h2>
           <p>View your wallet, hires, requests, alerts, and payments from one account.</p>
-          <button type="button" className="bnb-button bnb-focus" onClick={login}>
-            Sign in
+          <button type="button" className="bnb-button bnb-focus" onClick={signInWithBnbWallet} disabled={signingIn} aria-busy={signingIn}>
+            {signingIn ? <BnbButtonLoader /> : null}
+            {signingIn ? "Opening wallet..." : "Sign in"}
           </button>
         </BnbPanel>
       </BnbContainer>
@@ -106,7 +142,7 @@ export function BnbAccountClient() {
         <div className="bnb-account-panel-head">
           <div>
             <h2>Wallet</h2>
-            <p>Use this wallet for BNB Chain hires, alerts, and payments.</p>
+            <p>Use this wallet for BNB hires, alerts, and payments.</p>
           </div>
           <span className={`bnb-chip ${address && onBnb ? "bnb-chip-active" : ""}`}>
             {address && onBnb ? "Ready" : address ? "Wrong network" : "No wallet"}
@@ -115,23 +151,28 @@ export function BnbAccountClient() {
 
         <dl className="mt-5">
           {email ? <AccountRow label="Signed in as" value={email} /> : null}
+          {!authenticated && address ? <AccountRow label="Signed in as" value="Wallet session" /> : null}
           <AccountRow label="BNB wallet" value={address ? shortAddress(address) : "Not connected"} copyValue={address} />
-          <AccountRow label="Network" value={address ? onBnb ? "BNB Smart Chain" : "Switch to BNB Chain" : "No wallet connected"} />
+          <AccountRow label="Network" value={address ? onBnb ? `${nativeSymbol} network` : `Switch to ${nativeSymbol}` : "No wallet connected"} />
         </dl>
 
         <div className="bnb-account-actions">
-          <button type="button" className="bnb-button bnb-focus" onClick={connectBnbWallet}>
-            {address ? "Change wallet" : "Connect wallet"}
+          <button type="button" className="bnb-button bnb-focus" onClick={connectBnbWallet} disabled={connectingWallet} aria-busy={connectingWallet}>
+            {connectingWallet ? <BnbButtonLoader /> : null}
+            {connectingWallet ? "Opening wallet..." : address ? "Change wallet" : "Connect wallet"}
           </button>
           {address && !onBnb ? (
-            <button type="button" className="bnb-button bnb-button-secondary bnb-focus" onClick={switchToBnb} disabled={action === "switch"}>
+            <button type="button" className="bnb-button bnb-button-secondary bnb-focus" onClick={switchToBnb} disabled={action === "switch"} aria-busy={action === "switch"}>
+              {action === "switch" ? <BnbButtonLoader /> : null}
               {action === "switch" ? "Switching..." : "Switch network"}
             </button>
           ) : null}
-          <button type="button" className="bnb-button-dark bnb-focus" onClick={() => void logout()}>
-            <LogOut aria-hidden="true" size={15} />
-            Sign out
-          </button>
+          {authenticated ? (
+            <button type="button" className="bnb-button-dark bnb-focus" onClick={() => void signOut()} disabled={action === "logout"} aria-busy={action === "logout"}>
+              {action === "logout" ? <BnbButtonLoader /> : <LogOut aria-hidden="true" size={15} />}
+              {action === "logout" ? "Signing out..." : "Sign out"}
+            </button>
+          ) : null}
         </div>
 
         {error ? <p className="bnb-error mt-4 p-3 text-sm">{error}</p> : null}
@@ -141,7 +182,7 @@ export function BnbAccountClient() {
         <div className="bnb-account-panel-head">
           <div>
             <h2>Wallets</h2>
-            <p>Choose the wallet Hive should use for BNB transactions.</p>
+            <p>Choose the wallet Hive should use for {nativeSymbol} transactions.</p>
           </div>
           <Wallet aria-hidden="true" size={18} />
         </div>
@@ -158,12 +199,13 @@ export function BnbAccountClient() {
                   data-active={active ? "true" : undefined}
                   onClick={() => selectWallet(wallet)}
                   disabled={action === `wallet:${wallet.address}`}
+                  aria-busy={action === `wallet:${wallet.address}`}
                 >
                   <span>
                     <strong>{wallet.meta?.name || wallet.walletClientType || "Wallet"}</strong>
                     <small>{shortAddress(wallet.address)}</small>
                   </span>
-                  <span>{active ? <><CheckCircle2 aria-hidden="true" size={15} /> Active</> : action === `wallet:${wallet.address}` ? "Switching..." : "Use"}</span>
+                  <span>{active ? <><CheckCircle2 aria-hidden="true" size={15} /> Active</> : action === `wallet:${wallet.address}` ? <><BnbButtonLoader /> Switching...</> : "Use"}</span>
                 </button>
               );
             })}
@@ -171,8 +213,9 @@ export function BnbAccountClient() {
         ) : (
           <div className="bnb-account-empty">
             <p>No BNB wallet connected.</p>
-            <button type="button" className="bnb-button-dark bnb-focus" onClick={connectBnbWallet}>
-              Connect wallet
+            <button type="button" className="bnb-button-dark bnb-focus" onClick={connectBnbWallet} disabled={connectingWallet} aria-busy={connectingWallet}>
+              {connectingWallet ? <BnbButtonLoader /> : null}
+              {connectingWallet ? "Opening wallet..." : "Connect wallet"}
             </button>
           </div>
         )}

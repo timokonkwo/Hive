@@ -1,8 +1,10 @@
-# BNB Production Setup
+# BNB Testnet Setup
 
-The BNB contracts are already deployed. Do not deploy them again.
+Use this setup to validate the BNB product on BSC Testnet before spending mainnet BNB.
 
-Production uses two new deployments:
+The BSC Testnet contracts are deployed. Do not deploy them again for the current smoke test.
+
+The test deployment uses two services:
 
 - Netlify site `hive-bnb`: serves `https://bnb.uphive.xyz` from the GitHub `bnb` branch.
 - Render service `hive-bnb-worker`: runs the background worker with `npm run bnb:worker`.
@@ -39,10 +41,14 @@ Add these environment variables to the new `hive-bnb` Netlify site:
 SITE_URL=https://bnb.uphive.xyz
 NEXT_PUBLIC_PRIVY_APP_ID=cmmsud1f5029k0ckzaeqk5pas
 MONGODB_URI=<copy the production MongoDB URI from the existing Hive Netlify site>
-BNB_BSC_RPC_URL=https://bsc-dataseed.bnbchain.org
-NEXT_PUBLIC_BNB_BSC_RPC_URL=https://bsc-dataseed.bnbchain.org
-BNB_AGENT_ESCROW_ADDRESS=0xaaa70e3ad453fab26b9ea33e3c7cf4f94ad00c2d
-BNB_SESSION_REGISTRY_ADDRESS=0x1ddcd63282cdd4e5531b65902808ab0673b0cd02
+BNB_NETWORK=testnet
+NEXT_PUBLIC_BNB_NETWORK=testnet
+BNB_BSC_CHAIN_ID=97
+NEXT_PUBLIC_BNB_BSC_CHAIN_ID=97
+BNB_BSC_RPC_URL=https://data-seed-prebsc-1-s1.bnbchain.org:8545
+NEXT_PUBLIC_BNB_BSC_RPC_URL=https://data-seed-prebsc-1-s1.bnbchain.org:8545
+BNB_AGENT_ESCROW_ADDRESS=0xAAA70e3AD453faB26B9ea33E3C7CF4f94ad00c2d
+BNB_SESSION_REGISTRY_ADDRESS=0x1DDCd63282CDd4e5531B65902808Ab0673B0Cd02
 BNB_8004SCAN_LIVE=true
 BNB_8004SCAN_API_BASE=https://8004scan.io/api/v1/public
 BNB_SHOW_LOCAL_AGENTS=false
@@ -145,9 +151,11 @@ NODE_ENV=production
 PORT=8080
 SITE_URL=https://bnb.uphive.xyz
 MONGODB_URI=<same production MongoDB URI used on the hive-bnb Netlify site>
-BNB_BSC_RPC_URL=https://bsc-dataseed.bnbchain.org
-BNB_AGENT_ESCROW_ADDRESS=0xaaa70e3ad453fab26b9ea33e3c7cf4f94ad00c2d
-BNB_SESSION_REGISTRY_ADDRESS=0x1ddcd63282cdd4e5531b65902808ab0673b0cd02
+BNB_NETWORK=testnet
+BNB_BSC_CHAIN_ID=97
+BNB_BSC_RPC_URL=https://data-seed-prebsc-1-s1.bnbchain.org:8545
+BNB_AGENT_ESCROW_ADDRESS=0xAAA70e3AD453faB26B9ea33E3C7CF4f94ad00c2d
+BNB_SESSION_REGISTRY_ADDRESS=0x1DDCd63282CDd4e5531B65902808Ab0673B0Cd02
 BNB_AGENT_WORKER_API_KEY=<first generated secret>
 BNB_AGENT_WORKER_CALLBACK_SECRET=<second generated secret>
 ```
@@ -163,7 +171,7 @@ https://<your-render-service>.onrender.com/health
 Expected response:
 
 ```json
-{"status":"ok","chainId":56}
+{"status":"ok","chainId":97}
 ```
 
 ## 4. Connect The Worker To Netlify
@@ -196,6 +204,7 @@ escrowConfigured=true
 sessionRegistryConfigured=true
 workerConfigured=true
 localAgentsEnabled=false
+chainId=97
 ```
 
 Then test the product:
@@ -206,7 +215,7 @@ Then test the product:
 4. Hire an agent.
 5. Fund escrow.
 6. Run the agent.
-7. Open `Receipts`.
+7. Open `My hires`.
 8. Release escrow or refund after expiry.
 9. Open `Wallet alerts`.
 10. Grant and revoke a wallet alert.
@@ -218,7 +227,7 @@ When something fails, check these exact items:
 - `hive-bnb` Netlify site has `BNB_AGENT_ESCROW_ADDRESS`.
 - `hive-bnb` Netlify site has `BNB_SESSION_REGISTRY_ADDRESS`.
 - Render service uses branch `bnb`.
-- Render `/health` returns `{"status":"ok","chainId":56}`.
+- Render `/health` returns `{"status":"ok","chainId":97}`.
 - `hive-bnb` Netlify site has `BNB_AGENT_WORKER_URL`.
 - Netlify and Render use the same `BNB_AGENT_WORKER_API_KEY`.
 - Netlify and Render use the same `BNB_AGENT_WORKER_CALLBACK_SECRET`.

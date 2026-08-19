@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { authenticateClient } from "@/lib/client-auth";
+import { requireBnbClient } from "@/lib/bnb/auth";
 import { enforceBnbRateLimit } from "@/lib/bnb/rate-limit";
 import { BnbStorageError, listBnbRecords } from "@/lib/bnb/records";
 
@@ -7,15 +7,13 @@ export async function GET(request: NextRequest) {
   const limited = enforceBnbRateLimit(request, "records", "read");
   if (limited) return limited;
 
-  const client = await authenticateClient(request);
-  if (!client) {
-    return NextResponse.json({ error: "Sign in to view activity." }, { status: 401 });
-  }
+  const auth = await requireBnbClient(request, "view activity");
+  if (auth.response) return auth.response;
 
   const { searchParams } = new URL(request.url);
   const limit = Number(searchParams.get("limit") || 25);
   try {
-    const records = await listBnbRecords(Number.isFinite(limit) ? limit : 25, client.userId);
+    const records = await listBnbRecords(Number.isFinite(limit) ? limit : 25, auth.client.userId);
 
     return NextResponse.json(records);
   } catch (error) {

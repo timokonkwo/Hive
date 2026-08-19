@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { authenticateClient } from "@/lib/client-auth";
+import { requireBnbClient } from "@/lib/bnb/auth";
 import { BnbTransactionVerificationError } from "@/lib/bnb/errors";
 import { getBnbAgent, getBnbAltanaSessionTemplates } from "@/lib/bnb/catalog";
 import { enforceBnbRateLimit } from "@/lib/bnb/rate-limit";
@@ -15,10 +15,8 @@ export async function POST(request: NextRequest) {
   const limited = enforceBnbRateLimit(request, "altana:session", "write");
   if (limited) return limited;
 
-  const client = await authenticateClient(request);
-  if (!client) {
-    return NextResponse.json({ error: "Sign in to save a wallet alert." }, { status: 401 });
-  }
+  const auth = await requireBnbClient(request, "save a wallet alert");
+  if (auth.response) return auth.response;
 
   const body = await request.json().catch(() => ({}));
   const recordId = readString(body.recordId);
@@ -28,7 +26,7 @@ export async function POST(request: NextRequest) {
     try {
       const record = await confirmBnbAltanaSessionGrant({
         recordId,
-        clientAddress: client.userId,
+        clientAddress: auth.client.userId,
         transactionHash: grantTransactionHash,
       });
 
@@ -86,7 +84,7 @@ export async function POST(request: NextRequest) {
       walletAddress,
       trigger,
       budget,
-      clientAddress: client.userId,
+      clientAddress: auth.client.userId,
     });
     const agent = await getBnbAgent(56, template.agentTokenId);
     const grantRequest = agent

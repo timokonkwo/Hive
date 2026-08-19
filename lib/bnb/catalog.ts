@@ -111,8 +111,8 @@ const localBnbAgents: BnbAgentProfile[] = [
     identityRegistry: DEFAULT_REGISTRY,
     metadataUri: "https://bnb.uphive.xyz/agents/yield-scout.json",
     services: [
-      { name: "rank_yield_routes", type: "mcp", endpoint: "https://bnb.uphive.xyz/api/bnb/mcp", price: "0.005 BNB" },
-      { name: "yield_report", type: "erc8183", price: "0.01 BNB" },
+      { name: "rank_yield_routes", type: "mcp", endpoint: "https://bnb.uphive.xyz/api/bnb/mcp" },
+      { name: "yield_report", type: "erc8183" },
     ],
     capabilities: ["pancakeswap", "farm-apr", "yield-routing", "risk-adjusted-yield"],
     x402Support: true,
@@ -140,7 +140,7 @@ const localBnbAgents: BnbAgentProfile[] = [
     identityRegistry: DEFAULT_REGISTRY,
     metadataUri: "https://bnb.uphive.xyz/agents/range-guard.json",
     services: [
-      { name: "lp_rebalance_review", type: "a2a", endpoint: "https://bnb.uphive.xyz/api/bnb/activate", price: "0.01 BNB" },
+      { name: "lp_rebalance_review", type: "a2a", endpoint: "https://bnb.uphive.xyz/api/bnb/activate" },
     ],
     capabilities: ["pancakeswap-v3", "lp-range", "rebalance", "impermanent-loss"],
     x402Support: false,
@@ -168,7 +168,7 @@ const localBnbAgents: BnbAgentProfile[] = [
     identityRegistry: DEFAULT_REGISTRY,
     metadataUri: "https://bnb.uphive.xyz/agents/grid-pilot.json",
     services: [
-      { name: "grid_strategy_plan", type: "mcp", endpoint: "https://bnb.uphive.xyz/api/bnb/mcp", price: "0.01 BNB" },
+      { name: "grid_strategy_plan", type: "mcp", endpoint: "https://bnb.uphive.xyz/api/bnb/mcp" },
     ],
     capabilities: ["grid-trading", "bnb-usdt", "risk-limits", "strategy-design"],
     x402Support: false,
@@ -196,7 +196,7 @@ const localBnbAgents: BnbAgentProfile[] = [
     identityRegistry: DEFAULT_REGISTRY,
     metadataUri: "https://bnb.uphive.xyz/agents/health-sentinel.json",
     services: [
-      { name: "health_factor_watch", type: "a2a", endpoint: "https://bnb.uphive.xyz/api/bnb/activate", price: "0.01 BNB" },
+      { name: "health_factor_watch", type: "a2a", endpoint: "https://bnb.uphive.xyz/api/bnb/activate" },
     ],
     capabilities: ["venus", "liquidation-alert", "health-factor", "wallet-monitoring"],
     x402Support: false,
@@ -224,7 +224,7 @@ const localBnbAgents: BnbAgentProfile[] = [
     identityRegistry: DEFAULT_REGISTRY,
     metadataUri: "https://bnb.uphive.xyz/agents/audit-lens.json",
     services: [
-      { name: "token_risk_report", type: "http", endpoint: "https://bnb.uphive.xyz/api/bnb/activate", price: "0.01 BNB" },
+      { name: "token_risk_report", type: "http", endpoint: "https://bnb.uphive.xyz/api/bnb/activate" },
     ],
     capabilities: ["token-risk", "permissions", "liquidity-check", "security-report"],
     x402Support: false,
@@ -282,7 +282,7 @@ export const bnbPancakeSwapUtilities: BnbPancakeSwapUtility[] = [
     activationHref: "/bnb/activate?chainId=56&tokenId=hive-yield-scout",
     scoring: [
       { label: "Target time", value: "Under 60 sec" },
-      { label: "Target cost", value: "0.005 BNB" },
+      { label: "Target cost", value: "User budget" },
       { label: "Saved result", value: "Route ranking" },
     ],
   },
@@ -297,7 +297,7 @@ export const bnbPancakeSwapUtilities: BnbPancakeSwapUtility[] = [
     activationHref: "/bnb/activate?chainId=56&tokenId=hive-range-guard",
     scoring: [
       { label: "Target time", value: "Under 2 min" },
-      { label: "Target cost", value: "0.01 BNB" },
+      { label: "Target cost", value: "User budget" },
       { label: "Saved result", value: "LP decision" },
     ],
   },
@@ -312,7 +312,7 @@ export const bnbPancakeSwapUtilities: BnbPancakeSwapUtility[] = [
     activationHref: "/bnb/activate?chainId=56&tokenId=hive-yield-scout",
     scoring: [
       { label: "Target time", value: "Under 90 sec" },
-      { label: "Target cost", value: "0.01 BNB/week" },
+      { label: "Target cost", value: "User budget" },
       { label: "Saved result", value: "Watch receipt" },
     ],
   },
@@ -342,7 +342,7 @@ export const bnbAltanaSessionTemplates: BnbAltanaSessionTemplate[] = [
     title: "Health factor alert",
     agentTokenId: "hive-health-sentinel",
     summary: "Watch a lending position and alert when the health factor gets too low.",
-    spendCap: "0.01 BNB",
+    spendCap: "0.001 BNB",
     expiry: "7 days",
   },
   {
@@ -350,7 +350,7 @@ export const bnbAltanaSessionTemplates: BnbAltanaSessionTemplate[] = [
     title: "Yield route alert",
     agentTokenId: "hive-yield-scout",
     summary: "Watch selected farms and alert when a route needs review.",
-    spendCap: "0.005 BNB",
+    spendCap: "0.001 BNB",
     expiry: "24 hours",
   },
   {
@@ -358,7 +358,7 @@ export const bnbAltanaSessionTemplates: BnbAltanaSessionTemplate[] = [
     title: "LP range alert",
     agentTokenId: "hive-range-guard",
     summary: "Watch an LP position and alert when the range needs review.",
-    spendCap: "0.01 BNB",
+    spendCap: "0.001 BNB",
     expiry: "48 hours",
   },
 ];
@@ -616,9 +616,9 @@ function get8004BaseUrl() {
 }
 
 function get8004TimeoutMs() {
-  const timeout = Number(process.env.BNB_8004SCAN_TIMEOUT_MS || 3500);
-  if (!Number.isFinite(timeout)) return 3500;
-  return Math.min(Math.max(timeout, 1000), 10000);
+  const timeout = Number(process.env.BNB_8004SCAN_TIMEOUT_MS || 1500);
+  if (!Number.isFinite(timeout)) return 1500;
+  return Math.min(Math.max(timeout, 500), 5000);
 }
 
 async function fetch8004Json(url: URL | string, revalidate: number) {
@@ -1203,7 +1203,7 @@ export async function listBnbAgentsPage(query: BnbAgentQuery = {}): Promise<BnbA
     page === 1 && sourceSearch ? fetch8004SearchAgents(sourceSearch, Math.min(limit, 25)) : Promise.resolve([]),
   ]);
   const baseAgents = page === 1 ? getBaseBnbAgents() : [];
-  const liveAgents = await hydrate8004AgentDetails(uniqueAgents([...semanticAgents, ...livePage.agents]).slice(0, limit));
+  const liveAgents = uniqueAgents([...semanticAgents, ...livePage.agents]).slice(0, limit);
   const agents = uniqueAgents([...baseAgents, ...liveAgents])
     .filter((agent) => matchesQuery(agent, query))
     .map((agent) => ({

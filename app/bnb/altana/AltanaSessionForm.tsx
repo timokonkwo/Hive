@@ -1,20 +1,22 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
-import { bsc } from "wagmi/chains";
+import { useModalStatus } from "@privy-io/react-auth";
 import { useAccount, useSendTransaction, useSwitchChain } from "wagmi";
 import type { Hex } from "viem";
 import { Bell } from "lucide-react";
+import { BnbButtonLoader } from "@/app/bnb/_components/BnbButtonLoader";
 import { useAuth } from "@/hooks/useAuth";
 import { useBnbAuthFetch } from "@/hooks/useBnbAuthFetch";
+import { getClientBnbChainId, getClientBnbNativeSymbol } from "@/lib/bnb/client-chain";
 import type { BnbAltanaSessionTemplate } from "@/lib/bnb/types";
 import { BnbSelect } from "@/app/bnb/_components/BnbSelect";
 
 type GrantRequest =
   | {
       status: "ready";
-      chainId: 56;
+      chainId: number;
       to: string;
       value: string;
       data: string;
@@ -38,19 +40,39 @@ export function AltanaSessionForm({ templates }: { templates: BnbAltanaSessionTe
   const [error, setError] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [granting, setGranting] = useState(false);
+  const [authBusy, setAuthBusy] = useState(false);
+  const [walletBusy, setWalletBusy] = useState(false);
   const { authenticated, login, ready, connectWallet } = useAuth();
   const { address, chainId } = useAccount();
+  const { isOpen: privyModalOpen } = useModalStatus();
   const { sendTransactionAsync } = useSendTransaction();
   const { switchChainAsync } = useSwitchChain();
   const { authFetch } = useBnbAuthFetch();
+  const targetChainId = getClientBnbChainId();
+  const nativeSymbol = getClientBnbNativeSymbol();
   const templateOptions = templates.map((template) => ({ value: template.id, label: template.title }));
+
+  useEffect(() => {
+    if (!privyModalOpen) {
+      setAuthBusy(false);
+      setWalletBusy(false);
+    }
+  }, [privyModalOpen]);
+
+  function signInWithBnbWallet() {
+    setAuthBusy(true);
+    login({
+      loginMethods: ["wallet"],
+      walletChainType: "ethereum-only",
+    });
+  }
 
   async function submitSession(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setError("");
     setResult(null);
 
-    if (!ensureProtectedSession({ authenticated, login })) return;
+    if (!ensureProtectedSession({ authenticated, walletAddress: address, login: signInWithBnbWallet })) return;
 
     setSubmitting(true);
     try {
@@ -76,11 +98,12 @@ export function AltanaSessionForm({ templates }: { templates: BnbAltanaSessionTe
 
   async function grantSession() {
     if (!result?.grantRequest || result.grantRequest.status !== "ready") return;
-    if (!ensureProtectedSession({ authenticated, login })) return;
+    if (!ensureProtectedSession({ authenticated, walletAddress: address, login: signInWithBnbWallet })) return;
     if (!address) {
+      setWalletBusy(true);
       connectWallet({
         walletChainType: "ethereum-only",
-        description: "Connect the wallet you want to use for BNB Smart Chain transactions.",
+        description: `Connect the wallet you want to use for ${nativeSymbol} transactions.`,
       });
       return;
     }
@@ -89,15 +112,15 @@ export function AltanaSessionForm({ templates }: { templates: BnbAltanaSessionTe
     setError("");
 
     try {
-      if (chainId !== bsc.id) {
-        await switchChainAsync({ chainId: bsc.id });
+      if (chainId !== targetChainId) {
+        await switchChainAsync({ chainId: targetChainId });
       }
 
       const hash = await sendTransactionAsync({
         to: result.grantRequest.to as Hex,
         data: result.grantRequest.data as Hex,
         value: BigInt(result.grantRequest.value),
-        chainId: bsc.id,
+        chainId: targetChainId,
       });
 
       const response = await authFetch("/api/bnb/altana/session", {
@@ -177,17 +200,19 @@ export function AltanaSessionForm({ templates }: { templates: BnbAltanaSessionTe
             type="text"
             inputMode="decimal"
             autoComplete="off"
-            placeholder="0.01 BNB"
+            placeholder={`0.001 ${nativeSymbol}`}
             className="bnb-input"
           />
         </label>
 
         <button
           type="submit"
-          disabled={submitting || !ready}
+          disabled={submitting || authBusy || (!ready && !address)}
+          aria-busy={submitting || authBusy}
           className="bnb-button bnb-focus disabled:cursor-not-allowed disabled:opacity-70"
         >
-          {sessionButtonLabel({ submitting, authenticated, ready })}
+          {submitting || authBusy ? <BnbButtonLoader /> : null}
+          {sessionButtonLabel({ submitting, authenticated, walletAddress: address, ready, authBusy })}
         </button>
       </div>
 
@@ -201,10 +226,12 @@ export function AltanaSessionForm({ templates }: { templates: BnbAltanaSessionTe
             <button
               type="button"
               onClick={grantSession}
-              disabled={granting}
+              disabled={granting || walletBusy}
+              aria-busy={granting || walletBusy}
               className="bnb-button bnb-focus mt-4 w-full disabled:cursor-not-allowed disabled:opacity-60"
             >
-              {granting ? "Confirming..." : "Grant session on BSC"}
+              {granting || walletBusy ? <BnbButtonLoader /> : null}
+              {walletBusy ? "Opening wallet..." : granting ? "Confirming..." : `Grant session on ${nativeSymbol}`}
             </button>
           ) : result.grantRequest ? (
             <p className="mt-3 text-sm leading-6 text-zinc-300">{result.grantRequest.reason}</p>
@@ -221,26 +248,33 @@ export function AltanaSessionForm({ templates }: { templates: BnbAltanaSessionTe
 function sessionButtonLabel({
   submitting,
   authenticated,
+  walletAddress,
   ready,
+  authBusy,
 }: {
   submitting: boolean;
   authenticated: boolean;
+  walletAddress?: string;
   ready: boolean;
+  authBusy: boolean;
 }) {
+  if (authBusy) return "Opening wallet...";
   if (submitting) return "Saving...";
-  if (!ready) return "Loading...";
-  if (!authenticated) return "Sign in to save";
+  if (!ready && !walletAddress) return "Loading...";
+  if (!authenticated && !walletAddress) return "Sign in to save";
   return "Save alert";
 }
 
 function ensureProtectedSession({
   authenticated,
+  walletAddress,
   login,
 }: {
   authenticated: boolean;
+  walletAddress?: string;
   login: () => void;
 }) {
-  if (!authenticated) {
+  if (!authenticated && !walletAddress) {
     login();
     return false;
   }

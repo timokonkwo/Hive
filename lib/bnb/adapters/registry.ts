@@ -21,6 +21,23 @@ export async function preflightBnbAgentAdapters(agent: BnbAgentProfile): Promise
   return Promise.all(candidates.map((adapter) => adapter.preflight(agent)));
 }
 
+export async function preflightBnbAgentJob(agent: BnbAgentProfile, record: BnbActivationRecord): Promise<BnbAdapterPreflightResult[]> {
+  const candidates = adapters.filter((adapter) => adapter.canHandle(agent));
+  if (candidates.length === 0) {
+    return [{
+      ok: false,
+      adapter: "http",
+      reason: "No supported execution endpoint is listed for this agent.",
+    }];
+  }
+
+  return Promise.all(candidates.map(async (adapter) => {
+    const endpointPreflight = await adapter.preflight(agent);
+    if (!endpointPreflight.ok || !adapter.preflightJob) return endpointPreflight;
+    return adapter.preflightJob({ agent, record });
+  }));
+}
+
 export async function hasRunnableBnbAdapter(agent: BnbAgentProfile) {
   const results = await preflightBnbAgentAdapters(agent);
   return results.some((result) => result.ok);

@@ -43,6 +43,25 @@ export interface VerifiedClient {
   expiresAt: number;
 }
 
+export type ClientAuthFailureReason =
+  | 'missing_app_id'
+  | 'missing_token'
+  | 'expired'
+  | 'invalid'
+  | 'jwks_failed';
+
+export type ClientAuthResult =
+  | {
+      ok: true;
+      client: VerifiedClient;
+    }
+  | {
+      ok: false;
+      reason: ClientAuthFailureReason;
+      status: 401 | 503;
+      message: string;
+    };
+
 /**
  * Extract and verify the Privy access token from a request.
  *
@@ -50,10 +69,20 @@ export interface VerifiedClient {
  * Does NOT throw — callers should check the return value and respond 401.
  */
 export async function authenticateClient(req: NextRequest): Promise<VerifiedClient | null> {
+  const result = await authenticateClientDetailed(req);
+  return result.ok ? result.client : null;
+}
+
+export async function authenticateClientDetailed(req: NextRequest): Promise<ClientAuthResult> {
   try {
     if (!PRIVY_APP_ID) {
       logger.error('NEXT_PUBLIC_PRIVY_APP_ID is not set', { tag: 'AUTH' });
-      return null;
+      return {
+        ok: false,
+        reason: 'missing_app_id',
+        status: 503,
+        message: 'Privy authentication is not configured.',
+      };
     }
 
     // Extract Privy-issued tokens from Authorization, verified identity header, or cookies.
@@ -70,18 +99,31 @@ export async function authenticateClient(req: NextRequest): Promise<VerifiedClie
       tokens.push(identityHeader);
     }
 
-    const accessCookie = req.cookies.get('privy-token')?.value;
-    const identityCookie = req.cookies.get('privy-id-token')?.value;
-    if (accessCookie) {
-      tokens.push(accessCookie);
+    const cookieTokenNames = [
+      'privy-token',
+      'privy-id-token',
+      'privy:token',
+      'privy:id-token',
+      'privy:pat',
+    ];
+    for (const name of cookieTokenNames) {
+      const value = req.cookies.get(name)?.value;
+      if (value) tokens.push(value);
     }
-    if (identityCookie) {
-      tokens.push(identityCookie);
+    for (const cookie of req.cookies.getAll()) {
+      if (cookie.name.toLowerCase().includes('privy') && looksLikeJwt(cookie.value)) {
+        tokens.push(cookie.value);
+      }
     }
 
     const uniqueTokens = [...new Set(tokens.filter(Boolean))];
     if (uniqueTokens.length === 0) {
-      return null;
+      return {
+        ok: false,
+        reason: 'missing_token',
+        status: 401,
+        message: 'No Privy authentication token was sent.',
+      };
     }
 
     // Verify the JWT against Privy's JWKS
@@ -100,28 +142,72 @@ export async function authenticateClient(req: NextRequest): Promise<VerifiedClie
         }
 
         return {
-          userId,
-          // The userId (did:privy:...) is the canonical identity.
-          address: userId,
-          sessionId: (payload as any).sid || '',
-          expiresAt: payload.exp || 0,
+          ok: true,
+          client: {
+            userId,
+            // The userId (did:privy:...) is the canonical identity.
+            address: userId,
+            sessionId: (payload as any).sid || '',
+            expiresAt: payload.exp || 0,
+          },
         };
       } catch (verificationError: any) {
         lastError = verificationError;
       }
     }
 
-    if (lastError?.code !== 'ERR_JWT_EXPIRED') {
-      logger.error('Client auth verification failed', { tag: 'AUTH', error: lastError?.message });
+    if (lastError?.code === 'ERR_JWT_EXPIRED') {
+      return {
+        ok: false,
+        reason: 'expired',
+        status: 401,
+        message: 'Privy authentication token expired.',
+      };
     }
-    return null;
+
+    const reason = isJwksFailure(lastError) ? 'jwks_failed' : 'invalid';
+    const status = reason === 'jwks_failed' ? 503 : 401;
+    logger.warn('Client auth verification failed', { tag: 'AUTH', reason, error: lastError?.message });
+    return {
+      ok: false,
+      reason,
+      status,
+      message: reason === 'jwks_failed'
+        ? 'Privy authentication could not be verified right now.'
+        : 'Privy authentication token was rejected.',
+    };
   } catch (error: any) {
     // JWT verification failed — invalid, expired, or tampered token
-    if (error?.code !== 'ERR_JWT_EXPIRED') {
-      logger.error('Client auth verification failed', { tag: 'AUTH', error: error.message });
+    if (error?.code === 'ERR_JWT_EXPIRED') {
+      return {
+        ok: false,
+        reason: 'expired',
+        status: 401,
+        message: 'Privy authentication token expired.',
+      };
     }
-    return null;
+
+    const reason = isJwksFailure(error) ? 'jwks_failed' : 'invalid';
+    const status = reason === 'jwks_failed' ? 503 : 401;
+    logger.warn('Client auth verification failed', { tag: 'AUTH', reason, error: error.message });
+    return {
+      ok: false,
+      reason,
+      status,
+      message: reason === 'jwks_failed'
+        ? 'Privy authentication could not be verified right now.'
+        : 'Privy authentication token was rejected.',
+    };
   }
+}
+
+function isJwksFailure(error: any) {
+  const text = `${error?.code || ''} ${error?.name || ''} ${error?.message || ''}`.toLowerCase();
+  return /jwks|fetch|network|econn|enotfound|etimedout|timeout|dns|getaddrinfo/.test(text);
+}
+
+function looksLikeJwt(value: string) {
+  return /^[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+$/.test(value);
 }
 
 /**

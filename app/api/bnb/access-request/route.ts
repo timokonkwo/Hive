@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { authenticateClient } from "@/lib/client-auth";
+import { requireBnbClient } from "@/lib/bnb/auth";
 import { getBnbAgent } from "@/lib/bnb/catalog";
 import { enforceBnbRateLimit } from "@/lib/bnb/rate-limit";
 import {
@@ -22,10 +22,8 @@ export async function POST(request: NextRequest) {
   const limited = enforceBnbRateLimit(request, "access-request", "write");
   if (limited) return limited;
 
-  const client = await authenticateClient(request);
-  if (!client) {
-    return NextResponse.json({ error: "Sign in to request access." }, { status: 401 });
-  }
+  const auth = await requireBnbClient(request, "request access");
+  if (auth.response) return auth.response;
 
   const readiness = getBnbRuntimeReadiness();
   if (!readiness.actions.canCreateRequest) {
@@ -55,7 +53,7 @@ export async function POST(request: NextRequest) {
       ...(budget ? { budget } : {}),
       ...(deadline ? { deadline } : {}),
       ...(contactPreference ? { contactPreference } : {}),
-      clientAddress: client.userId,
+      clientAddress: auth.client.userId,
     });
 
     return NextResponse.json({
@@ -78,10 +76,8 @@ export async function PATCH(request: NextRequest) {
   const limited = enforceBnbRateLimit(request, "access-request:cancel", "write");
   if (limited) return limited;
 
-  const client = await authenticateClient(request);
-  if (!client) {
-    return NextResponse.json({ error: "Sign in to cancel this request." }, { status: 401 });
-  }
+  const auth = await requireBnbClient(request, "cancel this request");
+  if (auth.response) return auth.response;
 
   try {
     const body = await request.json().catch(() => ({}));
@@ -92,7 +88,7 @@ export async function PATCH(request: NextRequest) {
 
     const record = await cancelBnbAccessRequestRecord({
       recordId,
-      clientAddress: client.userId,
+      clientAddress: auth.client.userId,
       ...(cancelReason ? { cancelReason } : {}),
     });
 

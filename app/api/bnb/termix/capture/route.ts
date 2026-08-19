@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { authenticateClient } from "@/lib/client-auth";
+import { requireBnbClient } from "@/lib/bnb/auth";
 import { getBscAddressSummary } from "@/lib/bnb/chain";
 import { getBnbTermixCaptures } from "@/lib/bnb/catalog";
 import { analyzePancakeSwapV2Pair } from "@/lib/bnb/pancakeswap";
@@ -54,10 +54,8 @@ export async function POST(request: NextRequest) {
   const limited = enforceBnbRateLimit(request, "termix:capture", "write");
   if (limited) return limited;
 
-  const client = await authenticateClient(request);
-  if (!client) {
-    return NextResponse.json({ error: "Sign in to save a comparison." }, { status: 401 });
-  }
+  const auth = await requireBnbClient(request, "save a comparison");
+  if (auth.response) return auth.response;
 
   const body = await request.json().catch(() => ({}));
   const caseId = readString(body.caseId);
@@ -107,7 +105,7 @@ export async function POST(request: NextRequest) {
       agentTime: agentTime || generated?.agentTime,
       agentTokenId,
       verdict: normalizeTermixVerdict(verdict),
-      clientAddress: client.userId,
+      clientAddress: auth.client.userId,
       artifactUrl,
       transactionHash,
       manualOutput,

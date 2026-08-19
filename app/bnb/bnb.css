@@ -472,6 +472,17 @@ body:has(.bnb-shell) {
   transition: border-color 160ms cubic-bezier(0.23, 1, 0.32, 1), background-color 160ms cubic-bezier(0.23, 1, 0.32, 1), color 160ms cubic-bezier(0.23, 1, 0.32, 1), transform 160ms cubic-bezier(0.23, 1, 0.32, 1);
 }
 
+.bnb-button-loader {
+  flex: none;
+  animation: bnb-spin 720ms linear infinite;
+}
+
+@keyframes bnb-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
 .bnb-button-secondary {
   border-color: var(--bnb-line-strong);
   background: var(--bnb-carbon);
@@ -544,6 +555,16 @@ body:has(.bnb-shell) {
 button.bnb-account-button:disabled {
   cursor: not-allowed;
   opacity: 0.55;
+}
+
+.bnb-button:disabled,
+.bnb-button-dark:disabled,
+.bnb-button-secondary:disabled,
+.bnb-wallet-row:disabled,
+.bnb-account-wallet-row:disabled {
+  cursor: not-allowed;
+  opacity: 0.65;
+  transform: none;
 }
 
 .bnb-account-mobile-label {
@@ -932,6 +953,19 @@ button.bnb-account-button:disabled {
 .bnb-data-value span {
   min-width: 0;
   overflow-wrap: anywhere;
+}
+
+.bnb-data-value a {
+  min-width: 0;
+  color: var(--bnb-hive-hover);
+  overflow-wrap: anywhere;
+  text-decoration: none;
+}
+
+.bnb-data-value a:hover {
+  color: var(--bnb-text);
+  text-decoration: underline;
+  text-underline-offset: 3px;
 }
 
 .bnb-account-layout {
@@ -2120,6 +2154,381 @@ button.bnb-account-button:disabled {
   line-height: 1.5;
 }
 
+.bnb-hire-wizard {
+  display: grid;
+  gap: 14px;
+}
+
+.bnb-hire-steps {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.bnb-hire-steps li {
+  display: flex;
+  min-width: 0;
+  min-height: 48px;
+  align-items: center;
+  gap: 8px;
+  border: 1px solid var(--bnb-line);
+  border-radius: 8px;
+  background: var(--bnb-muted);
+  padding: 8px 10px;
+  color: var(--bnb-text-dim);
+}
+
+.bnb-hire-steps li[data-active="true"] {
+  border-color: var(--bnb-gold-line);
+  background: var(--bnb-gold-soft);
+  color: #f7d76b;
+}
+
+.bnb-hire-steps li[data-complete="true"] {
+  border-color: var(--bnb-hive-line);
+  color: var(--bnb-text);
+}
+
+.bnb-hire-steps li > span {
+  display: grid;
+  flex: 0 0 auto;
+  width: 22px;
+  height: 22px;
+  place-items: center;
+  border-radius: 999px;
+  background: var(--bnb-elevated);
+  color: inherit;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.bnb-hire-steps strong {
+  min-width: 0;
+  overflow: hidden;
+  font-size: 12px;
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.bnb-hire-card {
+  padding: 20px;
+}
+
+.bnb-hire-step,
+.bnb-hire-stage {
+  display: grid;
+  gap: 18px;
+}
+
+.bnb-hire-step-head h2 {
+  color: var(--bnb-text);
+  font-size: 24px;
+  font-weight: 500;
+  letter-spacing: 0;
+  line-height: 1.2;
+}
+
+.bnb-hire-step-head p {
+  margin-top: 6px;
+  max-width: 620px;
+  color: var(--bnb-text-muted);
+  font-size: 14px;
+  line-height: 1.55;
+}
+
+.bnb-form-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.bnb-form-grid > label,
+.bnb-form-span {
+  min-width: 0;
+}
+
+.bnb-form-span {
+  grid-column: 1 / -1;
+}
+
+.bnb-field-hint {
+  display: block;
+  margin-top: 6px;
+  color: var(--bnb-text-dim);
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.bnb-action-hint {
+  max-width: 280px;
+  margin-top: 0;
+  align-self: center;
+}
+
+.bnb-field-error {
+  margin-top: 7px;
+  color: #ffb4a8;
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.bnb-advanced-details {
+  border: 1px solid var(--bnb-line);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.025);
+  padding: 12px;
+}
+
+.bnb-advanced-details summary {
+  cursor: pointer;
+  color: var(--bnb-text);
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.bnb-advanced-details .bnb-form-grid {
+  margin-top: 12px;
+}
+
+.bnb-budget-field {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  overflow: hidden;
+  border: 1px solid var(--bnb-line-strong);
+  border-radius: 8px;
+  background: var(--bnb-elevated);
+}
+
+.bnb-budget-field:focus-within {
+  border-color: var(--bnb-hive);
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--bnb-hive) 52%, transparent);
+}
+
+.bnb-budget-field .bnb-input {
+  min-height: 40px;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+.bnb-budget-field .bnb-input:focus {
+  border-color: transparent;
+  box-shadow: none;
+}
+
+.bnb-budget-field > span {
+  display: grid;
+  min-height: 40px;
+  place-items: center;
+  border-left: 1px solid var(--bnb-line);
+  padding: 0 12px;
+  color: var(--bnb-text-muted);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.bnb-step-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10px;
+}
+
+.bnb-hire-review {
+  display: grid;
+  border: 1px solid var(--bnb-line);
+  border-radius: 8px;
+  background: rgba(221, 255, 220, 0.02);
+}
+
+.bnb-hire-review .bnb-data-row {
+  padding-right: 14px;
+  padding-left: 14px;
+}
+
+.bnb-hire-summary,
+.bnb-delivery-box {
+  display: grid;
+  gap: 10px;
+  border: 1px solid var(--bnb-line);
+  border-radius: 8px;
+  background: rgba(0, 0, 0, 0.22);
+  padding: 14px;
+}
+
+.bnb-hire-summary strong,
+.bnb-delivery-box strong {
+  color: var(--bnb-text);
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.bnb-hire-summary pre,
+.bnb-delivery-box pre {
+  max-height: 360px;
+  overflow: auto;
+  white-space: pre-wrap;
+  color: var(--bnb-text-soft);
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+.bnb-preflight-list,
+.bnb-validation-notes {
+  display: grid;
+  gap: 10px;
+}
+
+.bnb-preflight-ok,
+.bnb-preflight-warning {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  border: 1px solid var(--bnb-line);
+  border-radius: 8px;
+  padding: 12px;
+}
+
+.bnb-preflight-ok {
+  background: var(--bnb-hive-soft);
+  color: var(--bnb-text);
+}
+
+.bnb-preflight-warning {
+  background: rgba(255, 180, 168, 0.08);
+  color: #ffcec6;
+}
+
+.bnb-preflight-ok span,
+.bnb-preflight-warning span {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+
+.bnb-preflight-ok strong,
+.bnb-preflight-warning strong {
+  font-size: 13px;
+}
+
+.bnb-preflight-ok small,
+.bnb-preflight-warning small,
+.bnb-validation-notes p {
+  color: var(--bnb-text-muted);
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.bnb-validation-notes {
+  border-left: 2px solid var(--bnb-hive);
+  padding-left: 12px;
+}
+
+.bnb-hire-state {
+  display: inline-flex;
+  width: fit-content;
+  min-height: 44px;
+  align-items: center;
+  gap: 8px;
+  border: 1px solid var(--bnb-hive-line);
+  border-radius: 8px;
+  background: var(--bnb-hive-soft);
+  padding: 0 12px;
+  color: var(--bnb-text);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.bnb-job-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 340px;
+  gap: 18px;
+  align-items: start;
+}
+
+.bnb-job-main,
+.bnb-job-side {
+  min-width: 0;
+}
+
+.bnb-job-side {
+  position: sticky;
+  top: 86px;
+  display: grid;
+  gap: 14px;
+}
+
+.bnb-job-panel,
+.bnb-job-empty {
+  display: grid;
+  gap: 14px;
+  padding: 18px;
+}
+
+.bnb-job-empty h2,
+.bnb-job-panel h2 {
+  color: var(--bnb-text);
+  font-size: 20px;
+  font-weight: 500;
+}
+
+.bnb-job-empty p,
+.bnb-job-panel p {
+  color: var(--bnb-text-muted);
+  font-size: 14px;
+  line-height: 1.55;
+}
+
+.bnb-job-title-row {
+  display: flex;
+  align-items: start;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.bnb-job-title-row h2 {
+  margin-top: 4px;
+  font-size: 26px;
+  line-height: 1.15;
+  overflow-wrap: anywhere;
+}
+
+.bnb-job-section {
+  display: grid;
+  gap: 10px;
+  border-top: 1px solid var(--bnb-line);
+  padding-top: 14px;
+}
+
+.bnb-job-section h3 {
+  color: var(--bnb-text);
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.bnb-job-section pre {
+  max-height: 440px;
+  overflow: auto;
+  white-space: pre-wrap;
+  color: var(--bnb-text-soft);
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+.bnb-job-actions {
+  display: grid;
+  gap: 10px;
+}
+
+.bnb-job-actions .bnb-button,
+.bnb-job-actions .bnb-button-dark {
+  width: 100%;
+}
+
 .bnb-wallet-panel {
   display: grid;
   gap: 12px;
@@ -2221,6 +2630,20 @@ button.bnb-account-button:disabled {
 .bnb-input,
 .bnb-select {
   min-height: 42px;
+  padding: 0 12px;
+}
+
+.bnb-static-field {
+  display: flex;
+  min-height: 42px;
+  width: 100%;
+  align-items: center;
+  border: 1px solid var(--bnb-line-strong);
+  border-radius: 8px;
+  background: rgba(221, 255, 220, 0.03);
+  color: var(--bnb-text);
+  font-size: 14px;
+  line-height: 1.45;
   padding: 0 12px;
 }
 
@@ -3151,6 +3574,33 @@ button.bnb-account-button:disabled {
   min-width: 0;
 }
 
+.bnb-agent-sidebar {
+  position: sticky;
+  top: 92px;
+  display: grid;
+  min-width: 0;
+  gap: 16px;
+}
+
+.bnb-agent-sidebar-card {
+  border: 1px solid var(--bnb-line);
+  border-radius: 8px;
+  background: var(--bnb-surface);
+  padding: 16px;
+}
+
+.bnb-agent-sidebar-card:first-child {
+  border-top-color: var(--bnb-gold-line);
+}
+
+.bnb-agent-sidebar-card .bnb-agent-identity-grid {
+  grid-template-columns: 1fr;
+}
+
+.bnb-agent-sidebar-list {
+  grid-template-columns: 1fr;
+}
+
 .bnb-agent-heading {
   border-bottom: 1px solid var(--bnb-line);
   padding-bottom: 28px;
@@ -3977,6 +4427,31 @@ button.bnb-account-button:disabled {
 }
 
 @media (max-width: 900px) {
+  .bnb-job-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .bnb-job-side {
+    position: static;
+  }
+
+  .bnb-hire-steps {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .bnb-form-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .bnb-step-actions {
+    justify-content: stretch;
+  }
+
+  .bnb-step-actions .bnb-button,
+  .bnb-step-actions .bnb-button-dark {
+    width: 100%;
+  }
+
   .bnb-agent-profile-layout {
     grid-template-columns: 1fr;
     gap: 26px;
@@ -3985,6 +4460,10 @@ button.bnb-account-button:disabled {
   .bnb-agent-action-col {
     position: static;
     order: -1;
+  }
+
+  .bnb-agent-sidebar {
+    position: static;
   }
 
   .bnb-agent-action-card {
@@ -4009,8 +4488,25 @@ button.bnb-account-button:disabled {
 }
 
 @media (max-width: 640px) {
+  .bnb-hire-card {
+    padding: 16px;
+  }
+
+  .bnb-hire-steps {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .bnb-hire-steps li {
+    min-height: 44px;
+    padding: 8px;
+  }
+
   .bnb-agent-profile-layout {
     gap: 22px;
+  }
+
+  .bnb-agent-sidebar-card {
+    padding: 14px;
   }
 
   .bnb-agent-heading h1 {

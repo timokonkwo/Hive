@@ -150,7 +150,7 @@ export type BnbRecordStorage = {
 export type BnbTransactionRequest =
   | {
       status: "ready";
-      chainId: 56;
+      chainId: number;
       contractAddress: string;
       to: string;
       value: string;
@@ -168,6 +168,58 @@ export type BnbAgentWork = {
   completedAt?: string;
   output?: string;
   dataSources?: string[];
+  adapter?: string;
+  runId?: string;
+  error?: string;
+};
+
+export type BnbJobCapability = "rebalancing" | "concentrated_liquidity" | "grid_trading" | "yield_optimisation" | "health_factor" | "custom";
+
+export type BnbHireIntentInput = {
+  capability?: BnbJobCapability;
+  taskType?: string;
+  outcome: string;
+  target?: string;
+  riskPreference?: "Low" | "Balanced" | "Aggressive";
+  advancedFields?: Record<string, string>;
+  instructions?: string;
+};
+
+export type BnbJobSpec = {
+  capability: BnbJobCapability;
+  taskType: string;
+  summary: string;
+  expectedOutput: string;
+  fields: Record<string, string>;
+  instructions?: string;
+};
+
+export type BnbJobPreflightResult = {
+  status: "ready" | "needs_input" | "blocked";
+  canProceed: boolean;
+  paymentRequired?: boolean;
+  jobSpec?: BnbJobSpec;
+  missingInputs: string[];
+  warnings: string[];
+  assumptions: string[];
+  adapterPreflight: Array<{
+    ok: boolean;
+    adapter: "mcp" | "a2a" | "x402" | "http";
+    endpoint?: BnbExecutionEndpoint;
+    reason?: string;
+    capabilities?: string[];
+  }>;
+};
+
+export type BnbAgentDelivery = {
+  status: "pending" | "running" | "delivered" | "failed";
+  summary?: string;
+  rawOutput?: string;
+  dataSources?: string[];
+  adapter?: string;
+  runId?: string;
+  startedAt?: string;
+  completedAt?: string;
   error?: string;
 };
 
@@ -176,6 +228,12 @@ export type BnbActivationRecord = {
   recordId: string;
   receiptId: string;
   status:
+    | "awaiting_funding"
+    | "funded"
+    | "running"
+    | "delivered"
+    | "paid"
+    | "failed"
     | "saved"
     | "payment_submitted"
     | "payment_confirmed"
@@ -189,21 +247,24 @@ export type BnbActivationRecord = {
   updatedAt: string;
   clientAddress?: string;
   agent: Pick<BnbAgentProfile, "chainId" | "tokenId" | "name" | "activationStatus" | "executionStatus" | "agentWallet">;
+  jobSpec?: BnbJobSpec;
+  delivery?: BnbAgentDelivery;
   limits: {
     task: string;
     budget: string;
     expires: string;
-    walletConfirmationRequired: true;
+    walletConfirmationRequired: boolean;
   };
   work?: BnbAgentWork;
   payment?: {
-    chainId: 56;
+    chainId: number;
     contractAddress?: string;
     transactionHash?: string;
     transactionStatus?: "success" | "reverted" | "pending";
     explorerUrl?: string;
     blockNumber?: string;
     jobId?: string;
+    expiresAt?: number;
   };
   settlement?: {
     action: "release" | "refund";
@@ -278,7 +339,7 @@ export type BnbAltanaSessionRecord = {
   transactionHash?: string;
   permissionHash?: string;
   session?: {
-    chainId: 56;
+    chainId: number;
     contractAddress?: string;
     sessionId?: string;
     grantTransactionHash?: string;

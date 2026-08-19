@@ -2,13 +2,17 @@
 
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import Link from "next/link";
-import { bsc } from "wagmi/chains";
+import { useModalStatus } from "@privy-io/react-auth";
 import { useAccount, useSendTransaction, useSwitchChain } from "wagmi";
 import type { Hex } from "viem";
-import { FileText, Loader2 } from "lucide-react";
+import { FileText } from "lucide-react";
+import { BnbButtonLoader } from "@/app/bnb/_components/BnbButtonLoader";
 import { BnbContainer, BnbPanel } from "@/app/bnb/_components/BnbUi";
 import { useAuth } from "@/hooks/useAuth";
 import { useBnbAuthFetch } from "@/hooks/useBnbAuthFetch";
+import { getClientBnbChainId, getClientBnbNativeSymbol } from "@/lib/bnb/client-chain";
+import { formatBnbDeliveryText } from "@/lib/bnb/delivery";
+import { bnbRefundUnavailableReason } from "@/lib/bnb/settlement-state";
 import type { BnbAccessRequestRecord, BnbActivationRecord, BnbRecordsSnapshot } from "@/lib/bnb/types";
 
 type ActivityRow = {
@@ -22,17 +26,29 @@ type ActivityRow = {
 export function ReceiptsClient({ embedded = false }: { embedded?: boolean } = {}) {
   const { authenticated, login, ready, connectWallet } = useAuth();
   const { address, chainId } = useAccount();
+  const { isOpen: privyModalOpen } = useModalStatus();
   const { sendTransactionAsync } = useSendTransaction();
   const { switchChainAsync } = useSwitchChain();
   const { authFetch } = useBnbAuthFetch();
+  const targetChainId = getClientBnbChainId();
+  const nativeSymbol = getClientBnbNativeSymbol();
   const [records, setRecords] = useState<BnbRecordsSnapshot | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [actionId, setActionId] = useState("");
+  const [authBusy, setAuthBusy] = useState(false);
+  const [walletBusy, setWalletBusy] = useState(false);
   const [reloadKey, setReloadKey] = useState(0);
 
   useEffect(() => {
-    if (!ready || !authenticated) return;
+    if (!privyModalOpen) {
+      setAuthBusy(false);
+      setWalletBusy(false);
+    }
+  }, [privyModalOpen]);
+
+  useEffect(() => {
+    if ((!ready && !address) || (!authenticated && !address)) return;
 
     let cancelled = false;
     setLoading(true);
@@ -56,7 +72,7 @@ export function ReceiptsClient({ embedded = false }: { embedded?: boolean } = {}
     return () => {
       cancelled = true;
     };
-  }, [authenticated, authFetch, ready, reloadKey]);
+  }, [address, authenticated, authFetch, ready, reloadKey]);
 
   const rows = useMemo(() => {
     if (!records) return [];
@@ -65,8 +81,8 @@ export function ReceiptsClient({ embedded = false }: { embedded?: boolean } = {}
       id: record.recordId,
       title: record.agent.name,
       detail: record.limits.task,
-      meta: record.payment?.transactionStatus === "success" ? "Escrow funded" : record.status === "payment_submitted" ? "Payment submitted" : "Hire saved",
-      href: `/bnb/activate?chainId=${record.agent.chainId}&tokenId=${encodeURIComponent(record.agent.tokenId)}`,
+      meta: jobStatusLabel(record),
+      href: `/bnb/jobs/${encodeURIComponent(record.recordId)}`,
     }));
 
     const accessRequests: ActivityRow[] = records.accessRequests.map((record) => ({
@@ -116,8 +132,16 @@ export function ReceiptsClient({ embedded = false }: { embedded?: boolean } = {}
     });
   }
 
+  function signInWithBnbWallet() {
+    setAuthBusy(true);
+    login({
+      loginMethods: ["wallet"],
+      walletChainType: "ethereum-only",
+    });
+  }
+
   async function cancelAccessRequest(record: BnbAccessRequestRecord) {
-    if (!ensureProtectedSession({ authenticated, login })) return;
+    if (!ensureProtectedSession({ authenticated, walletAddress: address, login: signInWithBnbWallet })) return;
     setActionId(`${record.recordId}:cancel`);
     setError("");
 
@@ -138,7 +162,7 @@ export function ReceiptsClient({ embedded = false }: { embedded?: boolean } = {}
   }
 
   async function runHire(record: BnbActivationRecord) {
-    if (!ensureProtectedSession({ authenticated, login })) return;
+    if (!ensureProtectedSession({ authenticated, walletAddress: address, login: signInWithBnbWallet })) return;
     setActionId(`${record.recordId}:run`);
     setError("");
 
@@ -159,15 +183,12 @@ export function ReceiptsClient({ embedded = false }: { embedded?: boolean } = {}
   }
 
   async function settleHire(record: BnbActivationRecord, action: "release" | "refund") {
-    if (!authenticated) {
-      login();
-      return;
-    }
-    if (!ensureProtectedSession({ authenticated, login })) return;
+    if (!ensureProtectedSession({ authenticated, walletAddress: address, login: signInWithBnbWallet })) return;
     if (!address) {
+      setWalletBusy(true);
       connectWallet({
         walletChainType: "ethereum-only",
-        description: "Connect the wallet you want to use for BNB Smart Chain transactions.",
+        description: `Connect the wallet you want to use for ${nativeSymbol} transactions.`,
       });
       return;
     }
@@ -176,8 +197,8 @@ export function ReceiptsClient({ embedded = false }: { embedded?: boolean } = {}
     setError("");
 
     try {
-      if (chainId !== bsc.id) {
-        await switchChainAsync({ chainId: bsc.id });
+      if (chainId !== targetChainId) {
+        await switchChainAsync({ chainId: targetChainId });
       }
 
       const prepareResponse = await authFetch("/api/bnb/activate/settlement", {
@@ -194,7 +215,7 @@ export function ReceiptsClient({ embedded = false }: { embedded?: boolean } = {}
         to: settlementRequest.to as Hex,
         data: settlementRequest.data as Hex,
         value: BigInt(settlementRequest.value),
-        chainId: bsc.id,
+        chainId: targetChainId,
       });
 
       const confirmResponse = await authFetch("/api/bnb/activate/settlement", {
@@ -212,17 +233,17 @@ export function ReceiptsClient({ embedded = false }: { embedded?: boolean } = {}
     }
   }
 
-  if (!ready) {
+  if (!ready && !address) {
     return (
       <ActivityFrame embedded={embedded}>
         <BnbPanel className="p-6">
-          <Loader2 aria-hidden="true" className="animate-spin text-emerald-400" size={20} />
+          <BnbButtonLoader size={20} />
         </BnbPanel>
       </ActivityFrame>
     );
   }
 
-  if (!authenticated) {
+  if (!authenticated && !address) {
     if (embedded) return null;
 
     return (
@@ -230,8 +251,9 @@ export function ReceiptsClient({ embedded = false }: { embedded?: boolean } = {}
         <BnbPanel className="p-6">
           <h2 className="text-xl font-semibold text-white">Sign in to view activity</h2>
           <p className="mt-2 text-sm leading-6 text-zinc-400">Your hires, requests, alerts, and payments are private to your Hive account.</p>
-          <button type="button" onClick={() => login()} className="bnb-button bnb-focus mt-5">
-            Sign in
+          <button type="button" onClick={signInWithBnbWallet} disabled={authBusy || privyModalOpen} aria-busy={authBusy || privyModalOpen} className="bnb-button bnb-focus mt-5">
+            {authBusy || privyModalOpen ? <BnbButtonLoader /> : null}
+            {authBusy || privyModalOpen ? "Opening wallet..." : "Sign in"}
           </button>
         </BnbPanel>
       </BnbContainer>
@@ -271,51 +293,69 @@ export function ReceiptsClient({ embedded = false }: { embedded?: boolean } = {}
           ) : rows.length > 0 ? (
             <div>
               {records?.activations.map((record) => {
-                const funded = record.payment?.transactionStatus === "success";
-                const completed = record.work?.status === "completed";
-                const closed = record.status === "released" || record.status === "refunded";
+                const paymentNotRequired = record.limits.walletConfirmationRequired === false;
+                const funded = paymentNotRequired || record.payment?.transactionStatus === "success";
+                const completed = record.delivery?.status === "delivered" || record.work?.status === "completed" || record.status === "delivered" || record.status === "work_completed";
+                const closed = record.status === "paid" || record.status === "released" || record.status === "refunded";
+                const running = record.delivery?.status === "running" || record.work?.status === "running" || record.status === "running";
+                const output = record.delivery?.rawOutput || record.work?.output;
+                const refundBlocker = bnbRefundUnavailableReason(record);
+                const showSettlementActions = !paymentNotRequired && completed && !closed;
                 return (
                   <article key={record.recordId} className="bnb-receipt-row">
                     <span>
-                      <span className="flex items-center gap-2 text-sm font-semibold text-white">
+                      <Link href={`/bnb/jobs/${encodeURIComponent(record.recordId)}`} className="flex items-center gap-2 text-sm font-semibold text-white bnb-focus">
                         <FileText aria-hidden="true" size={15} />
                         {record.agent.name}
-                      </span>
+                      </Link>
                       <span className="mt-1 block break-all text-sm leading-6 text-zinc-500">{record.limits.task}</span>
-                      {record.work?.output ? (
-                        <pre className="mt-3 whitespace-pre-wrap rounded border border-zinc-800 bg-black/30 p-3 text-xs leading-5 text-zinc-300">{record.work.output}</pre>
+                      {output ? (
+                        <pre className="mt-3 whitespace-pre-wrap rounded border border-zinc-800 bg-black/30 p-3 text-xs leading-5 text-zinc-300">{formatBnbDeliveryText(output, record.jobSpec)}</pre>
                       ) : null}
                     </span>
                     <span className="grid gap-2 justify-items-start sm:justify-items-end">
-                      <span className="bnb-chip">{funded ? completed ? "Work complete" : "Funded" : record.status}</span>
+                      <span className="bnb-chip">{jobStatusLabel(record)}</span>
+                      <Link href={`/bnb/jobs/${encodeURIComponent(record.recordId)}`} className="bnb-button-dark bnb-focus">
+                        View
+                      </Link>
                       {funded && !completed && !closed ? (
                         <button
                           type="button"
                           onClick={() => runHire(record)}
-                          disabled={Boolean(actionId)}
+                          disabled={Boolean(actionId) || running}
+                          aria-busy={actionId === `${record.recordId}:run` || running}
                           className="bnb-button bnb-focus disabled:cursor-not-allowed disabled:opacity-60"
                         >
-                          {actionId === `${record.recordId}:run` ? "Running..." : "Run agent"}
+                          {actionId === `${record.recordId}:run` ? <BnbButtonLoader /> : null}
+                          {actionId === `${record.recordId}:run` || running ? "Running..." : "Run agent"}
                         </button>
                       ) : null}
-                      {completed && !closed ? (
+                      {showSettlementActions ? (
                         <span className="grid gap-2 sm:grid-cols-2">
                           <button
                             type="button"
                             onClick={() => settleHire(record, "release")}
-                            disabled={Boolean(actionId)}
+                            disabled={Boolean(actionId) || walletBusy}
+                            aria-busy={actionId === `${record.recordId}:release` || walletBusy}
                             className="bnb-button bnb-focus disabled:cursor-not-allowed disabled:opacity-60"
                           >
-                            {actionId === `${record.recordId}:release` ? "Confirming..." : "Release"}
+                            {actionId === `${record.recordId}:release` || walletBusy ? <BnbButtonLoader /> : null}
+                            {walletBusy ? "Opening wallet..." : actionId === `${record.recordId}:release` ? "Confirming..." : "Release"}
                           </button>
-                          <button
-                            type="button"
-                            onClick={() => settleHire(record, "refund")}
-                            disabled={Boolean(actionId)}
-                            className="bnb-button bnb-button-secondary bnb-focus disabled:cursor-not-allowed disabled:opacity-60"
-                          >
-                            {actionId === `${record.recordId}:refund` ? "Confirming..." : "Refund"}
-                          </button>
+                          {!refundBlocker ? (
+                            <button
+                              type="button"
+                              onClick={() => settleHire(record, "refund")}
+                              disabled={Boolean(actionId) || walletBusy}
+                              aria-busy={actionId === `${record.recordId}:refund` || walletBusy}
+                              className="bnb-button bnb-button-secondary bnb-focus disabled:cursor-not-allowed disabled:opacity-60"
+                            >
+                              {actionId === `${record.recordId}:refund` || walletBusy ? <BnbButtonLoader /> : null}
+                              {walletBusy ? "Opening wallet..." : actionId === `${record.recordId}:refund` ? "Confirming..." : "Refund"}
+                            </button>
+                          ) : (
+                            <p className="bnb-field-hint bnb-action-hint">{refundBlocker}</p>
+                          )}
                         </span>
                       ) : null}
                     </span>
@@ -343,8 +383,10 @@ export function ReceiptsClient({ embedded = false }: { embedded?: boolean } = {}
                         type="button"
                         onClick={() => cancelAccessRequest(record)}
                         disabled={Boolean(actionId)}
+                        aria-busy={actionId === `${record.recordId}:cancel`}
                         className="bnb-link-button bnb-focus disabled:cursor-not-allowed disabled:opacity-60"
                       >
+                        {actionId === `${record.recordId}:cancel` ? <BnbButtonLoader /> : null}
                         {actionId === `${record.recordId}:cancel` ? "Cancelling..." : "Cancel request"}
                       </button>
                     ) : null}
@@ -401,14 +443,28 @@ function accessRequestStatus(record: BnbAccessRequestRecord) {
   return "Access requested";
 }
 
+function jobStatusLabel(record: BnbActivationRecord) {
+  if (record.status === "paid" || record.status === "released") return "Paid";
+  if (record.status === "refunded") return "Refunded";
+  if (record.delivery?.status === "delivered" || record.work?.status === "completed" || record.status === "delivered" || record.status === "work_completed") return "Delivered";
+  if (record.delivery?.status === "running" || record.work?.status === "running" || record.status === "running") return "Running";
+  if (record.payment?.transactionStatus === "success" || record.status === "funded" || record.status === "payment_confirmed") return "Funded";
+  if (record.status === "payment_submitted") return "Payment submitted";
+  if (record.status === "failed") return "Failed";
+  if (record.limits.walletConfirmationRequired === false) return "Ready";
+  return "Awaiting funding";
+}
+
 function ensureProtectedSession({
   authenticated,
+  walletAddress,
   login,
 }: {
   authenticated: boolean;
+  walletAddress?: string;
   login: () => void;
 }) {
-  if (!authenticated) {
+  if (!authenticated && !walletAddress) {
     login();
     return false;
   }

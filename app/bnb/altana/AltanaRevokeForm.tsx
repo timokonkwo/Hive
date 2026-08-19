@@ -1,17 +1,19 @@
 "use client";
 
-import { useState } from "react";
-import { bsc } from "wagmi/chains";
+import { useEffect, useState } from "react";
+import { useModalStatus } from "@privy-io/react-auth";
 import { useAccount, useSendTransaction, useSwitchChain } from "wagmi";
 import type { Hex } from "viem";
 import { Ban } from "lucide-react";
+import { BnbButtonLoader } from "@/app/bnb/_components/BnbButtonLoader";
 import { useAuth } from "@/hooks/useAuth";
 import { useBnbAuthFetch } from "@/hooks/useBnbAuthFetch";
+import { getClientBnbChainId, getClientBnbNativeSymbol } from "@/lib/bnb/client-chain";
 
 type RevokeRequest =
   | {
       status: "ready";
-      chainId: 56;
+      chainId: number;
       to: string;
       value: string;
       data: string;
@@ -35,19 +37,39 @@ export function AltanaRevokeForm() {
   const [error, setError] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [confirming, setConfirming] = useState(false);
+  const [authBusy, setAuthBusy] = useState(false);
+  const [walletBusy, setWalletBusy] = useState(false);
   const [lastNote, setLastNote] = useState("");
   const { authenticated, login, ready, connectWallet } = useAuth();
   const { address, chainId } = useAccount();
+  const { isOpen: privyModalOpen } = useModalStatus();
   const { sendTransactionAsync } = useSendTransaction();
   const { switchChainAsync } = useSwitchChain();
   const { authFetch } = useBnbAuthFetch();
+  const targetChainId = getClientBnbChainId();
+  const nativeSymbol = getClientBnbNativeSymbol();
+
+  useEffect(() => {
+    if (!privyModalOpen) {
+      setAuthBusy(false);
+      setWalletBusy(false);
+    }
+  }, [privyModalOpen]);
+
+  function signInWithBnbWallet() {
+    setAuthBusy(true);
+    login({
+      loginMethods: ["wallet"],
+      walletChainType: "ethereum-only",
+    });
+  }
 
   async function revokeSession(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setError("");
     setResult(null);
 
-    if (!ensureProtectedSession({ authenticated, login })) return;
+    if (!ensureProtectedSession({ authenticated, walletAddress: address, login: signInWithBnbWallet })) return;
 
     setSubmitting(true);
     const formData = new FormData(event.currentTarget);
@@ -74,11 +96,12 @@ export function AltanaRevokeForm() {
 
   async function confirmRevoke() {
     if (!result?.revokeRequest || result.revokeRequest.status !== "ready") return;
-    if (!ensureProtectedSession({ authenticated, login })) return;
+    if (!ensureProtectedSession({ authenticated, walletAddress: address, login: signInWithBnbWallet })) return;
     if (!address) {
+      setWalletBusy(true);
       connectWallet({
         walletChainType: "ethereum-only",
-        description: "Connect the wallet you want to use for BNB Smart Chain transactions.",
+        description: `Connect the wallet you want to use for ${nativeSymbol} transactions.`,
       });
       return;
     }
@@ -87,15 +110,15 @@ export function AltanaRevokeForm() {
     setError("");
 
     try {
-      if (chainId !== bsc.id) {
-        await switchChainAsync({ chainId: bsc.id });
+      if (chainId !== targetChainId) {
+        await switchChainAsync({ chainId: targetChainId });
       }
 
       const hash = await sendTransactionAsync({
         to: result.revokeRequest.to as Hex,
         data: result.revokeRequest.data as Hex,
         value: BigInt(result.revokeRequest.value),
-        chainId: bsc.id,
+        chainId: targetChainId,
       });
 
       const response = await authFetch("/api/bnb/altana/revoke", {
@@ -148,10 +171,12 @@ export function AltanaRevokeForm() {
 
         <button
           type="submit"
-          disabled={submitting || !ready}
+          disabled={submitting || authBusy || (!ready && !address)}
+          aria-busy={submitting || authBusy}
           className="bnb-button bnb-button-secondary bnb-focus disabled:cursor-not-allowed disabled:opacity-70"
         >
-          {revokeButtonLabel({ submitting, authenticated, ready })}
+          {submitting || authBusy ? <BnbButtonLoader /> : null}
+          {revokeButtonLabel({ submitting, authenticated, walletAddress: address, ready, authBusy })}
         </button>
       </div>
 
@@ -167,10 +192,12 @@ export function AltanaRevokeForm() {
             <button
               type="button"
               onClick={confirmRevoke}
-              disabled={confirming}
+              disabled={confirming || walletBusy}
+              aria-busy={confirming || walletBusy}
               className="bnb-button bnb-focus mt-4 w-full disabled:cursor-not-allowed disabled:opacity-60"
             >
-              {confirming ? "Confirming..." : "Revoke session on BSC"}
+              {confirming || walletBusy ? <BnbButtonLoader /> : null}
+              {walletBusy ? "Opening wallet..." : confirming ? "Confirming..." : `Revoke session on ${nativeSymbol}`}
             </button>
           ) : result.revokeRequest ? (
             <p className="mt-3 text-sm leading-6 text-zinc-300">{result.revokeRequest.reason}</p>
@@ -184,26 +211,33 @@ export function AltanaRevokeForm() {
 function revokeButtonLabel({
   submitting,
   authenticated,
+  walletAddress,
   ready,
+  authBusy,
 }: {
   submitting: boolean;
   authenticated: boolean;
+  walletAddress?: string;
   ready: boolean;
+  authBusy: boolean;
 }) {
+  if (authBusy) return "Opening wallet...";
   if (submitting) return "Stopping...";
-  if (!ready) return "Loading...";
-  if (!authenticated) return "Sign in to stop";
+  if (!ready && !walletAddress) return "Loading...";
+  if (!authenticated && !walletAddress) return "Sign in to stop";
   return "Stop alert";
 }
 
 function ensureProtectedSession({
   authenticated,
+  walletAddress,
   login,
 }: {
   authenticated: boolean;
+  walletAddress?: string;
   login: () => void;
 }) {
-  if (!authenticated) {
+  if (!authenticated && !walletAddress) {
     login();
     return false;
   }

@@ -1,9 +1,7 @@
 import {
-  createPublicClient,
   encodeFunctionData,
   formatEther,
   getAddress,
-  http,
   isAddress,
   keccak256,
   parseEther,
@@ -11,8 +9,7 @@ import {
   toHex,
   type Hex,
 } from "viem";
-import { bsc } from "viem/chains";
-import { getBscExplorerTxUrl } from "@/lib/bnb/chain";
+import { getBscChainId, getBscClient, getBscExplorerTxUrl, getBscNativeSymbol } from "@/lib/bnb/chain";
 import { BnbTransactionVerificationError } from "@/lib/bnb/errors";
 import type { BnbActivationRecord } from "@/lib/bnb/types";
 
@@ -42,6 +39,21 @@ export const HIVE_BSC_AGENT_ESCROW_ABI = [
     stateMutability: "nonpayable",
     inputs: [{ name: "jobId", type: "bytes32" }],
     outputs: [],
+  },
+  {
+    type: "function",
+    name: "jobs",
+    stateMutability: "view",
+    inputs: [{ name: "jobId", type: "bytes32" }],
+    outputs: [
+      { name: "client", type: "address" },
+      { name: "agent", type: "address" },
+      { name: "amount", type: "uint256" },
+      { name: "expiresAt", type: "uint64" },
+      { name: "status", type: "uint8" },
+      { name: "taskHash", type: "bytes32" },
+      { name: "receiptId", type: "string" },
+    ],
   },
   {
     type: "event",
@@ -80,7 +92,7 @@ export const HIVE_BSC_AGENT_ESCROW_ABI = [
 export type BnbEscrowPaymentRequest =
   | {
       status: "ready";
-      chainId: 56;
+      chainId: number;
       contractAddress: Hex;
       to: Hex;
       value: string;
@@ -100,6 +112,7 @@ export type BnbEscrowPaymentConfirmation = {
   blockNumber?: string;
   jobId?: string;
   contractAddress?: string;
+  expiresAt?: number;
 };
 
 export type BnbEscrowSettlementAction = "release" | "refund";
@@ -107,7 +120,7 @@ export type BnbEscrowSettlementAction = "release" | "refund";
 export type BnbEscrowSettlementRequest =
   | {
       status: "ready";
-      chainId: 56;
+      chainId: number;
       contractAddress: Hex;
       to: Hex;
       value: "0";
@@ -130,9 +143,16 @@ export type BnbEscrowSettlementConfirmation = {
   jobId?: string;
 };
 
-function getBscRpcUrl() {
-  return process.env.BNB_BSC_RPC_URL?.trim() || "https://bsc-dataseed.binance.org";
-}
+export type BnbEscrowJobSnapshot = {
+  jobId: Hex;
+  client: Hex;
+  agent: Hex;
+  amount: string;
+  expiresAt: number;
+  status: "none" | "funded" | "released" | "refunded";
+  taskHash: Hex;
+  receiptId: string;
+};
 
 function getEscrowAddress() {
   const value = process.env.BNB_AGENT_ESCROW_ADDRESS?.trim();
@@ -140,16 +160,9 @@ function getEscrowAddress() {
   return getAddress(value) as Hex;
 }
 
-function getClient() {
-  return createPublicClient({
-    chain: bsc,
-    transport: http(getBscRpcUrl()),
-  });
-}
-
 function nativeBnbAmountWei(value: string) {
   const trimmed = value.trim();
-  const match = trimmed.match(/^(\d+(?:\.\d{1,18})?)\s*(?:bnb)?$/i);
+  const match = trimmed.match(/^(\d+(?:\.\d{1,18})?)\s*(?:t?bnb)?$/i);
   if (!match) return null;
 
   try {
@@ -217,7 +230,7 @@ export function buildBnbEscrowPaymentRequest(record: BnbActivationRecord): BnbEs
   if (!value) {
     return {
       status: "budget_needs_bnb",
-      reason: "Use a BNB budget such as 0.01 BNB to fund escrow.",
+      reason: `Use a positive ${getBscNativeSymbol()} budget to fund escrow.`,
     };
   }
 
@@ -231,12 +244,12 @@ export function buildBnbEscrowPaymentRequest(record: BnbActivationRecord): BnbEs
 
   return {
     status: "ready",
-    chainId: 56,
+    chainId: getBscChainId(),
     contractAddress: escrowAddress,
     to: escrowAddress,
     value: value.toString(),
     data,
-    amountLabel: `${formatEther(value)} BNB`,
+    amountLabel: `${formatEther(value)} ${getBscNativeSymbol()}`,
     expiresAt,
   };
 }
@@ -258,6 +271,14 @@ export function buildBnbEscrowSettlementRequest(record: BnbActivationRecord, act
     };
   }
 
+  const refundBlocker = action === "refund" ? getBnbEscrowRefundBlocker(record) : "";
+  if (refundBlocker) {
+    return {
+      status: "not_ready",
+      reason: refundBlocker,
+    };
+  }
+
   const functionName = action === "release" ? "release" : "refundExpired";
   const data = encodeFunctionData({
     abi: HIVE_BSC_AGENT_ESCROW_ABI,
@@ -267,7 +288,7 @@ export function buildBnbEscrowSettlementRequest(record: BnbActivationRecord, act
 
   return {
     status: "ready",
-    chainId: 56,
+    chainId: getBscChainId(),
     contractAddress: escrowAddress,
     to: escrowAddress,
     value: "0",
@@ -276,6 +297,56 @@ export function buildBnbEscrowSettlementRequest(record: BnbActivationRecord, act
     action,
     jobId: jobId as Hex,
   };
+}
+
+export function getBnbEscrowRefundBlocker(record: BnbActivationRecord, nowSeconds = Math.floor(Date.now() / 1000)) {
+  if (!record.payment?.jobId) return "Escrow must be funded before refund is available.";
+  const expiresAt = record.payment.expiresAt;
+  if (!expiresAt) return "Escrow expiry is still being verified. Try again in a moment.";
+  if (nowSeconds <= expiresAt) {
+    return `Refund unlocks after ${new Date((expiresAt + 1) * 1000).toISOString()}.`;
+  }
+  return "";
+}
+
+export function isBnbEscrowRefundAvailable(record: BnbActivationRecord, nowSeconds = Math.floor(Date.now() / 1000)) {
+  return !getBnbEscrowRefundBlocker(record, nowSeconds);
+}
+
+export async function readBnbEscrowJob(jobId: string): Promise<BnbEscrowJobSnapshot> {
+  if (!/^0x[0-9a-fA-F]{64}$/.test(jobId)) {
+    throw new Error("Invalid BSC escrow job ID.");
+  }
+
+  const escrowAddress = getEscrowAddress();
+  if (!escrowAddress) {
+    throw new BnbTransactionVerificationError("Deploy the BSC escrow contract and set BNB_AGENT_ESCROW_ADDRESS before reading escrow jobs.");
+  }
+
+  const [client, agent, amount, expiresAt, status, taskHash, receiptId] = await getBscClient().readContract({
+    address: escrowAddress,
+    abi: HIVE_BSC_AGENT_ESCROW_ABI,
+    functionName: "jobs",
+    args: [jobId as Hex],
+  });
+
+  return {
+    jobId: jobId as Hex,
+    client,
+    agent,
+    amount: amount.toString(),
+    expiresAt: Number(expiresAt),
+    status: escrowStatusLabel(Number(status)),
+    taskHash,
+    receiptId,
+  };
+}
+
+function escrowStatusLabel(status: number): BnbEscrowJobSnapshot["status"] {
+  if (status === 1) return "funded";
+  if (status === 2) return "released";
+  if (status === 3) return "refunded";
+  return "none";
 }
 
 export async function readBnbEscrowPayment(
@@ -292,7 +363,7 @@ export async function readBnbEscrowPayment(
   }
 
   const hash = txHash as Hex;
-  const client = getClient();
+  const client = getBscClient();
   const explorerUrl = getBscExplorerTxUrl(hash);
 
   let receipt;
@@ -353,6 +424,7 @@ export async function readBnbEscrowPayment(
     blockNumber: receipt.blockNumber.toString(),
     jobId: fundedEvent.args.jobId,
     contractAddress: fundedEvent.address,
+    expiresAt: Number(fundedEvent.args.expiresAt),
   };
 }
 
@@ -371,7 +443,7 @@ export async function readBnbEscrowSettlement(
   }
 
   const hash = txHash as Hex;
-  const client = getClient();
+  const client = getBscClient();
   const explorerUrl = getBscExplorerTxUrl(hash);
 
   let receipt;

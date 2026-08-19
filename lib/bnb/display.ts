@@ -21,6 +21,8 @@ const GENERATED_DESCRIPTION_PATTERNS = [
 ];
 
 const GENERIC_CAPABILITIES = new Set(["web", "api", "http", "https", "unknown", "general"]);
+const GENERIC_SERVICE_LABELS = new Set(["api", "discord", "http", "https", "mcp", "telegram", "twitter", "unknown", "web", "website", "x"]);
+const UNLISTED_SERVICE_PRICES = new Set(["", "not listed", "not set", "price not set", "price on request"]);
 
 export function bnbAgentKey(agent: Pick<BnbAgentProfile, "chainId" | "tokenId">) {
   return `${agent.chainId}:${agent.tokenId}`;
@@ -134,11 +136,34 @@ export function bnbAgentIntegrations(agent: Pick<BnbAgentProfile, "category" | "
 }
 
 export function bnbUsableServices(agent: Pick<BnbAgentProfile, "services">) {
-  return agent.services.filter((service) => Boolean(service.price || service.endpoint));
+  return agent.services.filter(isUserFacingBnbService);
+}
+
+export function bnbAgentHasListedPayment(agent: Pick<BnbAgentProfile, "services" | "x402Support">) {
+  if (agent.x402Support) return true;
+  return agent.services.some((service) => {
+    const price = normalizeServiceToken(service.price || "");
+    return Boolean(price && !UNLISTED_SERVICE_PRICES.has(price));
+  });
 }
 
 export function bnbServiceLabel(service: BnbAgentService) {
   return formatCapability(service.name);
+}
+
+function isUserFacingBnbService(service: BnbAgentService) {
+  const label = normalizeServiceToken(service.name);
+  const price = normalizeServiceToken(service.price || "");
+  if (!label || GENERIC_SERVICE_LABELS.has(label)) return false;
+  return Boolean(service.price && !UNLISTED_SERVICE_PRICES.has(price));
+}
+
+function normalizeServiceToken(value: string) {
+  return value
+    .replace(/[-_]+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim()
+    .toLowerCase();
 }
 
 export function formatCapability(value: string) {

@@ -141,6 +141,7 @@ export const a2aAdapter: BnbAgentExecutionAdapter = {
       [`A2A:${serviceUrl}`],
       startedAt,
       `a2a:${agent.chainId}:${agent.tokenId}`,
+      "a2a",
     );
   },
 };

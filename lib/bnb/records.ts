@@ -2,6 +2,7 @@ import { randomUUID } from "crypto";
 import type { Filter } from "mongodb";
 import { COLLECTIONS, getDb } from "@/lib/db";
 import { getBnbAgent } from "@/lib/bnb/catalog";
+import { getBscChainId } from "@/lib/bnb/chain";
 import { readBnbEscrowPayment } from "@/lib/bnb/escrow";
 import { readBnbSessionGrant, readBnbSessionRevoke } from "@/lib/bnb/session";
 import type {
@@ -10,6 +11,7 @@ import type {
   BnbAgentProfile,
   BnbAltanaSessionRecord,
   BnbAltanaSessionTemplate,
+  BnbJobSpec,
   BnbRecordStorage,
   BnbRecordsSnapshot,
   BnbTermixCapture,
@@ -127,22 +129,26 @@ async function listBnbCollection<T extends BnbStoredRecord>(collection: string, 
 export async function createBnbActivationRecord({
   agent,
   taskTemplate,
+  jobSpec,
   spendCap,
   expiry,
   clientAddress,
+  walletConfirmationRequired = true,
 }: {
   agent: BnbAgentProfile;
   taskTemplate: string;
+  jobSpec?: BnbJobSpec;
   spendCap: string;
   expiry: string;
   clientAddress?: string;
+  walletConfirmationRequired?: boolean;
 }) {
   const now = new Date().toISOString();
   const record: BnbActivationRecord = {
     recordType: "hire",
     recordId: randomUUID(),
     receiptId: `hive-bsc-${agent.tokenId}-${Date.now()}`,
-    status: "saved",
+    status: "awaiting_funding",
     createdAt: now,
     updatedAt: now,
     ...(clientAddress ? { clientAddress } : {}),
@@ -154,11 +160,15 @@ export async function createBnbActivationRecord({
       executionStatus: agent.executionStatus,
       agentWallet: agent.agentWallet,
     },
+    ...(jobSpec ? { jobSpec } : {}),
+    delivery: {
+      status: "pending",
+    },
     limits: {
       task: taskTemplate,
       budget: spendCap,
       expires: expiry,
-      walletConfirmationRequired: true,
+      walletConfirmationRequired,
     },
   };
 
@@ -478,7 +488,7 @@ export async function confirmBnbAltanaSessionGrant({
   const patch: Partial<BnbAltanaSessionRecord> = {
     status: confirmation.transactionStatus === "success" ? "active" : "grant_submitted",
     session: {
-      chainId: 56,
+      chainId: getBscChainId(),
       contractAddress: confirmation.contractAddress,
       sessionId: confirmation.sessionId,
       grantTransactionHash: confirmation.transactionHash,
@@ -512,7 +522,7 @@ export async function confirmBnbAltanaSessionRevoke({
     ...(revocationNote ? { stopNote: revocationNote } : {}),
     session: {
       ...existing.session,
-      chainId: 56,
+      chainId: getBscChainId(),
       contractAddress: confirmation.contractAddress || existing.session?.contractAddress,
       sessionId: confirmation.sessionId || existing.session?.sessionId,
       revokeTransactionHash: confirmation.transactionHash,
@@ -541,15 +551,16 @@ export async function confirmBnbActivationPayment({
   const payment = await readBnbEscrowPayment(transactionHash, existing);
   const patch: Partial<BnbActivationRecord> = {
     updatedAt: now,
-    status: payment.transactionStatus === "success" ? "payment_confirmed" : payment.transactionStatus === "reverted" ? "payment_reverted" : "payment_submitted",
+    status: payment.transactionStatus === "success" ? "funded" : payment.transactionStatus === "reverted" ? "payment_reverted" : "payment_submitted",
     payment: {
-      chainId: 56,
+      chainId: getBscChainId(),
       contractAddress: payment.contractAddress,
       transactionHash: payment.transactionHash,
       transactionStatus: payment.transactionStatus,
       explorerUrl: payment.explorerUrl,
       blockNumber: payment.blockNumber,
       jobId: payment.jobId,
+      expiresAt: payment.expiresAt,
     },
   };
 

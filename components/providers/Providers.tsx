@@ -5,15 +5,20 @@ import { toSolanaWalletConnectors } from "@privy-io/react-auth/solana";
 import { WagmiProvider, createConfig } from "@privy-io/wagmi";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { http } from "wagmi";
-import { bsc, mainnet } from "wagmi/chains";
+import { bsc, bscTestnet, mainnet } from "wagmi/chains";
 import { useState } from "react";
+import { getClientBnbChain } from "@/lib/bnb/client-chain";
 import { ThemeProvider } from "./ThemeProvider";
 import { HolderProvider } from "./HolderContext";
 
+const bnbChain = getClientBnbChain();
+const bnbRpcUrl = process.env.NEXT_PUBLIC_BNB_BSC_RPC_URL || undefined;
+
 const wagmiConfig = createConfig({
-  chains: [bsc, mainnet],
+  chains: [bsc, bscTestnet, mainnet],
   transports: {
-    [bsc.id]: http(process.env.NEXT_PUBLIC_BNB_BSC_RPC_URL || undefined),
+    [bsc.id]: http(bnbChain.id === bsc.id ? bnbRpcUrl : undefined),
+    [bscTestnet.id]: http(bnbChain.id === bscTestnet.id ? bnbRpcUrl : undefined),
     [mainnet.id]: http(),
   },
 });
@@ -35,8 +40,8 @@ export function Providers({ children }: { children: React.ReactNode }) {
             walletChainType: "ethereum-and-solana",
           },
           loginMethods: ['wallet', 'email', 'google'],
-          defaultChain: bsc,
-          supportedChains: [bsc, mainnet],
+          defaultChain: bnbChain,
+          supportedChains: [bnbChain, mainnet],
           externalWallets: {
             solana: {
               connectors: solanaConnectors,

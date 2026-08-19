@@ -1,26 +1,54 @@
 import { createPublicClient, formatEther, getAddress, http, isAddress } from "viem";
-import { bsc } from "viem/chains";
+import { bsc, bscTestnet } from "viem/chains";
+import {
+  getHiveBnbExplorerAddressUrl,
+  getHiveBnbExplorerTxUrl,
+  getHiveBnbNetworkConfig,
+} from "@/lib/bnb/network";
 import type { BnbBscAddressSummary } from "@/lib/bnb/types";
 
-const DEFAULT_BSC_RPC_URL = "https://bsc-dataseed.binance.org";
+const EIGHT004SCAN_AGENT_CHAIN_SLUGS: Record<number, string> = {
+  56: "bsc",
+  97: "bsc-testnet",
+};
 
 export function getBscRpcUrl() {
-  return process.env.BNB_BSC_RPC_URL?.trim() || DEFAULT_BSC_RPC_URL;
+  return getHiveBnbNetworkConfig().rpcUrl;
+}
+
+export function getBscChainId() {
+  return getHiveBnbNetworkConfig().chainId;
+}
+
+export function getBscNativeSymbol() {
+  return getHiveBnbNetworkConfig().nativeSymbol;
+}
+
+export function getBscViemChain() {
+  return getBscChainId() === 97 ? bscTestnet : bsc;
 }
 
 export function getBscClient() {
   return createPublicClient({
-    chain: bsc,
+    chain: getBscViemChain(),
     transport: http(getBscRpcUrl()),
   });
 }
 
 export function getBscExplorerAddressUrl(address: string) {
-  return `https://bscscan.com/address/${address}`;
+  return getHiveBnbExplorerAddressUrl(address);
 }
 
 export function getBscExplorerTxUrl(hash: string) {
-  return `https://bscscan.com/tx/${hash}`;
+  return getHiveBnbExplorerTxUrl(hash);
+}
+
+export function get8004scanAgentUrl(chainId: string | number, tokenId: string | number) {
+  const numericChainId = Number(chainId);
+  const chainSlug = Number.isFinite(numericChainId)
+    ? EIGHT004SCAN_AGENT_CHAIN_SLUGS[numericChainId] || String(Math.trunc(numericChainId))
+    : String(chainId).trim().toLowerCase();
+  return `https://8004scan.io/agents/${encodeURIComponent(chainSlug)}/${encodeURIComponent(String(tokenId))}`;
 }
 
 export async function getBscAddressSummary(address: string): Promise<BnbBscAddressSummary> {

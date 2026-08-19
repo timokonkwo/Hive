@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { authenticateClient } from "@/lib/client-auth";
+import { requireBnbClient } from "@/lib/bnb/auth";
 import { BnbTransactionVerificationError } from "@/lib/bnb/errors";
 import { enforceBnbRateLimit } from "@/lib/bnb/rate-limit";
 import { buildBnbSessionRevokeRequest } from "@/lib/bnb/session";
@@ -17,10 +17,8 @@ export async function POST(request: NextRequest) {
   const limited = enforceBnbRateLimit(request, "altana:revoke", "write");
   if (limited) return limited;
 
-  const client = await authenticateClient(request);
-  if (!client) {
-    return NextResponse.json({ error: "Sign in to stop a wallet alert." }, { status: 401 });
-  }
+  const auth = await requireBnbClient(request, "stop a wallet alert");
+  if (auth.response) return auth.response;
 
   const body = await request.json().catch(() => ({}));
   const recordId = readString(body.recordId);
@@ -33,7 +31,7 @@ export async function POST(request: NextRequest) {
 
   try {
     if (!revokeTransactionHash) {
-      const record = await getBnbAltanaSessionRecord({ recordId, clientAddress: client.userId });
+      const record = await getBnbAltanaSessionRecord({ recordId, clientAddress: auth.client.userId });
       if (!record) {
         return NextResponse.json({ error: "Wallet alert was not found" }, { status: 404 });
       }
@@ -50,7 +48,7 @@ export async function POST(request: NextRequest) {
 
     const record = await confirmBnbAltanaSessionRevoke({
       recordId,
-      clientAddress: client.userId,
+      clientAddress: auth.client.userId,
       transactionHash: revokeTransactionHash,
       revocationNote,
     });

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { authenticateClient } from "@/lib/client-auth";
+import { requireBnbClient } from "@/lib/bnb/auth";
 import { BnbTransactionVerificationError } from "@/lib/bnb/errors";
 import { enforceBnbRateLimit } from "@/lib/bnb/rate-limit";
 import { BnbStorageError, confirmBnbActivationPayment } from "@/lib/bnb/records";
@@ -12,10 +12,8 @@ export async function POST(request: NextRequest) {
   const limited = enforceBnbRateLimit(request, "activate:payment", "write");
   if (limited) return limited;
 
-  const client = await authenticateClient(request);
-  if (!client) {
-    return NextResponse.json({ error: "Sign in to update this payment." }, { status: 401 });
-  }
+  const auth = await requireBnbClient(request, "update this payment");
+  if (auth.response) return auth.response;
 
   const body = await request.json().catch(() => ({}));
   const recordId = readString(body.recordId);
@@ -27,7 +25,7 @@ export async function POST(request: NextRequest) {
 
   let record;
   try {
-    record = await confirmBnbActivationPayment({ recordId, clientAddress: client.userId, transactionHash });
+    record = await confirmBnbActivationPayment({ recordId, clientAddress: auth.client.userId, transactionHash });
   } catch (error) {
     if (error instanceof BnbTransactionVerificationError) {
       return NextResponse.json({ error: error.message }, { status: 400 });
@@ -44,7 +42,7 @@ export async function POST(request: NextRequest) {
 
   return NextResponse.json({
     status: record.status,
-    message: record.status === "payment_confirmed" ? "Escrow payment confirmed." : "Payment submitted.",
+    message: record.status === "funded" || record.status === "payment_confirmed" ? "Escrow funded." : "Payment submitted.",
     receiptId: record.receiptId,
     recordId: record.recordId,
     payment: record.payment,

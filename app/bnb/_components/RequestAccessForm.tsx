@@ -2,8 +2,10 @@
 
 import Link from "next/link";
 import type { FormEvent } from "react";
-import { useState } from "react";
-import { Loader2 } from "lucide-react";
+import { useEffect, useState } from "react";
+import { useModalStatus } from "@privy-io/react-auth";
+import { useAccount } from "wagmi";
+import { BnbButtonLoader } from "@/app/bnb/_components/BnbButtonLoader";
 import { useAuth } from "@/hooks/useAuth";
 import { useBnbAuthFetch } from "@/hooks/useBnbAuthFetch";
 import type { BnbAgentProfile } from "@/lib/bnb/types";
@@ -20,21 +22,38 @@ type SavedRequest = {
 
 export function RequestAccessForm({ agent, showHeading = true }: RequestAccessFormProps) {
   const { authenticated, login, ready } = useAuth();
+  const { address } = useAccount();
+  const { isOpen: privyModalOpen } = useModalStatus();
   const { authFetch } = useBnbAuthFetch();
   const [task, setTask] = useState("");
   const [budget, setBudget] = useState("");
   const [deadline, setDeadline] = useState("");
   const [contactPreference, setContactPreference] = useState("");
   const [saving, setSaving] = useState(false);
+  const [authBusy, setAuthBusy] = useState(false);
   const [error, setError] = useState("");
   const [saved, setSaved] = useState<SavedRequest | null>(null);
+
+  useEffect(() => {
+    if (!privyModalOpen) {
+      setAuthBusy(false);
+    }
+  }, [privyModalOpen]);
+
+  function signInWithBnbWallet() {
+    setAuthBusy(true);
+    login({
+      loginMethods: ["wallet"],
+      walletChainType: "ethereum-only",
+    });
+  }
 
   async function submitRequest(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setError("");
 
-    if (!authenticated) {
-      login();
+    if (!authenticated && !address) {
+      signInWithBnbWallet();
       return;
     }
 
@@ -134,10 +153,11 @@ export function RequestAccessForm({ agent, showHeading = true }: RequestAccessFo
       <button
         type="submit"
         className="bnb-button bnb-focus"
-        disabled={!ready || saving}
+        disabled={(!ready && !address) || saving || authBusy}
+        aria-busy={saving || authBusy}
       >
-        {saving ? <Loader2 aria-hidden="true" className="animate-spin" size={15} /> : null}
-        {requestButtonLabel({ authenticated, saving })}
+        {saving || authBusy ? <BnbButtonLoader /> : null}
+        {requestButtonLabel({ authenticated, walletAddress: address, saving, authBusy })}
       </button>
     </form>
   );
@@ -145,12 +165,17 @@ export function RequestAccessForm({ agent, showHeading = true }: RequestAccessFo
 
 function requestButtonLabel({
   authenticated,
+  walletAddress,
   saving,
+  authBusy,
 }: {
   authenticated: boolean;
+  walletAddress?: string;
   saving: boolean;
+  authBusy: boolean;
 }) {
+  if (authBusy) return "Opening wallet...";
   if (saving) return "Sending...";
-  if (!authenticated) return "Sign in to request";
+  if (!authenticated && !walletAddress) return "Sign in to request";
   return "Send request";
 }

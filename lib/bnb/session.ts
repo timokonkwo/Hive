@@ -1,8 +1,6 @@
 import {
-  createPublicClient,
   encodeFunctionData,
   getAddress,
-  http,
   isAddress,
   keccak256,
   parseEther,
@@ -10,8 +8,7 @@ import {
   toHex,
   type Hex,
 } from "viem";
-import { bsc } from "viem/chains";
-import { getBscExplorerTxUrl } from "@/lib/bnb/chain";
+import { getBscChainId, getBscClient, getBscExplorerTxUrl, getBscNativeSymbol } from "@/lib/bnb/chain";
 import { BnbTransactionVerificationError } from "@/lib/bnb/errors";
 import type { BnbAgentProfile, BnbAltanaSessionRecord, BnbTransactionRequest } from "@/lib/bnb/types";
 
@@ -73,26 +70,15 @@ export type BnbSessionConfirmation = {
   contractAddress?: string;
 };
 
-function getBscRpcUrl() {
-  return process.env.BNB_BSC_RPC_URL?.trim() || "https://bsc-dataseed.binance.org";
-}
-
 function getSessionRegistryAddress() {
   const value = process.env.BNB_SESSION_REGISTRY_ADDRESS?.trim();
   if (!value || !isAddress(value)) return null;
   return getAddress(value) as Hex;
 }
 
-function getClient() {
-  return createPublicClient({
-    chain: bsc,
-    transport: http(getBscRpcUrl()),
-  });
-}
-
 function nativeBnbAmountWei(value: string) {
   const trimmed = value.trim();
-  const match = trimmed.match(/^(\d+(?:\.\d{1,18})?)\s*(?:bnb)?$/i);
+  const match = trimmed.match(/^(\d+(?:\.\d{1,18})?)\s*(?:t?bnb)?$/i);
   if (!match) return null;
 
   try {
@@ -161,7 +147,7 @@ export function buildBnbSessionGrantRequest(record: BnbAltanaSessionRecord, agen
   if (spendCapWei === null) {
     return {
       status: "budget_needs_bnb",
-      reason: "Use a BNB budget such as 0.01 BNB for the session spend cap.",
+      reason: `Use a positive ${getBscNativeSymbol()} budget for the session spend cap.`,
     };
   }
 
@@ -175,7 +161,7 @@ export function buildBnbSessionGrantRequest(record: BnbAltanaSessionRecord, agen
 
   return {
     status: "ready",
-    chainId: 56,
+    chainId: getBscChainId(),
     contractAddress: registryAddress,
     to: registryAddress,
     value: "0",
@@ -209,7 +195,7 @@ export function buildBnbSessionRevokeRequest(record: BnbAltanaSessionRecord, rea
 
   return {
     status: "ready",
-    chainId: 56,
+    chainId: getBscChainId(),
     contractAddress: registryAddress,
     to: registryAddress,
     value: "0",
@@ -233,7 +219,7 @@ export async function readBnbSessionGrant(
   }
 
   const hash = txHash as Hex;
-  const client = getClient();
+  const client = getBscClient();
   const explorerUrl = getBscExplorerTxUrl(hash);
 
   let receipt;
@@ -311,7 +297,7 @@ export async function readBnbSessionRevoke(
   }
 
   const hash = txHash as Hex;
-  const client = getClient();
+  const client = getBscClient();
   const explorerUrl = getBscExplorerTxUrl(hash);
 
   let receipt;

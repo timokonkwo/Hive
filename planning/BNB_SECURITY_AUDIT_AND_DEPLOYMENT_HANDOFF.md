@@ -293,7 +293,45 @@ Post-deploy:
 4. Redeploy Netlify.
 5. Smoke-test hire, fund escrow, run agent, release escrow, grant wallet alert session, revoke wallet alert session.
 
-## Deployment Result
+## Testnet Deployment Result
+
+Deployed on BSC Testnet, chain ID `97`, on 2026-08-11.
+
+| Contract | Address | Deployment transaction |
+|:--|:--|:--|
+| `HiveBscAgentEscrow` | `0xAAA70e3AD453faB26B9ea33E3C7CF4f94ad00c2d` | `0xfb713be0752b1a4488cc6247abd8d012d48d593787c3077d723f1a64db4e6d99` |
+| `HiveBscSessionRegistry` | `0x1DDCd63282CDd4e5531B65902808Ab0673B0Cd02` | `0x64584a22a1af993885c7eba539d88dda80b14f55acfec01872086e8c4a7fde5a` |
+
+Bytecode was confirmed at both BSC Testnet addresses through RPC after deployment.
+
+Local `.env.local` has been updated for BSC Testnet:
+
+```bash
+BNB_NETWORK=testnet
+NEXT_PUBLIC_BNB_NETWORK=testnet
+BNB_BSC_CHAIN_ID=97
+NEXT_PUBLIC_BNB_BSC_CHAIN_ID=97
+BNB_BSC_RPC_URL=https://data-seed-prebsc-1-s1.bnbchain.org:8545
+NEXT_PUBLIC_BNB_BSC_RPC_URL=https://data-seed-prebsc-1-s1.bnbchain.org:8545
+BNB_AGENT_ESCROW_ADDRESS=0xAAA70e3AD453faB26B9ea33E3C7CF4f94ad00c2d
+BNB_SESSION_REGISTRY_ADDRESS=0x1DDCd63282CDd4e5531B65902808Ab0673B0Cd02
+```
+
+Lifecycle smoke test passed on BSC Testnet:
+
+```bash
+npm run bnb:testnet:smoke
+```
+
+Result:
+
+- Smoke account: `0xD1B72614e53d3CD62A5586f64d64b081EE2417CC`.
+- Record: `13e06884-7e7a-4f11-8617-5860d06214e1`.
+- Escrow funding tx: `https://testnet.bscscan.com/tx/0x2d98a82d636397ac8c8346682b3e5c5fbad9881e1b33ed6db38a922120e51f22`.
+- Escrow release tx: `https://testnet.bscscan.com/tx/0x1a220e4221bc2b1068d947f1877cc3a46fb23803d6f9fd624a80b709d166eb0f`.
+- Final saved status: `paid`.
+
+## Mainnet Deployment Result
 
 Deployed on BSC mainnet, chain ID `56`, on 2026-08-07.
 
