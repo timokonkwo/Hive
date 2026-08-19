@@ -59,6 +59,7 @@ describe('BNB marketplace product flows', () => {
   const adapterRegistry = read('lib/bnb/adapters/registry.ts');
   const mcpAdapter = read('lib/bnb/adapters/mcp.ts');
   const a2aAdapter = read('lib/bnb/adapters/a2a.ts');
+  const agentsRoute = read('app/api/bnb/agents/route.ts');
   const envExample = read('.env.example');
 
   it('persists access requests as owner-scoped activity records', () => {
@@ -106,6 +107,17 @@ describe('BNB marketplace product flows', () => {
     assert.match(directory, /bnbCanHireAgent/);
     assert.doesNotMatch(directory, /Connectable/);
     assert.doesNotMatch(directory, /Listed only/);
+    assert.match(directory, /All identities/);
+    assert.match(directory, /setStatus\("ready_to_run"\)/);
+    assert.match(directory, /status && status !== "ready_to_run"/);
+    assert.match(agentsPage, /const defaultStatus = "ready_to_run"/);
+    assert.match(agentsPage, /if \(!value\) return defaultStatus/);
+    assert.match(agentsPage, /if \(value === "all"\) return null/);
+    assert.match(agentsPage, /ready BSC agents/);
+    assert.match(agentsRoute, /function executionFilter/);
+    assert.match(agentsRoute, /if \(!value\) return "ready_to_run"/);
+    assert.match(agentsRoute, /if \(value === "all"\) return null/);
+    assert.match(agentsRoute, /activation:\s*null/);
     assert.match(profilePage, /canHire \? \(/);
     assert.doesNotMatch(profilePage, /Check and hire/);
     assert.doesNotMatch(profilePage, /Check availability/);

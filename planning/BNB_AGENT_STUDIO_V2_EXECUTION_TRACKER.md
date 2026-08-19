@@ -129,6 +129,7 @@ This tracker is the implementation source of truth for the BNB Agent Studio V2 m
 - Non-callable agents show profile or identity actions only.
 - Removed the status-page `Request this agent` fallback for non-callable agents.
 - Removed `Connectable` and `Listed only` from directory filter labels.
+- `/bnb/agents` and `/api/bnb/agents` now default to `ready_to_run`; users must choose `All identities` to browse non-runnable registry entries.
 - `npm test`: passed with 68 tests.
 - `npm run typecheck`: passed.
 - `npm run lint -- --quiet`: passed.

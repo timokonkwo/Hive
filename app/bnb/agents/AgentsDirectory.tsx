@@ -78,8 +78,8 @@ const savedKey = "hive:bnb:saved-agents";
 const compareKey = "hive:bnb:compare-agents";
 
 const availabilityOptions = [
-  { value: "", label: "All" },
   { value: "ready_to_run", label: "Ready to run" },
+  { value: "all", label: "All identities" },
   { value: "listed_only", label: "Listed" },
   { value: "unavailable", label: "Unavailable" },
 ];
@@ -122,7 +122,7 @@ export function AgentsDirectory({
   const [compareAgents, setCompareAgents] = useState<string[]>(() => readComparedAgents());
   const initialized = useRef(false);
 
-  const activeFilterCount = [q.trim(), category, status, integration, sort !== "recommended" ? sort : ""]
+  const activeFilterCount = [q.trim(), category, status && status !== "ready_to_run" ? status : "", integration, sort !== "recommended" ? sort : ""]
     .filter(Boolean)
     .length;
   const pageCount = Math.max(1, Math.ceil(totalAgents / pageSize));
@@ -140,7 +140,7 @@ export function AgentsDirectory({
       const params = new URLSearchParams();
       if (q.trim()) params.set("q", q.trim());
       if (category) params.set("category", category);
-      if (status) params.set("status", status);
+      if (status && status !== "ready_to_run") params.set("status", status);
       if (integration) params.set("integration", integration);
       if (sort && sort !== "recommended") params.set("sort", sort);
       const query = params.toString();
@@ -192,7 +192,7 @@ export function AgentsDirectory({
   function clearFilters() {
     setQ("");
     setCategory("");
-    setStatus("");
+    setStatus("ready_to_run");
     setIntegration("");
     setSort("recommended");
   }
@@ -201,7 +201,7 @@ export function AgentsDirectory({
     const params = new URLSearchParams();
     if (current.q) params.set("q", current.q);
     if (current.category) params.set("category", current.category);
-    if (current.status) params.set("status", current.status);
+    if (current.status && current.status !== "ready_to_run") params.set("status", current.status);
     if (current.integration) params.set("integration", current.integration);
     if (current.sort && current.sort !== "recommended") params.set("sort", current.sort);
     if (nextPage > 1) params.set("page", String(nextPage));

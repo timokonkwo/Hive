@@ -7,6 +7,7 @@ import { AgentsDirectory } from "./AgentsDirectory";
 type SearchParams = Promise<Record<string, string | string[] | undefined>>;
 
 export const dynamic = "force-dynamic";
+const defaultStatus = "ready_to_run";
 
 function paramValue(value: string | string[] | undefined) {
   return Array.isArray(value) ? value[0] : value;
@@ -19,6 +20,8 @@ function normalizePage(value: string | undefined) {
 }
 
 function normalizeStatus(value: string | undefined): string {
+  if (!value) return defaultStatus;
+  if (value === "all") return "all";
   if (value === "callable" || value === "available") return "ready_to_run";
   if (value === "request") return "connectable";
   if (value === "discoverable") return "listed_only";
@@ -27,6 +30,7 @@ function normalizeStatus(value: string | undefined): string {
 }
 
 function executionFromStatus(value: string): BnbExecutionStatus | null {
+  if (value === "all") return null;
   if (value === "ready_to_run" || value === "connectable" || value === "listed_only" || value === "unavailable") return value;
   return null;
 }
@@ -92,12 +96,14 @@ export default async function BnbAgentsPage({ searchParams }: { searchParams: Se
     label: categoryLabel(item),
   }));
   const agents = baseAgents;
-  const hasFilters = Boolean(q || category || status || integration || sort !== "recommended");
+  const hasFilters = Boolean(q || category || status === "all" || (status && status !== defaultStatus) || integration || sort !== "recommended");
   const resultLabel = q
     ? `${formatBnbAgentCount(networkTotal)} BSC agents for "${q}"`
-    : hasFilters
+    : status === "all"
+      ? `${formatBnbAgentCount(networkTotal)} BSC identities`
+      : hasFilters
       ? `${formatBnbAgentCount(networkTotal)} BSC agents`
-      : `${formatBnbAgentCount(networkTotal)} BSC agents`;
+      : `${formatBnbAgentCount(networkTotal)} ready BSC agents`;
 
   return (
     <BnbShell active="agents">
