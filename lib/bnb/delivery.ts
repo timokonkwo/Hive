@@ -40,9 +40,10 @@ function formatAgentDirectoryPayload(payload: unknown) {
     .slice(0, 5);
 
   return [
-    "The agent returned an agent directory instead of the job result.",
+    "This is not the requested result.",
+    "The agent returned a list of agents instead.",
     `${count} agent${count === 1 ? "" : "s"} returned${names.length > 0 ? `: ${names.join(", ")}${count > names.length ? ", ..." : "."}` : "."}`,
-    "Choose an agent with a matching tool for this job.",
+    "Choose an agent whose job type matches this request.",
   ].join("\n");
 }
 

@@ -683,10 +683,12 @@ describe('BNB marketplace product flows', () => {
     assert.match(records, /delivery:\s*\{[\s\S]*status:\s*"pending"/);
     assert.match(records, /expiresAt:\s*payment\.expiresAt/);
     assert.match(runRoute, /delivery:\s*\{[\s\S]*status:\s*isComplete \? "delivered" : "running"/);
+    assert.match(runRoute, /formatBnbDeliveryText\(work\.output,\s*executionRecord\.jobSpec\)/);
     assert.match(runRoute, /rawOutput:\s*work\.output/);
     assert.match(delivery, /formatBnbDeliveryText/);
     assert.match(delivery, /formatAgentDirectoryPayload/);
-    assert.match(delivery, /The agent returned an agent directory instead of the job result/);
+    assert.match(delivery, /This is not the requested result/);
+    assert.match(delivery, /The agent returned a list of agents instead/);
     assert.match(delivery, /formatStructuredPayload/);
     assert.match(delivery, /Protocol mismatch/);
     assert.match(delivery, /healthFactor === "-1"/);

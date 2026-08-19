@@ -3,6 +3,7 @@ import { requireBnbClient } from "@/lib/bnb/auth";
 import { getBnbAgent } from "@/lib/bnb/catalog";
 import { runBnbAgentAdapter } from "@/lib/bnb/adapters/registry";
 import { runBnbAgentWork } from "@/lib/bnb/agent-runner";
+import { formatBnbDeliveryText } from "@/lib/bnb/delivery";
 import { withBnbWalletJobContext } from "@/lib/bnb/jobs";
 import { enforceBnbRateLimit } from "@/lib/bnb/rate-limit";
 import { BnbStorageError, getBnbActivationRecord, updateBnbActivationRecord } from "@/lib/bnb/records";
@@ -107,6 +108,7 @@ export async function POST(request: NextRequest) {
       const workerResult = adapterWork ? null : hasBnbAgentWorker() ? await runBnbAgentWorkOnWorker(executionRecord) : null;
       const work = adapterWork || (workerResult ? workerResult.work : await runBnbAgentWork(executionRecord));
       const isComplete = work.status === "completed";
+      const deliveryText = formatBnbDeliveryText(work.output, executionRecord.jobSpec);
       const updated = await updateBnbActivationRecord({
         recordId,
         clientAddress: auth.client.userId,
@@ -115,7 +117,7 @@ export async function POST(request: NextRequest) {
           work,
           delivery: {
             status: isComplete ? "delivered" : "running",
-            summary: work.output?.split("\n").find(Boolean),
+            summary: deliveryText.split("\n").find(Boolean),
             rawOutput: work.output,
             dataSources: work.dataSources,
             adapter: work.adapter,
