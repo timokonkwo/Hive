@@ -264,9 +264,15 @@ describe('BNB marketplace product flows', () => {
     assert.match(copyButton, /navigator\.clipboard\.writeText\(value\)/);
     assert.match(copyButton, /aria-label=\{`Copy \$\{label\}`\}/);
     assert.match(bnbChain, /EIGHT004SCAN_AGENT_CHAIN_SLUGS:\s*Record<number,\s*string>/);
+    assert.match(bnbChain, /EIGHT004SCAN_AGENT_CHAIN_NAME_SLUGS:\s*Record<string,\s*string>/);
     assert.match(bnbChain, /56:\s*"bsc"/);
     assert.match(bnbChain, /97:\s*"bsc-testnet"/);
+    assert.match(bnbChain, /"bnb-smart-chain":\s*"bsc"/);
+    assert.match(bnbChain, /"bnb-smart-chain-testnet":\s*"bsc-testnet"/);
     assert.match(bnbChain, /export function get8004scanAgentUrl/);
+    assert.match(bnbChain, /export function get8004scanChainSlug/);
+    assert.match(bnbChain, /get8004scanAgentUrl\(chainId:\s*string \| number,\s*tokenId:\s*string \| number\)/);
+    assert.match(bnbChain, /get8004scanChainSlug\(chainId\)/);
     assert.match(profilePage, /const identityUrl = get8004scanAgentUrl\(agent\.chainId,\s*agent\.tokenId\)/);
     assert.doesNotMatch(profilePage, /8004scan\.io\/agents\/\$\{agent\.chainId\}/);
     assert.match(profilePage, /label="Wallet owner"[\s\S]*copyValue=\{ownerAddress\}/);

@@ -371,6 +371,7 @@ This tracker is the implementation source of truth for the BNB Agent Studio V2 m
 - `BNB_8004SCAN_PRO_API_KEY` now takes precedence over `BNB_8004SCAN_API_KEY`.
 - `BNB_8004SCAN_TIMEOUT_MS` now defaults to 3000 ms and is bounded from 500 ms to 15000 ms.
 - `BNB_8004SCAN_CACHE_TTL_SECONDS` now controls fetch revalidation and is bounded from 30 seconds to 3600 seconds.
+- 8004scan identity links now normalize numeric chain IDs and common BNB chain names into explorer slugs.
 - Richer owner history, profile source confidence, and expanded reputation display remain pending.
 
 ### Verification
