@@ -13,6 +13,9 @@ import { getBscChainId, getBscClient, getBscExplorerTxUrl, getBscNativeSymbol } 
 import { BnbTransactionVerificationError } from "@/lib/bnb/errors";
 import type { BnbActivationRecord } from "@/lib/bnb/types";
 
+const BNB_ESCROW_FUND_GAS_LIMIT = 600_000n;
+const BNB_ESCROW_SETTLEMENT_GAS_LIMIT = 500_000n;
+
 export const HIVE_BSC_AGENT_ESCROW_ABI = [
   {
     type: "function",
@@ -97,6 +100,7 @@ export type BnbEscrowPaymentRequest =
       to: Hex;
       value: string;
       data: Hex;
+      gasLimit: string;
       amountLabel: string;
       expiresAt: number;
     }
@@ -125,6 +129,7 @@ export type BnbEscrowSettlementRequest =
       to: Hex;
       value: "0";
       data: Hex;
+      gasLimit: string;
       label: string;
       action: BnbEscrowSettlementAction;
       jobId: Hex;
@@ -249,6 +254,7 @@ export function buildBnbEscrowPaymentRequest(record: BnbActivationRecord): BnbEs
     to: escrowAddress,
     value: value.toString(),
     data,
+    gasLimit: BNB_ESCROW_FUND_GAS_LIMIT.toString(),
     amountLabel: `${formatEther(value)} ${getBscNativeSymbol()}`,
     expiresAt,
   };
@@ -293,6 +299,7 @@ export function buildBnbEscrowSettlementRequest(record: BnbActivationRecord, act
     to: escrowAddress,
     value: "0",
     data,
+    gasLimit: BNB_ESCROW_SETTLEMENT_GAS_LIMIT.toString(),
     label: action === "release" ? "Release escrow" : "Refund expired escrow",
     action,
     jobId: jobId as Hex,

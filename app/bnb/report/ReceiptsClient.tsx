@@ -215,6 +215,7 @@ export function ReceiptsClient({ embedded = false }: { embedded?: boolean } = {}
         to: settlementRequest.to as Hex,
         data: settlementRequest.data as Hex,
         value: BigInt(settlementRequest.value),
+        gas: settlementRequest.gasLimit ? BigInt(settlementRequest.gasLimit) : undefined,
         chainId: targetChainId,
       });
 

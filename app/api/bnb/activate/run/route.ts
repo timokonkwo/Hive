@@ -71,7 +71,7 @@ export async function POST(request: NextRequest) {
     if (record.work?.status === "running") {
       return NextResponse.json({
         status: record.status,
-        message: "Agent is running.",
+        message: "Run in progress.",
         record,
         work: record.work,
         delivery: record.delivery,
@@ -129,7 +129,7 @@ export async function POST(request: NextRequest) {
 
       return NextResponse.json({
         status: updated?.status || (isComplete ? "delivered" : "running"),
-        message: isComplete ? "Agent delivery is ready." : "Agent is running.",
+        message: isComplete ? "Delivery is ready." : "Run in progress.",
         record: updated,
         work,
         delivery: updated?.delivery,

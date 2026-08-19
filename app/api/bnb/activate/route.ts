@@ -150,14 +150,14 @@ export async function POST(request: NextRequest) {
   }
 
   const normalizedJob = intentInput
-    ? buildBnbIntentJobSpec(withDefaultWalletTarget(intentWithDefaultCapability as BnbHireIntentInput, walletAddress))
+    ? buildBnbIntentJobSpec(withDefaultWalletTarget(intentWithDefaultCapability as BnbHireIntentInput, walletAddress), agent)
     : jobSpecInput
     ? buildBnbJobSpec({
       capability: jobSpecCapability,
       taskType: readString(jobSpecInput.taskType),
       fields: jobSpecInput.fields && typeof jobSpecInput.fields === "object" ? jobSpecInput.fields as Record<string, unknown> : {},
       instructions: readString(jobSpecInput.instructions),
-    })
+    }, agent)
     : { ok: true as const, spec: legacyBnbJobSpec(taskTemplate, taskDetails) };
 
   if (!normalizedJob.ok) {

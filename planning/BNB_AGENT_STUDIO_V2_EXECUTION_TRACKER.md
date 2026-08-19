@@ -35,7 +35,7 @@ This tracker is the implementation source of truth for the BNB Agent Studio V2 m
 |:--|:--|:--|
 | Phase 0: Safety Baseline and Config Contract | Complete | Added tracker, env placeholders, runtime readiness, and tests. |
 | Phase 1: Marketplace Readiness Gate | Complete | Centralized readiness and removed non-callable hire/request CTAs. |
-| Phase 2: Agent-Specific Capability Forms | Not started | Render only the selected agent's supported tasks and arguments. |
+| Phase 2: Agent-Specific Capability Forms | Complete | Render only the selected agent's supported tasks and arguments. |
 | Phase 3: Payment and Run State Repair | In progress | Zero-price policy is now explicit; remaining x402/escrow UI work is pending. |
 | Phase 4: Reference Studio V2 Agents | Not started | Add one reliable callable agent per required category. |
 | Phase 5: Delivery Formatting and Evidence | Not started | Convert outputs into human summaries and receipt evidence. |
@@ -170,6 +170,22 @@ This tracker is the implementation source of truth for the BNB Agent Studio V2 m
 
 - The form asks for the minimum correct inputs for the selected agent and task.
 
+### Verification
+
+- Date: 2026-08-19
+- Added `getBnbAgentJobCapability` and `supportedBnbProtocolsForAgent` as the shared capability profile source.
+- Protocol fields now use detected agent protocols where available instead of vague `All supported` defaults.
+- The activation form uses the selected agent's profile for capability, task, field, default, and preview state.
+- Preflight and activation routes pass the selected agent into the authoritative job-spec builder.
+- Server validation now fails missing V3, grid, rebalance, health, and yield inputs before adapter calls.
+- MCP adapter selection now blocks directory/listing tools and collateral-discovery tools from satisfying job-specific requests.
+- `planning/BNB_QUICK_TEST_VALUES.md` now matches the concrete single-protocol field labels.
+- `npm test`: passed with 68 tests.
+- `npm run typecheck`: passed.
+- `npm run lint -- --quiet`: passed.
+- `npm run build`: passed.
+- `git diff --check`: passed.
+
 ## Phase 3: Payment and Run State Repair
 
 ### Units
@@ -213,6 +229,9 @@ This tracker is the implementation source of truth for the BNB Agent Studio V2 m
 - `BNB_ZERO_PRICE_RUNS_ENABLED` now controls the unpriced run policy.
 - Unpriced agents skip escrow by default when zero-price runs are enabled.
 - `BNB_FORCE_ESCROW_FOR_UNPRICED_AGENTS` still overrides free runs when explicitly enabled.
+- Free-run activation records now start as `saved` instead of `awaiting_funding`.
+- Escrow fund, release, and refund transaction requests now include bounded gas limits passed to wallet transactions.
+- Run-route copy now reports `Run in progress.` instead of `Agent is running.`.
 - Full x402 payment review and paid Studio V2 settlement work remains pending.
 
 ### Verification

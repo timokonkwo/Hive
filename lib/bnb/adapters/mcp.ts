@@ -86,16 +86,23 @@ function chooseTool(tools: McpTool[], agent: BnbAgentProfile, record: BnbAdapter
     const text = `${tool.name} ${tool.description || ""}`.toLowerCase();
     let score = terms.reduce((sum, term) => sum + (text.includes(term) ? 1 : 0), 0);
     score += capabilityToolScore(capability, text);
-    if (capability !== "custom" && isDirectoryTool(tool, text)) {
+    const capabilityBlocker = capabilityToolBlocker(tool, text, capability);
+    if (capabilityBlocker) {
+      score -= 100;
+    } else if (capability !== "custom" && isDirectoryTool(tool, text)) {
       score -= 50;
     }
     let argsError = "";
-    try {
-      toolArguments(tool, agent, record);
-      score += 2;
-    } catch (error) {
-      argsError = error instanceof Error ? error.message : "This tool needs more job details.";
-      score -= 12;
+    if (capabilityBlocker) {
+      argsError = capabilityBlocker;
+    } else {
+      try {
+        toolArguments(tool, agent, record);
+        score += 2;
+      } catch (error) {
+        argsError = error instanceof Error ? error.message : "This tool needs more job details.";
+        score -= 12;
+      }
     }
     return { tool, score, argsError };
   });
@@ -111,6 +118,35 @@ function chooseTool(tools: McpTool[], agent: BnbAgentProfile, record: BnbAdapter
   if (callable) return callable.tool;
 
   throw new Error(matchingTools[0].argsError);
+}
+
+function capabilityToolBlocker(tool: McpTool, text: string, capability: string) {
+  if (capability === "custom") return "";
+  if (isDirectoryTool(tool, text)) {
+    return `This agent exposes a directory tool, not a ${capabilityLabel(capability)} tool.`;
+  }
+
+  const schema = normalizeInputSchema(tool.inputSchema);
+  const properties = Object.keys(asRecord(schema.properties)).join(" ").toLowerCase();
+  const spaced = `${text} ${properties}`.replace(/[_-]+/g, " ");
+  const compact = spaced.replace(/[^a-z0-9]+/g, "");
+
+  if (capability === "health_factor") {
+    if (
+      /getenabledcollateral|enabledcollateral|collateralassets|supportedcollateral|listcollateral/.test(compact) &&
+      !/(healthfactor|healthindicator|liquidation|borrowposition|userhealth)/.test(compact)
+    ) {
+      return "This agent does not expose a health-factor tool for this job.";
+    }
+  }
+
+  if (capability === "concentrated_liquidity") {
+    if (/getdexinfo|listdex|supportedfees|supportedpools/.test(compact) && !/(create|position|range|liquidity|tick)/.test(compact)) {
+      return "This agent exposes discovery data, not a liquidity-position tool.";
+    }
+  }
+
+  return "";
 }
 
 function isDirectoryTool(tool: McpTool, text: string) {

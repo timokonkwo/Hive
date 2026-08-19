@@ -117,7 +117,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: unsupportedBnbJobCapabilityReason(agent, intentWithDefaultCapability.capability) }, { status: 400 });
   }
 
-  const normalizedJob = buildBnbIntentJobSpec(withDefaultWalletTarget(intentWithDefaultCapability, walletAddress));
+  const normalizedJob = buildBnbIntentJobSpec(withDefaultWalletTarget(intentWithDefaultCapability, walletAddress), agent);
   if (!normalizedJob.ok) {
     return NextResponse.json({ error: normalizedJob.error }, { status: 400 });
   }

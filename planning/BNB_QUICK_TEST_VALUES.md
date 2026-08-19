@@ -80,7 +80,7 @@ Job: Compare yield routes
 Desired outcome: Compare BSC yield routes for USDT and recommend a safer option with clear risk notes.
 Asset: USDT
 Amount: 25
-Protocols: Venus
+Protocol: Venus
 Risk: Balanced
 Lockup: Liquid only
 Escrow budget: 0.0001
@@ -94,7 +94,7 @@ Desired outcome: Review my current BSC yield position and summarize safer altern
 Wallet: connected wallet
 Scope: All wallet assets
 Amount:
-Protocols: Venus
+Protocol: Venus
 Risk: Balanced
 Lockup: Liquid only
 Escrow budget: 0.0001

@@ -23,6 +23,7 @@ type PaymentRequest =
       to: string;
       value: string;
       data: string;
+      gasLimit?: string;
       amountLabel: string;
     }
   | {
@@ -37,6 +38,7 @@ type SettlementRequest =
       to: string;
       value: string;
       data: string;
+      gasLimit?: string;
       action: "release" | "refund";
     }
   | {
@@ -137,6 +139,7 @@ export function BnbJobClient({ recordId }: { recordId: string }) {
         to: job.paymentRequest.to as Hex,
         data: job.paymentRequest.data as Hex,
         value: BigInt(job.paymentRequest.value),
+        gas: job.paymentRequest.gasLimit ? BigInt(job.paymentRequest.gasLimit) : undefined,
         chainId: targetChainId,
       });
       const response = await authFetch("/api/bnb/activate/payment", {
@@ -194,6 +197,7 @@ export function BnbJobClient({ recordId }: { recordId: string }) {
         to: settlementRequest.to as Hex,
         data: settlementRequest.data as Hex,
         value: BigInt(settlementRequest.value),
+        gas: settlementRequest.gasLimit ? BigInt(settlementRequest.gasLimit) : undefined,
         chainId: targetChainId,
       });
 

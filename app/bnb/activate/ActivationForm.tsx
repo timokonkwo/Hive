@@ -16,14 +16,25 @@ import {
   BNB_CUSTOM_TOKEN_OPTION,
   BNB_RISK_PREFERENCES,
   BNB_YIELD_SOURCE_CONNECTED_WALLET,
-  BNB_YIELD_SOURCE_SELECTED_ASSET,
   allowedBnbJobCapabilitiesForAgent,
+  applyBnbJobFieldDefaults,
+  bnbJobFieldValue,
   capabilityForBnbAgent,
+  defaultBnbIntentTarget,
+  defaultBnbYieldAsset,
+  defaultBnbYieldSource,
+  getBnbAgentJobCapability,
   getBnbJobCapability,
+  initialBnbJobFieldValue,
+  isBnbJobFieldRequired,
+  summaryBnbJobFields,
   validateBnbJobField,
   validateBnbJobPriceBounds,
+  validateBnbYieldFields,
   validateOptionalBnbJobField,
+  visibleBnbJobFields,
   type BnbJobFieldDefinition,
+  yieldBnbJobUsesConnectedWallet,
 } from "@/lib/bnb/jobs";
 import {
   getClientBnbChain,
@@ -45,6 +56,7 @@ type PaymentRequest =
       to: string;
       value: string;
       data: string;
+      gasLimit?: string;
       amountLabel: string;
       expiresAt: number;
     }
@@ -60,6 +72,7 @@ type SettlementRequest =
       to: string;
       value: string;
       data: string;
+      gasLimit?: string;
       label: string;
       action: "release" | "refund";
       jobId: string;
@@ -157,8 +170,8 @@ export function ActivationForm({ agent }: { agent: BnbAgentProfile }) {
   const initialCapability = allowedCapabilities[0] || capabilityForBnbAgent(agent);
   const [stage, setStage] = useState<Stage>("details");
   const [capability, setCapability] = useState<BnbJobCapability>(initialCapability);
-  const definition = getBnbJobCapability(capability);
-  const [taskType, setTaskType] = useState(definition.defaultTaskType);
+  const definition = useMemo(() => getBnbAgentJobCapability(agent, capability), [agent, capability]);
+  const [taskType, setTaskType] = useState(() => getBnbAgentJobCapability(agent, initialCapability).defaultTaskType);
   const [outcome, setOutcome] = useState(() => defaultOutcome(agent));
   const [target, setTarget] = useState("");
   const [riskPreference, setRiskPreference] = useState<(typeof BNB_RISK_PREFERENCES)[number]>("Balanced");
@@ -199,7 +212,7 @@ export function ActivationForm({ agent }: { agent: BnbAgentProfile }) {
   const delivered = result?.record?.delivery?.status === "delivered" || result?.record?.work?.status === "completed" || result?.status === "delivered" || result?.status === "work_completed";
   const closed = result?.status === "paid" || result?.status === "released" || result?.status === "refunded";
   const intent = buildClientHireIntent({ capability, taskType, outcome, target, riskPreference, fields, instructions, walletAddress: address });
-  const jobSpec = preflightResult?.jobSpec || buildClientIntentPreview(intent, getBnbJobCapability(capability));
+  const jobSpec = preflightResult?.jobSpec || buildClientIntentPreview(intent, definition);
   const validation = useMemo(
     () => validateJobForm({ definition, fields, outcome, target, taskType, spendCap, instructions, nativeSymbol, walletAddress: address, paymentRequired: effectivePaymentRequired }),
     [address, definition, effectivePaymentRequired, fields, instructions, nativeSymbol, outcome, spendCap, target, taskType],
@@ -240,14 +253,14 @@ export function ActivationForm({ agent }: { agent: BnbAgentProfile }) {
   }, [allowedCapabilities, capability, initialCapability]);
 
   useEffect(() => {
-    const nextDefinition = getBnbJobCapability(capability);
+    const nextDefinition = getBnbAgentJobCapability(agent, capability);
     setTaskType(nextDefinition.defaultTaskType);
     setFields((current) => {
       const next: Record<string, string> = {};
-      for (const field of nextDefinition.fields) next[field.key] = current[field.key] || initialJobFieldValue(field, nextDefinition.capability, nextDefinition.defaultTaskType);
-      return applyJobFieldDefaults(nextDefinition.capability, nextDefinition.defaultTaskType, next);
+      for (const field of nextDefinition.fields) next[field.key] = current[field.key] || initialBnbJobFieldValue(field, nextDefinition.capability, nextDefinition.defaultTaskType);
+      return applyBnbJobFieldDefaults(nextDefinition.capability, nextDefinition.defaultTaskType, next);
     });
-  }, [capability]);
+  }, [agent, capability]);
 
   function openWalletConnector() {
     if (!ready && !address) {
@@ -412,6 +425,7 @@ export function ActivationForm({ agent }: { agent: BnbAgentProfile }) {
         to: result.paymentRequest.to as Hex,
         data: result.paymentRequest.data as Hex,
         value: BigInt(result.paymentRequest.value),
+        gas: result.paymentRequest.gasLimit ? BigInt(result.paymentRequest.gasLimit) : undefined,
         chainId: targetChainId,
       });
 
@@ -485,6 +499,7 @@ export function ActivationForm({ agent }: { agent: BnbAgentProfile }) {
         to: settlementRequest.to as Hex,
         data: settlementRequest.data as Hex,
         value: BigInt(settlementRequest.value),
+        gas: settlementRequest.gasLimit ? BigInt(settlementRequest.gasLimit) : undefined,
         chainId: targetChainId,
       });
 
@@ -747,7 +762,7 @@ function DetailsStage({
         onSubmit();
       }}
     >
-      <StepHead title="Job" body={`Set the exact context ${agent.name} will use before payment.`} />
+      <StepHead title="Job" body={`Set the exact context ${agent.name} will use.`} />
       <div className="bnb-form-grid">
         <label>
           <span className="bnb-label">Capability</span>
@@ -1570,17 +1585,7 @@ function visibleJobFields(
   definition: ReturnType<typeof getBnbJobCapability>,
   options: { fields?: Record<string, string>; taskType?: string } = {},
 ) {
-  return definition.fields.filter((field) => {
-    if (field.key === "riskPreference") return false;
-    if (definition.capability !== "yield_optimisation") return true;
-    const fields = options.fields || {};
-    const taskType = options.taskType || definition.defaultTaskType;
-    const connectedWallet = yieldUsesConnectedWallet(taskType, fields);
-    if (field.key === "yieldSource") return false;
-    if (field.key === "asset") return !connectedWallet;
-    if (field.key === "customAsset") return !connectedWallet && fields.asset === BNB_CUSTOM_TOKEN_OPTION;
-    return true;
-  });
+  return visibleBnbJobFields(definition, options);
 }
 
 function summaryJobFields(
@@ -1589,12 +1594,7 @@ function summaryJobFields(
   fields: Record<string, string>,
   walletAddress?: string,
 ) {
-  return visibleJobFields(definition, { fields, taskType }).filter((field) => {
-    if (definition.capability !== "yield_optimisation") return true;
-    if (yieldUsesConnectedWallet(taskType, fields)) return field.key !== "asset" && field.key !== "customAsset";
-    if (field.key === "customAsset") return fields.asset === BNB_CUSTOM_TOKEN_OPTION;
-    return field.key !== "yieldSource" && !(field.key === "walletAddress" && !walletAddress);
-  });
+  return summaryBnbJobFields(definition, fields, taskType, walletAddress);
 }
 
 function isConditionallyRequiredJobField(
@@ -1603,32 +1603,15 @@ function isConditionallyRequiredJobField(
   fields: Record<string, string>,
   field: BnbJobFieldDefinition,
 ) {
-  if (capability !== "yield_optimisation" || yieldUsesConnectedWallet(taskType, fields)) return false;
-  if (field.key === "asset") return true;
-  return field.key === "customAsset" && fields.asset === BNB_CUSTOM_TOKEN_OPTION;
+  return isBnbJobFieldRequired(capability, taskType, fields, field);
 }
 
 function initialJobFieldValue(field: BnbJobFieldDefinition, capability?: BnbJobCapability, taskType?: string) {
-  if (capability === "yield_optimisation") {
-    if (field.key === "yieldSource") return defaultYieldSource(taskType || "");
-    if (field.key === "asset") return defaultYieldAsset(taskType || "");
-  }
-  if (field.kind !== "select" || !field.required || !field.options?.length) return "";
-  if (field.key === "threshold") return field.options.includes("1.4") ? "1.4" : field.options[0];
-  return field.options[0];
+  return initialBnbJobFieldValue(field, capability, taskType);
 }
 
 function applyJobFieldDefaults(capability: BnbJobCapability, taskType: string, current: Record<string, string>) {
-  if (capability !== "yield_optimisation") return current;
-  const source = defaultYieldSource(taskType);
-  const next: Record<string, string> = {
-    ...current,
-    yieldSource: source,
-  };
-  if (source === BNB_YIELD_SOURCE_SELECTED_ASSET && !next.asset) {
-    next.asset = defaultYieldAsset(taskType);
-  }
-  return next;
+  return applyBnbJobFieldDefaults(capability, taskType, current);
 }
 
 function jobFieldValue({
@@ -1642,36 +1625,23 @@ function jobFieldValue({
   fields: Record<string, string>;
   walletAddress?: string;
 }) {
-  const value = fields[field.key] || "";
-  if (value) return value;
-  if (capability === "health_factor" && field.key === "walletOrPosition" && walletAddress) return walletAddress;
-  return "";
+  return bnbJobFieldValue({ capability, field, fields, walletAddress });
 }
 
 function defaultIntentTarget(capability: BnbJobCapability, fields: Record<string, string>, walletAddress?: string) {
-  if (capability === "health_factor") return fields.walletOrPosition || walletAddress || "";
-  if (capability === "yield_optimisation") {
-    if (yieldUsesConnectedWallet("", fields)) return fields.walletAddress || walletAddress || "";
-    if (fields.asset === BNB_CUSTOM_TOKEN_OPTION) return fields.customAsset || "";
-    return fields.asset || "";
-  }
-  if (capability === "grid_trading") return fields.pair || "";
-  if (capability === "concentrated_liquidity") return [fields.token0, fields.token1].filter(Boolean).join("/");
-  if (capability === "rebalancing") return fields.poolOrPair || fields.position || "";
-  return fields.request || "";
+  return defaultBnbIntentTarget(capability, fields, walletAddress);
 }
 
 function yieldUsesConnectedWallet(taskType: string, fields: Record<string, string>) {
-  const source = fields.yieldSource || defaultYieldSource(taskType);
-  return source === BNB_YIELD_SOURCE_CONNECTED_WALLET;
+  return yieldBnbJobUsesConnectedWallet(taskType, fields);
 }
 
 function defaultYieldSource(taskType: string) {
-  return taskType === "Review current yield position" ? BNB_YIELD_SOURCE_CONNECTED_WALLET : BNB_YIELD_SOURCE_SELECTED_ASSET;
+  return defaultBnbYieldSource(taskType);
 }
 
 function defaultYieldAsset(taskType: string) {
-  return taskType === "Compare yield routes" ? "BNB" : "USDT";
+  return defaultBnbYieldAsset(taskType);
 }
 
 function validateYieldClientFields(
@@ -1680,21 +1650,7 @@ function validateYieldClientFields(
   fields: Record<string, string>,
   walletAddress?: string,
 ) {
-  if (capability !== "yield_optimisation") return { field: "", error: "" };
-
-  if (yieldUsesConnectedWallet(taskType, fields)) {
-    return walletAddress ? { field: "", error: "" } : { field: "yieldSource", error: "Connect a wallet to review current yield positions." };
-  }
-
-  if (!fields.asset) {
-    return { field: "asset", error: "Choose the asset this yield job should use." };
-  }
-
-  if (fields.asset === BNB_CUSTOM_TOKEN_OPTION && !/^0x[a-fA-F0-9]{40}$/.test(fields.customAsset || "")) {
-    return { field: "customAsset", error: "Enter a valid token address." };
-  }
-
-  return { field: "", error: "" };
+  return validateBnbYieldFields(capability, taskType, fields, walletAddress);
 }
 
 function defaultOutcome(agent: BnbAgentProfile) {

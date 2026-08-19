@@ -148,7 +148,7 @@ export async function createBnbActivationRecord({
     recordType: "hire",
     recordId: randomUUID(),
     receiptId: `hive-bsc-${agent.tokenId}-${Date.now()}`,
-    status: "awaiting_funding",
+    status: walletConfirmationRequired ? "awaiting_funding" : "saved",
     createdAt: now,
     updatedAt: now,
     ...(clientAddress ? { clientAddress } : {}),
