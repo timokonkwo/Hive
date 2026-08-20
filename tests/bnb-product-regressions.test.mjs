@@ -632,8 +632,10 @@ describe('BNB marketplace product flows', () => {
     assert.match(network, /testnet\.bscscan\.com/);
     assert.match(network, /BNB_NETWORK/);
     assert.match(network, /BNB_BSC_CHAIN_ID/);
+    assert.match(network, /chainId === 56 \|\| network === "mainnet" \? HIVE_BNB_MAINNET : HIVE_BNB_TESTNET/);
     assert.match(runtime, /network:\s*network\.network/);
     assert.match(runtime, /chainId:\s*network\.chainId/);
+    assert.match(clientChain, /return network === "mainnet" \? 56 : 97/);
     assert.match(envExample, /BNB_NETWORK=testnet/);
     assert.match(envExample, /NEXT_PUBLIC_BNB_BSC_CHAIN_ID=97/);
   });

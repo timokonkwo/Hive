@@ -49,7 +49,7 @@ function configuredChainId() {
 export function getHiveBnbNetworkConfig(): HiveBnbNetworkConfig {
   const chainId = configuredChainId();
   const network = configuredNetworkName();
-  const base = chainId === 97 || network === "testnet" ? HIVE_BNB_TESTNET : HIVE_BNB_MAINNET;
+  const base = chainId === 56 || network === "mainnet" ? HIVE_BNB_MAINNET : HIVE_BNB_TESTNET;
   const rpcUrl = process.env.BNB_BSC_RPC_URL?.trim() || base.rpcUrl;
 
   return {

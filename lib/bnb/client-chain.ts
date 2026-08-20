@@ -8,7 +8,7 @@ function publicChainId() {
   if (parsed === 97 || parsed === 56) return parsed;
 
   const network = process.env.NEXT_PUBLIC_BNB_NETWORK?.trim().toLowerCase();
-  return network === "testnet" ? 97 : 56;
+  return network === "mainnet" ? 56 : 97;
 }
 
 export function getClientBnbChain() {

@@ -43,7 +43,7 @@ This tracker is the implementation source of truth for the BNB Agent Studio V2 m
 | Phase 7: Altana Permission Path | Not started | Add scoped grant, session-key transaction proof, and revoke flow. |
 | Phase 8: PancakeSwap Utility | Not started | Add LP, swap, farming, and pool demand workflows. |
 | Phase 9: TermiX Agent Advantage Report | Not started | Capture three real agent-vs-manual comparisons. |
-| Phase 10: Production Hardening | Not started | Add rate limits, ownership checks, moderation, analytics, and alerts. |
+| Phase 10: Production Hardening | In progress | Add deployment safety, rate limits, ownership checks, moderation, analytics, and alerts. |
 | Phase 11: Submission Freeze | Not started | Deploy, smoke test, record video, and submit. |
 
 ## Phase 0: Safety Baseline and Config Contract
@@ -489,6 +489,7 @@ This tracker is the implementation source of truth for the BNB Agent Studio V2 m
 
 ### Units
 
+- Prevent accidental BSC mainnet use when BNB env values are missing.
 - Rate-limit all write APIs.
 - Confirm auth ownership on all BNB writes.
 - Keep SSRF-safe endpoint fetching enforced.
@@ -498,6 +499,7 @@ This tracker is the implementation source of truth for the BNB Agent Studio V2 m
 
 ### Components
 
+- Network safety defaults
 - Auth guards
 - Rate limiter
 - Endpoint security
@@ -507,6 +509,7 @@ This tracker is the implementation source of truth for the BNB Agent Studio V2 m
 
 ### Tests
 
+- Unit: missing server and client BNB chain env defaults to testnet.
 - Security: unauthenticated writes return 401.
 - Security: body-provided owner is ignored.
 - Security: private and local endpoints are blocked.
@@ -517,6 +520,12 @@ This tracker is the implementation source of truth for the BNB Agent Studio V2 m
 ### Acceptance
 
 - The BNB marketplace is safe enough for production users.
+
+### Progress
+
+- Date: 2026-08-20
+- Server and client BNB chain selection now default to BSC Testnet.
+- BSC mainnet is selected only when the server or public client env explicitly sets mainnet or chain ID `56`.
 
 ## Phase 11: Submission Freeze
 
