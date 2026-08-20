@@ -638,40 +638,47 @@ describe('BNB marketplace product flows', () => {
     assert.match(envExample, /NEXT_PUBLIC_BNB_BSC_CHAIN_ID=97/);
   });
 
-  it('documents BNB Agent Studio V2 configuration without exposing secrets at runtime', () => {
+  it('documents the current BNB runtime env without speculative placeholders', () => {
     [
-      'BNB_AGENT_STUDIO_ENABLED',
-      'BNB_AGENT_STUDIO_API_BASE',
-      'BNB_AGENT_STUDIO_API_KEY',
-      'BNB_AGENT_STUDIO_PROJECT_ID',
-      'BNB_AGENT_STUDIO_PAYMASTER_ENABLED',
-      'BNB_8004SCAN_PRO_API_KEY',
-      'BNB_8004SCAN_TIMEOUT_MS',
-      'BNB_8004SCAN_CACHE_TTL_SECONDS',
-      'BNB_ERC8183_ENABLED',
-      'BNB_X402_ENABLED',
-      'BNB_X402_FACILITATOR_URL',
-      'BNB_X402_RECEIVER_WALLET',
-      'BNB_ZERO_PRICE_RUNS_ENABLED',
-      'BNB_REFERENCE_AGENTS_JSON',
-      'BNB_REFERENCE_AGENT_SIGNING_KEY',
-      'BNB_REFERENCE_AGENT_WEBHOOK_SECRET',
-      'BNB_ALTANA_ENABLED',
-      'BNB_ALTANA_API_BASE',
-      'BNB_ALTANA_API_KEY',
-      'BNB_ALTANA_EXPLORER_BASE',
-      'BNB_ALTANA_KEYSTORE_ADDRESS',
-      'BNB_PANCAKESWAP_ENABLED',
-      'BNB_PANCAKESWAP_API_BASE',
-      'BNB_PANCAKESWAP_SUBGRAPH_URL',
-      'BNB_PANCAKESWAP_DEEPLINK_BASE',
-      'BNB_TERMIX_REPORT_ENABLED',
-      'BNB_TERMIX_EVIDENCE_BUCKET_URL',
-      'BNB_MARKETPLACE_ANALYTICS_ENABLED',
-      'BNB_MARKETPLACE_ADMIN_SECRET',
-      'BNB_MARKETPLACE_ERROR_WEBHOOK_URL',
+      'NEXT_PUBLIC_PRIVY_APP_ID',
+      'MONGODB_URI',
+      'SITE_URL',
+      'BNB_AUTH_SECRET',
+      'BNB_NETWORK',
+      'NEXT_PUBLIC_BNB_NETWORK',
+      'BNB_BSC_CHAIN_ID',
+      'NEXT_PUBLIC_BNB_BSC_CHAIN_ID',
+      'BNB_BSC_RPC_URL',
+      'NEXT_PUBLIC_BNB_BSC_RPC_URL',
+      'BNB_AGENT_ESCROW_ADDRESS',
+      'BNB_SESSION_REGISTRY_ADDRESS',
+      'BNB_8004SCAN_LIVE',
+      'BNB_8004SCAN_API_BASE',
+      'BNB_8004SCAN_API_KEY',
+      'BNB_HIVE_AGENTS_JSON',
+      'BNB_SHOW_LOCAL_AGENTS',
+      'BNB_ALLOW_PROCESS_STORAGE',
+      'BNB_AGENT_RUN_REQUIRES_ESCROW',
+      'BNB_AGENT_WORKER_URL',
+      'BNB_AGENT_WORKER_API_KEY',
+      'BNB_AGENT_WORKER_CALLBACK_SECRET',
+      'BNB_DEPLOYER_PRIVATE_KEY',
     ].forEach((name) => assert.match(envExample, new RegExp(`${name}=`)));
 
+    [
+      'BNB_AGENT_STUDIO_API_KEY',
+      'BNB_ALTANA_API_KEY',
+      'BNB_MARKETPLACE_ADMIN_SECRET',
+      'BNB_REFERENCE_AGENT_SIGNING_KEY',
+      'BNB_X402_FACILITATOR_URL',
+      'BNB_TERMIX_EVIDENCE_BUCKET_URL',
+    ].forEach((name) => assert.doesNotMatch(envExample, new RegExp(`${name}=`)));
+
+    assert.match(envExample, /Privy dashboard -> Apps -> App ID/);
+    assert.match(envExample, /MongoDB Atlas -> Database -> Connect -> Drivers connection string/);
+    assert.match(envExample, /Generate with: openssl rand -hex 32/);
+    assert.match(envExample, /Do not add identities without callable endpoints/);
+    assert.match(envExample, /Never set this in Netlify or public hosting/);
     assert.match(studioV2, /export function getBnbStudioV2Readiness/);
     assert.match(studioV2, /apiConfigured:\s*envPresent\("BNB_AGENT_STUDIO_API_BASE"\) && envPresent\("BNB_AGENT_STUDIO_API_KEY"\)/);
     assert.match(studioV2, /scanProConfigured:\s*envPresent\("BNB_8004SCAN_PRO_API_KEY"\) \|\| envPresent\("BNB_8004SCAN_API_KEY"\)/);

@@ -33,7 +33,7 @@ This tracker is the implementation source of truth for the BNB Agent Studio V2 m
 
 | Phase | Status | Target |
 |:--|:--|:--|
-| Phase 0: Safety Baseline and Config Contract | Complete | Added tracker, env placeholders, runtime readiness, and tests. |
+| Phase 0: Safety Baseline and Config Contract | Complete | Added tracker, current-runtime env contract, readiness checks, and tests. |
 | Phase 1: Marketplace Readiness Gate | Complete | Centralized readiness and removed non-callable hire/request CTAs. |
 | Phase 2: Agent-Specific Capability Forms | Complete | Render only the selected agent's supported tasks and arguments. |
 | Phase 3: Payment and Run State Repair | In progress | Zero-price policy is now explicit; remaining x402/escrow UI work is pending. |
@@ -51,7 +51,8 @@ This tracker is the implementation source of truth for the BNB Agent Studio V2 m
 ### Units
 
 - Create this tracker.
-- Add environment placeholders for Studio V2, 8004scan Pro, ERC-8183, x402, reference agents, Altana, PancakeSwap, and production observability.
+- Keep `.env.example` limited to values needed by the current local and deployment runtime.
+- Keep future Studio V2, x402, Altana, PancakeSwap, TermiX, and observability values out of `.env.example` until their live integrations are wired.
 - Add runtime readiness flags that expose whether required values are configured without exposing secrets.
 - Add tests that lock the env contract and runtime gates.
 
@@ -69,7 +70,8 @@ This tracker is the implementation source of truth for the BNB Agent Studio V2 m
 - `npm run typecheck`
 - `npm run lint -- --quiet`
 - `npm run build`
-- Regression: `.env.example` contains all required Studio V2 fields.
+- Regression: `.env.example` contains current runtime fields and short acquisition notes.
+- Regression: `.env.example` does not expose speculative partner placeholders.
 - Regression: runtime readiness reports only booleans or non-secret public state.
 - Regression: no private key or API key value is exposed by runtime readiness.
 
@@ -88,6 +90,8 @@ This tracker is the implementation source of truth for the BNB Agent Studio V2 m
 - `npm run build`: passed.
 - `git diff --check`: passed.
 - Known non-fatal build output remained limited to the MetaMask optional React Native storage warning, bigint pure-JS fallback, and local sitemap MongoDB DNS refusal.
+- `.env.example` was trimmed to the values present in the current local BNB runtime plus the production-only `BNB_AUTH_SECRET`.
+- Each retained value now has a short acquisition note.
 
 ## Phase 1: Marketplace Readiness Gate
 
