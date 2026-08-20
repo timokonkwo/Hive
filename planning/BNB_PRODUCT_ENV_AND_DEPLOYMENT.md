@@ -41,6 +41,7 @@ Add these environment variables to the new `hive-bnb` Netlify site:
 SITE_URL=https://bnb.uphive.xyz
 NEXT_PUBLIC_PRIVY_APP_ID=cmmsud1f5029k0ckzaeqk5pas
 MONGODB_URI=<copy the production MongoDB URI from the existing Hive Netlify site>
+BNB_AUTH_SECRET=<generate with openssl rand -hex 32>
 BNB_NETWORK=testnet
 NEXT_PUBLIC_BNB_NETWORK=testnet
 BNB_BSC_CHAIN_ID=97
@@ -51,10 +52,13 @@ BNB_AGENT_ESCROW_ADDRESS=0xAAA70e3AD453faB26B9ea33E3C7CF4f94ad00c2d
 BNB_SESSION_REGISTRY_ADDRESS=0x1DDCd63282CDd4e5531B65902808Ab0673B0Cd02
 BNB_8004SCAN_LIVE=true
 BNB_8004SCAN_API_BASE=https://8004scan.io/api/v1/public
+BNB_8004SCAN_API_KEY=<optional 8004scan key>
 BNB_SHOW_LOCAL_AGENTS=false
 BNB_ALLOW_PROCESS_STORAGE=false
-BNB_AGENT_RUN_REQUIRES_ESCROW=true
+BNB_AGENT_RUN_REQUIRES_ESCROW=false
 ```
+
+`BNB_AGENT_RUN_REQUIRES_ESCROW=false` lets unpriced callable agents run without showing payment or budget UI. Set it to `true` only when every production run must be escrow-funded.
 
 Do not add this to Netlify:
 
@@ -213,10 +217,10 @@ Then test the product:
 2. Sign in.
 3. Open `Agents`.
 4. Hire an agent.
-5. Fund escrow.
+5. For a paid agent, fund escrow.
 6. Run the agent.
 7. Open `My hires`.
-8. Release escrow or refund after expiry.
+8. For a paid agent, release escrow or refund after expiry.
 9. Open `Wallet alerts`.
 10. Grant and revoke a wallet alert.
 
@@ -224,6 +228,8 @@ When something fails, check these exact items:
 
 - `hive-bnb` Netlify site uses branch `bnb`.
 - `hive-bnb` Netlify site has `MONGODB_URI`.
+- `hive-bnb` Netlify site has `BNB_AUTH_SECRET`.
+- `hive-bnb` Netlify site reports `network=testnet` and `chainId=97` at `/api/bnb/runtime`.
 - `hive-bnb` Netlify site has `BNB_AGENT_ESCROW_ADDRESS`.
 - `hive-bnb` Netlify site has `BNB_SESSION_REGISTRY_ADDRESS`.
 - Render service uses branch `bnb`.
