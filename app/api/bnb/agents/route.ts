@@ -17,7 +17,7 @@ export async function GET(request: NextRequest) {
   if (limited) return limited;
 
   const { searchParams } = new URL(request.url);
-  const limit = Number(searchParams.get("limit") || 24);
+  const limit = Number(searchParams.get("limit") || searchParams.get("pageSize") || 24);
   const page = Number(searchParams.get("page") || 1);
   const category = searchParams.get("category");
   const q = searchParams.get("q");

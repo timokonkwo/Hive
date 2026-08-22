@@ -563,9 +563,15 @@ function get8004CacheTtlSeconds(fallback: number) {
 }
 
 function get8004ExecutionScanPages() {
-  const pages = Number.parseInt(process.env.BNB_8004SCAN_EXECUTION_SCAN_PAGES || "4", 10);
-  if (!Number.isFinite(pages)) return 4;
+  const pages = Number.parseInt(process.env.BNB_8004SCAN_EXECUTION_SCAN_PAGES || "1", 10);
+  if (!Number.isFinite(pages)) return 1;
   return Math.min(Math.max(pages, 1), 12);
+}
+
+function get8004DetailHydrationLimit() {
+  const limit = Number.parseInt(process.env.BNB_8004SCAN_DETAIL_HYDRATION_LIMIT || "4", 10);
+  if (!Number.isFinite(limit)) return 4;
+  return Math.min(Math.max(limit, 0), 12);
 }
 
 async function fetch8004Json(url: URL | string, revalidate: number) {
@@ -948,14 +954,33 @@ function mayExposeExecutionEndpoint(agent: BnbAgentProfile) {
   return /\b(mcp|a2a|x402|http|api)\b/.test(protocolText);
 }
 
-async function hydrate8004AgentDetails(agents: BnbAgentProfile[], options: { onlyLikelyExecution?: boolean } = {}) {
+async function mapCatalogWithConcurrency<T, R>(items: T[], concurrency: number, mapper: (item: T) => Promise<R>) {
+  const results: R[] = new Array(items.length);
+  let index = 0;
+  const workers = Array.from({ length: Math.min(Math.max(concurrency, 1), items.length) }, async () => {
+    while (index < items.length) {
+      const current = index;
+      index += 1;
+      results[current] = await mapper(items[current]);
+    }
+  });
+  await Promise.all(workers);
+  return results;
+}
+
+async function hydrate8004AgentDetails(agents: BnbAgentProfile[], options: { onlyLikelyExecution?: boolean; limit?: number } = {}) {
   if (process.env.BNB_8004SCAN_LIVE !== "true") return agents;
-  const hydrated = await Promise.all(agents.map(async (agent) => {
+  let remaining = options.limit === undefined ? agents.length : Math.max(Math.trunc(options.limit), 0);
+  if (remaining === 0) return agents;
+
+  const hydrated = await mapCatalogWithConcurrency(agents, 2, async (agent) => {
     if (agent.sourceFreshness.source !== "8004scan") return agent;
     if (options.onlyLikelyExecution && !mayExposeExecutionEndpoint(agent)) return agent;
+    if (remaining <= 0) return agent;
+    remaining -= 1;
     const detail = await fetch8004AgentDetail(agent.chainId, agent.tokenId).catch(() => null);
     return detail || agent;
-  }));
+  });
   return hydrated;
 }
 
@@ -985,7 +1010,7 @@ async function fetch8004ExecutionCandidates({
     }))
   )));
   const candidates = uniqueAgents(pages.flatMap((result) => result.agents));
-  const hydrated = await hydrate8004AgentDetails(candidates);
+  const hydrated = await hydrate8004AgentDetails(candidates, { limit: get8004DetailHydrationLimit() });
 
   return {
     agents: hydrated,
@@ -1284,7 +1309,8 @@ export async function listBnbAgentsPage(query: BnbAgentQuery = {}): Promise<BnbA
   const sort = query.sort || "recommended";
   const sourceSearch = query.q?.trim() || categorySearchText(query.category);
   const runtimeFiltered = query.execution === "ready_to_run" || query.execution === "connectable" || query.execution === "unavailable";
-  const executionDiscovery = query.execution !== "listed_only" && (runtimeFiltered || page === 1);
+  const leadWithRunnableCandidates = !query.execution && page === 1 && !sourceSearch;
+  const executionDiscovery = query.execution !== "listed_only" && (runtimeFiltered || leadWithRunnableCandidates);
   const profileDiscovery = !runtimeFiltered || query.execution === "listed_only";
   const [executionPage, profilePage, semanticAgents, endpointAgents] = await Promise.all([
     executionDiscovery
@@ -1309,9 +1335,9 @@ export async function listBnbAgentsPage(query: BnbAgentQuery = {}): Promise<BnbA
   const baseAgents = page === 1 ? getBaseBnbAgents() : [];
   const liveCandidates = uniqueAgents([...semanticAgents, ...executionPage.agents, ...profilePage.agents])
     .slice(0, executionDiscovery ? Math.min(limit * get8004ExecutionScanPages() * 2, 200) : limit);
-  const shouldHydrateLiveDetails = runtimeFiltered || page === 1 || Boolean(sourceSearch);
+  const shouldHydrateLiveDetails = runtimeFiltered;
   const liveAgents = shouldHydrateLiveDetails
-    ? await hydrate8004AgentDetails(liveCandidates, { onlyLikelyExecution: !runtimeFiltered })
+    ? await hydrate8004AgentDetails(liveCandidates, { limit: get8004DetailHydrationLimit() })
     : liveCandidates;
   const candidates = uniqueAgents([...baseAgents, ...endpointAgents, ...liveAgents]);
   const runtimeCandidates = executionDiscovery ? await resolveBnbAgentsRuntime(candidates) : candidates;
