@@ -2395,8 +2395,7 @@ button.bnb-account-button:disabled {
   padding-top: 10px;
 }
 
-.bnb-delivery-sources span,
-.bnb-delivery-technical summary {
+.bnb-delivery-sources span {
   color: var(--bnb-text-muted);
   font-size: 12px;
   font-weight: 700;
@@ -2410,20 +2409,6 @@ button.bnb-account-button:disabled {
   color: var(--bnb-text-soft);
   font-size: 12px;
   line-height: 1.5;
-}
-
-.bnb-delivery-technical {
-  border-top: 1px solid var(--bnb-line);
-  padding-top: 10px;
-}
-
-.bnb-delivery-technical summary {
-  cursor: pointer;
-}
-
-.bnb-delivery-technical pre {
-  margin-top: 8px;
-  max-height: 300px;
 }
 
 .bnb-preflight-list,
@@ -2490,6 +2475,12 @@ button.bnb-account-button:disabled {
   color: var(--bnb-text);
   font-size: 13px;
   font-weight: 600;
+}
+
+.bnb-hire-state-running {
+  border-color: var(--bnb-line);
+  background: rgba(255, 255, 255, 0.03);
+  color: var(--bnb-text-muted);
 }
 
 .bnb-job-layout {

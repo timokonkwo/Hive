@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { timingSafeEqual } from "node:crypto";
 import { enforceBnbRateLimit } from "@/lib/bnb/rate-limit";
 import { BnbStorageError, updateBnbActivationRecord } from "@/lib/bnb/records";
 import type { BnbAgentWork } from "@/lib/bnb/types";
@@ -10,7 +11,13 @@ function readString(value: unknown) {
 function authorized(request: NextRequest) {
   const secret = process.env.BNB_AGENT_WORKER_CALLBACK_SECRET?.trim();
   if (!secret) return false;
-  return request.headers.get("authorization") === `Bearer ${secret}`;
+  return safeEqual(request.headers.get("authorization") || "", `Bearer ${secret}`);
+}
+
+function safeEqual(left: string, right: string) {
+  const leftBuffer = Buffer.from(left);
+  const rightBuffer = Buffer.from(right);
+  return leftBuffer.length === rightBuffer.length && timingSafeEqual(leftBuffer, rightBuffer);
 }
 
 function normalizeWork(value: unknown): BnbAgentWork | null {

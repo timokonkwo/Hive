@@ -78,9 +78,9 @@ const savedKey = "hive:bnb:saved-agents";
 const compareKey = "hive:bnb:compare-agents";
 
 const availabilityOptions = [
-  { value: "ready_to_run", label: "Ready to run" },
-  { value: "all", label: "All identities" },
-  { value: "listed_only", label: "Listed" },
+  { value: "all", label: "All agents" },
+  { value: "ready_to_run", label: "Can run now" },
+  { value: "listed_only", label: "Profiles only" },
   { value: "unavailable", label: "Unavailable" },
 ];
 
@@ -122,7 +122,7 @@ export function AgentsDirectory({
   const [compareAgents, setCompareAgents] = useState<string[]>(() => readComparedAgents());
   const initialized = useRef(false);
 
-  const activeFilterCount = [q.trim(), category, status && status !== "ready_to_run" ? status : "", integration, sort !== "recommended" ? sort : ""]
+  const activeFilterCount = [q.trim(), category, status && status !== "all" ? status : "", integration, sort !== "recommended" ? sort : ""]
     .filter(Boolean)
     .length;
   const pageCount = Math.max(1, Math.ceil(totalAgents / pageSize));
@@ -140,15 +140,22 @@ export function AgentsDirectory({
       const params = new URLSearchParams();
       if (q.trim()) params.set("q", q.trim());
       if (category) params.set("category", category);
-      if (status && status !== "ready_to_run") params.set("status", status);
+      if (status && status !== "all") params.set("status", status);
       if (integration) params.set("integration", integration);
       if (sort && sort !== "recommended") params.set("sort", sort);
       const query = params.toString();
+      const currentParams = new URLSearchParams();
+      if (current.q) currentParams.set("q", current.q);
+      if (current.category) currentParams.set("category", current.category);
+      if (current.status && current.status !== "all") currentParams.set("status", current.status);
+      if (current.integration) currentParams.set("integration", current.integration);
+      if (current.sort && current.sort !== "recommended") currentParams.set("sort", current.sort);
+      if (query === currentParams.toString()) return;
       router.replace(query ? `${pathname}?${query}` : pathname, { scroll: false });
     }, 250);
 
     return () => window.clearTimeout(timeout);
-  }, [category, integration, pathname, q, router, sort, status]);
+  }, [category, current.category, current.integration, current.q, current.sort, current.status, integration, pathname, q, router, sort, status]);
 
   const visibleAgentMap = useMemo(() => {
     const entries = agents.map((agent) => [agentKey(agent), toSavedAgent(agent)] as const);
@@ -192,7 +199,7 @@ export function AgentsDirectory({
   function clearFilters() {
     setQ("");
     setCategory("");
-    setStatus("ready_to_run");
+    setStatus("all");
     setIntegration("");
     setSort("recommended");
   }
@@ -201,7 +208,7 @@ export function AgentsDirectory({
     const params = new URLSearchParams();
     if (current.q) params.set("q", current.q);
     if (current.category) params.set("category", current.category);
-    if (current.status && current.status !== "ready_to_run") params.set("status", current.status);
+    if (current.status && current.status !== "all") params.set("status", current.status);
     if (current.integration) params.set("integration", current.integration);
     if (current.sort && current.sort !== "recommended") params.set("sort", current.sort);
     if (nextPage > 1) params.set("page", String(nextPage));
@@ -326,8 +333,7 @@ export function AgentsDirectory({
         </div>
       ) : (
         <div className="bnb-empty-state">
-          <h2>No matching agents</h2>
-          <p>No listed agents match these filters.</p>
+          <h2>No agents</h2>
           {activeFilterCount > 0 ? (
             <button type="button" className="bnb-button-dark bnb-focus" onClick={clearFilters}>
               Clear filters
@@ -445,8 +451,8 @@ function FilterFields({
         </span>
       </label>
       <label>
-        <span className="bnb-filter-label">Availability</span>
-        <BnbSelect value={status} onChange={setStatus} options={availabilityOptions} ariaLabel="Availability" />
+        <span className="bnb-filter-label">Run status</span>
+        <BnbSelect value={status} onChange={setStatus} options={availabilityOptions} ariaLabel="Run status" />
       </label>
       <label>
         <span className="bnb-filter-label">Works with</span>
@@ -500,7 +506,7 @@ function DirectoryAgentRow({
             {bnbAgentDisplayName(agent)}
           </Link>
           {bnbIsVerified(agent) ? (
-            <BadgeCheck aria-label="ERC-8004 identity verified" className="bnb-verified-mark" size={16} />
+            <BadgeCheck aria-label="Verified" className="bnb-verified-mark" size={16} />
           ) : null}
         </h2>
         <p>{categoryLabel(agent.category)} · {statusLabel(agent)}</p>
@@ -583,7 +589,7 @@ function SavedAgents({ agents, remove }: { agents: SavedAgent[]; remove: (key: s
 function ComparisonPanel({ agents, close }: { agents: SavedAgent[]; close: () => void }) {
   const rows: ComparisonRow[] = [
     { label: "Category", value: (agent) => agent.category },
-    { label: "Availability", value: (agent) => agent.status },
+    { label: "Run status", value: (agent) => agent.status },
     { label: "Reviews", value: (agent) => agent.reviews || "Not enough data", hasValue: (agent) => Boolean(agent.reviews) },
     { label: "Price", value: (agent) => agent.price || "Not listed", hasValue: (agent) => Boolean(agent.price) },
     { label: "Last active", value: (agent) => agent.lastActive || "Not listed" },

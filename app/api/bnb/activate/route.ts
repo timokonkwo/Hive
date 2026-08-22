@@ -48,19 +48,28 @@ function executionWalletAddress(request: NextRequest, authAddress: string) {
 }
 
 function withDefaultWalletTarget(intent: BnbHireIntentInput, walletAddress: string): BnbHireIntentInput {
-  if (intent.target || !walletAddress) return intent;
-  if (intent.capability === "health_factor") return { ...intent, target: walletAddress };
-  if (intent.capability === "yield_optimisation" && intent.advancedFields?.yieldSource === "Connected wallet") {
-    return {
+  const withWallet = walletAddress
+    ? {
       ...intent,
-      target: walletAddress,
       advancedFields: {
         ...intent.advancedFields,
+        walletAddress: intent.advancedFields?.walletAddress || walletAddress,
+      },
+    }
+    : intent;
+  if (intent.target || !walletAddress) return withWallet;
+  if (intent.capability === "health_factor") return { ...withWallet, target: walletAddress };
+  if (intent.capability === "yield_optimisation" && intent.advancedFields?.yieldSource === "Connected wallet") {
+    return {
+      ...withWallet,
+      target: walletAddress,
+      advancedFields: {
+        ...withWallet.advancedFields,
         walletAddress,
       },
     };
   }
-  return intent;
+  return withWallet;
 }
 
 function shouldPreflightJob(agent: BnbAgentProfile) {

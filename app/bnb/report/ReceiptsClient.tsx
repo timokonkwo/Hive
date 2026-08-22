@@ -173,7 +173,10 @@ export function ReceiptsClient({ embedded = false }: { embedded?: boolean } = {}
         body: JSON.stringify({ recordId: record.recordId }),
       });
       const payload = await response.json();
-      if (!response.ok) throw new Error(payload.error || "Agent work failed.");
+      if (!response.ok) {
+        if (payload.record) replaceActivation(payload.record);
+        throw new Error(payload.error || "Agent work failed.");
+      }
       if (payload.record) replaceActivation(payload.record);
     } catch (runError) {
       setError(runError instanceof Error ? runError.message : "Agent work failed.");
@@ -299,6 +302,7 @@ export function ReceiptsClient({ embedded = false }: { embedded?: boolean } = {}
                 const completed = record.delivery?.status === "delivered" || record.work?.status === "completed" || record.status === "delivered" || record.status === "work_completed";
                 const closed = record.status === "paid" || record.status === "released" || record.status === "refunded";
                 const running = record.delivery?.status === "running" || record.work?.status === "running" || record.status === "running";
+                const failed = record.delivery?.status === "failed" || record.work?.status === "failed" || record.status === "failed";
                 const output = record.delivery?.rawOutput || record.work?.output;
                 const dataSources = record.delivery?.dataSources || record.work?.dataSources;
                 const refundBlocker = bnbRefundUnavailableReason(record);
@@ -320,7 +324,7 @@ export function ReceiptsClient({ embedded = false }: { embedded?: boolean } = {}
                       <Link href={`/bnb/jobs/${encodeURIComponent(record.recordId)}`} className="bnb-button-dark bnb-focus">
                         View
                       </Link>
-                      {funded && !completed && !closed ? (
+                      {funded && !completed && !closed && !failed ? (
                         <button
                           type="button"
                           onClick={() => runHire(record)}
@@ -453,7 +457,7 @@ function jobStatusLabel(record: BnbActivationRecord) {
   if (record.payment?.transactionStatus === "success" || record.status === "funded" || record.status === "payment_confirmed") return "Funded";
   if (record.status === "payment_submitted") return "Payment submitted";
   if (record.status === "failed") return "Failed";
-  if (record.limits.walletConfirmationRequired === false) return "Ready";
+  if (record.limits.walletConfirmationRequired === false) return "Run needed";
   return "Awaiting funding";
 }
 

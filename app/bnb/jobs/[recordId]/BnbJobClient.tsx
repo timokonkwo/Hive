@@ -168,7 +168,12 @@ export function BnbJobClient({ recordId }: { recordId: string }) {
         body: JSON.stringify({ recordId }),
       });
       const payload = await response.json();
-      if (!response.ok) throw new Error(payload.error || "Agent run failed.");
+      if (!response.ok) {
+        if (payload.record) {
+          setJob((current) => current ? { ...current, record: payload.record } : current);
+        }
+        throw new Error(payload.error || "Agent run failed.");
+      }
       setJob((current) => current ? { ...current, record: payload.record } : current);
     } catch (runError) {
       setError(runError instanceof Error ? runError.message : "Agent run failed.");
@@ -264,6 +269,7 @@ export function BnbJobClient({ recordId }: { recordId: string }) {
   const funded = paymentNotRequired || record.payment?.transactionStatus === "success" || record.status === "funded" || record.status === "payment_confirmed" || delivered;
   const closed = record.status === "paid" || record.status === "released" || record.status === "refunded";
   const running = record.delivery?.status === "running" || record.work?.status === "running" || record.status === "running";
+  const failed = record.delivery?.status === "failed" || record.work?.status === "failed" || record.status === "failed";
   const output = record.delivery?.rawOutput || record.work?.output;
   const dataSources = record.delivery?.dataSources || record.work?.dataSources;
   const refundBlocker = bnbRefundUnavailableReason(record);
@@ -320,7 +326,7 @@ export function BnbJobClient({ recordId }: { recordId: string }) {
                   {action === "fund" ? "Confirming..." : `Fund ${job.paymentRequest.amountLabel}`}
                 </button>
               ) : null}
-              {funded && !delivered && !closed ? (
+              {funded && !delivered && !closed && !failed ? (
                 <button type="button" className="bnb-button bnb-focus" onClick={runJob} disabled={Boolean(action) || running} aria-busy={action === "run" || running}>
                   {action === "run" || running ? <BnbButtonLoader /> : <Play aria-hidden="true" size={16} />}
                   {action === "run" || running ? "Running..." : "Run agent"}
@@ -435,14 +441,14 @@ function jobStatusLabel(record: BnbActivationRecord) {
   if (record.delivery?.status === "running" || record.work?.status === "running" || record.status === "running") return "Running";
   if (record.payment?.transactionStatus === "success" || record.status === "funded" || record.status === "payment_confirmed") return "Funded";
   if (record.status === "failed") return "Failed";
-  if (record.limits.walletConfirmationRequired === false) return "Ready";
+  if (record.limits.walletConfirmationRequired === false) return "Run needed";
   return "Awaiting funding";
 }
 
 function nextActionCopy(record: BnbActivationRecord) {
   const label = jobStatusLabel(record);
   const paymentNotRequired = record.limits.walletConfirmationRequired === false;
-  if (label === "Ready") return "Run the agent.";
+  if (label === "Run needed") return "Run the agent.";
   if (label === "Awaiting funding") return record.limits.walletConfirmationRequired ? "Fund the job to start." : "Run the agent.";
   if (label === "Funded") return "Run the agent.";
   if (label === "Running") return "The agent is working on this job.";

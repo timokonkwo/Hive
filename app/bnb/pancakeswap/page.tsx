@@ -47,7 +47,7 @@ export default function BnbPancakeSwapPage() {
                   <strong>{job.scoring.find((item) => item.label === "Target cost")?.value || "Set"}</strong>
                 </div>
                 <Link href={job.activationHref} className="bnb-button-dark bnb-focus">
-                  Hire agent <ArrowRight aria-hidden="true" size={15} />
+                  Find agents <ArrowRight aria-hidden="true" size={15} />
                 </Link>
               </div>
             </article>

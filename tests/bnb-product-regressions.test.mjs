@@ -27,6 +27,7 @@ describe('BNB marketplace product flows', () => {
   const preflightRoute = read('app/api/bnb/activate/preflight/route.ts');
   const accessRoute = read('app/api/bnb/access-request/route.ts');
   const runRoute = read('app/api/bnb/activate/run/route.ts');
+  const callbackRoute = read('app/api/bnb/activate/callback/route.ts');
   const settlementRoute = read('app/api/bnb/activate/settlement/route.ts');
   const jobRoute = read('app/api/bnb/jobs/[recordId]/route.ts');
   const jobClient = read('app/bnb/jobs/[recordId]/BnbJobClient.tsx');
@@ -57,9 +58,12 @@ describe('BNB marketplace product flows', () => {
   const requestDialog = read('app/bnb/agents/[chainId]/[tokenId]/RequestAccessDialog.tsx');
   const clientAuth = read('lib/client-auth.ts');
   const endpointSecurity = read('lib/bnb/endpoint-security.ts');
+  const endpointAuth = read('lib/bnb/endpoint-auth.ts');
   const adapterRegistry = read('lib/bnb/adapters/registry.ts');
   const mcpAdapter = read('lib/bnb/adapters/mcp.ts');
   const a2aAdapter = read('lib/bnb/adapters/a2a.ts');
+  const httpAdapter = read('lib/bnb/adapters/http.ts');
+  const endpointSources = read('lib/bnb/endpoint-sources.ts');
   const agentsRoute = read('app/api/bnb/agents/route.ts');
   const envExample = read('.env.example');
 
@@ -108,15 +112,17 @@ describe('BNB marketplace product flows', () => {
     assert.match(directory, /bnbCanHireAgent/);
     assert.doesNotMatch(directory, /Connectable/);
     assert.doesNotMatch(directory, /Listed only/);
-    assert.match(directory, /All identities/);
-    assert.match(directory, /setStatus\("ready_to_run"\)/);
-    assert.match(directory, /status && status !== "ready_to_run"/);
-    assert.match(agentsPage, /const defaultStatus = "ready_to_run"/);
+    assert.match(directory, /label:\s*"All agents"/);
+    assert.match(directory, /label:\s*"Can run now"/);
+    assert.match(directory, /label:\s*"Profiles only"/);
+    assert.match(directory, /setStatus\("all"\)/);
+    assert.match(directory, /status && status !== "all"/);
+    assert.match(agentsPage, /const defaultStatus = "all"/);
     assert.match(agentsPage, /if \(!value\) return defaultStatus/);
     assert.match(agentsPage, /if \(value === "all"\) return null/);
-    assert.match(agentsPage, /ready BSC agents/);
+    assert.doesNotMatch(agentsPage, /ready BSC agents/);
     assert.match(agentsRoute, /function executionFilter/);
-    assert.match(agentsRoute, /if \(!value\) return "ready_to_run"/);
+    assert.match(agentsRoute, /if \(!value\) return null/);
     assert.match(agentsRoute, /if \(value === "all"\) return null/);
     assert.match(agentsRoute, /activation:\s*null/);
     assert.match(profilePage, /canHire \? \(/);
@@ -135,7 +141,7 @@ describe('BNB marketplace product flows', () => {
     assert.doesNotMatch(directory, /\/bnb\/match\?intent=.*Contact/);
     assert.doesNotMatch(bnbUi, /\/bnb\/match\?intent=.*Contact/);
     assert.doesNotMatch(statusPage, /Request this agent/);
-    assert.match(statusPage, /get8004scanAgentUrl\(matchedAgent\.chainId,\s*matchedAgent\.tokenId\)/);
+    assert.match(statusPage, /externalAgentUrl\(matchedAgent\)/);
   });
 
   it('keeps Privy auth and BNB wallet transactions wired together', () => {
@@ -150,7 +156,8 @@ describe('BNB marketplace product flows', () => {
     assert.match(activateForm, /paymentStages:\s*Exclude<Stage,\s*"job">\[\]\s*=\s*\["details",\s*"preflight",\s*"payment"\]/);
     assert.match(activateForm, /Validate job/);
     assert.match(activateForm, /Review payment/);
-    assert.match(activateForm, /Create job/);
+    assert.match(activateForm, /Run agent/);
+    assert.doesNotMatch(activateForm, /Create job/);
     assert.match(activateForm, /JobStatusPanel/);
     assert.match(activateForm, /getClientBnbChainId/);
     assert.match(activateForm, /authReadyTimedOut/);
@@ -213,12 +220,18 @@ describe('BNB marketplace product flows', () => {
     assert.match(directory, /bnb-directory-meta-empty/);
     assert.match(directory, /const metadata = \[/);
     assert.match(directory, /label:\s*"Category"/);
-    assert.match(directory, /label:\s*"Availability"/);
+    assert.match(directory, /label:\s*"Run status"/);
     assert.match(directory, /label:\s*"Reviews"/);
     assert.match(directory, /label:\s*"Price"/);
     assert.match(directory, /label:\s*"Identity"/);
     assert.match(agentsPage, /listBnbAgentsPage/);
-    assert.match(agentsPage, /\$\{formatBnbAgentCount\(networkTotal\)\} BSC agents/);
+    assert.match(catalog, /runtimeFiltered = query\.execution === "ready_to_run"/);
+    assert.match(catalog, /if \(total === 0\) return "0"/);
+    assert.match(agentsPage, /resultLabel = q[\s\S]*Agents for/);
+    assert.doesNotMatch(agentsPage, /formatBnbAgentCount\(networkTotal\)/);
+    assert.match(profilePage, /label:\s*"Run status"/);
+    assert.match(directory, /<h2>No agents<\/h2>/);
+    assert.doesNotMatch(directory, /No listed agents match these filters/);
     assert.match(directory, /compactPagination\(page,\s*pageCount\)/);
     assert.doesNotMatch(directory, /of \{totalAgents\} agents/);
     assert.doesNotMatch(directory, /item\.count|categories\.reduce\(\(sum,\s*item\) => sum \+ item\.count/);
@@ -273,12 +286,15 @@ describe('BNB marketplace product flows', () => {
     assert.match(bnbChain, /export function get8004scanChainSlug/);
     assert.match(bnbChain, /get8004scanAgentUrl\(chainId:\s*string \| number,\s*tokenId:\s*string \| number\)/);
     assert.match(bnbChain, /get8004scanChainSlug\(chainId\)/);
-    assert.match(profilePage, /const identityUrl = get8004scanAgentUrl\(agent\.chainId,\s*agent\.tokenId\)/);
+    assert.match(profilePage, /const identityUrl = externalAgentUrl\(agent\)/);
+    assert.match(profilePage, /function externalAgentUrl\(agent:\s*BnbAgentProfile\)/);
+    assert.match(profilePage, /agent\.sourceFreshness\.source === "8004scan"[\s\S]*get8004scanAgentUrl\(agent\.chainId,\s*agent\.tokenId\)/);
     assert.doesNotMatch(profilePage, /8004scan\.io\/agents\/\$\{agent\.chainId\}/);
     assert.match(profilePage, /label="Wallet owner"[\s\S]*copyValue=\{ownerAddress\}/);
     assert.match(profilePage, /label="Agent wallet"[\s\S]*copyValue=\{agentWallet\}/);
     assert.match(statusPage, /label="Wallet owner"[\s\S]*copyValue=\{matchedAgent\.ownerAddress\}/);
     assert.match(statusPage, /label="Agent wallet"[\s\S]*copyValue=\{matchedAgent\.agentWallet\}/);
+    assert.match(statusPage, /const matchedAgentSourceUrl = matchedAgent \? externalAgentUrl\(matchedAgent\) : ""/);
     assert.match(clientChain, /export function getClientBnbExplorerAddressUrl/);
     assert.match(clientChain, /export function getClientBnbExplorerTxUrl/);
     assert.match(activateForm, /getClientBnbExplorerAddressUrl\(escrowAddress\)/);
@@ -428,19 +444,21 @@ describe('BNB marketplace product flows', () => {
     assert.match(activateRoute, /status:\s*"not_required" as const/);
     assert.match(activateRoute, /walletConfirmationRequired:\s*escrowRequired/);
     assert.match(runRoute, /shouldRequireBnbEscrow\(agent\)/);
-    assert.match(runRoute, /record\.limits\.walletConfirmationRequired !== false/);
+    assert.match(runRoute, /Agent is no longer available/);
+    assert.doesNotMatch(runRoute, /record\.limits\.walletConfirmationRequired !== false/);
     assert.match(jobRoute, /status:\s*"not_required" as const/);
-    assert.match(activateForm, /paymentRequest\?\.status === "not_required" \? "job" : "payment"/);
+    assert.match(activateForm, /await runAgent\(payload\.recordId,\s*payload\)/);
     assert.match(activateForm, /paymentRequest\.status === "not_required"/);
     assert.match(activateForm, /paymentRequired=\{effectivePaymentRequired\}/);
     assert.match(activateForm, /stageLabel\(stage,\s*paymentRequired\)/);
     assert.match(activateForm, /return paymentRequired \? "Payment" : "Run"/);
-    assert.match(activateForm, /Create job/);
+    assert.match(activateForm, /Run agent/);
+    assert.doesNotMatch(activateForm, /Create job/);
     assert.match(activateForm, /showSettlementActions = !paymentNotRequired && delivered && !closed/);
     assert.doesNotMatch([activateRoute, jobRoute].join('\n'), /This job does not require payment/);
     assert.doesNotMatch(activateForm, /No escrow payment is required|public endpoint|Start job|Agent is running|Delivery ready|Review the work before releasing payment/);
     assert.match(jobClient, /paymentRequest\?\.status === "not_required"/);
-    assert.match(jobClient, /return "Ready"/);
+    assert.match(jobClient, /return "Run needed"/);
     assert.match(jobClient, /Run details/);
     assert.match(jobClient, /showSettlementActions = !paymentNotRequired && delivered && !closed/);
     assert.match(activityClient, /showSettlementActions = !paymentNotRequired && completed && !closed/);
@@ -451,6 +469,8 @@ describe('BNB marketplace product flows', () => {
   it('keeps agent work and escrow settlement idempotent enough for retries', () => {
     assert.match(runRoute, /record\.work\?\.status === "completed"/);
     assert.match(runRoute, /record\.work\?\.status === "running"/);
+    assert.match(callbackRoute, /timingSafeEqual/);
+    assert.match(callbackRoute, /safeEqual\(request\.headers\.get\("authorization"\) \|\| "",\s*`Bearer \$\{secret\}`\)/);
     assert.match(settlementRoute, /record\.status === "paid"/);
     assert.match(settlementRoute, /record\.status === "released"/);
     assert.match(settlementRoute, /record\.status === "refunded"/);
@@ -521,7 +541,7 @@ describe('BNB marketplace product flows', () => {
     assert.match(home, /What do you need an agent to do\?/);
     assert.match(home, /Find agents/);
     assert.doesNotMatch(home, /registered on BSC|Connected to the BNB ecosystem|Find an agent|Set the job terms|Review the result/);
-    assert.match(agentsPage, /Search agents by capability and availability/);
+    assert.match(agentsPage, /Search agents by capability and run status/);
     assert.doesNotMatch(agentsPage, /registered on BSC|agents shown/);
     assert.match(bnbUi, /function BnbFooter/);
     assert.match(bnbUi, /Find, hire, and track BNB Chain agents from one workspace/);
@@ -539,6 +559,8 @@ describe('BNB marketplace product flows', () => {
     assert.match(catalog, /headers\["X-API-Key"\]\s*=\s*apiKey/);
     assert.match(catalog, /function get8004CacheTtlSeconds/);
     assert.match(catalog, /BNB_8004SCAN_CACHE_TTL_SECONDS/);
+    assert.match(catalog, /process\.env\.BNB_8004SCAN_TIMEOUT_MS \|\| 8000/);
+    assert.match(catalog, /Math\.min\(Math\.max\(timeout,\s*500\),\s*20000\)/);
     assert.match(catalog, /next:\s*\{\s*revalidate:\s*get8004CacheTtlSeconds\(revalidate\)\s*\}/);
     assert.match(catalog, /type Bnb8004SortBy = "created_at" \| "stars" \| "name" \| "token_id" \| "total_score"/);
     assert.match(catalog, /export async function listBnbAgentsPage/);
@@ -546,10 +568,36 @@ describe('BNB marketplace product flows', () => {
     assert.match(catalog, /url\.searchParams\.set\("sortBy",\s*sortBy\)/);
     assert.match(catalog, /url\.searchParams\.set\("sortOrder",\s*"desc"\)/);
     assert.match(catalog, /url\.searchParams\.set\("page",\s*String\(safePage\)\)/);
+    assert.match(catalog, /url\.searchParams\.set\("protocol",\s*protocol\)/);
     assert.match(catalog, /paginationRecord\.total/);
     assert.match(catalog, /hydrate8004AgentDetails/);
-    assert.match(catalog, /const liveAgents = uniqueAgents\(\[\.\.\.semanticAgents,\s*\.\.\.livePage\.agents\]\)\.slice\(0,\s*limit\)/);
-    assert.doesNotMatch(catalog, /const liveAgents = await hydrate8004AgentDetails/);
+    assert.match(catalog, /function get8004ExecutionScanPages/);
+    assert.match(catalog, /function mayExposeExecutionEndpoint/);
+    assert.match(catalog, /type Bnb8004Protocol = "MCP" \| "A2A" \| "OASF" \| "Web" \| "Email"/);
+    assert.match(catalog, /async function fetch8004ExecutionCandidates/);
+    assert.match(catalog, /const executionProtocols: Bnb8004Protocol\[\] = \["MCP",\s*"A2A"\]/);
+    assert.match(catalog, /fetch8004ExecutionCandidates\(\{[\s\S]*sortBy:\s*sourceSortForCatalog\(sort\),[\s\S]*search:\s*sourceSearch/);
+    assert.match(catalog, /const shouldHydrateLiveDetails = runtimeFiltered \|\| page === 1 \|\| Boolean\(sourceSearch\)/);
+    assert.match(catalog, /shouldHydrateLiveDetails[\s\S]*\? await hydrate8004AgentDetails\(liveCandidates,\s*\{ onlyLikelyExecution: !runtimeFiltered \}\)[\s\S]*: liveCandidates/);
+    assert.match(catalog, /const sourcePage = await fetch8004AgentPage\(\{[\s\S]*limit:\s*safeLimit,[\s\S]*page:\s*safePage/);
+    assert.match(catalog, /total:\s*sourcePage\.total \|\| candidates\.length/);
+    assert.match(catalog, /const sourceTotal = profilePage\.total > 0[\s\S]*\? profilePage\.total[\s\S]*: executionPage\.total > 0/);
+    assert.match(catalog, /const total = sourceTotal > 0 \? sourceTotal : sorted\.length/);
+    assert.match(catalog, /const hasMore = sourceHasMore \|\| \(sourceTotal > 0 && page \* limit < sourceTotal\)/);
+    assert.match(catalog, /const executionDiscovery = query\.execution !== "listed_only" && \(runtimeFiltered \|\| page === 1\)/);
+    assert.match(agentsRoute, /const unfilteredRegistry = !q && !category && !execution/);
+    assert.match(agentsRoute, /const total = unfilteredRegistry \? Math\.max\(result\.total,\s*networkStats\.totalAgents\) : result\.total/);
+    assert.match(agentsRoute, /hasMore:\s*result\.hasMore \|\| result\.page \* result\.pageSize < total/);
+    assert.match(agentsPage, /getBnbAgentNetworkStats/);
+    assert.match(agentsPage, /const unfilteredRegistry = !q && !category && !execution && !integration/);
+    assert.match(agentsPage, /const networkTotal = unfilteredRegistry \? Math\.max\(result\.total,\s*networkStats\.totalAgents\) : result\.total \|\| 0/);
+    assert.match(agentsPage, /if \(networkTotal > 0 && page > pageCount\) \{/);
+    assert.match(agentsPage, /redirect\(query \? `\/bnb\/agents\?\$\{query\}` : "\/bnb\/agents"\)/);
+    assert.match(directory, /\{totalAgents > 0 \? \([\s\S]*aria-label="Agent directory pagination"/);
+    assert.match(directory, /const currentParams = new URLSearchParams\(\)/);
+    assert.match(directory, /if \(query === currentParams\.toString\(\)\) return/);
+    assert.doesNotMatch(catalog, /runnable8004SearchTerms|fetch8004RunnableAgentCandidates|HeyAnon/);
+    assert.doesNotMatch(catalog, /visibleOffset/);
     assert.match(catalog, /sortAgents\(agents,\s*sort\)\.slice\(0,\s*limit\)/);
     assert.match(catalog, /fetch8004AgentDetail/);
     assert.match(catalog, /\/agents\/\$\{encodeURIComponent\(String\(chainId\)\)\}\/\$\{encodeURIComponent\(tokenId\)\}/);
@@ -559,6 +607,41 @@ describe('BNB marketplace product flows', () => {
     assert.match(catalog, /record\.star_count/);
     assert.doesNotMatch(catalog, /sortBy",\s*"total_feedbacks"/);
     assert.doesNotMatch(catalog, /headers\.Authorization/);
+  });
+
+  it('pulls endpoint-backed services from external agent indexes without local fallback agents', () => {
+    assert.match(types, /export type BnbAgentSource = "8004scan" \| "configured" \| "agent402" \| "402index" \| "x402direct" \| "the402"/);
+    assert.match(endpointSources, /export async function listBnbEndpointSourceAgents/);
+    assert.match(endpointSources, /BNB_AGENT402_ENABLED/);
+    assert.match(endpointSources, /https:\/\/agent402\.tools/);
+    assert.match(endpointSources, /BNB_402INDEX_ENABLED/);
+    assert.match(endpointSources, /https:\/\/402index\.io/);
+    assert.match(endpointSources, /BNB_X402DIRECT_ENABLED/);
+    assert.match(endpointSources, /https:\/\/x402\.direct/);
+    assert.match(endpointSources, /BNB_THE402_ENABLED/);
+    assert.match(endpointSources, /https:\/\/api\.the402\.ai/);
+    assert.match(endpointSources, /safeFetchJson\(String\(url\)/);
+    assert.match(endpointSources, /maxBytes:\s*512 \* 1024/);
+    assert.match(endpointSources, /paymentRequired\(record\.price/);
+    assert.match(endpointSources, /executionStatus:\s*ready \? "ready_to_run" : "connectable"/);
+    assert.match(endpointSources, /source:\s*seed\.source/);
+    assert.match(endpointSources, /async function expandX402DiscoverySeed/);
+    assert.match(endpointSources, /rootRelativeUrl\(seed\.endpoint,\s*"\/\.well-known\/x402"\)/);
+    assert.match(endpointSources, /rawArray\(payload,\s*\["resources"\]\)/);
+    assert.match(endpointSources, /resource\.resource \?\? resource\.url \?\? resource\.endpoint/);
+    assert.match(endpointSources, /isProviderRootEndpoint\(seed\.endpoint\) && !seed\.inputSchema\) return null/);
+    assert.match(endpointSources, /function isBnbEndpointAgent/);
+    assert.match(endpointSources, /bnbChainContextTerms\.some/);
+    assert.match(endpointSources, /bnbAgentDomainTerms\.some/);
+    assert.match(endpointSources, /if \(!category\) return null/);
+    assert.doesNotMatch(endpointSources, /return scored\[0\]\?\.score > 0 \? scored\[0\]\.category : "Yield Optimisation"/);
+    assert.doesNotMatch(endpointSources, /if \(q\?\.trim\(\)\) return true/);
+    assert.match(catalog, /listBnbEndpointSourceAgents/);
+    assert.match(catalog, /\.\.\.baseAgents,\s*\.\.\.endpointAgents,\s*\.\.\.liveAgents/);
+    assert.match(catalog, /getBnbEndpointSourceAgent\(decodedTokenId\)/);
+    assert.match(catalog, /function decodeTokenId\(tokenId:\s*string\)/);
+    assert.doesNotMatch(catalog, /BNB_SHOW_LOCAL_AGENTS|LOCAL_BNB_AGENTS|hive-yield-scout|hive-health-sentinel/);
+    assert.doesNotMatch(runtime, /localAgentsEnabled/);
   });
 
   it('ranks BNB agents by relevance, reputation, source quality, readiness, freshness, and completeness', () => {
@@ -574,6 +657,32 @@ describe('BNB marketplace product flows', () => {
     assert.match(catalog, /categorySearchText\(query\.category\)/);
     assert.match(catalog, /if \(directTerms\.length > 1\) \{[\s\S]*directHits >= Math\.min\(directTerms\.length,\s*2\)/);
     assert.match(catalog, /categoryInferenceKeywords/);
+    assert.doesNotMatch(catalog, /"Yield Optimisation":\s*\[[^\]]*"defi"/);
+    assert.doesNotMatch(catalog, /"Yield Optimisation":\s*\[[^\]]*"aave"/);
+    assert.doesNotMatch(catalog, /"Yield Optimisation":\s*\[[^\]]*"venus"/);
+    assert.doesNotMatch(catalog, /"Yield Optimisation":\s*\[[^\]]*"lista"/);
+    assert.match(catalog, /marketplaceCategoryFromText/);
+    assert.match(catalog, /resolveBnbAgentsRuntime\(candidates\)/);
+    assert.match(catalog, /function fetch8004ProfileCandidates/);
+    assert.match(catalog, /const profileDiscovery = !runtimeFiltered \|\| query\.execution === "listed_only"/);
+    assert.match(catalog, /executionPage\.agents,\s*\.\.\.profilePage\.agents/);
+    assert.match(types, /"Other"/);
+    assert.match(catalog, /marketplaceCategoryFromText\(textFrom\(record\.category,\s*""\),\s*combinedText,\s*\{ allowOther: true \}\)/);
+    assert.match(catalog, /return options\.allowOther \? "Other" : null/);
+    assert.match(catalog, /\.filter\(\(category\) => category !== "Other"\)/);
+    assert.match(catalog, /function hiveUsableRank\(agent: BnbAgentProfile\)/);
+    assert.match(catalog, /agent\.category !== "Other" && mayExposeExecutionEndpoint\(agent\)/);
+    assert.match(catalog, /function executionRank\(agent: BnbAgentProfile\)/);
+    assert.match(catalog, /function endpointRank\(agent: BnbAgentProfile\)/);
+    assert.match(catalog, /byHiveUse\(a,\s*b\)/);
+    assert.match(catalog, /sourceHasMore = executionPage\.hasMore \|\| profilePage\.hasMore/);
+    assert.match(catalog, /withRuntimeScore/);
+    assert.match(catalog, /resolveBnbAgentRuntime\(agent\)/);
+    assert.doesNotMatch(endpointSources, /"Yield Optimisation":\s*\[[^\]]*"defi"/);
+    assert.match(catalog, /isBnbMarketplaceAgentText/);
+    assert.match(catalog, /return bnbMarketplaceDomainKeywords\.some/);
+    assert.match(catalog, /if \(!category\) return null/);
+    assert.doesNotMatch(catalog, /return scored\[0\]\?\.score > 0 \? scored\[0\]\.category : "Yield Optimisation"/);
     assert.match(agentsPage, /listBnbAgentsPage\(\{[\s\S]*limit:\s*pageSize,[\s\S]*page,/);
     assert.doesNotMatch(agentsPage, /limit:\s*100/);
   });
@@ -582,20 +691,54 @@ describe('BNB marketplace product flows', () => {
     assert.match(types, /export type BnbExecutionStatus = "ready_to_run" \| "connectable" \| "listed_only" \| "unavailable"/);
     assert.match(catalog, /deriveExecutionStatus\(executionEndpoints\)/);
     assert.match(catalog, /activationFromExecution\(executionStatus\)/);
+    assert.match(catalog, /function isCallableExecutionEndpoint\(endpoint: BnbExecutionEndpoint\)/);
+    assert.match(catalog, /function healthVerifiedServiceEndpoint\(record: Record<string, unknown>,\s*service: BnbAgentService\)/);
+    assert.match(catalog, /endpointAdapter\(type: BnbAgentService\["type"\]\): BnbExecutionEndpoint\["adapter"\] \| null/);
+    assert.match(catalog, /if \(!adapter\) return null/);
     assert.match(catalog, /record\.mcp_server \?\? record\.mcpServer/);
     assert.match(catalog, /record\.a2a_endpoint \?\? record\.a2aEndpoint/);
     assert.match(catalog, /rawMetadata\.offchain_content/);
     assert.doesNotMatch(catalog, /const hasCallableEndpoint = services\.some/);
     assert.doesNotMatch(catalog, /activationStatus:\s*hasCallableEndpoint \? "callable" : "request"/);
+    assert.doesNotMatch(catalog, /type === "mcp" \|\| type === "a2a" \|\| type === "x402" \|\| type === "web"/);
+    assert.doesNotMatch(catalog, /agent_url \?\? record\.agentUrl \?\? record\.externalLink/);
+  });
+
+  it('treats healthy 8004 MCP endpoints as runnable without using social links as execution endpoints', () => {
+    assert.match(catalog, /const endpoint = textFrom\(service\.endpoint \?\? service\.url,\s*""\)/);
+    assert.match(catalog, /verified:\s*status === "healthy" && \(adapter === "mcp" \|\| adapter === "a2a" \|\| verificationStatus === "verified"\)/);
+    assert.match(catalog, /source === "configured" \|\| healthVerifiedServiceEndpoint\(record,\s*service\)/);
+    assert.match(catalog, /seen\.set\(key,\s*\{[\s\S]*verified:\s*previous\.verified \|\| endpoint\.verified/);
+    assert.doesNotMatch(catalog, /domain \? `https:\/\/\$\{domain\}` : ""/);
+    assert.doesNotMatch(catalog, /adapter:\s*endpointAdapter\(type\),\s*url:\s*endpoint/);
   });
 
   it('runs external agents only through bounded server-side adapters', () => {
     assert.match(endpointSecurity, /assertPublicHttpsUrl/);
     assert.match(endpointSecurity, /lookup\(checked\.url\.hostname,\s*\{ all:\s*true,\s*verbatim:\s*true \}\)/);
     assert.match(endpointSecurity, /Endpoint resolves to a private address/);
+    assert.match(endpointSecurity, /redirect:\s*"manual"/);
+    assert.match(endpointSecurity, /MAX_REDIRECTS\s*=\s*3/);
+    assert.match(endpointSecurity, /assertPublicHttpsUrl\(new URL\(location,\s*url\)\.href\)/);
+    assert.match(endpointSecurity, /canForwardConfiguredHeaders/);
+    assert.match(endpointSecurity, /includeConfiguredHeaders \? options\.headers \|\| \{\} : \{\}/);
+    assert.match(endpointSecurity, /ipv4FromMappedIpv6/);
+    assert.match(endpointSecurity, /isInternalHostname/);
+    assert.match(endpointSecurity, /hostname\.endsWith\("\.internal"\)/);
+    assert.match(endpointSecurity, /\(a === 100 && b >= 64 && b <= 127\)/);
+    assert.match(endpointSecurity, /\(a === 203 && b === 0 && c === 113\)/);
+    assert.match(endpointSecurity, /normalized\.startsWith\("2001:db8:"\)/);
     assert.match(endpointSecurity, /Endpoint response is too large/);
+    assert.match(endpointAuth, /BNB_AGENT_ENDPOINT_AUTH_JSON/);
+    assert.match(endpointAuth, /export function endpointAuthHeaders/);
+    assert.match(endpointAuth, /export function hasEndpointAuthHeaders/);
+    assert.match(endpointAuth, /FORBIDDEN_HEADER_NAMES/);
+    assert.match(endpointAuth, /scopeMatchesEndpoint/);
+    assert.match(endpointAuth, /cookie/);
     assert.match(mcpAdapter, /tools\/list|tools\/call/);
     assert.match(mcpAdapter, /safeFetchJson\(endpoint\.url/);
+    assert.match(mcpAdapter, /endpointAuthHeaders\(endpoint\.url\)/);
+    assert.match(mcpAdapter, /protectedMcpReason/);
     assert.match(mcpAdapter, /normalizeInputSchema/);
     assert.match(mcpAdapter, /tool\.inputSchema \?\? tool\.input_schema \?\? tool\.parameters \?\? tool\.schema/);
     assert.match(mcpAdapter, /chainnames/);
@@ -607,9 +750,17 @@ describe('BNB marketplace product flows', () => {
     assert.match(mcpAdapter, /getenabledcollateral/);
     assert.match(mcpAdapter, /This agent does not expose a health-factor tool for this job/);
     assert.match(mcpAdapter, /exposes a directory tool, not a/);
+    assert.match(mcpAdapter, /toolContractText\(tool\)/);
+    assert.doesNotMatch(mcpAdapter, /agentText/);
+    assert.match(mcpAdapter, /isDocumentationTool/);
+    assert.match(mcpAdapter, /getdescription\|protocoloverview\|documentation/);
+    assert.match(mcpAdapter, /exposes documentation, not a/);
     assert.match(mcpAdapter, /capabilityToolScore/);
+    assert.match(mcpAdapter, /taskToolScore/);
+    assert.match(mcpAdapter, /isV3DiscoveryTask/);
+    assert.match(mcpAdapter, /getdexinfo\|supporteddex\|feetier\|supportedchains/);
     assert.match(mcpAdapter, /isDirectoryTool/);
-    assert.match(mcpAdapter, /This agent does not expose a matching/);
+    assert.match(mcpAdapter, /This agent cannot run this \$\{capabilityLabel\(capability\)\} job/);
     assert.match(mcpAdapter, /getuserhealthindicators/);
     assert.match(mcpAdapter, /toolArguments\(tool,\s*agent,\s*record\)/);
     assert.match(mcpAdapter, /enumValuesForSchema/);
@@ -619,10 +770,48 @@ describe('BNB marketplace product flows', () => {
     assert.match(mcpAdapter, /preflightJob/);
     assert.match(a2aAdapter, /message\/send/);
     assert.match(a2aAdapter, /fetchCard\(endpoint\)/);
+    assert.match(a2aAdapter, /isEmptyA2aPayload/);
+    assert.match(a2aAdapter, /A2A agent returned no result/);
+    assert.match(a2aAdapter, /async preflightJob/);
+    assert.match(a2aAdapter, /assertPublicA2aService/);
+    assert.match(a2aAdapter, /A2A_PREFLIGHT_METHOD = "hive\/preflight"/);
+    assert.match(a2aAdapter, /cardRequiresAuth/);
+    assert.match(a2aAdapter, /hasEndpointAuthHeaders\(serviceUrl\)/);
+    assert.match(a2aAdapter, /endpointAuthHeaders\(serviceUrl\)/);
+    assert.match(a2aAdapter, /protectedA2aReason/);
+    assert.match(a2aAdapter, /This agent cannot be run from Hive/);
+    assert.match(a2aAdapter, /This agent requires external sign-in/);
+    assert.match(a2aAdapter, /matchingSkills\(card,\s*capability,\s*taskType\)/);
+    assert.match(a2aAdapter, /capabilitySkillScore/);
+    assert.match(a2aAdapter, /yield\|apy\|apr\|vault\|farm\|staking\|deposit\|earn\|stablecoin\|usdd/);
+    assert.match(a2aAdapter, /This agent cannot run this \$\{capabilityLabel\(capability\)\} job/);
     assert.match(adapterRegistry, /preflightBnbAgentAdapters/);
     assert.match(adapterRegistry, /preflightBnbAgentJob/);
+    assert.match(adapterRegistry, /ENDPOINT_PREFLIGHT_CACHE_TTL_MS/);
+    assert.match(adapterRegistry, /endpointPreflightCache/);
+    assert.match(adapterRegistry, /preflightAdapterEndpoint/);
+    assert.match(adapterRegistry, /export async function resolveBnbAgentRuntime/);
+    assert.match(adapterRegistry, /export async function resolveBnbAgentsRuntime/);
+    assert.match(adapterRegistry, /RUNTIME_PROBE_CONCURRENCY/);
+    assert.match(adapterRegistry, /const jobPreflight = await adapter\.preflightJob\(\{ agent,\s*record \}\)/);
+    assert.match(adapterRegistry, /if \(!jobPreflight\.ok\) continue/);
+    assert.match(adapterRegistry, /httpAdapter/);
+    assert.match(httpAdapter, /export const httpAdapter/);
+    assert.match(httpAdapter, /assertPublicHttpsUrl\(endpoint\.url\)/);
+    assert.match(httpAdapter, /safeFetchJson\(requestUrl\(endpoint,\s*args\)/);
+    assert.match(httpAdapter, /endpointAuthHeaders\(endpoint\.url\)/);
+    assert.match(httpAdapter, /protectedHttpReason/);
+    assert.match(httpAdapter, /endpoint\.paymentRequired/);
+    assert.match(httpAdapter, /This endpoint requires x402 payment support before it can run/);
     assert.match(runRoute, /withRunWalletContext\(record,\s*executionWalletAddress\(request,\s*auth\.client\.address\)\)/);
+    assert.match(runRoute, /preflightBnbAgentJob\(agent,\s*executionRecord\)/);
+    assert.match(runRoute, /if \(!adapterPreflight\.some\(\(result\) => result\.ok\)\) \{[\s\S]*status:\s*"failed"[\s\S]*delivery:\s*\{[\s\S]*status:\s*"failed"[\s\S]*error:\s*work\.error/);
+    assert.match(runRoute, /adapterPreflight,\s*\n\s*\}/);
     assert.match(runRoute, /runBnbAgentAdapter\(agent,\s*executionRecord\)/);
+    assert.doesNotMatch(runRoute, /from "@\/lib\/bnb\/agent-runner"/);
+    assert.doesNotMatch(runRoute, /runBnbAgentWork\(executionRecord\)/);
+    assert.doesNotMatch(runRoute, /runBnbAgentWorkOnWorker/);
+    assert.doesNotMatch(runRoute, /hasBnbAgentWorker/);
   });
 
   it('uses BSC Testnet-aware chain configuration for escrow testing', () => {
@@ -657,8 +846,16 @@ describe('BNB marketplace product flows', () => {
       'BNB_8004SCAN_LIVE',
       'BNB_8004SCAN_API_BASE',
       'BNB_8004SCAN_API_KEY',
+      'BNB_AGENT402_ENABLED',
+      'BNB_AGENT402_API_BASE',
+      'BNB_402INDEX_ENABLED',
+      'BNB_402INDEX_API_BASE',
+      'BNB_X402DIRECT_ENABLED',
+      'BNB_X402DIRECT_API_BASE',
+      'BNB_THE402_ENABLED',
+      'BNB_THE402_API_BASE',
       'BNB_HIVE_AGENTS_JSON',
-      'BNB_SHOW_LOCAL_AGENTS',
+      'BNB_AGENT_ENDPOINT_AUTH_JSON',
       'BNB_ALLOW_PROCESS_STORAGE',
       'BNB_AGENT_RUN_REQUIRES_ESCROW',
       'BNB_AGENT_WORKER_URL',
@@ -679,6 +876,8 @@ describe('BNB marketplace product flows', () => {
     assert.match(envExample, /Privy dashboard -> Apps -> App ID/);
     assert.match(envExample, /MongoDB Atlas -> Database -> Connect -> Drivers connection string/);
     assert.match(envExample, /Generate with: openssl rand -hex 32/);
+    assert.match(envExample, /Endpoint-backed service indexes/);
+    assert.match(envExample, /Optional per-provider API auth/);
     assert.match(envExample, /Do not add identities without callable endpoints/);
     assert.match(envExample, /Never set this in Netlify or public hosting/);
     assert.match(studioV2, /export function getBnbStudioV2Readiness/);
@@ -695,6 +894,8 @@ describe('BNB marketplace product flows', () => {
     assert.match(catalog, /\.\.\.getConfiguredBnbAgentsFromEnv\("BNB_HIVE_AGENTS_JSON"\)/);
     assert.match(catalog, /return uniqueAgents\(\[/);
     assert.match(runtime, /getBnbStudioV2Readiness/);
+    assert.match(runtime, /getBnbEndpointSourceReadiness/);
+    assert.match(runtime, /endpointSources:\s*getBnbEndpointSourceReadiness\(\)/);
     assert.match(runtime, /studioV2/);
     assert.doesNotMatch(runtime, /BNB_AGENT_STUDIO_API_KEY|BNB_ALTANA_API_KEY|BNB_REFERENCE_AGENT_SIGNING_KEY|BNB_MARKETPLACE_ADMIN_SECRET/);
     assert.doesNotMatch(studioV2, /process\.env\.[A-Z0-9_]+[^?\n]*}/);
@@ -708,6 +909,12 @@ describe('BNB marketplace product flows', () => {
     assert.match(jobs, /grid_trading/);
     assert.match(jobs, /yield_optimisation/);
     assert.match(jobs, /health_factor/);
+    assert.match(jobs, /const BNB_V3_DISCOVERY_TASK = "Check V3 DEX support"/);
+    assert.match(jobs, /defaultTaskType:\s*BNB_V3_DISCOVERY_TASK/);
+    assert.match(jobs, /v3TaskFieldKeys\(options\.taskType \|\| definition\.defaultTaskType\)/);
+    assert.match(jobs, /fields\.walletAddress = walletAddress/);
+    assert.match(activateRoute, /walletAddress:\s*intent\.advancedFields\?\.walletAddress \|\| walletAddress/);
+    assert.match(preflightRoute, /walletAddress:\s*intent\.advancedFields\?\.walletAddress \|\| walletAddress/);
     assert.match(jobs, /buildBnbJobSpec/);
     assert.match(activateRoute, /buildBnbJobSpec/);
     assert.match(records, /jobSpec\?:\s*BnbJobSpec/);
@@ -721,18 +928,34 @@ describe('BNB marketplace product flows', () => {
     assert.match(delivery, /formatAgentDirectoryPayload/);
     assert.match(delivery, /This is not the requested result/);
     assert.match(delivery, /The agent returned a list of agents instead/);
+    assert.match(delivery, /formatDocumentationPayload/);
+    assert.match(delivery, /The agent returned protocol documentation instead of running the job/);
+    assert.match(delivery, /formatCapabilityMismatchPayload/);
+    assert.match(delivery, /does not match the selected job/);
     assert.match(delivery, /formatStructuredPayload/);
+    assert.match(delivery, /formatNestedCollectionPayload/);
+    assert.match(delivery, /collectDisplayCollections/);
+    assert.match(delivery, /formatDisplayRecord/);
+    assert.match(delivery, /DISPLAY_COLLECTION_LIMIT = 50/);
+    assert.match(delivery, /DISPLAY_ARRAY_LIMIT = 25/);
+    assert.match(delivery, /Showing first \$\{preview\.length\} of \$\{count\}/);
+    assert.match(delivery, /rateMetric\("APY",\s*record\.apy\)/);
+    assert.match(delivery, /moneyMetric\("TVL",\s*record\.tvl\)/);
+    assert.match(delivery, /moneyMetric\("Pool TVL",\s*record\.poolTvl\)/);
+    assert.match(delivery, /address \$\{shortAddress\(address\)\}/);
+    assert.match(delivery, /normalized\.toLowerCase\(\) === "beefy"/);
+    assert.match(delivery, /normalized\.toLowerCase\(\) === "pancakeswap"/);
+    assert.match(delivery, /formatEmptyPayload/);
+    assert.match(delivery, /No result returned/);
     assert.match(delivery, /Protocol mismatch/);
     assert.match(delivery, /healthFactor === "-1"/);
     assert.match(deliveryView, /formatBnbDeliveryText\(output,\s*jobSpec\)/);
-    assert.match(deliveryView, /<details className="bnb-delivery-technical">/);
-    assert.match(deliveryView, /Technical details/);
+    assert.doesNotMatch(deliveryView, /<details|Technical details|technicalPayload|shouldShowTechnicalDetails/);
     assert.match(deliveryView, /uniqueDataSources\(dataSources\)/);
-    assert.match(deliveryView, /technicalPayload\(output\)/);
     assert.match(activateForm, /<BnbDeliveryView output=\{output\}/);
     assert.match(jobClient, /<BnbDeliveryView output=\{output\} jobSpec=\{record\.jobSpec\} dataSources=\{dataSources\}/);
     assert.match(activityClient, /<BnbDeliveryView output=\{output\} jobSpec=\{record\.jobSpec\} dataSources=\{dataSources\} compact/);
-    assert.match(bnbCss, /\.bnb-delivery-technical/);
+    assert.doesNotMatch(bnbCss, /\.bnb-delivery-technical/);
   });
 
   it('makes saved hires clickable jobs with resumable actions', () => {
@@ -743,6 +966,16 @@ describe('BNB marketplace product flows', () => {
     assert.match(jobClient, /\/api\/bnb\/activate\/payment/);
     assert.match(jobClient, /\/api\/bnb\/activate\/run/);
     assert.match(jobClient, /\/api\/bnb\/activate\/settlement/);
+    assert.match(activateForm, /if \(!response\.ok\) \{[\s\S]*payload\.record[\s\S]*setResult/);
+    assert.match(activateForm, /const runBlocked = Boolean\(error && funded && !delivered && !closed && !jobRunning\)/);
+    assert.match(activateForm, /funded && !delivered && !closed && !jobRunning && !failed/);
+    assert.match(activateForm, /Waiting for result/);
+    assert.doesNotMatch(activateForm, /The agent is working|Running\.\.\./);
+    assert.match(bnbCss, /\.bnb-hire-state-running/);
+    assert.match(jobClient, /if \(!response\.ok\) \{[\s\S]*payload\.record[\s\S]*setJob/);
+    assert.match(jobClient, /funded && !delivered && !closed && !failed/);
+    assert.match(activityClient, /if \(!response\.ok\) \{[\s\S]*payload\.record[\s\S]*replaceActivation/);
+    assert.match(activityClient, /funded && !completed && !closed && !failed/);
     assert.match(jobClient, /showSettlementActions = !paymentNotRequired && delivered && !closed/);
     assert.match(jobClient, /Release payment/);
     assert.match(jobClient, /Refund after expiry/);

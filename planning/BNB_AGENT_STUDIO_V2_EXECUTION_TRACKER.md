@@ -1,6 +1,6 @@
 # BNB Agent Studio V2 Execution Tracker
 
-Last updated: 2026-08-19
+Last updated: 2026-08-22
 
 This tracker is the implementation source of truth for the BNB Agent Studio V2 marketplace work. The product is intended for real users. Do not mark a unit complete until the code is implemented, tested, and safe to deploy.
 
@@ -40,6 +40,7 @@ This tracker is the implementation source of truth for the BNB Agent Studio V2 m
 | Phase 4: Reference Studio V2 Agents | In progress | Reference-agent config loading is wired; real Studio V2 agents are pending. |
 | Phase 5: Delivery Formatting and Evidence | In progress | Convert outputs into human summaries and receipt evidence. |
 | Phase 6: 8004scan Pro Data Quality | In progress | Pro key precedence and cache controls are wired; richer profile data remains pending. |
+| Phase 6A: Endpoint-Backed Discovery | Complete | Agent402, 402Index, x402.direct, and the402 are wired as endpoint/service sources. |
 | Phase 7: Altana Permission Path | Not started | Add scoped grant, session-key transaction proof, and revoke flow. |
 | Phase 8: PancakeSwap Utility | Not started | Add LP, swap, farming, and pool demand workflows. |
 | Phase 9: TermiX Agent Advantage Report | Not started | Capture three real agent-vs-manual comparisons. |
@@ -133,12 +134,72 @@ This tracker is the implementation source of truth for the BNB Agent Studio V2 m
 - Non-callable agents show profile or identity actions only.
 - Removed the status-page `Request this agent` fallback for non-callable agents.
 - Removed `Connectable` and `Listed only` from directory filter labels.
-- `/bnb/agents` and `/api/bnb/agents` now default to `ready_to_run`; users must choose `All identities` to browse non-runnable registry entries.
+- `/bnb/agents` and `/api/bnb/agents` default to `all`; users can choose `Runnable` to see only agents with executable endpoints.
 - `npm test`: passed with 68 tests.
 - `npm run typecheck`: passed.
 - `npm run lint -- --quiet`: passed.
 - `npm run build`: passed.
 - `git diff --check`: passed.
+
+## Phase 6A: Endpoint-Backed Discovery
+
+### Units
+
+- Pull endpoint-backed services from Agent402, 402Index, x402.direct, and the402.
+- Keep 8004Scan as an identity source; do not treat identities without endpoints as runnable.
+- Default `/bnb/agents` and `/api/bnb/agents` to all records instead of a zero-result ready-only view.
+- Mark priced x402 endpoints as listed/connectable until x402 payment support is implemented.
+- Resolve endpoint-source detail pages and API detail routes from stable encoded token IDs.
+- Remove dead static activation links for old local BNB agents.
+- Keep empty-state copy short and remove explanatory non-runnable UI text.
+
+### Components
+
+- `lib/bnb/endpoint-sources.ts`
+- `lib/bnb/adapters/http.ts`
+- `lib/bnb/catalog.ts`
+- `app/api/bnb/agents/route.ts`
+- `app/bnb/agents/page.tsx`
+- `app/bnb/agents/AgentsDirectory.tsx`
+- `app/bnb/agents/[chainId]/[tokenId]/page.tsx`
+- `app/bnb/status/page.tsx`
+- `.env.example`
+- `tests/bnb-product-regressions.test.mjs`
+
+### Tests
+
+- Unit/regression: endpoint source env keys and defaults are present.
+- Unit/regression: catalog merges endpoint sources with configured and 8004Scan records.
+- Unit/regression: no local seeded BNB agents or `BNB_SHOW_LOCAL_AGENTS` fallback remain.
+- Unit/regression: paid x402 endpoints are not marked hireable without x402 payment support.
+- Unit/regression: bounded HTTP/x402 adapter validates public HTTPS URLs, size, and timeout.
+- Unit/regression: default directory status is `all`; `Runnable` is opt-in.
+- Unit/regression: stale empty-state and non-runnable explanatory copy is absent.
+- Integration: `/api/bnb/agents?limit=5` returns endpoint-backed Agent402 records locally.
+- Integration: `/bnb/agents/56/<encoded endpoint token>` returns HTTP 200 locally.
+- Integration: `/api/bnb/agents/56/<encoded endpoint token>` returns HTTP 200 locally.
+- Integration: `/api/bnb/agents?status=ready_to_run` returns no dead hire records when no runnable endpoint is available.
+
+### Acceptance
+
+- Users can discover real endpoint-backed services from live indexes.
+- Users cannot start hire/payment flows for records Hive cannot currently execute.
+- Endpoint-source profiles do not create fake 8004Scan URLs.
+
+### Verification
+
+- Date: 2026-08-20
+- `npx tsc --noEmit`: passed.
+- `npm test -- tests/bnb-product-regressions.test.mjs`: passed with 69 tests.
+- `npm run build`: passed.
+- `git diff --check`: passed.
+- Local route checks passed:
+  - `/api/bnb/runtime` reports all endpoint source toggles enabled.
+  - `/api/bnb/agents?limit=5` returned endpoint-backed Agent402 services.
+  - `/bnb/agents/56/agent402%3Astablecoin%3Ad7f223be1b` returned HTTP 200.
+  - `/api/bnb/agents/56/agent402%3Astablecoin%3Ad7f223be1b` returned HTTP 200.
+  - `/api/bnb/agents?limit=1&status=ready_to_run` returned zero runnable agents instead of dead hire records.
+- Known non-fatal build output remained limited to the MetaMask optional React Native storage warning, bigint pure-JS fallback, and local sitemap MongoDB DNS refusal.
 
 ## Phase 2: Agent-Specific Capability Forms
 
@@ -241,6 +302,9 @@ This tracker is the implementation source of truth for the BNB Agent Studio V2 m
 - Free-run API responses no longer return `This job does not require payment.` as user-facing copy.
 - x402 support alone no longer makes an agent paid; the resolver now requires a positive listed price.
 - Full x402 payment review and paid Studio V2 settlement work remains pending.
+- Date: 2026-08-22
+- Zero-price directory and activation flows were retested through the shared regression suite after the endpoint-backed discovery repairs.
+- The remaining Phase 3 risk is paid execution: x402 payment collection and Studio V2 paid settlement still need an end-to-end implementation and browser smoke.
 
 ### Verification
 
@@ -296,7 +360,7 @@ This tracker is the implementation source of truth for the BNB Agent Studio V2 m
 ### Units
 
 - Convert adapter output into user-readable summaries.
-- Hide raw payload under technical details.
+- Replace raw payload output with readable summaries.
 - Add result, key numbers, assumptions, risks, next action, and evidence sections.
 - Detect wrong-tool outputs and fail them clearly.
 - Persist evidence links and raw payloads.
@@ -315,7 +379,7 @@ This tracker is the implementation source of truth for the BNB Agent Studio V2 m
 - Unit: yield route array formatting.
 - Unit: agent-directory payload is not successful delivery.
 - Unit: protocol mismatch is visible.
-- Unit: raw payload remains available in technical details.
+- Unit: raw payload is not the default delivery UI.
 - Snapshot text tests for all four categories.
 - Browser QA: job detail and account activity pages.
 
@@ -329,8 +393,12 @@ This tracker is the implementation source of truth for the BNB Agent Studio V2 m
 - Run completion now stores delivery summaries from `formatBnbDeliveryText` instead of raw adapter output.
 - Agent-directory payloads now show a plain-language mismatch result instead of raw arrays.
 - Activation, job detail, and account activity now use one shared delivery view.
-- Raw JSON payloads are collapsed under `Technical details`.
+- Raw JSON payloads are no longer rendered as the default delivery UI.
 - Delivery data sources are displayed as plain source lines.
+- Date: 2026-08-22
+- Nested result arrays such as Beefy vault lists now render as human-readable collection summaries instead of raw JSON.
+- Directory outputs, documentation outputs, protocol mismatches, empty outputs, and capability mismatches are detected and rendered as explicit delivery states.
+- `Technical details` UI was removed from the shared delivery component to avoid hiding the actual useful result behind raw JSON.
 - Downloadable records and richer evidence receipt sections remain pending.
 
 ### Verification
@@ -374,9 +442,15 @@ This tracker is the implementation source of truth for the BNB Agent Studio V2 m
 
 - Date: 2026-08-19
 - `BNB_8004SCAN_PRO_API_KEY` now takes precedence over `BNB_8004SCAN_API_KEY`.
-- `BNB_8004SCAN_TIMEOUT_MS` now defaults to 3000 ms and is bounded from 500 ms to 15000 ms.
+- `BNB_8004SCAN_TIMEOUT_MS` now defaults to 8000 ms and is bounded from 500 ms to 20000 ms.
 - `BNB_8004SCAN_CACHE_TTL_SECONDS` now controls fetch revalidation and is bounded from 30 seconds to 3600 seconds.
 - 8004scan identity links now normalize numeric chain IDs and common BNB chain names into explorer slugs.
+- Date: 2026-08-22
+- 8004scan directory pagination now maps one Hive page to one source profile page so deep registry pages do not skip source pages.
+- Runnable and Hive-usable endpoint records are ranked first on the first page, then the broader profile-only registry follows.
+- BSC registry records that do not match the four primary product categories are preserved under `Other` instead of being dropped.
+- Unfiltered all-agent pagination falls back to live network stats at the route/page boundary when a deep page fetch is slow or empty.
+- The directory client no longer overwrites page navigation back to page 1 when only the page query changes.
 - Richer owner history, profile source confidence, and expanded reputation display remain pending.
 
 ### Verification
@@ -526,6 +600,13 @@ This tracker is the implementation source of truth for the BNB Agent Studio V2 m
 - Date: 2026-08-20
 - Server and client BNB chain selection now default to BSC Testnet.
 - BSC mainnet is selected only when the server or public client env explicitly sets mainnet or chain ID `56`.
+- Date: 2026-08-22
+- BNB execution and endpoint-index discovery now share the same bounded outbound fetch path: HTTPS-only, public DNS resolution, internal host suffix blocking, private/reserved IP blocking, credential-in-URL blocking, manual redirect validation, redirect depth cap, configured-header stripping on unsafe redirects, timeout cap, and response-size cap.
+- Worker callback bearer checks now use constant-time comparison.
+- Owner-scoped BNB record reads/writes were rechecked across job detail, activity, activation, run, payment, settlement, Altana session/revoke, and TermiX capture routes.
+- Secret-pattern scan found no committed secret values in tracked project files beyond placeholders and env variable references.
+- Dependency audit remains a production blocker: `npm audit --omit=dev --json` reports 60 production advisories: 25 high, 33 moderate, 2 low. Major/direct remediation candidates include `next`, `@bagsfm/bags-sdk`, `@solana/spl-token`, `@solana/web3.js`, `viem`, `wagmi`, and `@privy-io/react-auth`.
+- Remaining production risks: process-local rate limiting is not enough for serverless/multiple instances, CSP is still Report-Only with broad script allowances, and the legacy agent dashboard stores raw API keys in `sessionStorage`.
 
 ## Phase 11: Submission Freeze
 

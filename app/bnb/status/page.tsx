@@ -39,6 +39,7 @@ export default async function BnbStatusPage({ searchParams }: { searchParams: Se
     agent.agentWallet.toLowerCase() === normalizedAddress ||
     agent.tokenId.toLowerCase() === normalizedAddress
   ));
+  const matchedAgentSourceUrl = matchedAgent ? externalAgentUrl(matchedAgent) : "";
 
   return (
     <BnbShell active="verify">
@@ -108,7 +109,7 @@ export default async function BnbStatusPage({ searchParams }: { searchParams: Se
                 <p className="mt-2 text-sm leading-6 text-zinc-400">{bnbListingDescription(matchedAgent)}</p>
               ) : null}
               <dl className="mt-5">
-                <DataRow label="ERC-8004 ID" value={matchedAgent.tokenId} />
+                <DataRow label={matchedAgent.sourceFreshness.source === "8004scan" ? "ERC-8004 ID" : "Source ID"} value={matchedAgent.tokenId} />
                 {isAddress(matchedAgent.ownerAddress) ? (
                   <DataRow label="Wallet owner" value={shortAddress(matchedAgent.ownerAddress)} copyValue={matchedAgent.ownerAddress} />
                 ) : null}
@@ -121,9 +122,9 @@ export default async function BnbStatusPage({ searchParams }: { searchParams: Se
                 <Link href={`/bnb/agents/${matchedAgent.chainId}/${encodeURIComponent(matchedAgent.tokenId)}`} className="bnb-button-dark bnb-focus">View agent</Link>
                 {canHireBnbAgent(matchedAgent) ? (
                   <Link href={`/bnb/activate?chainId=${matchedAgent.chainId}&tokenId=${encodeURIComponent(matchedAgent.tokenId)}`} className="bnb-button bnb-focus">Hire agent</Link>
-                ) : (
-                  <ExternalTextLink href={get8004scanAgentUrl(matchedAgent.chainId, matchedAgent.tokenId)}>View identity</ExternalTextLink>
-                )}
+                ) : matchedAgentSourceUrl ? (
+                  <ExternalTextLink href={matchedAgentSourceUrl}>View source</ExternalTextLink>
+                ) : null}
               </div>
             </BnbPanel>
           ) : null}
@@ -143,4 +144,18 @@ function DataRow({ label, value, copyValue }: { label: string; value: string; co
       </dd>
     </div>
   );
+}
+
+function externalAgentUrl(agent: Awaited<ReturnType<typeof listBnbAgents>>[number]) {
+  if (agent.sourceFreshness.source === "8004scan") return get8004scanAgentUrl(agent.chainId, agent.tokenId);
+  return safeExternalUrl(agent.metadataUri || agent.executionEndpoints?.[0]?.url || agent.services.find((service) => service.endpoint)?.endpoint || "");
+}
+
+function safeExternalUrl(value: string) {
+  try {
+    const url = new URL(value);
+    return url.protocol === "https:" ? url.href : "";
+  } catch {
+    return "";
+  }
 }

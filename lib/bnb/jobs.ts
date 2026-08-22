@@ -34,6 +34,11 @@ export const BNB_YIELD_ASSETS = ["BNB", "WBNB", "USDT", "USDC", "BTCB", "ETH", "
 export const BNB_HEALTH_PROTOCOLS = ["Venus", "Lista", "Aave"] as const;
 export const BNB_YIELD_PROTOCOLS = ["PancakeSwap", "Venus", "Lista", "Aave"] as const;
 export const BNB_V3_DEXES = ["PancakeSwap", "Uniswap", "WAGMI", "OkuTrade"] as const;
+const BNB_V3_DISCOVERY_TASK = "Check V3 DEX support";
+const BNB_V3_PRICE_TASK = "Check V3 pool price";
+const BNB_V3_RANGE_TASK = "Get predefined V3 range";
+const BNB_V3_ESTIMATE_TASK = "Estimate V3 position amounts";
+const BNB_V3_POSITION_TASK = "Prepare V3 liquidity position";
 
 export const BNB_JOB_CAPABILITIES: Record<BnbJobCapability, BnbJobCapabilityDefinition> = {
   rebalancing: {
@@ -59,8 +64,8 @@ export const BNB_JOB_CAPABILITIES: Record<BnbJobCapability, BnbJobCapabilityDefi
   concentrated_liquidity: {
     capability: "concentrated_liquidity",
     label: "Concentrated Liquidity",
-    defaultTaskType: "Prepare V3 liquidity position",
-    taskTypes: ["Prepare V3 liquidity position", "Validate V3 range", "Create V3 pool or position", "Increase V3 liquidity"],
+    defaultTaskType: BNB_V3_DISCOVERY_TASK,
+    taskTypes: [BNB_V3_DISCOVERY_TASK, BNB_V3_PRICE_TASK, BNB_V3_RANGE_TASK, BNB_V3_ESTIMATE_TASK, BNB_V3_POSITION_TASK],
     expectedOutput: "Validated V3 liquidity parameters, approval checks, and execution notes",
     fields: [
       { key: "token0", label: "Token 0", placeholder: "0x... or token symbol", required: true, kind: "address_or_text", minLength: 2, maxLength: 120 },
@@ -70,8 +75,7 @@ export const BNB_JOB_CAPABILITIES: Record<BnbJobCapability, BnbJobCapabilityDefi
       { key: "fee", label: "Fee tier", placeholder: "Select fee tier", required: true, kind: "select", options: ["100", "500", "2500", "3000", "10000"], helper: "Uniswap/Pancake V3 fee tier in hundredths of a bip." },
       { key: "lowerPrice", label: "Lower price", placeholder: "580", required: true, kind: "amount", min: 0, maxLength: 32 },
       { key: "upperPrice", label: "Upper price", placeholder: "720", required: true, kind: "amount", min: 0, maxLength: 32 },
-      { key: "dex", label: "DEX", placeholder: "Select DEX", required: false, kind: "select", options: ["Auto", "PancakeSwap", "Uniswap", "WAGMI", "OkuTrade"] },
-      { key: "recipient", label: "Recipient", placeholder: "Wallet receiving the position", required: false, kind: "address_or_text", minLength: 3, maxLength: 120 },
+      { key: "shortcut", label: "Range", placeholder: "Select range", required: true, kind: "select", options: ["safe", "wide", "risky"] },
     ],
   },
   grid_trading: {
@@ -153,6 +157,15 @@ export function capabilityForBnbAgent(agent: BnbAgentCapabilitySource): BnbJobCa
     agent.sourceMetrics?.supportedProtocols?.join(" ") || "",
   ].join(" ").toLowerCase();
 
+  if (
+    /\bv3\b/.test(text) ||
+    text.includes("concentrated liquidity") ||
+    text.includes("tick spacing") ||
+    (text.includes("liquidity") && text.includes("range"))
+  ) {
+    return "concentrated_liquidity";
+  }
+
   if (agent.category === "Health Factor Monitoring" || /\b(?:health\s*factor|liquidation|borrow\s*position|lending\s*position)\b/.test(text)) {
     return "health_factor";
   }
@@ -163,15 +176,6 @@ export function capabilityForBnbAgent(agent: BnbAgentCapabilitySource): BnbJobCa
 
   if (agent.category === "Yield Optimisation" || /\b(?:yield|apy|apr|vault|farm|staking|deposit|earn)\b/.test(text)) {
     return "yield_optimisation";
-  }
-
-  if (
-    /\bv3\b/.test(text) ||
-    text.includes("concentrated liquidity") ||
-    text.includes("tick spacing") ||
-    (text.includes("liquidity") && text.includes("range"))
-  ) {
-    return "concentrated_liquidity";
   }
 
   return capabilityForBnbCategory(agent.category);
@@ -286,6 +290,16 @@ function uniqueStrings(values: string[]) {
   return Array.from(new Set(values.map((value) => value.trim()).filter(Boolean)));
 }
 
+function v3TaskFieldKeys(taskType: string) {
+  if (taskType === BNB_V3_DISCOVERY_TASK) return [];
+  if (taskType === BNB_V3_PRICE_TASK) return ["token0", "token1", "fee"];
+  if (taskType === BNB_V3_RANGE_TASK) return ["token0", "token1", "fee", "shortcut"];
+  if (taskType === BNB_V3_ESTIMATE_TASK || taskType === BNB_V3_POSITION_TASK) {
+    return ["token0", "token1", "amount0", "amount1", "fee", "lowerPrice", "upperPrice"];
+  }
+  return ["token0", "token1", "amount0", "amount1", "fee", "lowerPrice", "upperPrice"];
+}
+
 function readIntentString(value: unknown, maxLength = 1200) {
   if (typeof value !== "string") return "";
   return value.trim().slice(0, maxLength);
@@ -342,6 +356,9 @@ export function visibleBnbJobFields(
 ) {
   return definition.fields.filter((field) => {
     if (field.key === "riskPreference") return false;
+    if (definition.capability === "concentrated_liquidity") {
+      return v3TaskFieldKeys(options.taskType || definition.defaultTaskType).includes(field.key);
+    }
     if (definition.capability !== "yield_optimisation") return true;
     const fields = options.fields || {};
     const taskType = options.taskType || definition.defaultTaskType;
@@ -374,6 +391,9 @@ export function isBnbJobFieldRequired(
   field: BnbJobFieldDefinition,
 ) {
   if (field.required) return true;
+  if (capability === "concentrated_liquidity") {
+    return v3TaskFieldKeys(taskType).includes(field.key);
+  }
   if (capability !== "yield_optimisation" || yieldBnbJobUsesConnectedWallet(taskType, fields)) return false;
   if (field.key === "asset") return true;
   return field.key === "customAsset" && fields.asset === BNB_CUSTOM_TOKEN_OPTION;
@@ -384,6 +404,7 @@ export function initialBnbJobFieldValue(field: BnbJobFieldDefinition, capability
     if (field.key === "yieldSource") return defaultBnbYieldSource(taskType || "");
     if (field.key === "asset") return defaultBnbYieldAsset(taskType || "");
   }
+  if (capability === "concentrated_liquidity" && field.key === "shortcut") return "safe";
   if (field.kind !== "select" || !field.required || !field.options?.length) return "";
   if (field.key === "threshold") return field.options.includes("1.4") ? "1.4" : field.options[0];
   return field.options[0];
@@ -519,6 +540,9 @@ export function buildBnbIntentJobSpec(input: BnbHireIntentInput, agent?: BnbAgen
     if (value) fields[field.key] = value;
   }
 
+  const walletAddress = readField(advancedFields, "walletAddress");
+  if (isEvmAddress(walletAddress)) fields.walletAddress = walletAddress;
+
   if (definition.capability === "health_factor") {
     const walletOrPosition = fields.walletOrPosition || target;
     if (!walletOrPosition) {
@@ -581,15 +605,18 @@ export function buildBnbIntentJobSpec(input: BnbHireIntentInput, agent?: BnbAgen
 }
 
 export function withBnbWalletJobContext(spec: BnbJobSpec, walletAddress: string | undefined): BnbJobSpec {
-  if (spec.capability !== "health_factor" || !walletAddress || !isEvmAddress(walletAddress)) return spec;
+  if (!walletAddress || !isEvmAddress(walletAddress)) return spec;
   const existingWallet = spec.fields.walletOrPosition || spec.fields.intentTarget;
-  if (existingWallet) return spec;
-
   const fields = {
     ...spec.fields,
-    walletOrPosition: walletAddress,
-    intentTarget: walletAddress,
+    walletAddress,
+    ...(spec.capability === "health_factor" && !existingWallet ? {
+      walletOrPosition: walletAddress,
+      intentTarget: walletAddress,
+    } : {}),
   };
+  if (fields === spec.fields || (spec.fields.walletAddress === walletAddress && (spec.capability !== "health_factor" || existingWallet))) return spec;
+
   const nextSpec = {
     ...spec,
     fields,
@@ -620,6 +647,9 @@ export function buildBnbJobSpec(input: {
     if (fieldError) return { ok: false, error: fieldError };
     if (value) fields[field.key] = value;
   }
+
+  const walletAddress = readField(incomingFields, "walletAddress");
+  if (isEvmAddress(walletAddress)) fields.walletAddress = walletAddress;
 
   const instructions = typeof input.instructions === "string" ? input.instructions.trim() : "";
   if (instructions.length > 1200) return { ok: false, error: "Notes are too long." };

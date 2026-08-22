@@ -3,6 +3,7 @@ export const BNB_AGENT_CATEGORIES = [
   "Grid Trading",
   "Yield Optimisation",
   "Health Factor Monitoring",
+  "Other",
 ] as const;
 
 export type BnbAgentCategory = (typeof BNB_AGENT_CATEGORIES)[number];
@@ -11,12 +12,19 @@ export type BnbActivationStatus = "callable" | "request" | "discoverable";
 
 export type BnbExecutionStatus = "ready_to_run" | "connectable" | "listed_only" | "unavailable";
 
+export type BnbAgentSource = "8004scan" | "configured" | "agent402" | "402index" | "x402direct" | "the402";
+
+export type BnbExecutionEndpointSource = BnbAgentSource | "metadata";
+
 export type BnbExecutionEndpoint = {
   adapter: "mcp" | "a2a" | "x402" | "http" | "web";
   url: string;
   label: string;
   verified: boolean;
-  source: "8004scan" | "metadata" | "configured" | "local";
+  source: BnbExecutionEndpointSource;
+  method?: "GET" | "POST";
+  inputSchema?: unknown;
+  paymentRequired?: boolean;
 };
 
 export type BnbAgentService = {
@@ -64,7 +72,7 @@ export type BnbAgentProfile = {
   executionEndpoints?: BnbExecutionEndpoint[];
   scoreBreakdown?: BnbScoreBreakdown;
   sourceFreshness: {
-    source: "8004scan" | "configured" | "local";
+    source: BnbAgentSource;
     fetchedAt: string;
     stale: boolean;
     note: string;

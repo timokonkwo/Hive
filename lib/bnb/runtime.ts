@@ -1,5 +1,6 @@
 import { isAddress } from "viem";
 import { getHiveBnbNetworkConfig } from "@/lib/bnb/network";
+import { getBnbEndpointSourceReadiness } from "@/lib/bnb/endpoint-sources";
 import { classifyBnbAgentReadiness, isBnbAgentHireable } from "@/lib/bnb/readiness";
 import { getBnbStudioV2Readiness } from "@/lib/bnb/studio-v2";
 import type { BnbAgentProfile } from "@/lib/bnb/types";
@@ -95,7 +96,7 @@ export function getBnbRuntimeReadiness() {
     discovery: {
       live8004scanEnabled: envFlag("BNB_8004SCAN_LIVE"),
       configuredAgents: envPresent("BNB_HIVE_AGENTS_JSON"),
-      localAgentsEnabled: envFlag("BNB_SHOW_LOCAL_AGENTS"),
+      endpointSources: getBnbEndpointSourceReadiness(),
     },
     actions: {
       canCreateRequest: storageReady,

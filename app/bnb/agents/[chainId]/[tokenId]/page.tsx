@@ -50,13 +50,14 @@ export default async function BnbAgentDetailPage({
   const visibleServices = bnbUsableServices(agent);
   const integrations = bnbAgentIntegrations(agent);
   const protocols = bnbProtocolSummary(agent);
-  const hasServiceEndpoint = agent.services.some((service) => Boolean(service.endpoint));
+  const hasServiceEndpoint = Boolean(agent.executionEndpoints?.some((endpoint) => endpoint.adapter === "mcp" || endpoint.adapter === "a2a" || endpoint.adapter === "x402" || endpoint.adapter === "http"));
   const ownerAddress = isAddress(agent.ownerAddress) ? agent.ownerAddress : "";
   const agentWallet = isAddress(agent.agentWallet) ? agent.agentWallet : "";
-  const identityUrl = get8004scanAgentUrl(agent.chainId, agent.tokenId);
+  const identityUrl = externalAgentUrl(agent);
+  const identityLabel = externalAgentLabel(agent);
   const verified = bnbIsVerified(agent);
   const facts = [
-    { label: "Availability", value: bnbStatusLabel(agent) },
+    { label: "Run status", value: bnbStatusLabel(agent) },
     ...(freshnessLabel(agent.lastActivity) ? [{ label: "Last active", value: freshnessLabel(agent.lastActivity) }] : []),
     ...(hasPrice(agent) ? [{ label: "Price", value: priceLabel(agent) }] : []),
     ...(hasReviews ? [{ label: "Reviews", value: bnbReviewLabel(agent) }] : []),
@@ -92,11 +93,11 @@ export default async function BnbAgentDetailPage({
               <Link href={`/bnb/activate?chainId=${agent.chainId}&tokenId=${encodeURIComponent(agent.tokenId)}`} className="bnb-button bnb-focus">
                 Hire agent <ArrowRight aria-hidden="true" size={16} />
               </Link>
-            ) : (
+            ) : identityUrl ? (
               <Link href={identityUrl} className="bnb-button bnb-focus" target="_blank" rel="noopener noreferrer">
-                View identity <ArrowRight aria-hidden="true" size={16} />
+                View source <ArrowRight aria-hidden="true" size={16} />
               </Link>
-            )}
+            ) : null}
             <ProfileCompareAction agent={agent} />
           </div>
         </section>
@@ -156,12 +157,12 @@ export default async function BnbAgentDetailPage({
               <h2>Identity</h2>
               <dl className="bnb-agent-identity-grid">
                 <DataRow label="Network" value="BNB Smart Chain" />
-                <DataRow label="ERC-8004 ID" value={agent.sourceMetrics?.sourceAgentId || agent.tokenId} />
+                <DataRow label={agent.sourceFreshness.source === "8004scan" ? "ERC-8004 ID" : "Source ID"} value={agent.sourceMetrics?.sourceAgentId || agent.tokenId} />
                 {ownerAddress ? <DataRow label="Wallet owner" value={shortAddress(ownerAddress)} copyValue={ownerAddress} /> : null}
                 {agentWallet ? <DataRow label="Agent wallet" value={shortAddress(agentWallet)} copyValue={agentWallet} /> : null}
               </dl>
               <div className="bnb-agent-links">
-                <ExternalTextLink href={identityUrl}>8004scan</ExternalTextLink>
+                {identityUrl ? <ExternalTextLink href={identityUrl}>{identityLabel}</ExternalTextLink> : null}
                 {agentWallet ? <ExternalTextLink href={getBscExplorerAddressUrl(agentWallet)}>BscScan</ExternalTextLink> : null}
               </div>
             </section>
@@ -208,4 +209,26 @@ function DataRow({ label, value, copyValue }: { label: string; value: string; co
 
 function positiveFeedbackLabel(agent: BnbAgentProfile) {
   return `${agent.feedback.positive} of ${agent.feedback.count}`;
+}
+
+function externalAgentUrl(agent: BnbAgentProfile) {
+  if (agent.sourceFreshness.source === "8004scan") return get8004scanAgentUrl(agent.chainId, agent.tokenId);
+  return safeExternalUrl(agent.metadataUri || agent.executionEndpoints?.[0]?.url || agent.services.find((service) => service.endpoint)?.endpoint || "");
+}
+
+function externalAgentLabel(agent: BnbAgentProfile) {
+  if (agent.sourceFreshness.source === "agent402") return "Agent402";
+  if (agent.sourceFreshness.source === "402index") return "402Index";
+  if (agent.sourceFreshness.source === "x402direct") return "x402.direct";
+  if (agent.sourceFreshness.source === "the402") return "the402";
+  return "8004scan";
+}
+
+function safeExternalUrl(value: string) {
+  try {
+    const url = new URL(value);
+    return url.protocol === "https:" ? url.href : "";
+  } catch {
+    return "";
+  }
 }

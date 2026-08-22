@@ -761,7 +761,7 @@ Latest verification:
 - Phase 7 smoke tests exposed a MongoDB `_id` response leak on newly inserted records; `saveBnbRecord` now strips internal IDs before API responses.
 - Phase 8 mobile screenshots were reviewed for `/bnb`, `/bnb/altana`, and `/bnb/report`; the receipts page correctly shows a signed-out auth state.
 - `npm run typecheck` passed after Phase 9.
-- Phase 9 changed the production behavior: local agents are hidden in production unless `BNB_SHOW_LOCAL_AGENTS=true`, and production writes fail loudly when MongoDB is unavailable.
+- Phase 9 changed the production behavior: runnable supply must come from verified configured agents or live endpoint-backed discovery, and production writes fail loudly when MongoDB is unavailable.
 - Phase 10 production push `389db99` shipped the redesigned BNB marketplace, dark custom dropdowns, simplified directory rows, mobile viewport fixes, top-reviewed default ordering, profile-linked comparison, and BNB partner capability audit.
 - `npm run typecheck`, focused BNB lint, `git diff --check`, and `npm run build` passed after Phase 10 profile compatibility, compare-from-profile, and hire-preview work. The build still shows the existing local sitemap MongoDB DNS refusal.
 - `npm test` passed with 52 tests after Phase 12, including the new BNB access-request, hire eligibility, runtime gating, receipt-management, live-discovery, and stale-copy regressions.

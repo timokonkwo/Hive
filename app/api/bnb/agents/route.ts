@@ -3,13 +3,13 @@ import { getBnbAgentNetworkStats, getBnbCategories, listBnbAgentsPage } from "@/
 import { enforceBnbRateLimit } from "@/lib/bnb/rate-limit";
 
 function executionFilter(value: string | null) {
-  if (!value) return "ready_to_run";
+  if (!value) return null;
   if (value === "all") return null;
   if (value === "callable" || value === "available") return "ready_to_run";
   if (value === "request") return "connectable";
   if (value === "discoverable") return "listed_only";
   if (value === "ready_to_run" || value === "connectable" || value === "listed_only" || value === "unavailable") return value;
-  return "ready_to_run";
+  return null;
 }
 
 export async function GET(request: NextRequest) {
@@ -19,12 +19,15 @@ export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url);
   const limit = Number(searchParams.get("limit") || 24);
   const page = Number(searchParams.get("page") || 1);
+  const category = searchParams.get("category");
+  const q = searchParams.get("q");
+  const execution = executionFilter(searchParams.get("execution") || searchParams.get("status") || searchParams.get("activation"));
   const [result, networkStats] = await Promise.all([
     listBnbAgentsPage({
-      category: searchParams.get("category"),
-      q: searchParams.get("q"),
+      category,
+      q,
       activation: null,
-      execution: executionFilter(searchParams.get("execution") || searchParams.get("status") || searchParams.get("activation")),
+      execution,
       sort: searchParams.get("sort"),
       limit: Number.isFinite(limit) ? limit : 24,
       page: Number.isFinite(page) ? page : 1,
@@ -32,6 +35,8 @@ export async function GET(request: NextRequest) {
     getBnbAgentNetworkStats(),
   ]);
   const sources = Array.from(new Set(result.agents.map((agent) => agent.sourceFreshness.source)));
+  const unfilteredRegistry = !q && !category && !execution;
+  const total = unfilteredRegistry ? Math.max(result.total, networkStats.totalAgents) : result.total;
 
   return NextResponse.json({
     agents: result.agents,
@@ -39,8 +44,8 @@ export async function GET(request: NextRequest) {
     pagination: {
       page: result.page,
       pageSize: result.pageSize,
-      total: result.total,
-      hasMore: result.hasMore,
+      total,
+      hasMore: result.hasMore || result.page * result.pageSize < total,
     },
     networkStats,
     source: sources.length > 0 ? sources.join("+") : "none",

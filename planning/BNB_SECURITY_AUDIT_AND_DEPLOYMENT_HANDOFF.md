@@ -116,11 +116,11 @@ Location:
 
 Impact:
 
-The status endpoint could report local agents as enabled even though the catalog only returns local agents when `BNB_SHOW_LOCAL_AGENTS=true`.
+The status endpoint previously exposed local-agent mode. Local seeded agents have since been removed from marketplace discovery.
 
 Fix:
 
-Runtime status now reports `localAgentsEnabled` from `BNB_SHOW_LOCAL_AGENTS` only.
+Runtime status now reports live 8004Scan discovery and configured endpoint-backed agent readiness only.
 
 Status: fixed.
 
@@ -349,7 +349,7 @@ Bytecode verification through BSC RPC:
 
 Local production smoke test:
 
-- `GET /api/bnb/runtime`: `escrowConfigured=true`, `sessionRegistryConfigured=true`, `live8004scanEnabled=true`, `localAgentsEnabled=false`.
+- `GET /api/bnb/runtime`: `escrowConfigured=true`, `sessionRegistryConfigured=true`, `live8004scanEnabled=true`.
 - `GET /api/bnb/agents?limit=2`: returns live `8004scan` agents.
 - `POST /api/bnb/pancakeswap`: returns live WBNB/USDT PancakeSwap V2 reserve data from BSC RPC.
 

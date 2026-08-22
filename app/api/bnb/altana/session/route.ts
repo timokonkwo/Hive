@@ -86,7 +86,7 @@ export async function POST(request: NextRequest) {
       budget,
       clientAddress: auth.client.userId,
     });
-    const agent = await getBnbAgent(56, template.agentTokenId);
+    const agent = template.agentTokenId ? await getBnbAgent(56, template.agentTokenId) : null;
     const grantRequest = agent
       ? buildBnbSessionGrantRequest(record, agent)
       : { status: "not_ready", reason: "The wallet alert agent is not configured." };

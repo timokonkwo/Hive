@@ -5,6 +5,7 @@ import {
   Grid3X3,
   RefreshCcw,
   Search,
+  Shapes,
   TrendingUp,
   type LucideIcon,
 } from "lucide-react";
@@ -40,6 +41,11 @@ const categoryDetails: Record<BnbAgentCategory, { title: string; body: string; i
     title: "Health Factor",
     body: "Monitor lending positions and liquidation risk.",
     icon: BellRing,
+  },
+  Other: {
+    title: "Other",
+    body: "Browse the rest of the BSC agent registry.",
+    icon: Shapes,
   },
 };
 

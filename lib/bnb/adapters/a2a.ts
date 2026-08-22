@@ -1,3 +1,4 @@
+import { endpointAuthHeaders, hasEndpointAuthHeaders } from "@/lib/bnb/endpoint-auth";
 import { safeFetchJson, validatePublicHttpsUrl } from "@/lib/bnb/endpoint-security";
 import type { BnbAgentProfile, BnbExecutionEndpoint } from "@/lib/bnb/types";
 import type { BnbAgentExecutionAdapter, BnbAdapterPreflightResult, BnbAdapterRunInput } from "@/lib/bnb/adapters/types";
@@ -7,11 +8,17 @@ type A2aCard = {
   name?: string;
   description?: string;
   url?: string;
-  skills?: Array<{ id?: string; name?: string; description?: string }>;
+  skills?: Array<{ id?: string; name?: string; description?: string; tags?: string[] }>;
+  security?: Array<Record<string, unknown>>;
+  securitySchemes?: Record<string, unknown>;
+  authentication?: unknown;
+  supportsAuthenticatedExtendedCard?: boolean;
   capabilities?: {
     streaming?: boolean;
   };
 };
+
+const A2A_PREFLIGHT_METHOD = "hive/preflight";
 
 function a2aEndpoint(agent: BnbAgentProfile) {
   return agent.executionEndpoints?.find((endpoint) => endpoint.adapter === "a2a");
@@ -28,6 +35,7 @@ function parseCard(payload: unknown): A2aCard {
       id: typeof skill.id === "string" ? skill.id : undefined,
       name: typeof skill.name === "string" ? skill.name : undefined,
       description: typeof skill.description === "string" ? skill.description : undefined,
+      tags: Array.isArray(skill.tags) ? skill.tags.filter((tag): tag is string => typeof tag === "string") : [],
     }))
     : [];
   return {
@@ -35,6 +43,10 @@ function parseCard(payload: unknown): A2aCard {
     description: typeof record.description === "string" ? record.description : undefined,
     url: typeof record.url === "string" ? record.url : undefined,
     skills,
+    security: Array.isArray(record.security) ? record.security.map(asRecord) : [],
+    securitySchemes: asRecord(record.securitySchemes ?? record.security_schemes),
+    authentication: record.authentication,
+    supportsAuthenticatedExtendedCard: record.supportsAuthenticatedExtendedCard === true,
     capabilities: asRecord(record.capabilities) as A2aCard["capabilities"],
   };
 }
@@ -42,6 +54,7 @@ function parseCard(payload: unknown): A2aCard {
 async function fetchCard(endpoint: BnbExecutionEndpoint) {
   const { response, payload } = await safeFetchJson(endpoint.url, {
     method: "GET",
+    headers: endpointAuthHeaders(endpoint.url),
     timeoutMs: 7_000,
     maxBytes: 192 * 1024,
   });
@@ -51,6 +64,60 @@ async function fetchCard(endpoint: BnbExecutionEndpoint) {
   const checked = validatePublicHttpsUrl(serviceUrl);
   if (!checked.ok) throw new Error(checked.reason);
   return { card, serviceUrl: checked.url.toString() };
+}
+
+function cardRequiresAuth(card: A2aCard, serviceUrl: string) {
+  if (hasEndpointAuthHeaders(serviceUrl)) return false;
+  if (card.security && card.security.length > 0) return true;
+  if (card.authentication && !isEmptyA2aPayload(card.authentication)) return true;
+  return false;
+}
+
+function payloadText(payload: unknown) {
+  if (typeof payload === "string") return payload;
+  try {
+    return JSON.stringify(payload);
+  } catch {
+    return "";
+  }
+}
+
+function protectedA2aReason(status: number, payload: unknown) {
+  const text = payloadText(payload).toLowerCase();
+  if (status === 401 || /unauthorized|authentication required|access-token|no-access-token|session/.test(text)) {
+    return "This agent requires external sign-in.";
+  }
+  if (status === 403 || /forbidden|csrf|sec-fetch/.test(text)) {
+    return "This agent cannot be run from Hive.";
+  }
+  return "";
+}
+
+function isJsonRpcProbeResponse(status: number, payload: unknown) {
+  const record = asRecord(payload);
+  if (status >= 200 && status < 300) return typeof payload !== "string";
+  if (status !== 400 && status !== 422) return false;
+
+  const error = asRecord(record.error);
+  const message = payloadText(error.message || record.message || payload).toLowerCase();
+  return /method|unknown|not found|invalid|jsonrpc|params/.test(message);
+}
+
+async function assertPublicA2aService(serviceUrl: string, card: A2aCard) {
+  if (cardRequiresAuth(card, serviceUrl)) throw new Error("This agent requires external sign-in.");
+
+  const { response, payload } = await safeFetchJson(serviceUrl, {
+    method: "POST",
+    headers: endpointAuthHeaders(serviceUrl),
+    body: jsonRpc(A2A_PREFLIGHT_METHOD, {}),
+    timeoutMs: 7_000,
+    maxBytes: 64 * 1024,
+  });
+  const protectedReason = protectedA2aReason(response.status, payload);
+  if (protectedReason) throw new Error(protectedReason);
+  if (!isJsonRpcProbeResponse(response.status, payload)) {
+    throw new Error("This agent cannot be run from Hive.");
+  }
 }
 
 function jsonRpc(method: string, params: unknown) {
@@ -85,8 +152,63 @@ function stringifyA2aOutput(payload: unknown) {
     .filter(Boolean)
     .join("\n\n");
   if (text) return text;
-  if (typeof result.text === "string") return result.text;
+  if (typeof result.text === "string" && result.text.trim()) return result.text;
+  if (isEmptyA2aPayload(result)) throw new Error("A2A agent returned no result.");
   return JSON.stringify(result || payload, null, 2);
+}
+
+function isEmptyA2aPayload(value: unknown): boolean {
+  if (value === undefined || value === null) return true;
+  if (typeof value === "string") return value.trim().length === 0;
+  if (Array.isArray(value)) return value.every(isEmptyA2aPayload);
+  if (typeof value === "object") return Object.values(value as Record<string, unknown>).every(isEmptyA2aPayload);
+  return false;
+}
+
+function matchingSkills(card: A2aCard, capability: string, taskType: string) {
+  const skills = card.skills || [];
+  if (capability === "custom") return skills;
+
+  return skills.filter((skill) => {
+    const text = [
+      skill.id,
+      skill.name,
+      skill.description,
+      ...(skill.tags || []),
+    ].filter(Boolean).join(" ").toLowerCase();
+    return capabilitySkillScore(capability, taskType, text) > 0;
+  });
+}
+
+function capabilitySkillScore(capability: string, taskType: string, text: string) {
+  const compact = text.replace(/[^a-z0-9]+/g, "");
+  if (capability === "yield_optimisation") {
+    return /yield|apy|apr|vault|farm|staking|deposit|earn|stablecoin|usdd/.test(text) ? 10 : 0;
+  }
+  if (capability === "health_factor") {
+    return /health\s*factor|liquidation|borrow|loan|collateral|account\s*liquidity|risk/.test(text) ? 10 : 0;
+  }
+  if (capability === "grid_trading") {
+    return /grid|bounds|trading\s*range|market\s*making|strategy/.test(text) ? 10 : 0;
+  }
+  if (capability === "concentrated_liquidity") {
+    const task = taskType.toLowerCase();
+    if (/dex\s*support|dex\s*info|supported\s*v3|supported\s*dex|fee\s*support/.test(task) && /v3|dex|fee|pool|liquidity/.test(text)) return 10;
+    return /v3|concentrated|liquidity|tick|range|position|pool/.test(text) ? 10 : 0;
+  }
+  if (capability === "rebalancing") {
+    return /rebalance|position|allocation|range|liquidity|lp/.test(text) ? 10 : 0;
+  }
+  return /job|task|request|agent/.test(compact) ? 1 : 0;
+}
+
+function capabilityLabel(capability: string) {
+  if (capability === "health_factor") return "health factor";
+  if (capability === "concentrated_liquidity") return "liquidity";
+  if (capability === "yield_optimisation") return "yield";
+  if (capability === "grid_trading") return "grid trading";
+  if (capability === "rebalancing") return "rebalancing";
+  return "job";
 }
 
 export const a2aAdapter: BnbAgentExecutionAdapter = {
@@ -101,7 +223,8 @@ export const a2aAdapter: BnbAgentExecutionAdapter = {
     if (!endpoint) return { ok: false, adapter: "a2a", reason: "No A2A endpoint is listed." };
 
     try {
-      const { card } = await fetchCard(endpoint);
+      const { card, serviceUrl } = await fetchCard(endpoint);
+      await assertPublicA2aService(serviceUrl, card);
       return {
         ok: true,
         adapter: "a2a",
@@ -118,6 +241,42 @@ export const a2aAdapter: BnbAgentExecutionAdapter = {
     }
   },
 
+  async preflightJob({ agent, record }: BnbAdapterRunInput): Promise<BnbAdapterPreflightResult> {
+    const endpoint = a2aEndpoint(agent);
+    if (!endpoint) return { ok: false, adapter: "a2a", reason: "No A2A endpoint is listed." };
+
+    try {
+      const { card, serviceUrl } = await fetchCard(endpoint);
+      await assertPublicA2aService(serviceUrl, card);
+      const capability = record.jobSpec?.capability || "custom";
+      const taskType = record.jobSpec?.taskType || record.limits.task;
+      const skills = matchingSkills(card, capability, taskType);
+      if (capability !== "custom" && skills.length === 0) {
+        return {
+          ok: false,
+          adapter: "a2a",
+          endpoint,
+          reason: `This agent cannot run this ${capabilityLabel(capability)} job. Choose another agent.`,
+          capabilities: (card.skills || []).map((skill) => skill.name || skill.id || "").filter(Boolean).slice(0, 20),
+        };
+      }
+
+      return {
+        ok: true,
+        adapter: "a2a",
+        endpoint,
+        capabilities: (skills.length > 0 ? skills : card.skills || []).map((skill) => skill.name || skill.id || "").filter(Boolean).slice(0, 20),
+      };
+    } catch (error) {
+      return {
+        ok: false,
+        adapter: "a2a",
+        endpoint,
+        reason: error instanceof Error ? error.message : "A2A job check failed.",
+      };
+    }
+  },
+
   async run({ agent, record }: BnbAdapterRunInput) {
     const endpoint = a2aEndpoint(agent);
     if (!endpoint) throw new Error("No A2A endpoint is listed for this agent.");
@@ -125,11 +284,15 @@ export const a2aAdapter: BnbAgentExecutionAdapter = {
     const { serviceUrl } = await fetchCard(endpoint);
     const { response, payload } = await safeFetchJson(serviceUrl, {
       method: "POST",
+      headers: endpointAuthHeaders(serviceUrl),
       body: jsonRpc("message/send", messageParams(record.limits.task)),
       timeoutMs: 15_000,
       maxBytes: 384 * 1024,
     });
-    if (!response.ok) throw new Error(`A2A message/send failed with HTTP ${response.status}.`);
+    if (!response.ok) {
+      const protectedReason = protectedA2aReason(response.status, payload);
+      throw new Error(protectedReason || `A2A message/send failed with HTTP ${response.status}.`);
+    }
     const error = asRecord(payload).error;
     if (error) {
       const message = asRecord(error).message;

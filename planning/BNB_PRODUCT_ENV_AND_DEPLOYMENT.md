@@ -53,7 +53,6 @@ BNB_SESSION_REGISTRY_ADDRESS=0x1DDCd63282CDd4e5531B65902808Ab0673B0Cd02
 BNB_8004SCAN_LIVE=true
 BNB_8004SCAN_API_BASE=https://8004scan.io/api/v1/public
 BNB_8004SCAN_API_KEY=<optional 8004scan key>
-BNB_SHOW_LOCAL_AGENTS=false
 BNB_ALLOW_PROCESS_STORAGE=false
 BNB_AGENT_RUN_REQUIRES_ESCROW=false
 ```
@@ -207,7 +206,6 @@ Confirm the response has:
 escrowConfigured=true
 sessionRegistryConfigured=true
 workerConfigured=true
-localAgentsEnabled=false
 chainId=97
 ```
 

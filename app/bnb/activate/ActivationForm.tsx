@@ -402,7 +402,12 @@ export function ActivationForm({ agent }: { agent: BnbAgentProfile }) {
       const payload = await response.json();
       if (!response.ok) throw new Error(payload.error || "Could not prepare this job.");
       setResult(payload);
-      setStage(payload.paymentRequest?.status === "not_required" ? "job" : "payment");
+      if (payload.paymentRequest?.status === "not_required") {
+        setStage("job");
+        await runAgent(payload.recordId, payload);
+        return;
+      }
+      setStage("payment");
     } catch (activationError) {
       setError(activationError instanceof Error ? activationError.message : "Could not prepare this job.");
     } finally {
@@ -450,7 +455,7 @@ export function ActivationForm({ agent }: { agent: BnbAgentProfile }) {
     }
   }
 
-  async function runAgent(recordId = result?.recordId) {
+  async function runAgent(recordId = result?.recordId, seedResult?: ActivationResponse) {
     if (!recordId) return;
     if (!ensureProtectedSession({ authenticated, walletAddress: address, login: signInWithBnbWallet })) return;
     setRunning(true);
@@ -463,8 +468,20 @@ export function ActivationForm({ agent }: { agent: BnbAgentProfile }) {
         body: JSON.stringify({ recordId }),
       });
       const payload = await response.json();
-      if (!response.ok) throw new Error(payload.error || "Agent run failed.");
-      setResult((current) => current ? { ...current, status: payload.status, message: payload.message, record: payload.record } : current);
+      if (!response.ok) {
+        if (payload.record) {
+          setResult((current) => {
+            const base = current || seedResult;
+            return base ? { ...base, status: payload.status || "failed", message: payload.error || "Agent run failed.", record: payload.record } : current;
+          });
+          setStage("job");
+        }
+        throw new Error(payload.error || "Agent run failed.");
+      }
+      setResult((current) => {
+        const base = current || seedResult;
+        return base ? { ...base, status: payload.status, message: payload.message, record: payload.record } : current;
+      });
       setStage("job");
     } catch (runError) {
       setError(runError instanceof Error ? runError.message : "Agent run failed.");
@@ -1042,7 +1059,7 @@ function PreflightStage({
         <button type="button" className="bnb-button-dark bnb-focus" onClick={onBack}><ArrowLeft aria-hidden="true" size={15} /> Edit details</button>
         <button type="button" className="bnb-button bnb-focus" onClick={onReviewPayment} disabled={!result?.canProceed || loading || blocked} aria-busy={loading}>
           {loading ? <BnbButtonLoader /> : result?.paymentRequired === false ? <Play aria-hidden="true" size={16} /> : <ShieldCheck aria-hidden="true" size={16} />}
-          {loading ? "Preparing..." : result?.paymentRequired === false ? "Create job" : "Review payment"}
+          {loading ? result?.paymentRequired === false ? "Starting..." : "Preparing..." : result?.paymentRequired === false ? "Run agent" : "Review payment"}
         </button>
       </div>
     </div>
@@ -1147,7 +1164,6 @@ function JobStatusPanel({
 }) {
   const output = result?.record?.delivery?.rawOutput || result?.record?.work?.output;
   const dataSources = result?.record?.delivery?.dataSources || result?.record?.work?.dataSources;
-  const failed = result?.record?.delivery?.status === "failed" || result?.record?.work?.status === "failed";
   const refundBlocker = result?.record ? bnbRefundUnavailableReason(result.record) : "";
   const jobHref = result?.recordId ? `/bnb/jobs/${encodeURIComponent(result.recordId)}` : `/bnb/agents/${agent.chainId}/${agent.tokenId}`;
   const record = result?.record;
@@ -1156,17 +1172,22 @@ function JobStatusPanel({
   const paymentNotRequired = result?.paymentRequest.status === "not_required" || record?.limits.walletConfirmationRequired === false;
   const jobRunning = running || record?.delivery?.status === "running" || record?.work?.status === "running" || record?.status === "running";
   const showSettlementActions = !paymentNotRequired && delivered && !closed;
-  const title = closed ? "Job closed" : failed ? "Job failed" : delivered ? "Delivery" : jobRunning ? "Running" : funded ? paymentNotRequired ? "Ready" : "Funded" : "Payment";
+  const recordFailed = record?.delivery?.status === "failed" || record?.work?.status === "failed" || record?.status === "failed";
+  const runBlocked = Boolean(error && funded && !delivered && !closed && !jobRunning);
+  const failed = recordFailed || runBlocked;
+  const failureMessage = record?.delivery?.error || record?.work?.error || error || "Agent run failed.";
+  const cannotRun = /cannot run|does not expose|matching|no supported execution endpoint|endpoint cannot/i.test(failureMessage);
+  const title = closed ? "Job closed" : failed ? cannotRun ? "Job cannot run" : "Job failed" : delivered ? "Delivery" : jobRunning ? "Job running" : funded ? paymentNotRequired ? "Run" : "Funded" : "Payment";
   const body = closed
     ? "This job is closed."
     : failed
-    ? "The run failed."
+    ? ""
     : delivered
     ? paymentNotRequired ? "Review the result." : "Review the delivery."
     : jobRunning
-    ? "The agent is working."
+    ? ""
     : funded
-    ? paymentNotRequired ? "Ready." : "Funded."
+    ? paymentNotRequired ? "Run the agent." : "Funded."
     : "Waiting for payment.";
 
   return (
@@ -1178,11 +1199,16 @@ function JobStatusPanel({
       {output ? (
         <BnbDeliveryView output={output} jobSpec={result?.record?.jobSpec || result?.jobSpec} dataSources={dataSources} title="Delivery" />
       ) : failed ? (
-        <div className="bnb-error p-4 text-sm">{result?.record?.delivery?.error || result?.record?.work?.error || "Agent run failed."}</div>
+        <div className="bnb-error p-4 text-sm">{failureMessage}</div>
+      ) : jobRunning ? (
+        <div className="bnb-hire-state bnb-hire-state-running" role="status" aria-live="polite">
+          <BnbButtonLoader />
+          <span>Waiting for result</span>
+        </div>
       ) : (
         <div className="bnb-hire-state">
           <Play aria-hidden="true" size={18} />
-          <span>{jobRunning ? "Running" : funded ? paymentNotRequired ? "Ready" : "Funded" : "Payment submitted"}</span>
+          <span>{funded ? paymentNotRequired ? "Run needed" : "Funded" : "Payment submitted"}</span>
         </div>
       )}
       {record?.payment ? (
@@ -1217,12 +1243,11 @@ function JobStatusPanel({
           ) : null}
         </dl>
       ) : null}
-      <StepError error={error} />
+      <StepError error={failed ? null : error} />
       <div className="bnb-step-actions">
-        {funded && !delivered && !closed ? (
-          <button type="button" onClick={onRun} disabled={jobRunning} className="bnb-button bnb-focus" aria-busy={jobRunning}>
-            {jobRunning ? <BnbButtonLoader /> : null}
-            {jobRunning ? "Running..." : "Run agent"}
+        {funded && !delivered && !closed && !jobRunning && !failed ? (
+          <button type="button" onClick={onRun} className="bnb-button bnb-focus">
+            Run agent
           </button>
         ) : null}
         {showSettlementActions ? (
@@ -1251,11 +1276,11 @@ function JobStatusPanel({
   );
 }
 
-function StepHead({ title, body }: { title: string; body: string }) {
+function StepHead({ title, body }: { title: string; body?: string }) {
   return (
     <div className="bnb-hire-step-head">
       <h2>{title}</h2>
-      <p>{body}</p>
+      {body ? <p>{body}</p> : null}
     </div>
   );
 }
@@ -1427,6 +1452,9 @@ function buildClientHireIntent({
   const advancedFields = Object.fromEntries(
     Object.entries(fields).map(([key, value]) => [key, value.trim()]).filter(([, value]) => Boolean(value)),
   );
+  if (walletAddress) {
+    advancedFields.walletAddress = walletAddress;
+  }
   if (capability === "health_factor" && walletAddress && !advancedFields.walletOrPosition) {
     advancedFields.walletOrPosition = walletAddress;
   }
@@ -1660,7 +1688,7 @@ function validateYieldClientFields(
 
 function defaultOutcome(agent: BnbAgentProfile) {
   if (capabilityForBnbAgent(agent) === "concentrated_liquidity") {
-    return "Validate the V3 liquidity parameters and return the safest execution plan.";
+    return "Check BSC V3 DEX and fee support.";
   }
   if (agent.category === "Health Factor Monitoring") {
     return "Check my BSC lending position and tell me whether it is near liquidation.";

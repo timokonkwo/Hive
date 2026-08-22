@@ -6,6 +6,7 @@ export const bnbCategoryLabels: Record<BnbAgentCategory, string> = {
   "Grid Trading": "Grid Trading",
   "Yield Optimisation": "Yield Optimisation",
   "Health Factor Monitoring": "Health Factor",
+  Other: "Other",
 };
 
 const GENERATED_DESCRIPTION_PATTERNS = [
@@ -15,7 +16,6 @@ const GENERATED_DESCRIPTION_PATTERNS = [
   /^think like/i,
   /^[\w.-]+\.agent on termix platform\.?$/i,
   /mechanism analyst/i,
-  /sports prediction/i,
   /geopolitics/i,
   /general news/i,
   /entertainment/i,

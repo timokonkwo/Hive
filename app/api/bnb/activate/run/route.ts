@@ -1,14 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireBnbClient } from "@/lib/bnb/auth";
 import { getBnbAgent } from "@/lib/bnb/catalog";
-import { runBnbAgentAdapter } from "@/lib/bnb/adapters/registry";
-import { runBnbAgentWork } from "@/lib/bnb/agent-runner";
+import { preflightBnbAgentJob, runBnbAgentAdapter } from "@/lib/bnb/adapters/registry";
 import { formatBnbDeliveryText } from "@/lib/bnb/delivery";
 import { withBnbWalletJobContext } from "@/lib/bnb/jobs";
 import { enforceBnbRateLimit } from "@/lib/bnb/rate-limit";
 import { BnbStorageError, getBnbActivationRecord, updateBnbActivationRecord } from "@/lib/bnb/records";
 import { shouldRequireBnbEscrow } from "@/lib/bnb/runtime";
-import { hasBnbAgentWorker, runBnbAgentWorkOnWorker } from "@/lib/bnb/worker";
 import type { BnbActivationRecord } from "@/lib/bnb/types";
 
 function readString(value: unknown) {
@@ -80,10 +78,50 @@ export async function POST(request: NextRequest) {
     }
 
     const agent = await getBnbAgent(record.agent.chainId, record.agent.tokenId);
-    const escrowRequired = agent ? shouldRequireBnbEscrow(agent) : record.limits.walletConfirmationRequired !== false;
+    if (!agent) {
+      return NextResponse.json({ error: "Agent is no longer available." }, { status: 409 });
+    }
+
+    const escrowRequired = shouldRequireBnbEscrow(agent);
 
     if (escrowRequired && record.payment?.transactionStatus !== "success") {
       return NextResponse.json({ error: "Fund escrow before running this agent." }, { status: 409 });
+    }
+
+    const executionRecord = withRunWalletContext(record, executionWalletAddress(request, auth.client.address));
+    const adapterPreflight = await preflightBnbAgentJob(agent, executionRecord);
+    if (!adapterPreflight.some((result) => result.ok)) {
+      const reason = adapterPreflight.find((result) => result.reason)?.reason || "This agent endpoint cannot run the supplied job.";
+      const now = new Date().toISOString();
+      const work = {
+        status: "failed" as const,
+        startedAt: record.work?.startedAt || now,
+        completedAt: now,
+        error: reason,
+      };
+      const updated = await updateBnbActivationRecord({
+        recordId,
+        clientAddress: auth.client.userId,
+        patch: {
+          status: "failed",
+          work,
+          delivery: {
+            status: "failed",
+            startedAt: work.startedAt,
+            completedAt: work.completedAt,
+            error: work.error,
+          },
+        },
+      });
+
+      return NextResponse.json({
+        status: "failed",
+        error: reason,
+        record: updated,
+        work,
+        delivery: updated?.delivery,
+        adapterPreflight,
+      }, { status: 409 });
     }
 
     await updateBnbActivationRecord({
@@ -103,10 +141,10 @@ export async function POST(request: NextRequest) {
     });
 
     try {
-      const executionRecord = withRunWalletContext(record, executionWalletAddress(request, auth.client.address));
-      const adapterWork = agent ? await runBnbAgentAdapter(agent, executionRecord) : null;
-      const workerResult = adapterWork ? null : hasBnbAgentWorker() ? await runBnbAgentWorkOnWorker(executionRecord) : null;
-      const work = adapterWork || (workerResult ? workerResult.work : await runBnbAgentWork(executionRecord));
+      const work = await runBnbAgentAdapter(agent, executionRecord);
+      if (!work) {
+        throw new Error("This agent endpoint did not return work.");
+      }
       const isComplete = work.status === "completed";
       const deliveryText = formatBnbDeliveryText(work.output, executionRecord.jobSpec);
       const updated = await updateBnbActivationRecord({
@@ -135,7 +173,6 @@ export async function POST(request: NextRequest) {
         record: updated,
         work,
         delivery: updated?.delivery,
-        ...(workerResult?.mode === "async" ? { workerJobId: workerResult.workerJobId } : {}),
       });
     } catch (error) {
       const work = {

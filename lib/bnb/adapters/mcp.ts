@@ -1,3 +1,4 @@
+import { endpointAuthHeaders } from "@/lib/bnb/endpoint-auth";
 import { safeFetchJson } from "@/lib/bnb/endpoint-security";
 import type { BnbAgentProfile, BnbExecutionEndpoint } from "@/lib/bnb/types";
 import type { BnbAgentExecutionAdapter, BnbAdapterPreflightResult, BnbAdapterRunInput } from "@/lib/bnb/adapters/types";
@@ -66,27 +67,52 @@ function parseTools(payload: unknown): McpTool[] {
 async function listTools(endpoint: BnbExecutionEndpoint) {
   const { response, payload } = await safeFetchJson(endpoint.url, {
     method: "POST",
+    headers: endpointAuthHeaders(endpoint.url),
     body: jsonRpc("tools/list"),
     timeoutMs: 7_000,
     maxBytes: 192 * 1024,
   });
+  const protectedReason = protectedMcpReason(response.status, payload);
+  if (protectedReason) throw new Error(protectedReason);
   if (!response.ok) throw new Error(`Agent tools could not be loaded with HTTP ${response.status}.`);
   const tools = parseTools(payload);
   if (tools.length === 0) throw new Error("This agent did not return callable tools.");
   return tools;
 }
 
+function payloadText(payload: unknown) {
+  if (typeof payload === "string") return payload;
+  try {
+    return JSON.stringify(payload);
+  } catch {
+    return "";
+  }
+}
+
+function protectedMcpReason(status: number, payload: unknown) {
+  const text = payloadText(payload).toLowerCase();
+  if (status === 401 || /unauthorized|authentication required|access-token|api key|token required/.test(text)) {
+    return "This agent requires external sign-in.";
+  }
+  if (status === 403 || /forbidden|csrf|sec-fetch/.test(text)) {
+    return "This agent cannot be run from Hive.";
+  }
+  return "";
+}
+
 function chooseTool(tools: McpTool[], agent: BnbAgentProfile, record: BnbAdapterRunInput["record"]) {
   const capability = record.jobSpec?.capability || "custom";
+  const taskType = record.jobSpec?.taskType || record.limits.task;
   const terms = record.limits.task
     .toLowerCase()
     .split(/[^a-z0-9]+/)
     .filter((term) => term.length >= 3);
   const scored = tools.map((tool) => {
-    const text = `${tool.name} ${tool.description || ""}`.toLowerCase();
+    const text = toolContractText(tool);
     let score = terms.reduce((sum, term) => sum + (text.includes(term) ? 1 : 0), 0);
     score += capabilityToolScore(capability, text);
-    const capabilityBlocker = capabilityToolBlocker(tool, text, capability);
+    score += taskToolScore(capability, taskType, text);
+    const capabilityBlocker = capabilityToolBlocker(tool, text, capability, taskType);
     if (capabilityBlocker) {
       score -= 100;
     } else if (capability !== "custom" && isDirectoryTool(tool, text)) {
@@ -111,7 +137,7 @@ function chooseTool(tools: McpTool[], agent: BnbAgentProfile, record: BnbAdapter
   const minimumScore = capability === "custom" ? Number.NEGATIVE_INFINITY : 4;
   const matchingTools = sorted.filter((candidate) => candidate.score >= minimumScore);
   if (matchingTools.length === 0) {
-    throw new Error(`This agent does not expose a matching ${capabilityLabel(capability)} tool. Choose another agent.`);
+    throw new Error(`This agent cannot run this ${capabilityLabel(capability)} job. Choose another agent.`);
   }
 
   const callable = matchingTools.find((candidate) => !candidate.argsError);
@@ -120,10 +146,13 @@ function chooseTool(tools: McpTool[], agent: BnbAgentProfile, record: BnbAdapter
   throw new Error(matchingTools[0].argsError);
 }
 
-function capabilityToolBlocker(tool: McpTool, text: string, capability: string) {
+function capabilityToolBlocker(tool: McpTool, text: string, capability: string, taskType = "") {
   if (capability === "custom") return "";
   if (isDirectoryTool(tool, text)) {
     return `This agent exposes a directory tool, not a ${capabilityLabel(capability)} tool.`;
+  }
+  if (isDocumentationTool(tool, text)) {
+    return `This agent exposes documentation, not a ${capabilityLabel(capability)} tool.`;
   }
 
   const schema = normalizeInputSchema(tool.inputSchema);
@@ -141,12 +170,30 @@ function capabilityToolBlocker(tool: McpTool, text: string, capability: string) 
   }
 
   if (capability === "concentrated_liquidity") {
-    if (/getdexinfo|listdex|supportedfees|supportedpools/.test(compact) && !/(create|position|range|liquidity|tick)/.test(compact)) {
+    if (!isV3DiscoveryTask(taskType) && /getdexinfo|listdex|supportedfees|supportedpools/.test(compact) && !/(create|position|range|liquidity|tick)/.test(compact)) {
       return "This agent exposes discovery data, not a liquidity-position tool.";
     }
   }
 
   return "";
+}
+
+function toolContractText(tool: McpTool) {
+  const schema = normalizeInputSchema(tool.inputSchema);
+  const properties = asRecord(schema.properties);
+  const propertyText = Object.entries(properties)
+    .map(([key, value]) => `${key} ${textFromSchema(value)}`)
+    .join(" ");
+  return `${tool.name} ${tool.description || ""} ${propertyText}`.toLowerCase();
+}
+
+function textFromSchema(value: unknown): string {
+  const record = asRecord(value);
+  return [
+    record.title,
+    record.description,
+    Array.isArray(record.enum) ? record.enum.join(" ") : "",
+  ].filter(Boolean).join(" ");
 }
 
 function isDirectoryTool(tool: McpTool, text: string) {
@@ -163,6 +210,19 @@ function isDirectoryTool(tool: McpTool, text: string) {
   );
 }
 
+function isDocumentationTool(tool: McpTool, text: string) {
+  const schema = normalizeInputSchema(tool.inputSchema);
+  const properties = Object.keys(asRecord(schema.properties));
+  const propertyText = properties.join(" ").toLowerCase();
+  const spaced = `${text} ${propertyText}`.replace(/[_-]+/g, " ");
+  const compact = spaced.replace(/[^a-z0-9]+/g, "");
+
+  return (
+    /(?:^|[^a-z])(help|guide|docs|documentation|overview|description|instructions|how\s+to|tutorial)(?:[^a-z]|$)/.test(spaced) ||
+    /(?:getdescription|protocoloverview|documentation|instructions|tutorial|howto|userguide|usageguide)/.test(compact)
+  ) && properties.length <= 2;
+}
+
 function capabilityLabel(capability: string) {
   if (capability === "health_factor") return "health factor";
   if (capability === "concentrated_liquidity") return "liquidity";
@@ -175,7 +235,7 @@ function capabilityLabel(capability: string) {
 function capabilityToolScore(capability: string, text: string) {
   if (capability === "health_factor") {
     let score = 0;
-    if (/getuserhealthindicators|health\s*factor|health\s*indicator|liquidation|borrow\s*position|risk/.test(text)) score += 16;
+    if (/getuserhealthindicators|getaccountliquidity|account\s*liquidity|borrow\s*limit|shortfall|health\s*factor|health\s*indicator|liquidation|borrow\s*position|risk/.test(text)) score += 16;
     if (/enabled\s*collateral|getenabledcollateral|collateral\s*assets/.test(text)) score -= 4;
     return score;
   }
@@ -197,6 +257,22 @@ function capabilityToolScore(capability: string, text: string) {
   }
 
   return 0;
+}
+
+function taskToolScore(capability: string, taskType: string, text: string) {
+  if (capability !== "concentrated_liquidity") return 0;
+  const task = taskType.toLowerCase();
+  const compact = text.replace(/[^a-z0-9]+/g, "");
+  if (isV3DiscoveryTask(task) && /getdexinfo|supporteddex|feetier|supportedchains/.test(compact)) return 18;
+  if (/pool\s*price|current\s*price/.test(task) && /getcurrentpoolprice|poolprice/.test(compact)) return 20;
+  if (/predefined|range/.test(task) && /getpredefinedpriceranges|predefined/.test(compact)) return 20;
+  if (/estimate/.test(task) && /estimateamountsforpositioncreation|estimateamounts/.test(compact)) return 20;
+  if (/position|liquidity/.test(task) && /createposition/.test(compact)) return 20;
+  return 0;
+}
+
+function isV3DiscoveryTask(taskType: string) {
+  return /dex\s*support|dex\s*info|supported\s*v3|supported\s*dex|fee\s*support/.test(taskType.toLowerCase());
 }
 
 function toolArguments(tool: McpTool, agent: BnbAgentProfile, record: BnbAdapterRunInput["record"]) {
@@ -572,6 +648,7 @@ export const mcpAdapter: BnbAgentExecutionAdapter = {
     const tool = chooseTool(tools, agent, record);
     const { response, payload } = await safeFetchJson(endpoint.url, {
       method: "POST",
+      headers: endpointAuthHeaders(endpoint.url),
       body: jsonRpc("tools/call", {
         name: tool.name,
         arguments: toolArguments(tool, agent, record),
@@ -579,6 +656,8 @@ export const mcpAdapter: BnbAgentExecutionAdapter = {
       timeoutMs: 12_000,
       maxBytes: 384 * 1024,
     });
+    const protectedReason = protectedMcpReason(response.status, payload);
+    if (protectedReason) throw new Error(protectedReason);
     if (!response.ok) throw new Error(`Agent tool call failed with HTTP ${response.status}.`);
     const error = asRecord(payload).error;
     if (error) throw new Error(typeof asRecord(error).message === "string" ? asRecord(error).message as string : "Agent tool call failed.");
