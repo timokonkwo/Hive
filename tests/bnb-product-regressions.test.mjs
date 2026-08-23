@@ -582,8 +582,9 @@ describe('BNB marketplace product flows', () => {
     assert.match(catalog, /async function fetch8004ExecutionCandidates/);
     assert.match(catalog, /const executionProtocols: Bnb8004Protocol\[\] = \["MCP",\s*"A2A"\]/);
     assert.match(catalog, /fetch8004ExecutionCandidates\(\{[\s\S]*sortBy:\s*sourceSortForCatalog\(sort\),[\s\S]*search:\s*sourceSearch/);
-    assert.match(catalog, /const leadWithRunnableCandidates = !query\.execution && page === 1 && !sourceSearch/);
-    assert.match(catalog, /const shouldHydrateLiveDetails = runtimeFiltered \|\| leadWithRunnableCandidates/);
+    assert.match(catalog, /const executionDiscovery = query\.execution !== "listed_only" && runtimeFiltered/);
+    assert.doesNotMatch(catalog, /leadWithRunnableCandidates/);
+    assert.match(catalog, /const shouldHydrateLiveDetails = runtimeFiltered/);
     assert.match(catalog, /shouldHydrateLiveDetails[\s\S]*\? await hydrate8004AgentDetails\(liveCandidates,\s*\{ limit: get8004DetailHydrationLimit\(\) \}\)[\s\S]*: liveCandidates/);
     assert.match(catalog, /const sourcePage = await fetch8004AgentPage\(\{[\s\S]*limit:\s*safeLimit,[\s\S]*page:\s*safePage/);
     assert.match(catalog, /total:\s*sourcePage\.total \|\| candidates\.length/);
@@ -591,7 +592,7 @@ describe('BNB marketplace product flows', () => {
     assert.match(catalog, /const verifiedRuntimeTotal = runtimeFiltered \? sorted\.length : 0/);
     assert.match(catalog, /const total = runtimeFiltered[\s\S]*\? verifiedRuntimeTotal[\s\S]*: sourceTotal > 0/);
     assert.match(catalog, /const hasMore = runtimeFiltered[\s\S]*\? false[\s\S]*: sourceHasMore \|\| \(sourceTotal > 0 && page \* limit < sourceTotal\)/);
-    assert.match(catalog, /const executionDiscovery = query\.execution !== "listed_only" && \(runtimeFiltered \|\| leadWithRunnableCandidates\)/);
+    assert.doesNotMatch(catalog, /const executionDiscovery = query\.execution !== "listed_only" && \(runtimeFiltered \|\| page === 1\)/);
     assert.match(agentsRoute, /searchParams\.get\("limit"\) \|\| searchParams\.get\("pageSize"\) \|\| 24/);
     assert.match(agentsRoute, /const unfilteredRegistry = !q && !category && !execution/);
     assert.match(agentsRoute, /const total = unfilteredRegistry \? Math\.max\(result\.total,\s*networkStats\.totalAgents\) : result\.total/);
