@@ -617,7 +617,7 @@ describe('BNB marketplace product flows', () => {
     assert.match(catalog, /sortAgents\(agents,\s*sort\)\.slice\(0,\s*limit\)/);
     assert.match(catalog, /await upsertBnbAgentCache\(runtimeCandidates\)/);
     assert.match(catalog, /fetch8004AgentDetail/);
-    assert.match(catalog, /await upsertBnbAgentCache\(\[scored\],\s*\{ hydrated:\s*true \}\)/);
+    assert.match(catalog, /await upsertBnbAgentCache\(\[scored\],\s*\{ hydrated:\s*true,\s*runtimeProbed:\s*true \}\)/);
     assert.match(catalog, /\/agents\/\$\{encodeURIComponent\(String\(chainId\)\)\}\/\$\{encodeURIComponent\(tokenId\)\}/);
     assert.match(catalog, /record\.agentWallet \?\? record\.agent_wallet/);
     assert.match(catalog, /record\.total_feedbacks/);
@@ -640,8 +640,11 @@ describe('BNB marketplace product flows', () => {
     assert.match(agentCache, /total < Math\.min\(limit,\s*12\)/);
     assert.match(agentCache, /return null/);
     assert.match(agentCache, /function agentFromCacheDocument/);
-    assert.match(agentCache, /!doc\.hydratedAt[\s\S]*doc\.agent\.executionStatus === "ready_to_run"/);
+    assert.match(agentCache, /runtimeProofAt\?:\s*Date/);
+    assert.match(agentCache, /runtimeProbed\?:\s*boolean/);
+    assert.match(agentCache, /!doc\.runtimeProofAt[\s\S]*doc\.agent\.executionStatus === "ready_to_run"/);
     assert.match(agentCache, /executionStatus:\s*"connectable" as const/);
+    assert.match(agentCache, /runtimeProofAt:\s*now/);
     assert.match(agentCache, /needsHydration:\s*needsHydration && !options\.hydrated/);
     assert.match(agentCache, /export async function claimBnbAgentHydrationBatch/);
     assert.match(agentCache, /hydrateLockedUntil/);
@@ -653,6 +656,7 @@ describe('BNB marketplace product flows', () => {
     assert.match(catalog, /export async function hydrateBnbAgentCacheQueue/);
     assert.match(catalog, /claimBnbAgentHydrationBatch\(limit\)/);
     assert.match(catalog, /completeBnbAgentHydration\(agent,\s*runtimeAgent\)/);
+    assert.match(catalog, /\{ hydrated:\s*true,\s*runtimeProbed:\s*true \}/);
     assert.match(catalog, /recordBnbAgentCacheRun\("hydrate"/);
     assert.match(bnbAgentCacheCron, /CRON_SECRET/);
     assert.match(bnbAgentCacheCron, /STEALTH_AGENT_SECRET/);

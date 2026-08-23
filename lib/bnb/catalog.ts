@@ -1424,7 +1424,7 @@ export async function getBnbAgent(chainId: string | number, tokenId: string) {
   const endpointAgent = await getBnbEndpointSourceAgent(decodedTokenId);
   if (endpointAgent && String(endpointAgent.chainId) === String(chainId)) {
     const scored = await withRuntimeScore(endpointAgent);
-    await upsertBnbAgentCache([scored], { hydrated: true }).catch(() => undefined);
+    await upsertBnbAgentCache([scored], { hydrated: true, runtimeProbed: true }).catch(() => undefined);
     return scored;
   }
 
@@ -1434,7 +1434,7 @@ export async function getBnbAgent(chainId: string | number, tokenId: string) {
   const liveAgent = await fetch8004AgentDetail(chainId, decodedTokenId);
   if (liveAgent) {
     const scored = await withRuntimeScore(liveAgent);
-    await upsertBnbAgentCache([scored], { hydrated: true }).catch(() => undefined);
+    await upsertBnbAgentCache([scored], { hydrated: true, runtimeProbed: true }).catch(() => undefined);
     return scored;
   }
 

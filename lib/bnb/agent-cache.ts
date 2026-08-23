@@ -29,6 +29,7 @@ type BnbAgentCacheDocument = {
   cachedAt: Date;
   refreshedAt: Date;
   hydratedAt?: Date;
+  runtimeProofAt?: Date;
   lastSeenAt: Date;
 };
 
@@ -42,6 +43,7 @@ type CachedAgentPage = BnbAgentPageResult & {
 
 type CacheUpsertOptions = {
   hydrated?: boolean;
+  runtimeProbed?: boolean;
   fetchedAt?: Date;
 };
 
@@ -146,6 +148,7 @@ export async function upsertBnbAgentCache(agents: BnbAgentProfile[], options: Ca
         refreshedAt: doc.refreshedAt,
         lastSeenAt: doc.lastSeenAt,
         ...(options.hydrated ? { hydrationStatus: "hydrated", hydratedAt: now } : {}),
+        ...(options.runtimeProbed ? { runtimeProofAt: now } : {}),
       },
       $setOnInsert: {
         hydrateAttempts: 0,
@@ -226,7 +229,7 @@ export async function completeBnbAgentHydration(agent: BnbAgentProfile, hydrated
   const now = new Date();
   const key = cacheKey(agent.chainId, agent.tokenId);
   if (hydrated) {
-    await upsertBnbAgentCache([hydrated], { hydrated: true, fetchedAt: now });
+    await upsertBnbAgentCache([hydrated], { hydrated: true, runtimeProbed: true, fetchedAt: now });
     await db.collection<BnbAgentCacheDocument>(COLLECTIONS.BNB_AGENT_CACHE).updateOne(
       { _id: key },
       {
@@ -234,6 +237,7 @@ export async function completeBnbAgentHydration(agent: BnbAgentProfile, hydrated
           hydrationStatus: "hydrated",
           needsHydration: false,
           hydratedAt: now,
+          runtimeProofAt: now,
         },
         $unset: { hydrateError: "", hydrateLockedUntil: "" },
       },
@@ -332,6 +336,7 @@ function cacheDocument(agent: BnbAgentProfile, now: Date, options: CacheUpsertOp
     refreshedAt: now,
     lastSeenAt: now,
     ...(options.hydrated ? { hydratedAt: now } : {}),
+    ...(options.runtimeProbed ? { runtimeProofAt: now } : {}),
   };
 }
 
@@ -373,7 +378,7 @@ function cacheHitIsUsable(query: BnbAgentQuery, docs: BnbAgentCacheDocument[], t
 function agentFromCacheDocument(doc: BnbAgentCacheDocument) {
   if (
     doc.source === "8004scan" &&
-    !doc.hydratedAt &&
+    !doc.runtimeProofAt &&
     doc.agent.executionStatus === "ready_to_run"
   ) {
     return {
