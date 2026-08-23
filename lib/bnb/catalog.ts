@@ -1355,8 +1355,15 @@ export async function listBnbAgentsPage(query: BnbAgentQuery = {}): Promise<BnbA
     : executionPage.total > 0
       ? executionPage.total
       : sorted.length;
-  const total = sourceTotal > 0 ? sourceTotal : sorted.length;
-  const hasMore = sourceHasMore || (sourceTotal > 0 && page * limit < sourceTotal);
+  const verifiedRuntimeTotal = runtimeFiltered ? sorted.length : 0;
+  const total = runtimeFiltered
+    ? verifiedRuntimeTotal
+    : sourceTotal > 0
+      ? sourceTotal
+      : sorted.length;
+  const hasMore = runtimeFiltered
+    ? false
+    : sourceHasMore || (sourceTotal > 0 && page * limit < sourceTotal);
 
   return {
     agents: sorted,

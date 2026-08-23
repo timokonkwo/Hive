@@ -588,8 +588,9 @@ describe('BNB marketplace product flows', () => {
     assert.match(catalog, /const sourcePage = await fetch8004AgentPage\(\{[\s\S]*limit:\s*safeLimit,[\s\S]*page:\s*safePage/);
     assert.match(catalog, /total:\s*sourcePage\.total \|\| candidates\.length/);
     assert.match(catalog, /const sourceTotal = profilePage\.total > 0[\s\S]*\? profilePage\.total[\s\S]*: executionPage\.total > 0/);
-    assert.match(catalog, /const total = sourceTotal > 0 \? sourceTotal : sorted\.length/);
-    assert.match(catalog, /const hasMore = sourceHasMore \|\| \(sourceTotal > 0 && page \* limit < sourceTotal\)/);
+    assert.match(catalog, /const verifiedRuntimeTotal = runtimeFiltered \? sorted\.length : 0/);
+    assert.match(catalog, /const total = runtimeFiltered[\s\S]*\? verifiedRuntimeTotal[\s\S]*: sourceTotal > 0/);
+    assert.match(catalog, /const hasMore = runtimeFiltered[\s\S]*\? false[\s\S]*: sourceHasMore \|\| \(sourceTotal > 0 && page \* limit < sourceTotal\)/);
     assert.match(catalog, /const executionDiscovery = query\.execution !== "listed_only" && \(runtimeFiltered \|\| leadWithRunnableCandidates\)/);
     assert.match(agentsRoute, /searchParams\.get\("limit"\) \|\| searchParams\.get\("pageSize"\) \|\| 24/);
     assert.match(agentsRoute, /const unfilteredRegistry = !q && !category && !execution/);
