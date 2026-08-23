@@ -98,6 +98,9 @@ export function getBnbRuntimeReadiness() {
       configuredAgents: envPresent("BNB_HIVE_AGENTS_JSON"),
       endpointSources: getBnbEndpointSourceReadiness(),
     },
+    observability: {
+      endpointProbeStorageReady: mongoConfigured,
+    },
     actions: {
       canCreateRequest: storageReady,
       canCreateHire: storageReady && escrowConfigured,

@@ -23,6 +23,7 @@ describe('BNB marketplace product flows', () => {
   const settlementState = read('lib/bnb/settlement-state.ts');
   const catalog = read('lib/bnb/catalog.ts');
   const agentCache = read('lib/bnb/agent-cache.ts');
+  const endpointObservability = read('lib/bnb/endpoint-observability.ts');
   const display = read('lib/bnb/display.ts');
   const activateRoute = read('app/api/bnb/activate/route.ts');
   const preflightRoute = read('app/api/bnb/activate/preflight/route.ts');
@@ -66,6 +67,7 @@ describe('BNB marketplace product flows', () => {
   const httpAdapter = read('lib/bnb/adapters/http.ts');
   const endpointSources = read('lib/bnb/endpoint-sources.ts');
   const agentsRoute = read('app/api/bnb/agents/route.ts');
+  const runtimeRoute = read('app/api/bnb/runtime/route.ts');
   const bnbAgentCacheCron = read('app/api/cron/bnb-agent-cache/route.ts');
   const scheduledBnbAgentCache = read('netlify/functions/scheduled-bnb-agent-cache.mts');
   const netlifyToml = read('netlify.toml');
@@ -634,6 +636,7 @@ describe('BNB marketplace product flows', () => {
   it('keeps BNB discovery cache durable, guarded, and refreshable by cron', () => {
     assert.match(db, /BNB_AGENT_CACHE:\s*"bnb_agent_cache"/);
     assert.match(db, /BNB_AGENT_CACHE_RUNS:\s*"bnb_agent_cache_runs"/);
+    assert.match(db, /BNB_ENDPOINT_PROBES:\s*"bnb_endpoint_probes"/);
     assert.match(agentCache, /export function isBnbAgentCacheEnabled/);
     assert.match(agentCache, /process\.env\.BNB_AGENT_CACHE_ENABLED !== "false" && Boolean\(process\.env\.MONGODB_URI\)/);
     assert.match(agentCache, /export async function readCachedBnbAgentsPage/);
@@ -665,6 +668,13 @@ describe('BNB marketplace product flows', () => {
     assert.match(catalog, /completeBnbAgentHydration\(agent,\s*runtimeAgent\)/);
     assert.match(catalog, /\{ hydrated:\s*true,\s*runtimeProbed:\s*true \}/);
     assert.match(catalog, /recordBnbAgentCacheRun\("hydrate"/);
+    assert.match(endpointObservability, /export async function recordBnbEndpointProbeResult/);
+    assert.match(endpointObservability, /export async function getBnbEndpointProbeSummary/);
+    assert.match(endpointObservability, /COLLECTIONS\.BNB_ENDPOINT_PROBES/);
+    assert.match(endpointObservability, /collection\.createIndex\(\{ agentKey:\s*1,\s*adapter:\s*1 \}\)/);
+    assert.match(endpointObservability, /totalChecks:\s*1/);
+    assert.match(endpointObservability, /consecutiveFailures:\s*1/);
+    assert.match(endpointObservability, /Observability must never block agent discovery, validation, or execution/);
     assert.match(bnbAgentCacheCron, /CRON_SECRET/);
     assert.match(bnbAgentCacheCron, /STEALTH_AGENT_SECRET/);
     assert.match(bnbAgentCacheCron, /refreshBnbAgentDiscoveryCache/);
@@ -865,6 +875,9 @@ describe('BNB marketplace product flows', () => {
     assert.match(adapterRegistry, /ENDPOINT_PREFLIGHT_CACHE_TTL_MS/);
     assert.match(adapterRegistry, /endpointPreflightCache/);
     assert.match(adapterRegistry, /preflightAdapterEndpoint/);
+    assert.match(adapterRegistry, /recordBnbEndpointProbeResult/);
+    assert.match(adapterRegistry, /"endpoint_preflight"/);
+    assert.match(adapterRegistry, /"run",\s*startedAt/);
     assert.match(adapterRegistry, /export async function resolveBnbAgentRuntime/);
     assert.match(adapterRegistry, /export async function resolveBnbAgentsRuntime/);
     assert.match(adapterRegistry, /RUNTIME_PROBE_CONCURRENCY/);
@@ -899,6 +912,10 @@ describe('BNB marketplace product flows', () => {
     assert.match(network, /chainId === 56 \|\| network === "mainnet" \? HIVE_BNB_MAINNET : HIVE_BNB_TESTNET/);
     assert.match(runtime, /network:\s*network\.network/);
     assert.match(runtime, /chainId:\s*network\.chainId/);
+    assert.match(runtime, /observability:\s*\{/);
+    assert.match(runtime, /endpointProbeStorageReady:\s*mongoConfigured/);
+    assert.match(runtimeRoute, /getBnbEndpointProbeSummary/);
+    assert.match(runtimeRoute, /endpointProbes/);
     assert.match(clientChain, /return network === "mainnet" \? 56 : 97/);
     assert.match(envExample, /BNB_NETWORK=testnet/);
     assert.match(envExample, /NEXT_PUBLIC_BNB_BSC_CHAIN_ID=97/);

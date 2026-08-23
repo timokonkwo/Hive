@@ -54,4 +54,5 @@ export const COLLECTIONS = {
   BNB_ALTANA_SESSIONS: "bnb_altana_sessions",
   BNB_AGENT_CACHE: "bnb_agent_cache",
   BNB_AGENT_CACHE_RUNS: "bnb_agent_cache_runs",
+  BNB_ENDPOINT_PROBES: "bnb_endpoint_probes",
 } as const;

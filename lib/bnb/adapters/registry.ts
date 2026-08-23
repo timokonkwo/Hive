@@ -2,6 +2,7 @@ import type { BnbActivationRecord, BnbAgentProfile, BnbAgentWork } from "@/lib/b
 import { a2aAdapter } from "@/lib/bnb/adapters/a2a";
 import { httpAdapter } from "@/lib/bnb/adapters/http";
 import { mcpAdapter } from "@/lib/bnb/adapters/mcp";
+import { recordBnbEndpointProbeResult } from "@/lib/bnb/endpoint-observability";
 import type { BnbAdapterPreflightResult, BnbAgentExecutionAdapter } from "@/lib/bnb/adapters/types";
 
 const ENDPOINT_PREFLIGHT_CACHE_TTL_MS = 5 * 60 * 1000;
@@ -81,7 +82,25 @@ export async function runBnbAgentAdapter(agent: BnbAgentProfile, record: BnbActi
       const jobPreflight = await adapter.preflightJob({ agent, record });
       if (!jobPreflight.ok) continue;
     }
-    return adapter.run({ agent, record });
+    const startedAt = Date.now();
+    try {
+      const work = await adapter.run({ agent, record });
+      await recordBnbEndpointProbeResult(agent, {
+        ok: true,
+        adapter: preflight.adapter,
+        endpoint: preflight.endpoint,
+        capabilities: preflight.capabilities,
+      }, "run", startedAt);
+      return work;
+    } catch (error) {
+      await recordBnbEndpointProbeResult(agent, {
+        ok: false,
+        adapter: preflight.adapter,
+        endpoint: preflight.endpoint,
+        reason: error instanceof Error ? error.message : "Agent run failed.",
+      }, "run", startedAt);
+      throw error;
+    }
   }
 
   return null;
@@ -94,6 +113,7 @@ async function preflightAdapterEndpoint(adapter: BnbAgentExecutionAdapter, agent
   if (cached && cached.expiresAt > now) return cached.result;
 
   const result = await adapter.preflight(agent);
+  await recordBnbEndpointProbeResult(agent, result, "endpoint_preflight", now);
   endpointPreflightCache.set(key, {
     result,
     expiresAt: now + ENDPOINT_PREFLIGHT_CACHE_TTL_MS,
