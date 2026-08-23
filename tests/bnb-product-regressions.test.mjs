@@ -69,6 +69,7 @@ describe('BNB marketplace product flows', () => {
   const bnbAgentCacheCron = read('app/api/cron/bnb-agent-cache/route.ts');
   const scheduledBnbAgentCache = read('netlify/functions/scheduled-bnb-agent-cache.mts');
   const netlifyToml = read('netlify.toml');
+  const middleware = read('middleware.ts');
   const envExample = read('.env.example');
 
   it('persists access requests as owner-scoped activity records', () => {
@@ -661,6 +662,8 @@ describe('BNB marketplace product flows', () => {
     assert.match(scheduledBnbAgentCache, /process\.env\.CRON_SECRET \|\| process\.env\.STEALTH_AGENT_SECRET/);
     assert.match(scheduledBnbAgentCache, /schedule:\s*'\*\/30 \* \* \* \*'/);
     assert.match(netlifyToml, /\[functions\."scheduled-bnb-agent-cache"\][\s\S]*timeout = 60/);
+    assert.match(middleware, /pathname\.startsWith\('\/\.netlify\/'\)/);
+    assert.match(middleware, /\(\?!api\|\\\\\.netlify\|_next\/static\|_next\/image\|favicon\.ico\)/);
   });
 
   it('pulls endpoint-backed services from external agent indexes without local fallback agents', () => {

@@ -139,6 +139,7 @@ function shouldLeaveBnbPathAlone(pathname: string) {
   return (
     pathname.startsWith('/api/') ||
     pathname === '/api' ||
+    pathname.startsWith('/.netlify/') ||
     pathname.startsWith('/_next/') ||
     pathname.startsWith('/images/') ||
     pathname.startsWith('/fonts/') ||
@@ -221,6 +222,6 @@ export function middleware(request: NextRequest) {
 export const config = {
   // Run on pages so bnb.uphive.xyz can serve the BNB app without breaking API/static assets.
   matcher: [
-    '/((?!api|_next/static|_next/image|favicon.ico).*)',
+    '/((?!api|\\.netlify|_next/static|_next/image|favicon.ico).*)',
   ],
 };
