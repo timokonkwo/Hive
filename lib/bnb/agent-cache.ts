@@ -1,4 +1,5 @@
 import { COLLECTIONS, getDb } from "@/lib/db";
+import { applyBnbEndpointProbeHealth } from "@/lib/bnb/endpoint-observability";
 import type { BnbAgentPageResult, BnbAgentProfile, BnbAgentQuery, BnbAgentSource, BnbExecutionStatus } from "@/lib/bnb/types";
 
 type BnbAgentCacheDocument = {
@@ -98,8 +99,9 @@ export async function readCachedBnbAgentsPage(query: BnbAgentQuery = {}): Promis
 
   const newestCachedAt = newest?.cachedAt;
   const stale = newestCachedAt ? Date.now() - newestCachedAt.getTime() > getBnbAgentCacheTtlMs() : true;
+  const agents = await applyBnbEndpointProbeHealth(docs.map(agentFromCacheDocument));
   return {
-    agents: docs.map(agentFromCacheDocument),
+    agents,
     page,
     pageSize: limit,
     total,
@@ -120,7 +122,9 @@ export async function getCachedBnbAgent(chainId: string | number, tokenId: strin
 
   const doc = await db.collection<BnbAgentCacheDocument>(COLLECTIONS.BNB_AGENT_CACHE)
     .findOne({ _id: cacheKey(chainId, tokenId), cachedAt: { $gte: new Date(Date.now() - getBnbAgentCacheStaleMs()) } });
-  return doc ? agentFromCacheDocument(doc) : null;
+  if (!doc) return null;
+  const [agent] = await applyBnbEndpointProbeHealth([agentFromCacheDocument(doc)]);
+  return agent || null;
 }
 
 export async function upsertBnbAgentCache(agents: BnbAgentProfile[], options: CacheUpsertOptions = {}) {

@@ -23,6 +23,7 @@ import {
   recordBnbAgentCacheRun,
   upsertBnbAgentCache,
 } from "@/lib/bnb/agent-cache";
+import { applyBnbEndpointProbeHealth } from "@/lib/bnb/endpoint-observability";
 import { getBnbEndpointSourceAgent, listBnbEndpointSourceAgents } from "@/lib/bnb/endpoint-sources";
 
 const BSC_CHAIN_ID = 56;
@@ -1357,12 +1358,13 @@ export async function listBnbAgentsPage(query: BnbAgentQuery = {}): Promise<BnbA
     : liveCandidates;
   const candidates = uniqueAgents([...baseAgents, ...endpointAgents, ...liveAgents]);
   const runtimeCandidates = executionDiscovery ? await resolveBnbAgentsRuntime(candidates) : candidates;
-  const agents = runtimeCandidates
+  const scoredAgents = runtimeCandidates
     .filter((agent) => matchesQuery(agent, query))
     .map((agent) => ({
       ...agent,
       scoreBreakdown: scoreBnbAgent(agent, query.q || "", query.category),
     }));
+  const agents = await applyBnbEndpointProbeHealth(scoredAgents);
 
   const sorted = sortAgents(agents, sort).slice(0, limit);
   await upsertBnbAgentCache(runtimeCandidates).catch(() => undefined);
@@ -1558,9 +1560,12 @@ export async function matchBnbAgents(intent: string, category?: string | null, l
     listBnbEndpointSourceAgents({ q: intent, category, limit: 25 }),
   ]);
 
-  return uniqueAgents([...endpointAgents, ...semanticAgents, ...fallbackAgents])
+  const scored = uniqueAgents([...endpointAgents, ...semanticAgents, ...fallbackAgents])
     .filter((agent) => (!category || !hasCategory(category) ? true : agent.category === category))
-    .map((agent) => ({ ...agent, scoreBreakdown: scoreBnbAgent(agent, intent, category) }))
+    .map((agent) => ({ ...agent, scoreBreakdown: scoreBnbAgent(agent, intent, category) }));
+  const agents = await applyBnbEndpointProbeHealth(scored);
+
+  return agents
     .sort((a, b) => (b.scoreBreakdown?.total || 0) - (a.scoreBreakdown?.total || 0))
     .slice(0, Math.min(Math.max(limit, 1), 10));
 }

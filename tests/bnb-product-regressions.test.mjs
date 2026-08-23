@@ -640,6 +640,8 @@ describe('BNB marketplace product flows', () => {
     assert.match(agentCache, /export function isBnbAgentCacheEnabled/);
     assert.match(agentCache, /process\.env\.BNB_AGENT_CACHE_ENABLED !== "false" && Boolean\(process\.env\.MONGODB_URI\)/);
     assert.match(agentCache, /export async function readCachedBnbAgentsPage/);
+    assert.match(agentCache, /applyBnbEndpointProbeHealth\(docs\.map\(agentFromCacheDocument\)\)/);
+    assert.match(agentCache, /applyBnbEndpointProbeHealth\(\[agentFromCacheDocument\(doc\)\]\)/);
     assert.match(agentCache, /COLLECTIONS\.BNB_AGENT_CACHE/);
     assert.match(agentCache, /collection\.createIndex\(\{ chainId:\s*1,\s*tokenId:\s*1 \},\s*\{ unique:\s*true \}\)/);
     assert.match(agentCache, /collection\.createIndex\(\{ searchTokens:\s*1 \}\)/);
@@ -658,6 +660,8 @@ describe('BNB marketplace product flows', () => {
     assert.match(agentCache, /hydrateLockedUntil/);
     assert.match(agentCache, /\$unset:\s*\{ hydrateError:\s*"",\s*hydrateLockedUntil:\s*"" \}/);
     assert.match(catalog, /export async function refreshBnbAgentDiscoveryCache/);
+    assert.match(catalog, /applyBnbEndpointProbeHealth\(scoredAgents\)/);
+    assert.match(catalog, /applyBnbEndpointProbeHealth\(scored\)/);
     assert.match(catalog, /query\.execution === "hireable"[\s\S]*agent\.executionStatus !== "ready_to_run"[\s\S]*agent\.executionStatus !== "connectable"/);
     assert.match(catalog, /const runtimeFiltered = query\.execution === "hireable"/);
     assert.match(catalog, /fetch8004ProfileCandidates\(\{[\s\S]*page,[\s\S]*sortBy:\s*sourceSortForCatalog\("recommended"\)/);
@@ -670,6 +674,9 @@ describe('BNB marketplace product flows', () => {
     assert.match(catalog, /recordBnbAgentCacheRun\("hydrate"/);
     assert.match(endpointObservability, /export async function recordBnbEndpointProbeResult/);
     assert.match(endpointObservability, /export async function getBnbEndpointProbeSummary/);
+    assert.match(endpointObservability, /export async function applyBnbEndpointProbeHealth/);
+    assert.match(endpointObservability, /maxConsecutiveFailures < 3/);
+    assert.match(endpointObservability, /executionStatus:\s*agent\.executionStatus === "ready_to_run" \? "connectable" : agent\.executionStatus/);
     assert.match(endpointObservability, /COLLECTIONS\.BNB_ENDPOINT_PROBES/);
     assert.match(endpointObservability, /collection\.createIndex\(\{ agentKey:\s*1,\s*adapter:\s*1 \}\)/);
     assert.match(endpointObservability, /totalChecks:\s*1/);

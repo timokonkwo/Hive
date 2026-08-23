@@ -52,6 +52,11 @@ export type BnbEndpointProbeSummary = {
   }>;
 };
 
+type ProbeHealth = {
+  hasSuccess: boolean;
+  maxConsecutiveFailures: number;
+};
+
 let indexesReady: Promise<void> | null = null;
 
 export async function recordBnbEndpointProbeResult(
@@ -164,6 +169,38 @@ export async function getBnbEndpointProbeSummary(limit = 8): Promise<BnbEndpoint
   }
 }
 
+export async function applyBnbEndpointProbeHealth(agents: BnbAgentProfile[]): Promise<BnbAgentProfile[]> {
+  if (agents.length === 0) return agents;
+  const db = await getProbeDb();
+  if (!db) return agents;
+
+  try {
+    await ensureProbeIndexes();
+    const keys = Array.from(new Set(agents.map(agentKey)));
+    const probes = await db.collection<BnbEndpointProbeDocument>(COLLECTIONS.BNB_ENDPOINT_PROBES)
+      .find({ agentKey: { $in: keys } })
+      .sort({ checkedAt: -1 })
+      .limit(Math.min(keys.length * 4, 400))
+      .toArray();
+    const healthByAgent = new Map<string, ProbeHealth>();
+    for (const probe of probes) {
+      const current = healthByAgent.get(probe.agentKey) || { hasSuccess: false, maxConsecutiveFailures: 0 };
+      healthByAgent.set(probe.agentKey, {
+        hasSuccess: current.hasSuccess || probe.ok,
+        maxConsecutiveFailures: Math.max(current.maxConsecutiveFailures, probe.consecutiveFailures || 0),
+      });
+    }
+
+    return agents.map((agent) => {
+      const health = healthByAgent.get(agentKey(agent));
+      if (!health || health.hasSuccess || health.maxConsecutiveFailures < 3) return agent;
+      return penalizeAgent(agent, health.maxConsecutiveFailures);
+    });
+  } catch {
+    return agents;
+  }
+}
+
 async function getProbeDb() {
   if (!process.env.MONGODB_URI) return null;
   try {
@@ -198,6 +235,25 @@ function probeId(agent: BnbAgentProfile, adapter: BnbAdapterId, endpoint: BnbExe
 
 function agentKey(agent: Pick<BnbAgentProfile, "chainId" | "tokenId">) {
   return `${agent.chainId}:${agent.tokenId}`;
+}
+
+function penalizeAgent(agent: BnbAgentProfile, failures: number): BnbAgentProfile {
+  const penalty = Math.min(24, failures * 4);
+  const scoreBreakdown = agent.scoreBreakdown
+    ? {
+      ...agent.scoreBreakdown,
+      total: Math.max(0, agent.scoreBreakdown.total - penalty),
+      activation: Math.max(0, agent.scoreBreakdown.activation - Math.min(10, penalty)),
+      explanations: agent.scoreBreakdown.explanations.filter((item) => item !== "Protocol support detected."),
+    }
+    : agent.scoreBreakdown;
+
+  return {
+    ...agent,
+    executionStatus: agent.executionStatus === "ready_to_run" ? "connectable" : agent.executionStatus,
+    activationStatus: agent.activationStatus === "callable" ? "request" : agent.activationStatus,
+    ...(scoreBreakdown ? { scoreBreakdown } : {}),
+  };
 }
 
 function hash(value: string) {
