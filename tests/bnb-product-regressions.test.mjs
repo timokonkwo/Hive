@@ -583,7 +583,7 @@ describe('BNB marketplace product flows', () => {
     assert.match(catalog, /const executionProtocols: Bnb8004Protocol\[\] = \["MCP",\s*"A2A"\]/);
     assert.match(catalog, /fetch8004ExecutionCandidates\(\{[\s\S]*sortBy:\s*sourceSortForCatalog\(sort\),[\s\S]*search:\s*sourceSearch/);
     assert.match(catalog, /const leadWithRunnableCandidates = !query\.execution && page === 1 && !sourceSearch/);
-    assert.match(catalog, /const shouldHydrateLiveDetails = runtimeFiltered/);
+    assert.match(catalog, /const shouldHydrateLiveDetails = runtimeFiltered \|\| leadWithRunnableCandidates/);
     assert.match(catalog, /shouldHydrateLiveDetails[\s\S]*\? await hydrate8004AgentDetails\(liveCandidates,\s*\{ limit: get8004DetailHydrationLimit\(\) \}\)[\s\S]*: liveCandidates/);
     assert.match(catalog, /const sourcePage = await fetch8004AgentPage\(\{[\s\S]*limit:\s*safeLimit,[\s\S]*page:\s*safePage/);
     assert.match(catalog, /total:\s*sourcePage\.total \|\| candidates\.length/);

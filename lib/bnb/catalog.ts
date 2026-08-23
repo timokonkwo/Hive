@@ -1335,7 +1335,7 @@ export async function listBnbAgentsPage(query: BnbAgentQuery = {}): Promise<BnbA
   const baseAgents = page === 1 ? getBaseBnbAgents() : [];
   const liveCandidates = uniqueAgents([...semanticAgents, ...executionPage.agents, ...profilePage.agents])
     .slice(0, executionDiscovery ? Math.min(limit * get8004ExecutionScanPages() * 2, 200) : limit);
-  const shouldHydrateLiveDetails = runtimeFiltered;
+  const shouldHydrateLiveDetails = runtimeFiltered || leadWithRunnableCandidates;
   const liveAgents = shouldHydrateLiveDetails
     ? await hydrate8004AgentDetails(liveCandidates, { limit: get8004DetailHydrationLimit() })
     : liveCandidates;
