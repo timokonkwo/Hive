@@ -405,6 +405,18 @@ describe('BNB marketplace product flows', () => {
     assert.match(activateForm, /body=\{result\?\.canProceed \? "Agent and job inputs checked\." : "This agent cannot run this job\."\}/);
     assert.doesNotMatch(activateForm, /MCP endpoint|endpoint accepted job|endpoint rejected job|accepted job|rejected job/);
     assert.match(activateForm, /Desired outcome \*/);
+    assert.match(activateForm, /const customJob = definition\.capability === "custom"/);
+    assert.match(activateForm, /body=\{customJob \? undefined : `Set the exact context \$\{agent\.name\} will use\.`\}/);
+    assert.match(activateForm, /\{!customJob \? \(/);
+    assert.match(activateForm, /const normalizedOutcome = capability === "custom" && advancedFields\.request \? advancedFields\.request : outcome\.trim\(\)/);
+    assert.match(activateForm, /definition\.capability === "custom" \|\| outcome\.trim\(\)\.length >= 12/);
+    assert.match(activateForm, /if \(capability === "custom"\) return ""/);
+    assert.doesNotMatch(activateForm, /setError\(validation\.firstError\)/);
+    assert.doesNotMatch(activateForm, /Review my BSC position and recommend whether it should be rebalanced/);
+    assert.match(jobs, /const request = readField\(advancedFields,\s*"request"\)/);
+    assert.match(jobs, /const outcome = definition\.capability === "custom" && !rawOutcome \? request : rawOutcome/);
+    assert.match(jobs, /\.\.\.\(definition\.capability === "custom" \? \{\} : \{ outcome \}\)/);
+    assert.match(jobs, /definition\.capability === "custom" \? "" : `Outcome: \$\{outcome\}`/);
     assert.match(activateForm, /Optional details/);
     assert.match(activateForm, /visibleJobFields\(definition,\s*\{\s*fields,\s*taskType\s*\}\)/);
     assert.match(activateForm, /yieldUsesConnectedWallet/);

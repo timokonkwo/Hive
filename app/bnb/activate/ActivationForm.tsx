@@ -347,7 +347,7 @@ export function ActivationForm({ agent }: { agent: BnbAgentProfile }) {
       return;
     }
     if (validation.firstError) {
-      setError(validation.firstError);
+      setError(null);
       return;
     }
 
@@ -774,6 +774,7 @@ function DetailsStage({
   const requiredFields = visibleFields.filter((field) => field.required || isConditionallyRequiredJobField(definition.capability, taskType, fields, field));
   const optionalFields = visibleFields.filter((field) => !requiredFields.includes(field));
   const usingConnectedYieldWallet = definition.capability === "yield_optimisation" && yieldUsesConnectedWallet(taskType, fields);
+  const customJob = definition.capability === "custom";
   const capabilityOptions = allowedCapabilities.map((item) => {
     const capabilityDefinition = getBnbJobCapability(item);
     return { value: capabilityDefinition.capability, label: capabilityDefinition.label };
@@ -787,7 +788,7 @@ function DetailsStage({
         onSubmit();
       }}
     >
-      <StepHead title="Job" body={`Set the exact context ${agent.name} will use.`} />
+      <StepHead title="Job" body={customJob ? undefined : `Set the exact context ${agent.name} will use.`} />
       <div className="bnb-form-grid">
         <label>
           <span className="bnb-label">Capability</span>
@@ -820,18 +821,20 @@ function DetailsStage({
             ariaLabel="Risk"
           />
         </label>
-        <label className="bnb-form-span">
-          <span className="bnb-label">Desired outcome *</span>
-          <textarea
-            value={outcome}
-            onChange={(event) => onOutcomeChange(event.target.value)}
-            className="bnb-textarea"
-            placeholder="Example: Check my Venus borrow position and tell me whether it is near liquidation."
-            maxLength={1200}
-            aria-invalid={validation?.outcome ? "true" : undefined}
-          />
-          {validation?.outcome ? <p className="bnb-field-error">{validation.outcome}</p> : null}
-        </label>
+        {!customJob ? (
+          <label className="bnb-form-span">
+            <span className="bnb-label">Desired outcome *</span>
+            <textarea
+              value={outcome}
+              onChange={(event) => onOutcomeChange(event.target.value)}
+              className="bnb-textarea"
+              placeholder="Example: Check my Venus borrow position and tell me whether it is near liquidation."
+              maxLength={1200}
+              aria-invalid={validation?.outcome ? "true" : undefined}
+            />
+            {validation?.outcome ? <p className="bnb-field-error">{validation.outcome}</p> : null}
+          </label>
+        ) : null}
         {requiredFields.map((field) => (
           <JobField
             key={field.key}
@@ -1452,6 +1455,7 @@ function buildClientHireIntent({
   const advancedFields = Object.fromEntries(
     Object.entries(fields).map(([key, value]) => [key, value.trim()]).filter(([, value]) => Boolean(value)),
   );
+  const normalizedOutcome = capability === "custom" && advancedFields.request ? advancedFields.request : outcome.trim();
   if (walletAddress) {
     advancedFields.walletAddress = walletAddress;
   }
@@ -1470,7 +1474,7 @@ function buildClientHireIntent({
   return {
     capability,
     taskType,
-    outcome: outcome.trim(),
+    outcome: normalizedOutcome,
     target: normalizedTarget,
     riskPreference,
     advancedFields,
@@ -1482,7 +1486,7 @@ function buildClientIntentPreview(intent: BnbHireIntentInput, definition: Return
   const previewWallet = intent.advancedFields?.walletAddress || intent.target || "";
   const summary = [
     intent.taskType || definition.defaultTaskType,
-    intent.outcome ? `Outcome: ${intent.outcome}` : "",
+    definition.capability === "custom" ? "" : intent.outcome ? `Outcome: ${intent.outcome}` : "",
     intent.target && !(definition.capability === "yield_optimisation" && yieldUsesConnectedWallet(intent.taskType || definition.defaultTaskType, intent.advancedFields || {})) ? `Target: ${intent.target}` : "",
     `Risk: ${intent.riskPreference || "Balanced"}`,
     ...summaryJobFields(definition, intent.taskType || definition.defaultTaskType, intent.advancedFields || {}, previewWallet).map((field) => {
@@ -1499,7 +1503,7 @@ function buildClientIntentPreview(intent: BnbHireIntentInput, definition: Return
     summary,
     expectedOutput: definition.expectedOutput,
     fields: {
-      ...(intent.outcome ? { outcome: intent.outcome } : {}),
+      ...(definition.capability !== "custom" && intent.outcome ? { outcome: intent.outcome } : {}),
       ...(intent.target ? { intentTarget: intent.target } : {}),
       riskPreference: intent.riskPreference || "Balanced",
       ...(intent.advancedFields || {}),
@@ -1533,7 +1537,7 @@ function validateJobForm({
 }): JobFormValidation {
   const fieldErrors: Record<string, string> = {};
   let firstError = "";
-  const outcomeError = outcome.trim().length >= 12 ? "" : "Describe the result you want from this agent.";
+  const outcomeError = definition.capability === "custom" || outcome.trim().length >= 12 ? "" : "Describe the result you want from this agent.";
   if (outcomeError) firstError = outcomeError;
   const targetError = target.trim() && target.trim().length < 3 ? "Target is too short." : "";
   if (targetError && !firstError) firstError = targetError;
@@ -1687,7 +1691,9 @@ function validateYieldClientFields(
 }
 
 function defaultOutcome(agent: BnbAgentProfile) {
-  if (capabilityForBnbAgent(agent) === "concentrated_liquidity") {
+  const capability = capabilityForBnbAgent(agent);
+  if (capability === "custom") return "";
+  if (capability === "concentrated_liquidity") {
     return "Check BSC V3 DEX and fee support.";
   }
   if (agent.category === "Health Factor Monitoring") {
@@ -1699,7 +1705,7 @@ function defaultOutcome(agent: BnbAgentProfile) {
   if (agent.category === "Grid Trading") {
     return "Review a BSC trading pair and propose grid settings with risk limits.";
   }
-  return "Review my BSC position and recommend whether it should be rebalanced.";
+  return "";
 }
 
 function hireIntentButtonLabel({

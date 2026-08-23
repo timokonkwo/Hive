@@ -507,7 +507,10 @@ function validateBnbJobDefinitionFields(definition: BnbJobCapabilityDefinition, 
 
 export function buildBnbIntentJobSpec(input: BnbHireIntentInput, agent?: BnbAgentCapabilitySource): { ok: true; spec: BnbJobSpec; assumptions: string[]; warnings: string[]; missingInputs: string[] } | { ok: false; error: string } {
   const definition = agent ? getBnbAgentJobCapability(agent, input.capability) : getBnbJobCapability(input.capability);
-  const outcome = readIntentString(input.outcome);
+  const advancedFields = input.advancedFields && typeof input.advancedFields === "object" ? input.advancedFields : {};
+  const request = readField(advancedFields, "request");
+  const rawOutcome = readIntentString(input.outcome);
+  const outcome = definition.capability === "custom" && !rawOutcome ? request : rawOutcome;
   if (outcome.length < 12) {
     return { ok: false, error: "Describe the result you want from this agent." };
   }
@@ -524,9 +527,8 @@ export function buildBnbIntentJobSpec(input: BnbHireIntentInput, agent?: BnbAgen
     ? input.taskType
     : definition.defaultTaskType;
   const instructions = readIntentString(input.instructions);
-  const advancedFields = input.advancedFields && typeof input.advancedFields === "object" ? input.advancedFields : {};
   const fields: Record<string, string> = {
-    outcome,
+    ...(definition.capability === "custom" ? {} : { outcome }),
     riskPreference,
   };
 
@@ -577,7 +579,7 @@ export function buildBnbIntentJobSpec(input: BnbHireIntentInput, agent?: BnbAgen
   const missingInputs = target ? [] : ["Target wallet, pair, or position may be needed for a precise result."];
   const summary = [
     taskType,
-    `Outcome: ${outcome}`,
+    definition.capability === "custom" ? "" : `Outcome: ${outcome}`,
     target ? definition.capability === "yield_optimisation" && fields.yieldSource === BNB_YIELD_SOURCE_CONNECTED_WALLET ? `Wallet: ${target}` : `Target: ${target}` : "",
     `Risk: ${riskPreference}`,
     ...summaryBnbJobFields(definition, fields, taskType, fields.walletAddress || target).map((field) => {
