@@ -112,7 +112,10 @@ function chooseTool(tools: McpTool[], agent: BnbAgentProfile, record: BnbAdapter
     let score = terms.reduce((sum, term) => sum + (text.includes(term) ? 1 : 0), 0);
     score += capabilityToolScore(capability, text);
     score += taskToolScore(capability, taskType, text);
-    const capabilityBlocker = capabilityToolBlocker(tool, text, capability, taskType);
+    score += capability === "custom" ? customToolScore(tool, text, record.limits.task, terms) : 0;
+    const capabilityBlocker = capability === "custom"
+      ? customToolBlocker(tool, text)
+      : capabilityToolBlocker(tool, text, capability, taskType);
     if (capabilityBlocker) {
       score -= 100;
     } else if (capability !== "custom" && isDirectoryTool(tool, text)) {
@@ -134,7 +137,7 @@ function chooseTool(tools: McpTool[], agent: BnbAgentProfile, record: BnbAdapter
   });
 
   const sorted = scored.sort((a, b) => b.score - a.score || a.tool.name.localeCompare(b.tool.name));
-  const minimumScore = capability === "custom" ? Number.NEGATIVE_INFINITY : 4;
+  const minimumScore = 4;
   const matchingTools = sorted.filter((candidate) => candidate.score >= minimumScore);
   if (matchingTools.length === 0) {
     throw new Error(`This agent cannot run this ${capabilityLabel(capability)} job. Choose another agent.`);
@@ -175,6 +178,12 @@ function capabilityToolBlocker(tool: McpTool, text: string, capability: string, 
     }
   }
 
+  return "";
+}
+
+function customToolBlocker(tool: McpTool, text: string) {
+  if (isDirectoryTool(tool, text)) return "This agent cannot run this job. Choose another agent.";
+  if (isDocumentationTool(tool, text)) return "This agent cannot run this job. Choose another agent.";
   return "";
 }
 
@@ -257,6 +266,31 @@ function capabilityToolScore(capability: string, text: string) {
   }
 
   return 0;
+}
+
+function customToolScore(tool: McpTool, text: string, task: string, terms: string[]) {
+  const compact = text.replace(/[^a-z0-9]+/g, "");
+  let score = terms.reduce((sum, term) => sum + (text.includes(term) ? 2 : 0), 0);
+  if (acceptsFreeformRequest(tool)) score += 4;
+  if (/(run|execute|invoke|call|chat|message|ask|query|prompt|request|task)/.test(compact)) score += 2;
+
+  if (/\b(buy|sell|swap|trade|transfer|bridge|stake|unstake|deposit|withdraw|borrow|repay|mint)\b/i.test(task)) {
+    if (/(buy|sell|swap|trade|order|execute|transaction|calldata|quote|route)/.test(compact)) {
+      score += 4;
+    } else {
+      score -= 4;
+    }
+  }
+
+  return score;
+}
+
+function acceptsFreeformRequest(tool: McpTool) {
+  const schema = normalizeInputSchema(tool.inputSchema);
+  const properties = asRecord(schema.properties);
+  const propertyNames = Object.keys(properties).map(normalizePropertyName);
+  if (propertyNames.length === 0) return schema.additionalProperties !== false;
+  return propertyNames.some((key) => ["query", "task", "prompt", "input", "message", "description", "request", "instruction", "instructions"].includes(key));
 }
 
 function taskToolScore(capability: string, taskType: string, text: string) {

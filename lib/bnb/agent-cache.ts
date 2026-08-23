@@ -79,15 +79,22 @@ export async function readCachedBnbAgentsPage(query: BnbAgentQuery = {}): Promis
   const maxStaleAt = new Date(Date.now() - getBnbAgentCacheStaleMs());
   const finalFilter = { ...filter, cachedAt: { $gte: maxStaleAt } };
   const sort = cacheSort(query.sort);
-
-  const [docs, total, newest] = await Promise.all([
-    db.collection<BnbAgentCacheDocument>(COLLECTIONS.BNB_AGENT_CACHE)
+  const defaultMarketplaceBrowse = !query.q?.trim() && !query.category;
+  const readPage = defaultMarketplaceBrowse
+    ? readDefaultMarketplaceCachePage(db, finalFilter, sort, limit, page)
+    : db.collection<BnbAgentCacheDocument>(COLLECTIONS.BNB_AGENT_CACHE)
       .find(finalFilter)
       .sort(sort)
       .skip((page - 1) * limit)
       .limit(limit)
-      .toArray(),
-    db.collection<BnbAgentCacheDocument>(COLLECTIONS.BNB_AGENT_CACHE).countDocuments(finalFilter),
+      .toArray();
+  const countPage = defaultMarketplaceBrowse
+    ? countDefaultMarketplaceCachePage(db, finalFilter)
+    : db.collection<BnbAgentCacheDocument>(COLLECTIONS.BNB_AGENT_CACHE).countDocuments(finalFilter);
+
+  const [docs, total, newest] = await Promise.all([
+    readPage,
+    countPage,
     db.collection<BnbAgentCacheDocument>(COLLECTIONS.BNB_AGENT_CACHE)
       .find(finalFilter)
       .sort({ cachedAt: -1 })
@@ -113,6 +120,53 @@ export async function readCachedBnbAgentsPage(query: BnbAgentQuery = {}): Promis
       newestCachedAt: newestCachedAt?.toISOString(),
     },
   };
+}
+
+async function readDefaultMarketplaceCachePage(
+  db: Awaited<ReturnType<typeof getDb>>,
+  filter: Record<string, unknown>,
+  sort: Record<string, 1 | -1>,
+  limit: number,
+  page: number,
+) {
+  if (!db) return [];
+  const offset = (page - 1) * limit;
+  const relevantFilter = { ...filter, category: { $ne: "Other" } };
+  const otherFilter = { ...filter, category: "Other" };
+  const relevantTotal = await db.collection<BnbAgentCacheDocument>(COLLECTIONS.BNB_AGENT_CACHE).countDocuments(relevantFilter);
+  const relevantSkip = Math.min(offset, relevantTotal);
+  const relevantLimit = Math.max(Math.min(limit, relevantTotal - relevantSkip), 0);
+  const relevantDocs = relevantLimit > 0
+    ? await db.collection<BnbAgentCacheDocument>(COLLECTIONS.BNB_AGENT_CACHE)
+      .find(relevantFilter)
+      .sort(sort)
+      .skip(relevantSkip)
+      .limit(relevantLimit)
+      .toArray()
+    : [];
+  const remaining = limit - relevantDocs.length;
+  if (remaining <= 0) return relevantDocs;
+
+  const otherSkip = Math.max(offset - relevantTotal, 0);
+  const otherDocs = await db.collection<BnbAgentCacheDocument>(COLLECTIONS.BNB_AGENT_CACHE)
+    .find(otherFilter)
+    .sort(sort)
+    .skip(otherSkip)
+    .limit(remaining)
+    .toArray();
+  return [...relevantDocs, ...otherDocs];
+}
+
+async function countDefaultMarketplaceCachePage(
+  db: Awaited<ReturnType<typeof getDb>>,
+  filter: Record<string, unknown>,
+) {
+  if (!db) return 0;
+  const [relevantTotal, otherTotal] = await Promise.all([
+    db.collection<BnbAgentCacheDocument>(COLLECTIONS.BNB_AGENT_CACHE).countDocuments({ ...filter, category: { $ne: "Other" } }),
+    db.collection<BnbAgentCacheDocument>(COLLECTIONS.BNB_AGENT_CACHE).countDocuments({ ...filter, category: "Other" }),
+  ]);
+  return relevantTotal + otherTotal;
 }
 
 export async function getCachedBnbAgent(chainId: string | number, tokenId: string): Promise<BnbAgentProfile | null> {

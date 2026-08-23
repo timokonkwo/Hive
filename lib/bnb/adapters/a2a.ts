@@ -140,21 +140,90 @@ function messageParams(task: string) {
 }
 
 function stringifyA2aOutput(payload: unknown) {
-  const result = asRecord(asRecord(payload).result || payload);
+  const payloadRecord = asRecord(payload);
+  const resultValue = "result" in payloadRecord ? payloadRecord.result : payload;
+  if (typeof resultValue === "string" && resultValue.trim()) return resultValue.trim();
+
+  const result = asRecord(resultValue);
   const status = asRecord(result.status);
-  const message = asRecord(status.message || result.message);
-  const parts = Array.isArray(message.parts) ? message.parts : Array.isArray(result.parts) ? result.parts : [];
-  const text = parts
+  const text = [
+    messageText(status.message),
+    messageText(result.message),
+    partsText(result.parts),
+    artifactsText(result.artifacts),
+    typeof result.text === "string" ? result.text : "",
+    typeof result.output === "string" ? result.output : "",
+    typeof result.response === "string" ? result.response : "",
+    typeof result.answer === "string" ? result.answer : "",
+  ].map((item) => item.trim()).filter(Boolean).join("\n\n");
+
+  if (text) return text;
+  if (isA2aTransportOnlyPayload(resultValue) || isEmptyA2aPayload(result)) throw new Error("A2A agent returned no result.");
+  return JSON.stringify(resultValue, null, 2);
+}
+
+function messageText(value: unknown) {
+  const message = asRecord(value);
+  return partsText(message.parts);
+}
+
+function artifactsText(value: unknown) {
+  if (!Array.isArray(value)) return "";
+  return value
+    .map((artifact) => {
+      const record = asRecord(artifact);
+      return [
+        typeof record.text === "string" ? record.text : "",
+        partsText(record.parts),
+      ].filter(Boolean).join("\n\n");
+    })
+    .filter(Boolean)
+    .join("\n\n");
+}
+
+function partsText(value: unknown) {
+  if (!Array.isArray(value)) return "";
+  return value
     .map((part) => {
       const record = asRecord(part);
       return typeof record.text === "string" ? record.text : "";
     })
     .filter(Boolean)
     .join("\n\n");
-  if (text) return text;
-  if (typeof result.text === "string" && result.text.trim()) return result.text;
-  if (isEmptyA2aPayload(result)) throw new Error("A2A agent returned no result.");
-  return JSON.stringify(result || payload, null, 2);
+}
+
+function isA2aTransportOnlyPayload(value: unknown) {
+  if (typeof value === "string") return isTransportStatusText(value);
+  if (Array.isArray(value) || typeof value !== "object" || value === null) return false;
+
+  const entries = Object.entries(value as Record<string, unknown>).filter(([, item]) => !isEmptyA2aPayload(item));
+  if (entries.length === 0) return true;
+
+  const transportKeys = new Set(["id", "jsonrpc", "kind", "metadata", "messageid", "contextid", "taskid", "status", "state"]);
+  const textEntries = entries.filter(([key]) => ["message", "detail", "description"].includes(key.toLowerCase()));
+  const nonTransportKeys = entries.filter(([key]) => !transportKeys.has(key.toLowerCase()) && !textEntries.some(([textKey]) => textKey === key));
+  if (nonTransportKeys.length > 0) return false;
+
+  const texts = [
+    ...textEntries.map(([, item]) => typeof item === "string" ? item : ""),
+    ...entries.filter(([key]) => ["status", "state"].includes(key.toLowerCase())).map(([, item]) => transportStatusText(item)),
+  ].map((item) => item.trim()).filter(Boolean);
+
+  return texts.length === 0 || texts.every(isTransportStatusText);
+}
+
+function transportStatusText(value: unknown): string {
+  if (typeof value === "string") return value;
+  const record = asRecord(value);
+  return [
+    typeof record.status === "string" ? record.status : "",
+    typeof record.state === "string" ? record.state : "",
+    typeof record.message === "string" ? record.message : "",
+  ].filter(Boolean).join(" ");
+}
+
+function isTransportStatusText(value: string) {
+  return /^(ok|success|successful|succeeded|complete|completed|accepted|submitted|queued|running|done|200)$/i.test(value.trim());
 }
 
 function isEmptyA2aPayload(value: unknown): boolean {

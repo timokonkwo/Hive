@@ -8,6 +8,9 @@ export function formatBnbDeliveryText(output: string | undefined, jobSpec?: BnbJ
     const emptyReport = formatEmptyPayload(parsed);
     if (emptyReport) return emptyReport;
 
+    const transportStatusReport = formatTransportStatusPayload(parsed);
+    if (transportStatusReport) return transportStatusReport;
+
     const directoryReport = formatAgentDirectoryPayload(parsed);
     if (directoryReport) return directoryReport;
 
@@ -41,6 +44,46 @@ function isEmptyStructuredPayload(value: unknown): boolean {
   if (Array.isArray(value)) return value.every(isEmptyStructuredPayload);
   if (typeof value === "object") return Object.values(value as Record<string, unknown>).every(isEmptyStructuredPayload);
   return false;
+}
+
+function formatTransportStatusPayload(payload: unknown) {
+  return isTransportStatusPayload(payload) ? "No result returned." : "";
+}
+
+function isTransportStatusPayload(value: unknown): boolean {
+  if (typeof value === "string") return isTransportStatusText(value);
+  if (Array.isArray(value) || typeof value !== "object" || value === null) return false;
+
+  const record = value as Record<string, unknown>;
+  const entries = Object.entries(record).filter(([, item]) => !isEmptyStructuredPayload(item));
+  if (entries.length === 0) return true;
+
+  const transportKeys = new Set(["id", "jsonrpc", "kind", "metadata", "messageid", "contextid", "taskid", "status", "state"]);
+  const textKeys = new Set(["message", "detail", "description"]);
+  const nonTransportKeys = entries.filter(([key]) => !transportKeys.has(key.toLowerCase()) && !textKeys.has(key.toLowerCase()));
+  if (nonTransportKeys.length > 0) return false;
+
+  const statusTexts = entries
+    .filter(([key]) => ["status", "state", "message", "detail", "description"].includes(key.toLowerCase()))
+    .map(([, item]) => transportStatusText(item))
+    .map((item) => item.trim())
+    .filter(Boolean);
+
+  return statusTexts.length === 0 || statusTexts.every(isTransportStatusText);
+}
+
+function transportStatusText(value: unknown): string {
+  if (typeof value === "string") return value;
+  const record = asRecord(value);
+  return [
+    readDisplayValue(record.status),
+    readDisplayValue(record.state),
+    readDisplayValue(record.message),
+  ].filter(Boolean).join(" ");
+}
+
+function isTransportStatusText(value: string) {
+  return /^(ok|success|successful|succeeded|complete|completed|accepted|submitted|queued|running|done|200)$/i.test(value.trim());
 }
 
 const capabilityOutputTerms: Record<NonNullable<BnbJobSpec["capability"]>, string[]> = {
@@ -232,13 +275,19 @@ function formatStructuredPayload(payload: unknown) {
     }
   }
 
-  const entries = simpleEntries(dataRecord, "", 0).slice(0, 14);
+  const detailRecord = data === record ? omitStructuredHeaderFields(dataRecord) : dataRecord;
+  const entries = simpleEntries(detailRecord, "", 0).slice(0, 14);
   if (entries.length > 0) {
     if (lines.length > 0) lines.push("");
     lines.push(...entries);
   }
 
   return lines.length > 0 ? lines.join("\n") : "";
+}
+
+function omitStructuredHeaderFields(record: Record<string, unknown>) {
+  const skipped = new Set(["operation", "project", "status", "message", "error"]);
+  return Object.fromEntries(Object.entries(record).filter(([key]) => !skipped.has(key)));
 }
 
 type DisplayCollection = {

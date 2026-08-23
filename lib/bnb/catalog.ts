@@ -63,6 +63,7 @@ const categoryInferenceKeywords: Record<BnbAgentCategory, string[]> = {
   "Health Factor Monitoring": ["health factor", "liquidation", "borrow", "loan", "venus", "aave", "lista", "collateral", "wallet monitoring", "risk alert"],
   Other: [],
 };
+const marketplaceCategories = BNB_AGENT_CATEGORIES.filter((category) => category !== "Other");
 
 const searchAliases: Record<string, string[]> = {
   lp: ["liquidity", "pool", "position", "range", "pancakeswap", "fee tier", "concentrated liquidity"],
@@ -1065,6 +1066,35 @@ async function fetch8004ProfileCandidates({
   };
 }
 
+async function fetchDefaultMarketplaceCandidates({
+  limit,
+  page,
+  sortBy,
+}: {
+  limit: number;
+  page: number;
+  sortBy?: Bnb8004SortBy;
+}): Promise<Bnb8004PageResult> {
+  const safeLimit = Math.min(Math.max(Math.trunc(limit), 1), 100);
+  const needed = Math.min(Math.max(Math.trunc(page), 1) * safeLimit, marketplaceCategories.length * 100);
+  const perCategoryLimit = Math.min(Math.max(Math.ceil(needed / marketplaceCategories.length), safeLimit), 100);
+  const pages = await Promise.all(marketplaceCategories.map((category) => fetch8004ProfileCandidates({
+    limit: perCategoryLimit,
+    page: 1,
+    sortBy,
+    search: categorySearchText(category),
+  })));
+  const agents = uniqueAgents(pages.flatMap((result) => result.agents));
+
+  return {
+    agents,
+    page,
+    limit: safeLimit,
+    total: pages.reduce((sum, result) => sum + result.total, 0) || agents.length,
+    hasMore: pages.some((result) => result.hasMore),
+  };
+}
+
 function empty8004Page(page: number, limit: number): Bnb8004PageResult {
   return {
     agents: [],
@@ -1336,32 +1366,42 @@ export async function listBnbAgentsPage(query: BnbAgentQuery = {}): Promise<BnbA
   const page = Math.max(Math.trunc(query.page || 1), 1);
   const sort = query.sort || "recommended";
   const sourceSearch = query.q?.trim() || categorySearchText(query.category);
+  const defaultMarketplaceBrowse = !query.q?.trim() && !query.category;
+  const sourceWindowLimit = defaultMarketplaceBrowse ? Math.min(Math.max(page * limit, limit), 100) : limit;
+  const sourcePage = defaultMarketplaceBrowse ? 1 : page;
   const runtimeFiltered = query.execution === "hireable" || query.execution === "ready_to_run" || query.execution === "connectable" || query.execution === "unavailable";
   const executionDiscovery = query.execution !== "listed_only" && runtimeFiltered;
   const profileDiscovery = !runtimeFiltered || query.execution === "listed_only";
-  const [executionPage, profilePage, semanticAgents, endpointAgents] = await Promise.all([
+  const [executionPage, profilePage, marketplacePage, semanticAgents, endpointAgents] = await Promise.all([
     executionDiscovery
       ? fetch8004ExecutionCandidates({
-        limit,
-        page,
+        limit: sourceWindowLimit,
+        page: sourcePage,
         sortBy: sourceSortForCatalog(sort),
         search: sourceSearch,
       })
       : Promise.resolve(empty8004Page(page, limit)),
     profileDiscovery
       ? fetch8004ProfileCandidates({
+        limit: sourceWindowLimit,
+        page: sourcePage,
+        sortBy: sourceSortForCatalog(sort),
+        search: sourceSearch,
+      })
+      : Promise.resolve(empty8004Page(page, limit)),
+    defaultMarketplaceBrowse && profileDiscovery
+      ? fetchDefaultMarketplaceCandidates({
         limit,
         page,
         sortBy: sourceSortForCatalog(sort),
-        search: sourceSearch,
       })
       : Promise.resolve(empty8004Page(page, limit)),
     page === 1 && sourceSearch ? fetch8004SearchAgents(sourceSearch, Math.min(limit, 25)) : Promise.resolve([]),
     page === 1 ? listBnbEndpointSourceAgents({ q: query.q, category: query.category, limit: Math.min(limit, 32) }) : Promise.resolve([]),
   ]);
   const baseAgents = page === 1 ? getBaseBnbAgents() : [];
-  const liveCandidates = uniqueAgents([...semanticAgents, ...executionPage.agents, ...profilePage.agents])
-    .slice(0, executionDiscovery ? Math.min(limit * get8004ExecutionScanPages() * 2, 200) : limit);
+  const liveCandidates = uniqueAgents([...semanticAgents, ...marketplacePage.agents, ...executionPage.agents, ...profilePage.agents])
+    .slice(0, executionDiscovery ? Math.min(limit * get8004ExecutionScanPages() * 2, 200) : defaultMarketplaceBrowse ? Math.min(page * limit + limit, 500) : limit);
   const shouldHydrateLiveDetails = runtimeFiltered;
   const liveAgents = shouldHydrateLiveDetails
     ? await hydrate8004AgentDetails(liveCandidates, { limit: get8004DetailHydrationLimit() })
@@ -1376,15 +1416,20 @@ export async function listBnbAgentsPage(query: BnbAgentQuery = {}): Promise<BnbA
     }));
   const agents = await applyBnbEndpointProbeHealth(scoredAgents);
 
-  const sorted = sortAgents(agents, sort, query).slice(0, limit);
+  const sortedPool = sortAgents(agents, sort, query);
+  const sorted = defaultMarketplaceBrowse
+    ? sortedPool.slice((page - 1) * limit, page * limit)
+    : sortedPool.slice(0, limit);
   await upsertBnbAgentCache(runtimeCandidates).catch(() => undefined);
 
-  const sourceHasMore = executionPage.hasMore || profilePage.hasMore;
+  const sourceHasMore = executionPage.hasMore || profilePage.hasMore || marketplacePage.hasMore;
   const sourceTotal = profilePage.total > 0
     ? profilePage.total
     : executionPage.total > 0
       ? executionPage.total
-      : sorted.length;
+      : marketplacePage.total > 0
+        ? marketplacePage.total
+        : sorted.length;
   const verifiedRuntimeTotal = runtimeFiltered ? sorted.length : 0;
   const total = runtimeFiltered
     ? verifiedRuntimeTotal
