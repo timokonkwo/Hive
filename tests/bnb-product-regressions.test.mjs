@@ -67,6 +67,8 @@ describe('BNB marketplace product flows', () => {
   const endpointSources = read('lib/bnb/endpoint-sources.ts');
   const agentsRoute = read('app/api/bnb/agents/route.ts');
   const bnbAgentCacheCron = read('app/api/cron/bnb-agent-cache/route.ts');
+  const scheduledBnbAgentCache = read('netlify/functions/scheduled-bnb-agent-cache.mts');
+  const netlifyToml = read('netlify.toml');
   const envExample = read('.env.example');
 
   it('persists access requests as owner-scoped activity records', () => {
@@ -654,6 +656,11 @@ describe('BNB marketplace product flows', () => {
     assert.match(bnbAgentCacheCron, /hydrateBnbAgentCacheQueue/);
     assert.match(bnbAgentCacheCron, /mode === "refresh" \|\| mode === "all"/);
     assert.match(bnbAgentCacheCron, /mode === "hydrate" \|\| mode === "all"/);
+    assert.match(scheduledBnbAgentCache, /\/api\/cron\/bnb-agent-cache\?mode=all&pages=2&pageSize=50&batch=6/);
+    assert.match(scheduledBnbAgentCache, /process\.env\.SITE_URL \|\| process\.env\.URL \|\| 'https:\/\/bnb\.uphive\.xyz'/);
+    assert.match(scheduledBnbAgentCache, /process\.env\.CRON_SECRET \|\| process\.env\.STEALTH_AGENT_SECRET/);
+    assert.match(scheduledBnbAgentCache, /schedule:\s*'\*\/30 \* \* \* \*'/);
+    assert.match(netlifyToml, /\[functions\."scheduled-bnb-agent-cache"\][\s\S]*timeout = 60/);
   });
 
   it('pulls endpoint-backed services from external agent indexes without local fallback agents', () => {
