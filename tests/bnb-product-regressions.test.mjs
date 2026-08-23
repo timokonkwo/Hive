@@ -620,7 +620,7 @@ describe('BNB marketplace product flows', () => {
     assert.match(directory, /if \(query === currentParams\.toString\(\)\) return/);
     assert.doesNotMatch(catalog, /runnable8004SearchTerms|fetch8004RunnableAgentCandidates|HeyAnon/);
     assert.doesNotMatch(catalog, /visibleOffset/);
-    assert.match(catalog, /sortAgents\(agents,\s*sort\)\.slice\(0,\s*limit\)/);
+    assert.match(catalog, /sortAgents\(agents,\s*sort,\s*query\)\.slice\(0,\s*limit\)/);
     assert.match(catalog, /await upsertBnbAgentCache\(runtimeCandidates\)/);
     assert.match(catalog, /fetch8004AgentDetail/);
     assert.match(catalog, /await upsertBnbAgentCache\(\[scored\],\s*\{ hydrated:\s*true,\s*runtimeProbed:\s*true \}\)/);
@@ -760,6 +760,10 @@ describe('BNB marketplace product flows', () => {
     assert.match(catalog, /\.filter\(\(category\) => category !== "Other"\)/);
     assert.match(catalog, /function hiveUsableRank\(agent: BnbAgentProfile\)/);
     assert.match(catalog, /agent\.category !== "Other" && mayExposeExecutionEndpoint\(agent\)/);
+    assert.match(catalog, /function marketplaceRelevanceRank\(agent: BnbAgentProfile\)/);
+    assert.match(catalog, /if \(agent\.category !== "Other"\) return 3/);
+    assert.match(catalog, /prioritizeMarketplaceFit = !context\.q\?\.trim\(\) && !context\.category/);
+    assert.match(catalog, /byMarketplaceFit\(a,\s*b\) \|\|/);
     assert.match(catalog, /function executionRank\(agent: BnbAgentProfile\)/);
     assert.match(catalog, /function endpointRank\(agent: BnbAgentProfile\)/);
     assert.match(catalog, /byHiveUse\(a,\s*b\)/);

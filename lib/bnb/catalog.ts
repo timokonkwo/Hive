@@ -1237,9 +1237,14 @@ function matchesQuery(agent: BnbAgentProfile, query: BnbAgentQuery) {
     .some((word) => haystack.includes(word));
 }
 
-function sortAgents(agents: BnbAgentProfile[], sort?: string | null) {
+function sortAgents(agents: BnbAgentProfile[], sort?: string | null, context: Pick<BnbAgentQuery, "q" | "category"> = {}) {
   const sorted = [...agents];
+  const prioritizeMarketplaceFit = !context.q?.trim() && !context.category;
+  const byMarketplaceFit = (a: BnbAgentProfile, b: BnbAgentProfile) => (
+    prioritizeMarketplaceFit ? marketplaceRelevanceRank(b) - marketplaceRelevanceRank(a) : 0
+  );
   const byHiveUse = (a: BnbAgentProfile, b: BnbAgentProfile) => (
+    byMarketplaceFit(a, b) ||
     hiveUsableRank(b) - hiveUsableRank(a) ||
     executionRank(b) - executionRank(a) ||
     endpointRank(b) - endpointRank(a)
@@ -1295,6 +1300,11 @@ function hiveUsableRank(agent: BnbAgentProfile) {
   if (agent.category !== "Other") return 2;
   if (mayExposeExecutionEndpoint(agent)) return 1;
   return 0;
+}
+
+function marketplaceRelevanceRank(agent: BnbAgentProfile) {
+  if (agent.category !== "Other") return 3;
+  return isBnbMarketplaceAgentText(agentSearchText(agent)) ? 1 : 0;
 }
 
 function endpointRank(agent: BnbAgentProfile) {
@@ -1366,7 +1376,7 @@ export async function listBnbAgentsPage(query: BnbAgentQuery = {}): Promise<BnbA
     }));
   const agents = await applyBnbEndpointProbeHealth(scoredAgents);
 
-  const sorted = sortAgents(agents, sort).slice(0, limit);
+  const sorted = sortAgents(agents, sort, query).slice(0, limit);
   await upsertBnbAgentCache(runtimeCandidates).catch(() => undefined);
 
   const sourceHasMore = executionPage.hasMore || profilePage.hasMore;
