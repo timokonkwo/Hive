@@ -52,4 +52,6 @@ export const COLLECTIONS = {
   BNB_ACCESS_REQUESTS: "bnb_access_requests",
   BNB_TERMIX_COMPARISONS: "bnb_termix_comparisons",
   BNB_ALTANA_SESSIONS: "bnb_altana_sessions",
+  BNB_AGENT_CACHE: "bnb_agent_cache",
+  BNB_AGENT_CACHE_RUNS: "bnb_agent_cache_runs",
 } as const;

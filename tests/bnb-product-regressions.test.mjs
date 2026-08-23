@@ -22,6 +22,7 @@ describe('BNB marketplace product flows', () => {
   const escrow = read('lib/bnb/escrow.ts');
   const settlementState = read('lib/bnb/settlement-state.ts');
   const catalog = read('lib/bnb/catalog.ts');
+  const agentCache = read('lib/bnb/agent-cache.ts');
   const display = read('lib/bnb/display.ts');
   const activateRoute = read('app/api/bnb/activate/route.ts');
   const preflightRoute = read('app/api/bnb/activate/preflight/route.ts');
@@ -65,6 +66,7 @@ describe('BNB marketplace product flows', () => {
   const httpAdapter = read('lib/bnb/adapters/http.ts');
   const endpointSources = read('lib/bnb/endpoint-sources.ts');
   const agentsRoute = read('app/api/bnb/agents/route.ts');
+  const bnbAgentCacheCron = read('app/api/cron/bnb-agent-cache/route.ts');
   const envExample = read('.env.example');
 
   it('persists access requests as owner-scoped activity records', () => {
@@ -564,6 +566,8 @@ describe('BNB marketplace product flows', () => {
     assert.match(catalog, /next:\s*\{\s*revalidate:\s*get8004CacheTtlSeconds\(revalidate\)\s*\}/);
     assert.match(catalog, /type Bnb8004SortBy = "created_at" \| "stars" \| "name" \| "token_id" \| "total_score"/);
     assert.match(catalog, /export async function listBnbAgentsPage/);
+    assert.match(catalog, /const cached = await readCachedBnbAgentsPage\(query\)/);
+    assert.match(catalog, /if \(cached\) return cached/);
     assert.match(catalog, /const page = Math\.max\(Math\.trunc\(query\.page \|\| 1\),\s*1\)/);
     assert.match(catalog, /url\.searchParams\.set\("sortBy",\s*sortBy\)/);
     assert.match(catalog, /url\.searchParams\.set\("sortOrder",\s*"desc"\)/);
@@ -608,7 +612,9 @@ describe('BNB marketplace product flows', () => {
     assert.doesNotMatch(catalog, /runnable8004SearchTerms|fetch8004RunnableAgentCandidates|HeyAnon/);
     assert.doesNotMatch(catalog, /visibleOffset/);
     assert.match(catalog, /sortAgents\(agents,\s*sort\)\.slice\(0,\s*limit\)/);
+    assert.match(catalog, /await upsertBnbAgentCache\(runtimeCandidates\)/);
     assert.match(catalog, /fetch8004AgentDetail/);
+    assert.match(catalog, /await upsertBnbAgentCache\(\[scored\],\s*\{ hydrated:\s*true \}\)/);
     assert.match(catalog, /\/agents\/\$\{encodeURIComponent\(String\(chainId\)\)\}\/\$\{encodeURIComponent\(tokenId\)\}/);
     assert.match(catalog, /record\.agentWallet \?\? record\.agent_wallet/);
     assert.match(catalog, /record\.total_feedbacks/);
@@ -616,6 +622,38 @@ describe('BNB marketplace product flows', () => {
     assert.match(catalog, /record\.star_count/);
     assert.doesNotMatch(catalog, /sortBy",\s*"total_feedbacks"/);
     assert.doesNotMatch(catalog, /headers\.Authorization/);
+  });
+
+  it('keeps BNB discovery cache durable, guarded, and refreshable by cron', () => {
+    assert.match(db, /BNB_AGENT_CACHE:\s*"bnb_agent_cache"/);
+    assert.match(db, /BNB_AGENT_CACHE_RUNS:\s*"bnb_agent_cache_runs"/);
+    assert.match(agentCache, /export function isBnbAgentCacheEnabled/);
+    assert.match(agentCache, /process\.env\.BNB_AGENT_CACHE_ENABLED !== "false" && Boolean\(process\.env\.MONGODB_URI\)/);
+    assert.match(agentCache, /export async function readCachedBnbAgentsPage/);
+    assert.match(agentCache, /COLLECTIONS\.BNB_AGENT_CACHE/);
+    assert.match(agentCache, /collection\.createIndex\(\{ chainId:\s*1,\s*tokenId:\s*1 \},\s*\{ unique:\s*true \}\)/);
+    assert.match(agentCache, /collection\.createIndex\(\{ searchTokens:\s*1 \}\)/);
+    assert.match(agentCache, /function cacheHitIsUsable/);
+    assert.match(agentCache, /total < Math\.min\(limit,\s*12\)/);
+    assert.match(agentCache, /return null/);
+    assert.match(agentCache, /needsHydration:\s*needsHydration && !options\.hydrated/);
+    assert.match(agentCache, /export async function claimBnbAgentHydrationBatch/);
+    assert.match(agentCache, /hydrateLockedUntil/);
+    assert.match(agentCache, /\$unset:\s*\{ hydrateError:\s*"",\s*hydrateLockedUntil:\s*"" \}/);
+    assert.match(catalog, /export async function refreshBnbAgentDiscoveryCache/);
+    assert.match(catalog, /fetch8004ProfileCandidates\(\{[\s\S]*page,[\s\S]*sortBy:\s*sourceSortForCatalog\("recommended"\)/);
+    assert.match(catalog, /listBnbEndpointSourceAgents\(\{ limit:\s*Math\.min\(safePageSize,\s*50\) \}\)/);
+    assert.match(catalog, /recordBnbAgentCacheRun\("refresh"/);
+    assert.match(catalog, /export async function hydrateBnbAgentCacheQueue/);
+    assert.match(catalog, /claimBnbAgentHydrationBatch\(limit\)/);
+    assert.match(catalog, /completeBnbAgentHydration\(agent,\s*runtimeAgent\)/);
+    assert.match(catalog, /recordBnbAgentCacheRun\("hydrate"/);
+    assert.match(bnbAgentCacheCron, /CRON_SECRET/);
+    assert.match(bnbAgentCacheCron, /STEALTH_AGENT_SECRET/);
+    assert.match(bnbAgentCacheCron, /refreshBnbAgentDiscoveryCache/);
+    assert.match(bnbAgentCacheCron, /hydrateBnbAgentCacheQueue/);
+    assert.match(bnbAgentCacheCron, /mode === "refresh" \|\| mode === "all"/);
+    assert.match(bnbAgentCacheCron, /mode === "hydrate" \|\| mode === "all"/);
   });
 
   it('pulls endpoint-backed services from external agent indexes without local fallback agents', () => {
@@ -844,6 +882,7 @@ describe('BNB marketplace product flows', () => {
       'MONGODB_URI',
       'SITE_URL',
       'BNB_AUTH_SECRET',
+      'CRON_SECRET',
       'BNB_NETWORK',
       'NEXT_PUBLIC_BNB_NETWORK',
       'BNB_BSC_CHAIN_ID',
@@ -855,6 +894,10 @@ describe('BNB marketplace product flows', () => {
       'BNB_8004SCAN_LIVE',
       'BNB_8004SCAN_API_BASE',
       'BNB_8004SCAN_API_KEY',
+      'BNB_AGENT_CACHE_ENABLED',
+      'BNB_AGENT_CACHE_TTL_SECONDS',
+      'BNB_AGENT_CACHE_STALE_SECONDS',
+      'BNB_AGENT_CACHE_HYDRATION_BATCH',
       'BNB_AGENT402_ENABLED',
       'BNB_AGENT402_API_BASE',
       'BNB_402INDEX_ENABLED',
@@ -885,6 +928,7 @@ describe('BNB marketplace product flows', () => {
     assert.match(envExample, /Privy dashboard -> Apps -> App ID/);
     assert.match(envExample, /MongoDB Atlas -> Database -> Connect -> Drivers connection string/);
     assert.match(envExample, /Generate with: openssl rand -hex 32/);
+    assert.match(envExample, /Mongo-backed discovery cache/);
     assert.match(envExample, /Endpoint-backed service indexes/);
     assert.match(envExample, /Optional per-provider API auth/);
     assert.match(envExample, /Do not add identities without callable endpoints/);

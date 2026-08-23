@@ -1,6 +1,6 @@
 # BNB Agent Studio V2 Execution Tracker
 
-Last updated: 2026-08-22
+Last updated: 2026-08-23
 
 This tracker is the implementation source of truth for the BNB Agent Studio V2 marketplace work. The product is intended for real users. Do not mark a unit complete until the code is implemented, tested, and safe to deploy.
 
@@ -451,6 +451,10 @@ This tracker is the implementation source of truth for the BNB Agent Studio V2 m
 - BSC registry records that do not match the four primary product categories are preserved under `Other` instead of being dropped.
 - Unfiltered all-agent pagination falls back to live network stats at the route/page boundary when a deep page fetch is slow or empty.
 - The directory client no longer overwrites page navigation back to page 1 when only the page query changes.
+- Date: 2026-08-23
+- Durable MongoDB discovery cache is being added for normalized 8004scan and endpoint-index records.
+- `/api/cron/bnb-agent-cache` refreshes bounded 8004 pages and hydrates endpoint details without making user page loads scan every profile.
+- Cache hits are rejected when an unfiltered first page has too few records, so partial caches cannot replace live registry discovery.
 - Richer owner history, profile source confidence, and expanded reputation display remain pending.
 
 ### Verification
