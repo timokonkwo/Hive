@@ -535,6 +535,11 @@ function deriveExecutionStatus(endpoints: BnbExecutionEndpoint[]): BnbExecutionS
   return "listed_only";
 }
 
+function initial8004ExecutionStatus(endpoints: BnbExecutionEndpoint[]): BnbExecutionStatus {
+  const derived = deriveExecutionStatus(endpoints);
+  return derived === "ready_to_run" ? "connectable" : derived;
+}
+
 function isCallableExecutionEndpoint(endpoint: BnbExecutionEndpoint) {
   return endpoint.adapter === "mcp" || endpoint.adapter === "a2a" || endpoint.adapter === "x402" || endpoint.adapter === "http";
 }
@@ -675,7 +680,7 @@ function normalize8004Agent(raw: unknown): BnbAgentProfile | null {
     : feedbackCount;
   const updatedAt = textFrom(record.lastActivity ?? record.updatedAt ?? record.updated_at, fetchedAt);
   const executionEndpoints = endpointsFromRecord(record, services, "8004scan");
-  const executionStatus = deriveExecutionStatus(executionEndpoints);
+  const executionStatus = initial8004ExecutionStatus(executionEndpoints);
 
   return {
     chainId: Number.isFinite(chainId) ? chainId : BSC_CHAIN_ID,

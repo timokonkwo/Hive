@@ -455,6 +455,7 @@ This tracker is the implementation source of truth for the BNB Agent Studio V2 m
 - Durable MongoDB discovery cache is being added for normalized 8004scan and endpoint-index records.
 - `/api/cron/bnb-agent-cache` refreshes bounded 8004 pages and hydrates endpoint details without making user page loads scan every profile.
 - Cache hits are rejected when an unfiltered first page has too few records, so partial caches cannot replace live registry discovery.
+- Unprobed 8004scan endpoint records now start as `connectable`; only Hive runtime preflight or cache hydration can promote them to `ready_to_run`.
 - Richer owner history, profile source confidence, and expanded reputation display remain pending.
 
 ### Verification

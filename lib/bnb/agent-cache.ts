@@ -97,7 +97,7 @@ export async function readCachedBnbAgentsPage(query: BnbAgentQuery = {}): Promis
   const newestCachedAt = newest?.cachedAt;
   const stale = newestCachedAt ? Date.now() - newestCachedAt.getTime() > getBnbAgentCacheTtlMs() : true;
   return {
-    agents: docs.map((doc) => doc.agent),
+    agents: docs.map(agentFromCacheDocument),
     page,
     pageSize: limit,
     total,
@@ -118,7 +118,7 @@ export async function getCachedBnbAgent(chainId: string | number, tokenId: strin
 
   const doc = await db.collection<BnbAgentCacheDocument>(COLLECTIONS.BNB_AGENT_CACHE)
     .findOne({ _id: cacheKey(chainId, tokenId), cachedAt: { $gte: new Date(Date.now() - getBnbAgentCacheStaleMs()) } });
-  return doc?.agent || null;
+  return doc ? agentFromCacheDocument(doc) : null;
 }
 
 export async function upsertBnbAgentCache(agents: BnbAgentProfile[], options: CacheUpsertOptions = {}) {
@@ -302,7 +302,8 @@ function cacheDocument(agent: BnbAgentProfile, now: Date, options: CacheUpsertOp
     endpoint.adapter === "x402" ||
     endpoint.adapter === "http"
   )));
-  const needsHydration = agent.sourceFreshness.source === "8004scan" && !hasCallableEndpoint && mayNeedHydration(agent);
+  const needsHydration = agent.sourceFreshness.source === "8004scan" && !options.hydrated && mayNeedHydration(agent);
+  const runtimeHydrated = options.hydrated || (agent.sourceFreshness.source !== "8004scan" && hasCallableEndpoint);
 
   return {
     _id: cacheKey(agent.chainId, agent.tokenId),
@@ -315,7 +316,7 @@ function cacheDocument(agent: BnbAgentProfile, now: Date, options: CacheUpsertOp
     executionStatus,
     hasCallableEndpoint,
     needsHydration: needsHydration && !options.hydrated,
-    hydrationStatus: options.hydrated || hasCallableEndpoint ? "hydrated" : needsHydration ? "pending" : "none",
+    hydrationStatus: runtimeHydrated ? "hydrated" : needsHydration ? "pending" : "none",
     hydrateAttempts: 0,
     hydrateAfter: now,
     searchTokens: tokenizeAgent(agent),
@@ -367,6 +368,21 @@ function cacheHitIsUsable(query: BnbAgentQuery, docs: BnbAgentCacheDocument[], t
   );
   if (!hasNarrowFilter && page === 1 && total < Math.min(limit, 12)) return false;
   return true;
+}
+
+function agentFromCacheDocument(doc: BnbAgentCacheDocument) {
+  if (
+    doc.source === "8004scan" &&
+    !doc.hydratedAt &&
+    doc.agent.executionStatus === "ready_to_run"
+  ) {
+    return {
+      ...doc.agent,
+      executionStatus: "connectable" as const,
+      activationStatus: "request" as const,
+    };
+  }
+  return doc.agent;
 }
 
 function cacheKey(chainId: string | number, tokenId: string | number) {

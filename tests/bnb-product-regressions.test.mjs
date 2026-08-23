@@ -639,6 +639,9 @@ describe('BNB marketplace product flows', () => {
     assert.match(agentCache, /function cacheHitIsUsable/);
     assert.match(agentCache, /total < Math\.min\(limit,\s*12\)/);
     assert.match(agentCache, /return null/);
+    assert.match(agentCache, /function agentFromCacheDocument/);
+    assert.match(agentCache, /!doc\.hydratedAt[\s\S]*doc\.agent\.executionStatus === "ready_to_run"/);
+    assert.match(agentCache, /executionStatus:\s*"connectable" as const/);
     assert.match(agentCache, /needsHydration:\s*needsHydration && !options\.hydrated/);
     assert.match(agentCache, /export async function claimBnbAgentHydrationBatch/);
     assert.match(agentCache, /hydrateLockedUntil/);
@@ -747,6 +750,9 @@ describe('BNB marketplace product flows', () => {
   it('does not mark live indexed protocol labels as runnable without endpoints', () => {
     assert.match(types, /export type BnbExecutionStatus = "ready_to_run" \| "connectable" \| "listed_only" \| "unavailable"/);
     assert.match(catalog, /deriveExecutionStatus\(executionEndpoints\)/);
+    assert.match(catalog, /function initial8004ExecutionStatus/);
+    assert.match(catalog, /return derived === "ready_to_run" \? "connectable" : derived/);
+    assert.match(catalog, /const executionStatus = initial8004ExecutionStatus\(executionEndpoints\)/);
     assert.match(catalog, /activationFromExecution\(executionStatus\)/);
     assert.match(catalog, /function isCallableExecutionEndpoint\(endpoint: BnbExecutionEndpoint\)/);
     assert.match(catalog, /function healthVerifiedServiceEndpoint\(record: Record<string, unknown>,\s*service: BnbAgentService\)/);
@@ -761,10 +767,11 @@ describe('BNB marketplace product flows', () => {
     assert.doesNotMatch(catalog, /agent_url \?\? record\.agentUrl \?\? record\.externalLink/);
   });
 
-  it('treats healthy 8004 MCP endpoints as runnable without using social links as execution endpoints', () => {
+  it('discovers healthy 8004 MCP endpoints without treating unprobed records as runnable', () => {
     assert.match(catalog, /const endpoint = textFrom\(service\.endpoint \?\? service\.url,\s*""\)/);
     assert.match(catalog, /verified:\s*status === "healthy" && \(adapter === "mcp" \|\| adapter === "a2a" \|\| verificationStatus === "verified"\)/);
     assert.match(catalog, /source === "configured" \|\| healthVerifiedServiceEndpoint\(record,\s*service\)/);
+    assert.match(catalog, /initial8004ExecutionStatus\(executionEndpoints\)/);
     assert.match(catalog, /seen\.set\(key,\s*\{[\s\S]*verified:\s*previous\.verified \|\| endpoint\.verified/);
     assert.doesNotMatch(catalog, /domain \? `https:\/\/\$\{domain\}` : ""/);
     assert.doesNotMatch(catalog, /adapter:\s*endpointAdapter\(type\),\s*url:\s*endpoint/);
