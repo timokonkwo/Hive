@@ -79,8 +79,8 @@ const compareKey = "hive:bnb:compare-agents";
 
 const availabilityOptions = [
   { value: "all", label: "All agents" },
-  { value: "ready_to_run", label: "Can run now" },
-  { value: "listed_only", label: "Profiles only" },
+  { value: "hireable", label: "Can hire" },
+  { value: "listed_only", label: "Profiles" },
   { value: "unavailable", label: "Unavailable" },
 ];
 

@@ -344,7 +344,11 @@ function cacheFilter(query: BnbAgentQuery) {
   const filter: Record<string, unknown> = {};
   if (query.category) filter.category = query.category;
   if (query.activation) filter.activationStatus = query.activation;
-  if (query.execution) filter.executionStatus = query.execution;
+  if (query.execution === "hireable") {
+    filter.executionStatus = { $in: ["ready_to_run", "connectable"] };
+  } else if (query.execution) {
+    filter.executionStatus = query.execution;
+  }
   const tokens = tokenize(`${query.q || ""}`).slice(0, 4);
   if (tokens.length > 0) filter.searchTokens = { $all: tokens };
   return filter;

@@ -6,7 +6,7 @@ export type BnbMarketplaceReadinessStatus = "hireable" | "identity_only" | "unav
 export type BnbMarketplaceReadiness = {
   status: BnbMarketplaceReadinessStatus;
   canHire: boolean;
-  label: "Ready to run" | "Listed" | "Unavailable";
+  label: "Can hire" | "Profile" | "Unavailable";
   reason: string;
 };
 
@@ -14,13 +14,15 @@ type BnbReadinessAgent = Pick<BnbAgentProfile, "activationStatus" | "executionSt
 
 export function classifyBnbAgentReadiness(agent: BnbReadinessAgent): BnbMarketplaceReadiness {
   const executionStatus = agent.executionStatus;
-  const callable = executionStatus === "ready_to_run" || (!executionStatus && agent.activationStatus === "callable");
+  const callable = executionStatus === "ready_to_run"
+    || executionStatus === "connectable"
+    || (!executionStatus && agent.activationStatus === "callable");
 
   if (callable && isAddress(agent.agentWallet)) {
     return {
       status: "hireable",
       canHire: true,
-      label: "Ready to run",
+      label: "Can hire",
       reason: "",
     };
   }
@@ -29,7 +31,7 @@ export function classifyBnbAgentReadiness(agent: BnbReadinessAgent): BnbMarketpl
     return {
       status: "unavailable",
       canHire: false,
-      label: "Ready to run",
+      label: "Can hire",
       reason: "The agent wallet is not a valid BSC address.",
     };
   }
@@ -46,7 +48,7 @@ export function classifyBnbAgentReadiness(agent: BnbReadinessAgent): BnbMarketpl
   return {
     status: "identity_only",
     canHire: false,
-    label: "Listed",
+    label: "Profile",
     reason: "No callable job endpoint is available.",
   };
 }
@@ -56,7 +58,7 @@ export function isBnbAgentHireable(agent: BnbReadinessAgent) {
 }
 
 export function bnbAgentReadinessLabel(agent: BnbReadinessAgent) {
-  if (agent.executionStatus === "ready_to_run" || (!agent.executionStatus && agent.activationStatus === "callable")) return "Ready to run";
+  if (agent.executionStatus === "ready_to_run" || agent.executionStatus === "connectable" || (!agent.executionStatus && agent.activationStatus === "callable")) return "Can hire";
   if (agent.executionStatus === "unavailable") return "Unavailable";
-  return "Listed";
+  return "Profile";
 }

@@ -135,6 +135,8 @@ export async function POST(request: NextRequest) {
     const runnable = await hasRunnableBnbAdapter(agent);
     if (runnable) {
       agent = { ...agent, executionStatus: "ready_to_run", activationStatus: "callable" };
+    } else {
+      return NextResponse.json({ error: "Agent cannot run from Hive." }, { status: 409 });
     }
   }
 

@@ -1,7 +1,7 @@
 import { redirect } from "next/navigation";
 import { getBnbAgentNetworkStats, getBnbCategories, listBnbAgentsPage } from "@/lib/bnb/catalog";
 import { BnbContainer, BnbPageHeader, BnbShell } from "@/app/bnb/_components/BnbUi";
-import type { BnbAgentCategory, BnbAgentProfile, BnbExecutionStatus } from "@/lib/bnb/types";
+import type { BnbAgentCategory, BnbAgentProfile } from "@/lib/bnb/types";
 import { bnbCategoryLabel } from "@/lib/bnb/display";
 import { AgentsDirectory } from "./AgentsDirectory";
 
@@ -23,16 +23,15 @@ function normalizePage(value: string | undefined) {
 function normalizeStatus(value: string | undefined): string {
   if (!value) return defaultStatus;
   if (value === "all") return "all";
-  if (value === "callable" || value === "available") return "ready_to_run";
-  if (value === "request") return "connectable";
+  if (value === "callable" || value === "available" || value === "ready_to_run" || value === "connectable" || value === "request" || value === "hireable") return "hireable";
   if (value === "discoverable") return "listed_only";
-  if (value === "ready_to_run" || value === "connectable" || value === "listed_only" || value === "unavailable") return value;
+  if (value === "listed_only" || value === "unavailable") return value;
   return "";
 }
 
-function executionFromStatus(value: string): BnbExecutionStatus | null {
+function executionFromStatus(value: string): string | null {
   if (value === "all") return null;
-  if (value === "ready_to_run" || value === "connectable" || value === "listed_only" || value === "unavailable") return value;
+  if (value === "hireable" || value === "ready_to_run" || value === "connectable" || value === "listed_only" || value === "unavailable") return value;
   return null;
 }
 

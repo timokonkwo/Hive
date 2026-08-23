@@ -1214,7 +1214,8 @@ export function scoreBnbAgent(agent: BnbAgentProfile, intent = "", category?: st
 function matchesQuery(agent: BnbAgentProfile, query: BnbAgentQuery) {
   if (query.category && hasCategory(query.category) && agent.category !== query.category) return false;
   if (query.activation && agent.activationStatus !== query.activation) return false;
-  if (query.execution && agent.executionStatus !== query.execution) return false;
+  if (query.execution === "hireable" && agent.executionStatus !== "ready_to_run" && agent.executionStatus !== "connectable") return false;
+  if (query.execution && query.execution !== "hireable" && agent.executionStatus !== query.execution) return false;
   if (!query.q) return true;
 
   const needle = query.q.toLowerCase();
@@ -1324,7 +1325,7 @@ export async function listBnbAgentsPage(query: BnbAgentQuery = {}): Promise<BnbA
   const page = Math.max(Math.trunc(query.page || 1), 1);
   const sort = query.sort || "recommended";
   const sourceSearch = query.q?.trim() || categorySearchText(query.category);
-  const runtimeFiltered = query.execution === "ready_to_run" || query.execution === "connectable" || query.execution === "unavailable";
+  const runtimeFiltered = query.execution === "hireable" || query.execution === "ready_to_run" || query.execution === "connectable" || query.execution === "unavailable";
   const executionDiscovery = query.execution !== "listed_only" && runtimeFiltered;
   const profileDiscovery = !runtimeFiltered || query.execution === "listed_only";
   const [executionPage, profilePage, semanticAgents, endpointAgents] = await Promise.all([
