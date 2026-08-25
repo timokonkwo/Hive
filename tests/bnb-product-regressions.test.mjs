@@ -756,6 +756,12 @@ describe('BNB marketplace product flows', () => {
     assert.match(catalog, /const byRecommendation = \(a: BnbAgentProfile,\s*b: BnbAgentProfile\)/);
     assert.match(catalog, /\(b\.scoreBreakdown\?\.total \|\| 0\) - \(a\.scoreBreakdown\?\.total \|\| 0\)/);
     assert.match(catalog, /categorySearchText\(query\.category\)/);
+    assert.match(catalog, /const categorySearchSeeds: Record<BnbAgentCategory,\s*string>/);
+    assert.match(catalog, /"Grid Trading":\s*"grid trading"/);
+    assert.match(catalog, /"Health Factor Monitoring":\s*"health liquidation"/);
+    assert.match(catalog, /return categorySearchSeeds\[category\] \|\| category/);
+    assert.match(catalog, /return "Grid Trading"/);
+    assert.match(catalog, /return "Health Factor Monitoring"/);
     assert.match(catalog, /if \(directTerms\.length > 1\) \{[\s\S]*directHits >= Math\.min\(directTerms\.length,\s*2\)/);
     assert.match(catalog, /categoryInferenceKeywords/);
     assert.doesNotMatch(catalog, /"Yield Optimisation":\s*\[[^\]]*"defi"/);

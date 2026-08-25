@@ -64,6 +64,13 @@ const categoryInferenceKeywords: Record<BnbAgentCategory, string[]> = {
   Other: [],
 };
 const marketplaceCategories = BNB_AGENT_CATEGORIES.filter((category) => category !== "Other");
+const categorySearchSeeds: Record<BnbAgentCategory, string> = {
+  Rebalancing: "liquidity rebalance",
+  "Grid Trading": "grid trading",
+  "Yield Optimisation": "yield",
+  "Health Factor Monitoring": "health liquidation",
+  Other: "",
+};
 
 const searchAliases: Record<string, string[]> = {
   lp: ["liquidity", "pool", "position", "range", "pancakeswap", "fee tier", "concentrated liquidity"],
@@ -315,6 +322,10 @@ function arrayFrom(value: unknown): string[] {
 
 function inferCategory(text: string): BnbAgentCategory | null {
   const normalized = text.toLowerCase();
+  if (/\bhealth\s*factor\b|\bliquidation\b|\bcollateral\b|\bborrow\b|\blending\b/.test(normalized)) return "Health Factor Monitoring";
+  if (/\bgrid(?:\s+(?:trading|trader|strategy|bot|plan|planning))?\b|\bbuy\s+and\s+sell\s+ladders?\b|\bmarket\s+making\b/.test(normalized)) return "Grid Trading";
+  if (/\bconcentrated\s+liquidity\b|\blp\s+range\b|\brebalance\b|\bfee\s+tier\b|\bv3\s+pool\b|\bliquidity\s+position\b/.test(normalized)) return "Rebalancing";
+  if (/\byield\b|\bapy\b|\bapr\b|\bfarm\b|\bvault\b|\bstaking\b|\bbeefy\b|\bearn\b/.test(normalized)) return "Yield Optimisation";
   const scored = BNB_AGENT_CATEGORIES
     .filter((category) => category !== "Other")
     .map((category) => ({
@@ -1128,7 +1139,7 @@ function agentSearchText(agent: BnbAgentProfile) {
 
 function categorySearchText(category?: string | null) {
   if (!category || !hasCategory(category)) return "";
-  return `${category} ${categoryKeywords[category].join(" ")}`;
+  return categorySearchSeeds[category] || category;
 }
 
 function countKeywordHits(text: string, keywords: string[]) {
