@@ -1125,7 +1125,7 @@ function PaymentStage({
       </dl>
       <JobReview jobSpec={jobSpec} rows={[{ label: "Delivery", value: jobSpec.expectedOutput }]} />
       {walletPanel}
-      {payment && payment.status !== "ready" ? <div className="bnb-warning p-4 text-sm">{payment.reason}</div> : null}
+      {payment && payment.status !== "ready" && payment.reason ? <div className="bnb-warning p-4 text-sm">{payment.reason}</div> : null}
       <StepError error={error} />
       <div className="bnb-step-actions">
         <button type="button" className="bnb-button-dark bnb-focus" onClick={onBack}><ArrowLeft aria-hidden="true" size={15} /> Edit details</button>
@@ -1180,7 +1180,7 @@ function JobStatusPanel({
   const failed = recordFailed || runBlocked;
   const failureMessage = record?.delivery?.error || record?.work?.error || error || "Agent run failed.";
   const cannotRun = /cannot run|does not expose|matching|no supported execution endpoint|endpoint cannot/i.test(failureMessage);
-  const title = closed ? "Job closed" : failed ? cannotRun ? "Job cannot run" : "Job failed" : delivered ? "Delivery" : jobRunning ? "Job running" : funded ? paymentNotRequired ? "Run" : "Funded" : "Payment";
+  const title = closed ? "Job closed" : failed ? cannotRun ? "Job cannot run" : "Job failed" : delivered ? "Delivery" : jobRunning ? "Running" : funded ? paymentNotRequired ? "Run" : "Funded" : "Payment";
   const body = closed
     ? "This job is closed."
     : failed
@@ -1190,7 +1190,7 @@ function JobStatusPanel({
     : jobRunning
     ? ""
     : funded
-    ? paymentNotRequired ? "Run the agent." : "Funded."
+    ? ""
     : "Waiting for payment.";
 
   return (
@@ -1211,7 +1211,7 @@ function JobStatusPanel({
       ) : (
         <div className="bnb-hire-state">
           <Play aria-hidden="true" size={18} />
-          <span>{funded ? paymentNotRequired ? "Run needed" : "Funded" : "Payment submitted"}</span>
+          <span>{funded ? paymentNotRequired ? "Run" : "Funded" : "Payment submitted"}</span>
         </div>
       )}
       {record?.payment ? (

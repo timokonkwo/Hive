@@ -457,7 +457,7 @@ function jobStatusLabel(record: BnbActivationRecord) {
   if (record.payment?.transactionStatus === "success" || record.status === "funded" || record.status === "payment_confirmed") return "Funded";
   if (record.status === "payment_submitted") return "Payment submitted";
   if (record.status === "failed") return "Failed";
-  if (record.limits.walletConfirmationRequired === false) return "Run needed";
+  if (record.limits.walletConfirmationRequired === false) return "Run";
   return "Awaiting funding";
 }
 

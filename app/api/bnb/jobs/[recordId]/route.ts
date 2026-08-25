@@ -35,7 +35,7 @@ export async function GET(request: NextRequest, { params }: { params: Params }) 
         ? buildBnbEscrowPaymentRequest(record)
         : {
           status: "not_required" as const,
-          reason: "Ready to run.",
+          reason: "",
         };
     return NextResponse.json({ record, paymentRequest });
   } catch (error) {

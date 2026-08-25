@@ -441,17 +441,17 @@ function jobStatusLabel(record: BnbActivationRecord) {
   if (record.delivery?.status === "running" || record.work?.status === "running" || record.status === "running") return "Running";
   if (record.payment?.transactionStatus === "success" || record.status === "funded" || record.status === "payment_confirmed") return "Funded";
   if (record.status === "failed") return "Failed";
-  if (record.limits.walletConfirmationRequired === false) return "Run needed";
+  if (record.limits.walletConfirmationRequired === false) return "Run";
   return "Awaiting funding";
 }
 
 function nextActionCopy(record: BnbActivationRecord) {
   const label = jobStatusLabel(record);
   const paymentNotRequired = record.limits.walletConfirmationRequired === false;
-  if (label === "Run needed") return "Run the agent.";
-  if (label === "Awaiting funding") return record.limits.walletConfirmationRequired ? "Fund the job to start." : "Run the agent.";
-  if (label === "Funded") return "Run the agent.";
-  if (label === "Running") return "The agent is working on this job.";
+  if (label === "Run") return "";
+  if (label === "Awaiting funding") return record.limits.walletConfirmationRequired ? "Fund the job to start." : "";
+  if (label === "Funded") return "";
+  if (label === "Running") return "";
   if (label === "Delivered") return paymentNotRequired ? "Review the result." : "Review the delivery.";
   if (label === "Paid") return "Payment has been released.";
   if (label === "Refunded") return "Payment has been refunded.";

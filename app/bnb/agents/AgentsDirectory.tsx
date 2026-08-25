@@ -79,7 +79,7 @@ const compareKey = "hive:bnb:compare-agents";
 
 const availabilityOptions = [
   { value: "all", label: "All agents" },
-  { value: "hireable", label: "Can hire" },
+  { value: "hireable", label: "Available" },
   { value: "listed_only", label: "Profiles" },
   { value: "unavailable", label: "Unavailable" },
 ];
@@ -451,8 +451,8 @@ function FilterFields({
         </span>
       </label>
       <label>
-        <span className="bnb-filter-label">Run status</span>
-        <BnbSelect value={status} onChange={setStatus} options={availabilityOptions} ariaLabel="Run status" />
+        <span className="bnb-filter-label">Status</span>
+        <BnbSelect value={status} onChange={setStatus} options={availabilityOptions} ariaLabel="Status" />
       </label>
       <label>
         <span className="bnb-filter-label">Works with</span>
@@ -589,7 +589,7 @@ function SavedAgents({ agents, remove }: { agents: SavedAgent[]; remove: (key: s
 function ComparisonPanel({ agents, close }: { agents: SavedAgent[]; close: () => void }) {
   const rows: ComparisonRow[] = [
     { label: "Category", value: (agent) => agent.category },
-    { label: "Run status", value: (agent) => agent.status },
+    { label: "Status", value: (agent) => agent.status },
     { label: "Reviews", value: (agent) => agent.reviews || "Not enough data", hasValue: (agent) => Boolean(agent.reviews) },
     { label: "Price", value: (agent) => agent.price || "Not listed", hasValue: (agent) => Boolean(agent.price) },
     { label: "Last active", value: (agent) => agent.lastActive || "Not listed" },

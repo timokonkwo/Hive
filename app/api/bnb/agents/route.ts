@@ -5,7 +5,8 @@ import { enforceBnbRateLimit } from "@/lib/bnb/rate-limit";
 function executionFilter(value: string | null) {
   if (!value) return null;
   if (value === "all") return null;
-  if (value === "callable" || value === "available" || value === "ready_to_run" || value === "connectable" || value === "request" || value === "hireable") return "hireable";
+  if (value === "callable" || value === "available" || value === "ready_to_run" || value === "run_ready" || value === "hireable") return "hireable";
+  if (value === "connectable" || value === "endpoint_found" || value === "request") return "hireable";
   if (value === "discoverable") return "listed_only";
   if (value === "listed_only" || value === "unavailable") return value;
   return null;

@@ -430,6 +430,7 @@ function cacheHitIsUsable(query: BnbAgentQuery, docs: BnbAgentCacheDocument[], t
 
   const hasNarrowFilter = Boolean(
     query.q?.trim() ||
+    query.category ||
     query.activation ||
     query.execution,
   );

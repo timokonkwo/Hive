@@ -84,6 +84,14 @@ const bnbAgentDomainTerms = [
   "token pair",
 ];
 
+const endpointCategorySearchSeeds: Record<BnbAgentCategory, string> = {
+  Rebalancing: "BNB Chain liquidity rebalance PancakeSwap pool",
+  "Grid Trading": "BNB Chain grid trading strategy bot",
+  "Yield Optimisation": "BNB Chain yield APY vault farm PancakeSwap Beefy",
+  "Health Factor Monitoring": "BNB Chain health factor liquidation lending Venus collateral",
+  Other: DEFAULT_QUERY,
+};
+
 export async function listBnbEndpointSourceAgents({
   q,
   category,
@@ -94,13 +102,13 @@ export async function listBnbEndpointSourceAgents({
   limit?: number;
 } = {}) {
   const safeLimit = Math.min(Math.max(Math.trunc(limit), 1), 50);
-  const query = endpointDiscoveryQuery(q, category);
-  const candidates = await Promise.all([
+  const queries = endpointDiscoveryQueries(q, category);
+  const candidates = await Promise.all(queries.flatMap((query) => [
     sourceEnabled("BNB_AGENT402_ENABLED", true) ? fetchAgent402Agents(query, safeLimit) : Promise.resolve([]),
     sourceEnabled("BNB_402INDEX_ENABLED", true) ? fetch402IndexAgents(query, safeLimit) : Promise.resolve([]),
     sourceEnabled("BNB_X402DIRECT_ENABLED", true) ? fetchX402DirectAgents(query, safeLimit) : Promise.resolve([]),
     sourceEnabled("BNB_THE402_ENABLED", true) ? fetchThe402Agents(query, safeLimit) : Promise.resolve([]),
-  ]);
+  ]));
 
   return uniqueEndpointAgents(candidates.flat())
     .filter((agent) => endpointAgentMatchesContext(agent, q, category))
@@ -443,11 +451,17 @@ function rootRelativeUrl(endpoint: string, path: string) {
   }
 }
 
-function endpointDiscoveryQuery(q?: string | null, category?: string | null) {
+function endpointDiscoveryQueries(q?: string | null, category?: string | null) {
   const cleaned = q?.trim();
-  if (cleaned) return cleaned;
-  if (category && hasCategory(category)) return `${category} ${categoryKeywords[category].join(" ")}`;
-  return DEFAULT_QUERY;
+  if (cleaned) return [cleaned];
+  if (category && hasCategory(category)) {
+    return Array.from(new Set([
+      endpointCategorySearchSeeds[category],
+      `${category} ${categoryKeywords[category].join(" ")}`,
+      DEFAULT_QUERY,
+    ].filter(Boolean)));
+  }
+  return [DEFAULT_QUERY];
 }
 
 function endpointAgentMatchesContext(agent: BnbAgentProfile, q?: string | null, category?: string | null) {

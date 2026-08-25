@@ -66,7 +66,7 @@ const categoryInferenceKeywords: Record<BnbAgentCategory, string[]> = {
 const marketplaceCategories = BNB_AGENT_CATEGORIES.filter((category) => category !== "Other");
 const categorySearchSeeds: Record<BnbAgentCategory, string> = {
   Rebalancing: "liquidity rebalance",
-  "Grid Trading": "grid trading",
+  "Grid Trading": "grid",
   "Yield Optimisation": "yield",
   "Health Factor Monitoring": "health liquidation",
   Other: "",
@@ -337,7 +337,8 @@ function inferCategory(text: string): BnbAgentCategory | null {
 }
 
 function marketplaceCategoryFromText(categoryText: string, text: string, options: { allowOther?: boolean } = {}): BnbAgentCategory | null {
-  const category = hasCategory(categoryText) ? categoryText : inferCategory(text);
+  const explicitCategory: BnbAgentCategory | null = hasCategory(categoryText) && categoryText !== "Other" ? categoryText : null;
+  const category = explicitCategory || inferCategory(text);
   if (category && category !== "Other" && isBnbMarketplaceAgentText(text)) return category;
   return options.allowOther ? "Other" : null;
 }
@@ -1378,8 +1379,9 @@ export async function listBnbAgentsPage(query: BnbAgentQuery = {}): Promise<BnbA
   const sort = query.sort || "recommended";
   const sourceSearch = query.q?.trim() || categorySearchText(query.category);
   const defaultMarketplaceBrowse = !query.q?.trim() && !query.category;
-  const sourceWindowLimit = defaultMarketplaceBrowse ? Math.min(Math.max(page * limit, limit), 100) : limit;
-  const sourcePage = defaultMarketplaceBrowse ? 1 : page;
+  const defaultRankedWindow = defaultMarketplaceBrowse && page * limit <= 100;
+  const sourceWindowLimit = defaultRankedWindow ? Math.min(Math.max(page * limit, limit), 100) : limit;
+  const sourcePage = defaultRankedWindow ? 1 : page;
   const runtimeFiltered = query.execution === "hireable" || query.execution === "ready_to_run" || query.execution === "connectable" || query.execution === "unavailable";
   const executionDiscovery = query.execution !== "listed_only" && runtimeFiltered;
   const profileDiscovery = !runtimeFiltered || query.execution === "listed_only";
@@ -1400,7 +1402,7 @@ export async function listBnbAgentsPage(query: BnbAgentQuery = {}): Promise<BnbA
         search: sourceSearch,
       })
       : Promise.resolve(empty8004Page(page, limit)),
-    defaultMarketplaceBrowse && profileDiscovery
+    defaultRankedWindow && profileDiscovery
       ? fetchDefaultMarketplaceCandidates({
         limit,
         page,
@@ -1412,7 +1414,7 @@ export async function listBnbAgentsPage(query: BnbAgentQuery = {}): Promise<BnbA
   ]);
   const baseAgents = page === 1 ? getBaseBnbAgents() : [];
   const liveCandidates = uniqueAgents([...semanticAgents, ...marketplacePage.agents, ...executionPage.agents, ...profilePage.agents])
-    .slice(0, executionDiscovery ? Math.min(limit * get8004ExecutionScanPages() * 2, 200) : defaultMarketplaceBrowse ? Math.min(page * limit + limit, 500) : limit);
+    .slice(0, executionDiscovery ? Math.min(limit * get8004ExecutionScanPages() * 2, 200) : defaultRankedWindow ? Math.min(page * limit + limit, 500) : Math.min(limit * 2, 100));
   const shouldHydrateLiveDetails = runtimeFiltered;
   const liveAgents = shouldHydrateLiveDetails
     ? await hydrate8004AgentDetails(liveCandidates, { limit: get8004DetailHydrationLimit() })
@@ -1428,7 +1430,7 @@ export async function listBnbAgentsPage(query: BnbAgentQuery = {}): Promise<BnbA
   const agents = await applyBnbEndpointProbeHealth(scoredAgents);
 
   const sortedPool = sortAgents(agents, sort, query);
-  const sorted = defaultMarketplaceBrowse
+  const sorted = defaultRankedWindow
     ? sortedPool.slice((page - 1) * limit, page * limit)
     : sortedPool.slice(0, limit);
   await upsertBnbAgentCache(runtimeCandidates).catch(() => undefined);
@@ -1555,6 +1557,22 @@ export async function refreshBnbAgentDiscoveryCache({
       stored += result.stored;
     } catch (error) {
       errors.push(`8004 page ${page}: ${error instanceof Error ? error.message : "failed"}`);
+    }
+  }
+
+  for (const category of marketplaceCategories) {
+    try {
+      const categoryPage = await fetch8004ProfileCandidates({
+        limit: Math.min(safePageSize, 50),
+        page: 1,
+        sortBy: sourceSortForCatalog("recommended"),
+        search: categorySearchText(category),
+      });
+      fetched += categoryPage.agents.length;
+      const result = await upsertBnbAgentCache(categoryPage.agents, { fetchedAt: startedAt });
+      stored += result.stored;
+    } catch (error) {
+      errors.push(`8004 ${category}: ${error instanceof Error ? error.message : "failed"}`);
     }
   }
 

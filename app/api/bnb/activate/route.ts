@@ -197,7 +197,7 @@ export async function POST(request: NextRequest) {
       ? buildBnbEscrowPaymentRequest(record)
       : {
         status: "not_required" as const,
-        reason: "Ready to run.",
+        reason: "",
       };
 
     return NextResponse.json({

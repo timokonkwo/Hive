@@ -23,7 +23,8 @@ function normalizePage(value: string | undefined) {
 function normalizeStatus(value: string | undefined): string {
   if (!value) return defaultStatus;
   if (value === "all") return "all";
-  if (value === "callable" || value === "available" || value === "ready_to_run" || value === "connectable" || value === "request" || value === "hireable") return "hireable";
+  if (value === "callable" || value === "available" || value === "ready_to_run" || value === "run_ready" || value === "hireable") return "hireable";
+  if (value === "connectable" || value === "endpoint_found" || value === "request") return "hireable";
   if (value === "discoverable") return "listed_only";
   if (value === "listed_only" || value === "unavailable") return value;
   return "";
@@ -121,10 +122,7 @@ export default async function BnbAgentsPage({ searchParams }: { searchParams: Se
 
   return (
     <BnbShell active="agents">
-      <BnbPageHeader
-        title="Agents"
-        body="Search agents by capability and run status."
-      />
+      <BnbPageHeader title="Agents" />
 
       <BnbContainer className="bnb-section">
         <AgentsDirectory

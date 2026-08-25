@@ -136,7 +136,7 @@ export function getBnbHireBlocker(
 
   const agentReadiness = classifyBnbAgentReadiness(agent);
   if (!agentReadiness.canHire) {
-    if (agentReadiness.status === "identity_only") return "This agent does not expose a callable endpoint for this job.";
+    if (agentReadiness.status === "profile") return "This agent does not expose a callable endpoint for this job.";
     if (agentReadiness.status === "unavailable") return "This agent is unavailable.";
     return agentReadiness.reason;
   }

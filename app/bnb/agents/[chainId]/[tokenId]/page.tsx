@@ -50,14 +50,13 @@ export default async function BnbAgentDetailPage({
   const visibleServices = bnbUsableServices(agent);
   const integrations = bnbAgentIntegrations(agent);
   const protocols = bnbProtocolSummary(agent);
-  const hasServiceEndpoint = Boolean(agent.executionEndpoints?.some((endpoint) => endpoint.adapter === "mcp" || endpoint.adapter === "a2a" || endpoint.adapter === "x402" || endpoint.adapter === "http"));
   const ownerAddress = isAddress(agent.ownerAddress) ? agent.ownerAddress : "";
   const agentWallet = isAddress(agent.agentWallet) ? agent.agentWallet : "";
   const identityUrl = externalAgentUrl(agent);
   const identityLabel = externalAgentLabel(agent);
   const verified = bnbIsVerified(agent);
   const facts = [
-    { label: "Run status", value: bnbStatusLabel(agent) },
+    { label: "Status", value: bnbStatusLabel(agent) },
     ...(freshnessLabel(agent.lastActivity) ? [{ label: "Last active", value: freshnessLabel(agent.lastActivity) }] : []),
     ...(hasPrice(agent) ? [{ label: "Price", value: priceLabel(agent) }] : []),
     ...(hasReviews ? [{ label: "Reviews", value: bnbReviewLabel(agent) }] : []),
@@ -178,13 +177,12 @@ export default async function BnbAgentDetailPage({
               </section>
             ) : null}
 
-            {(protocols.length > 0 || agent.x402Support || hasServiceEndpoint) ? (
+            {(protocols.length > 0 || agent.x402Support) ? (
               <details className="bnb-agent-section bnb-agent-sidebar-card bnb-agent-technical-details">
                 <summary>Protocol details</summary>
                 <dl className="bnb-agent-identity-grid">
                   {protocols.length > 0 ? <DataRow label="Protocols" value={protocols.join(", ")} /> : null}
                   <DataRow label="Payment protocol" value={agent.x402Support ? "x402 supported" : "Not listed"} />
-                  {hasServiceEndpoint ? <DataRow label="Service endpoint" value="Available" /> : null}
                 </dl>
               </details>
             ) : null}
