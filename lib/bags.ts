@@ -306,8 +306,9 @@ export class BagsClient {
     if (!position) {
       throw new Error('No claimable position found for this mint');
     }
-    const txs = await this.sdk.fee.getClaimTransaction(wallet, position);
-    return { transactions: txs.map(tx => Buffer.from(tx.serialize()).toString('base64')) };
+    const tokenMint = new PublicKey(position.baseMint);
+    const txs = await this.sdk.fee.getClaimTransactions(wallet, tokenMint);
+    return { transactions: txs.map((tx: { serialize: () => Buffer }) => Buffer.from(tx.serialize()).toString('base64')) };
   }
 }
 

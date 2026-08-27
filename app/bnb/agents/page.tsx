@@ -1,7 +1,7 @@
 import { redirect } from "next/navigation";
-import { getBnbAgentNetworkStats, getBnbCategories, listBnbAgentsPage } from "@/lib/bnb/catalog";
+import { getBnbCategories, listBnbAgentsPage } from "@/lib/bnb/catalog";
 import { BnbContainer, BnbPageHeader, BnbShell } from "@/app/bnb/_components/BnbUi";
-import type { BnbAgentCategory, BnbAgentProfile } from "@/lib/bnb/types";
+import type { BnbAgentCategory } from "@/lib/bnb/types";
 import { bnbCategoryLabel } from "@/lib/bnb/display";
 import { AgentsDirectory } from "./AgentsDirectory";
 
@@ -56,17 +56,23 @@ function categoryLabel(category: BnbAgentCategory) {
   return bnbCategoryLabel(category);
 }
 
-function supportsIntegration(agent: BnbAgentProfile, integration?: string | null) {
-  if (!integration) return true;
-  const haystack = [
-    agent.capabilities.join(" "),
-    agent.services.map((service) => `${service.name} ${service.type}`).join(" "),
-  ].join(" ").toLowerCase();
-
-  if (integration === "pancakeswap") return haystack.includes("pancake");
-  if (integration === "altana") return haystack.includes("altana") || (agent.a2aSupport && (haystack.includes("wallet") || haystack.includes("health")));
-  if (integration === "8004scan") return agent.sourceFreshness.source === "8004scan";
-  return true;
+function resultPaginationTotal({
+  total,
+  agentCount,
+  page,
+  pageSize,
+  hasMore,
+}: {
+  total: number;
+  agentCount: number;
+  page: number;
+  pageSize: number;
+  hasMore: boolean;
+}) {
+  const normalizedTotal = Number.isFinite(total) ? Math.max(Math.trunc(total), 0) : 0;
+  if (normalizedTotal > 0) return normalizedTotal;
+  if (agentCount === 0) return 0;
+  return (page - 1) * pageSize + agentCount + (hasMore ? pageSize : 0);
 }
 
 export default async function BnbAgentsPage({ searchParams }: { searchParams: SearchParams }) {
@@ -82,21 +88,24 @@ export default async function BnbAgentsPage({ searchParams }: { searchParams: Se
   const catalogSort = sortForCatalog(sort);
   const pageSize = 24;
   const page = normalizePage(paramValue(params.page));
-  const [result, networkStats] = await Promise.all([
-    listBnbAgentsPage({
-      q,
-      category,
-      sort: catalogSort,
-      execution,
-      limit: pageSize,
-      page,
-    }),
-    getBnbAgentNetworkStats(),
-  ]);
-  const unfilteredRegistry = !q && !category && !execution && !integration;
-  const networkTotal = unfilteredRegistry ? Math.max(result.total, networkStats.totalAgents) : result.total || 0;
-  const pageCount = Math.max(1, Math.ceil(networkTotal / pageSize));
-  if (networkTotal > 0 && page > pageCount) {
+  const result = await listBnbAgentsPage({
+    q,
+    category,
+    sort: catalogSort,
+    execution,
+    integration,
+    limit: pageSize,
+    page,
+  });
+  const paginationTotal = resultPaginationTotal({
+    total: result.total,
+    agentCount: result.agents.length,
+    page: result.page,
+    pageSize: result.pageSize,
+    hasMore: result.hasMore,
+  });
+  const pageCount = Math.max(1, Math.ceil(paginationTotal / pageSize));
+  if (paginationTotal > 0 && page > pageCount) {
     const nextParams = new URLSearchParams();
     if (q) nextParams.set("q", q);
     if (category) nextParams.set("category", category);
@@ -107,12 +116,11 @@ export default async function BnbAgentsPage({ searchParams }: { searchParams: Se
     const query = nextParams.toString();
     redirect(query ? `/bnb/agents?${query}` : "/bnb/agents");
   }
-  const baseAgents = result.agents.filter((agent) => supportsIntegration(agent, integration));
   const categoryCounts = categories.map((item) => ({
     category: item,
     label: categoryLabel(item),
   }));
-  const agents = baseAgents;
+  const agents = result.agents;
   const hasFilters = Boolean(q || category || (status && status !== defaultStatus) || integration || sort !== "recommended");
   const resultLabel = q
     ? `Agents for "${q}"`
@@ -132,7 +140,7 @@ export default async function BnbAgentsPage({ searchParams }: { searchParams: Se
           resultLabel={resultLabel}
           page={page}
           pageSize={pageSize}
-          totalAgents={networkTotal}
+          totalAgents={paginationTotal}
           hasMore={result.hasMore}
         />
       </BnbContainer>

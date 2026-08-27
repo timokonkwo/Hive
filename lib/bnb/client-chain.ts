@@ -23,12 +23,12 @@ export function getClientBnbNativeSymbol() {
   return getClientBnbChainId() === 97 ? "tBNB" : "BNB";
 }
 
-export function getClientBnbExplorerTxUrl(hash: string) {
-  const base = getClientBnbChainId() === 97 ? "https://testnet.bscscan.com" : "https://bscscan.com";
+export function getClientBnbExplorerTxUrl(hash: string, chainId: number = getClientBnbChainId()) {
+  const base = chainId === 97 ? "https://testnet.bscscan.com" : "https://bscscan.com";
   return `${base}/tx/${hash}`;
 }
 
-export function getClientBnbExplorerAddressUrl(address: string) {
-  const base = getClientBnbChainId() === 97 ? "https://testnet.bscscan.com" : "https://bscscan.com";
+export function getClientBnbExplorerAddressUrl(address: string, chainId: number = getClientBnbChainId()) {
+  const base = chainId === 97 ? "https://testnet.bscscan.com" : "https://bscscan.com";
   return `${base}/address/${address}`;
 }

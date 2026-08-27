@@ -1,11 +1,16 @@
-import { NextResponse } from "next/server";
+import { timingSafeEqual } from "node:crypto";
+import { NextRequest, NextResponse } from "next/server";
 import { hydrateBnbAgentCacheQueue, refreshBnbAgentDiscoveryCache } from "@/lib/bnb/catalog";
+import { enforceBnbRateLimit } from "@/lib/bnb/rate-limit";
 
 export const dynamic = "force-dynamic";
 
 type CacheCronMode = "refresh" | "hydrate" | "all";
 
-export async function GET(request: Request) {
+export async function GET(request: NextRequest) {
+  const limited = await enforceBnbRateLimit(request, "cron:bnb-agent-cache", "write");
+  if (limited) return limited;
+
   if (!isAuthorized(request)) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
@@ -43,13 +48,14 @@ export async function GET(request: Request) {
 
 function isAuthorized(request: Request) {
   const authHeader = request.headers.get("authorization");
-  const cronSecret = process.env.CRON_SECRET;
-  const stealthSecret = process.env.STEALTH_AGENT_SECRET;
+  const cronSecret = process.env.CRON_SECRET?.trim();
+  return Boolean(cronSecret && authHeader && safeEqual(authHeader, `Bearer ${cronSecret}`));
+}
 
-  return Boolean(
-    (cronSecret && authHeader === `Bearer ${cronSecret}`) ||
-    (stealthSecret && authHeader === `Bearer ${stealthSecret}`),
-  );
+function safeEqual(left: string, right: string) {
+  const leftBuffer = Buffer.from(left);
+  const rightBuffer = Buffer.from(right);
+  return leftBuffer.length === rightBuffer.length && timingSafeEqual(leftBuffer, rightBuffer);
 }
 
 function cacheCronMode(value: string | null): CacheCronMode {

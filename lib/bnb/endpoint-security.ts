@@ -14,6 +14,9 @@ const DEFAULT_MAX_BYTES = 256 * 1024;
 const MAX_REDIRECTS = 3;
 
 export function validatePublicHttpsUrl(value: string) {
+  if (hasUnresolvedUrlTemplate(value)) {
+    return { ok: false as const, reason: "Endpoint URL is incomplete." };
+  }
   try {
     const url = new URL(value);
     if (url.protocol !== "https:") return { ok: false as const, reason: "Endpoint must use HTTPS." };
@@ -29,6 +32,10 @@ export function validatePublicHttpsUrl(value: string) {
   } catch {
     return { ok: false as const, reason: "Endpoint URL is invalid." };
   }
+}
+
+export function hasUnresolvedUrlTemplate(value: string) {
+  return /\{[^}]+\}|<[^>]+>|\$\{[^}]+\}/.test(value);
 }
 
 export async function assertPublicHttpsUrl(value: string) {

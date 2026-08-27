@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { useModalStatus } from "@privy-io/react-auth";
-import { useAccount, useSendTransaction, useSwitchChain } from "wagmi";
+import { useAccount, usePublicClient, useSendTransaction, useSwitchChain, useWalletClient } from "wagmi";
 import type { Hex } from "viem";
 import { ArrowLeft, CreditCard, Play } from "lucide-react";
 import { BnbButtonLoader } from "@/app/bnb/_components/BnbButtonLoader";
@@ -13,23 +13,18 @@ import { BnbDeliveryView } from "@/app/bnb/_components/BnbDeliveryView";
 import { useAuth } from "@/hooks/useAuth";
 import { useBnbAuthFetch } from "@/hooks/useBnbAuthFetch";
 import { getClientBnbChainId, getClientBnbExplorerAddressUrl, getClientBnbExplorerTxUrl, getClientBnbNativeSymbol } from "@/lib/bnb/client-chain";
+import { bnbJobTaskLabel, getBnbJobSpecDefinition } from "@/lib/bnb/jobs";
 import { bnbRefundUnavailableReason } from "@/lib/bnb/settlement-state";
 import type { BnbActivationRecord } from "@/lib/bnb/types";
+import type { BnbPaymentRequest } from "@/lib/bnb/types";
+import {
+  bnbX402ChainId,
+  bnbX402Signer,
+  createBnbX402PaymentConfirmation,
+  getBnbX402Permit2Approval,
+} from "@/lib/bnb/client-x402";
 
-type PaymentRequest =
-  | {
-      status: "ready";
-      chainId: number;
-      to: string;
-      value: string;
-      data: string;
-      gasLimit?: string;
-      amountLabel: string;
-    }
-  | {
-      status: "setup_required" | "budget_needs_bnb" | "agent_wallet_invalid" | "not_required";
-      reason: string;
-    };
+type PaymentRequest = BnbPaymentRequest;
 
 type SettlementRequest =
   | {
@@ -52,19 +47,22 @@ type JobPayload = {
 };
 
 export function BnbJobClient({ recordId }: { recordId: string }) {
+  const targetChainId = getClientBnbChainId();
+  const nativeSymbol = getClientBnbNativeSymbol();
   const { authenticated, login, ready, connectWallet } = useAuth();
   const { address, chainId } = useAccount();
   const { isOpen: privyModalOpen } = useModalStatus();
   const { switchChainAsync } = useSwitchChain();
   const { sendTransactionAsync } = useSendTransaction();
+  const { data: walletClient } = useWalletClient();
   const { authFetch } = useBnbAuthFetch();
-  const targetChainId = getClientBnbChainId();
-  const nativeSymbol = getClientBnbNativeSymbol();
   const [job, setJob] = useState<JobPayload | null>(null);
   const [loading, setLoading] = useState(true);
   const [action, setAction] = useState("");
   const [authAction, setAuthAction] = useState<"login" | "connect" | "">("");
   const [error, setError] = useState("");
+  const activePaymentChainId = jobPaymentChainId(job?.paymentRequest, targetChainId);
+  const publicClient = usePublicClient({ chainId: activePaymentChainId });
 
   useEffect(() => {
     if (!privyModalOpen) {
@@ -101,7 +99,7 @@ export function BnbJobClient({ recordId }: { recordId: string }) {
     };
   }, [address, authFetch, authenticated, ready, recordId]);
 
-  async function ensureWallet() {
+  async function ensureWallet(requiredChainId = targetChainId) {
     if (!authenticated && !address) {
       signInWithBnbWallet();
       return false;
@@ -114,8 +112,8 @@ export function BnbJobClient({ recordId }: { recordId: string }) {
       });
       return false;
     }
-    if (chainId !== targetChainId) {
-      await switchChainAsync({ chainId: targetChainId });
+    if (chainId !== requiredChainId) {
+      await switchChainAsync({ chainId: requiredChainId });
     }
     return true;
   }
@@ -134,22 +132,53 @@ export function BnbJobClient({ recordId }: { recordId: string }) {
     setError("");
 
     try {
-      if (!(await ensureWallet())) return;
-      const hash = await sendTransactionAsync({
-        to: job.paymentRequest.to as Hex,
-        data: job.paymentRequest.data as Hex,
-        value: BigInt(job.paymentRequest.value),
-        gas: job.paymentRequest.gasLimit ? BigInt(job.paymentRequest.gasLimit) : undefined,
-        chainId: targetChainId,
-      });
+      const requiredChainId = jobPaymentChainId(job.paymentRequest, targetChainId);
+      if (!(await ensureWallet(requiredChainId))) return;
+      let paymentConfirmation: { transactionHash?: string; paymentHeader?: string };
+      if (job.paymentRequest.mode === "x402") {
+        const paymentChainId = bnbX402ChainId(job.paymentRequest);
+        if (!address || !walletClient || !publicClient) {
+          throw new Error("Your wallet is not ready for this payment.");
+        }
+        const approval = await getBnbX402Permit2Approval({
+          request: job.paymentRequest,
+          ownerAddress: address,
+          readContract: (args) => publicClient.readContract(args),
+        });
+        if (approval) {
+          const approvalHash = await sendTransactionAsync({
+            to: approval.to,
+            data: approval.data,
+            value: 0n,
+            chainId: paymentChainId,
+          });
+          const receipt = await publicClient.waitForTransactionReceipt({ hash: approvalHash });
+          if (receipt.status !== "success") throw new Error("Token approval failed.");
+        }
+        const signed = await createBnbX402PaymentConfirmation({
+          request: job.paymentRequest,
+          signer: bnbX402Signer(walletClient, address),
+        });
+        paymentConfirmation = { paymentHeader: signed.paymentHeader };
+      } else {
+        const hash = await sendTransactionAsync({
+          to: job.paymentRequest.to as Hex,
+          data: job.paymentRequest.data as Hex,
+          value: BigInt(job.paymentRequest.value),
+          gas: job.paymentRequest.gasLimit ? BigInt(job.paymentRequest.gasLimit) : undefined,
+          chainId: job.paymentRequest.chainId,
+        });
+        paymentConfirmation = { transactionHash: hash };
+      }
       const response = await authFetch("/api/bnb/activate/payment", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ recordId, transactionHash: hash }),
+        body: JSON.stringify({ recordId, ...paymentConfirmation }),
       });
       const payload = await response.json();
       if (!response.ok) throw new Error(payload.error || "Payment was sent, but the job could not be updated.");
       setJob({ record: payload.record, paymentRequest: null });
+      await runJob();
     } catch (fundError) {
       setError(fundError instanceof Error ? fundError.message : "Could not fund job.");
     } finally {
@@ -187,7 +216,7 @@ export function BnbJobClient({ recordId }: { recordId: string }) {
     setError("");
 
     try {
-      if (!(await ensureWallet())) return;
+      if (!(await ensureWallet(targetChainId))) return;
       const prepareResponse = await authFetch("/api/bnb/activate/settlement", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -272,10 +301,12 @@ export function BnbJobClient({ recordId }: { recordId: string }) {
   const failed = record.delivery?.status === "failed" || record.work?.status === "failed" || record.status === "failed";
   const output = record.delivery?.rawOutput || record.work?.output;
   const dataSources = record.delivery?.dataSources || record.work?.dataSources;
+  const deliveryError = userFacingJobIssue(record.delivery?.error || record.work?.error || "");
   const refundBlocker = bnbRefundUnavailableReason(record);
-  const showSettlementActions = !paymentNotRequired && delivered && !closed;
-  const fundedExplorerUrl = record.payment?.explorerUrl || (record.payment?.transactionHash ? getClientBnbExplorerTxUrl(record.payment.transactionHash) : "");
-  const settlementExplorerUrl = record.settlement?.explorerUrl || (record.settlement?.transactionHash ? getClientBnbExplorerTxUrl(record.settlement.transactionHash) : "");
+  const showSettlementActions = record.payment?.mode === "escrow" && delivered && !closed;
+  const recordChainId = record.payment?.chainId || targetChainId;
+  const fundedExplorerUrl = record.payment?.explorerUrl || (record.payment?.transactionHash ? getClientBnbExplorerTxUrl(record.payment.transactionHash, recordChainId) : "");
+  const settlementExplorerUrl = record.settlement?.explorerUrl || (record.settlement?.transactionHash ? getClientBnbExplorerTxUrl(record.settlement.transactionHash, recordChainId) : "");
 
   return (
     <BnbContainer className="bnb-section">
@@ -297,7 +328,7 @@ export function BnbJobClient({ recordId }: { recordId: string }) {
 
             {record.jobSpec ? (
               <div className="bnb-job-section">
-                <h3>{record.jobSpec.taskType}</h3>
+                <h3>{bnbJobTaskLabel(getBnbJobSpecDefinition(record.jobSpec), record.jobSpec.taskType)}</h3>
                 <pre>{record.jobSpec.summary}</pre>
               </div>
             ) : (
@@ -310,7 +341,7 @@ export function BnbJobClient({ recordId }: { recordId: string }) {
             <div className="bnb-job-section">
               <h3>Delivery</h3>
               {output ? <BnbDeliveryView output={output} jobSpec={record.jobSpec} dataSources={dataSources} /> : <p>No delivery yet.</p>}
-              {record.delivery?.error || record.work?.error ? <p className="bnb-form-error">{record.delivery?.error || record.work?.error}</p> : null}
+              {deliveryError ? <p className="bnb-form-error">{deliveryError}</p> : null}
             </div>
           </BnbPanel>
         </main>
@@ -323,13 +354,13 @@ export function BnbJobClient({ recordId }: { recordId: string }) {
               {job.paymentRequest?.status === "ready" && !funded ? (
                 <button type="button" className="bnb-button bnb-focus" onClick={fundJob} disabled={Boolean(action)} aria-busy={action === "fund"}>
                   {action === "fund" ? <BnbButtonLoader /> : <CreditCard aria-hidden="true" size={16} />}
-                  {action === "fund" ? "Confirming..." : `Fund ${job.paymentRequest.amountLabel}`}
+                  {action === "fund" ? "Confirming..." : `Pay ${job.paymentRequest.amountLabel}`}
                 </button>
               ) : null}
               {funded && !delivered && !closed && !failed ? (
                 <button type="button" className="bnb-button bnb-focus" onClick={runJob} disabled={Boolean(action) || running} aria-busy={action === "run" || running}>
                   {action === "run" || running ? <BnbButtonLoader /> : <Play aria-hidden="true" size={16} />}
-                  {action === "run" || running ? "Running..." : "Run agent"}
+                  {action === "run" || running ? "Running" : "Run agent"}
                 </button>
               ) : null}
               {showSettlementActions ? (
@@ -352,29 +383,29 @@ export function BnbJobClient({ recordId }: { recordId: string }) {
                 View agent
               </Link>
             </div>
-            {job.paymentRequest && job.paymentRequest.status !== "ready" && job.paymentRequest.status !== "not_required" ? <p className="bnb-form-error">{job.paymentRequest.reason}</p> : null}
-            {error ? <p className="bnb-form-error">{error}</p> : null}
+            {job.paymentRequest && job.paymentRequest.status !== "ready" && job.paymentRequest.status !== "not_required" ? <p className="bnb-form-error">{userFacingJobIssue(job.paymentRequest.reason)}</p> : null}
+            {error ? <p className="bnb-form-error">{userFacingJobIssue(error)}</p> : null}
           </BnbPanel>
 
           <BnbPanel className="bnb-job-panel">
             <h2>{paymentNotRequired ? "Run details" : "Payment"}</h2>
             <dl>
               {!paymentNotRequired ? <DataRow label="Budget" value={record.limits.budget} /> : null}
-              <DataRow label="Network" value={nativeSymbol} />
+              <DataRow label="Network" value={recordChainId === 97 ? "BNB Smart Chain Testnet" : "BNB Smart Chain"} />
               <DataRow label="Expires" value={record.limits.expires} />
               {record.payment?.contractAddress ? (
                 <DataRow
-                  label="Escrow contract"
+                  label="Payment contract"
                   value={record.payment.contractAddress}
                   displayValue={shortHash(record.payment.contractAddress)}
-                  href={getClientBnbExplorerAddressUrl(record.payment.contractAddress)}
+                  href={getClientBnbExplorerAddressUrl(record.payment.contractAddress, recordChainId)}
                   copyValue={record.payment.contractAddress}
                 />
               ) : null}
-              {record.payment?.jobId ? <DataRow label="Escrow job" value={record.payment.jobId} displayValue={shortHash(record.payment.jobId)} copyValue={record.payment.jobId} /> : null}
+              {record.payment?.jobId ? <DataRow label="Job ID" value={record.payment.jobId} displayValue={shortHash(record.payment.jobId)} copyValue={record.payment.jobId} /> : null}
               {record.payment?.transactionHash ? (
                 <DataRow
-                  label="Funded"
+                  label="Payment"
                   value={record.payment.transactionHash}
                   displayValue={shortHash(record.payment.transactionHash)}
                   href={fundedExplorerUrl}
@@ -383,7 +414,7 @@ export function BnbJobClient({ recordId }: { recordId: string }) {
               ) : null}
               {record.settlement?.transactionHash ? (
                 <DataRow
-                  label="Settlement"
+                  label="Final transaction"
                   value={record.settlement.transactionHash}
                   displayValue={shortHash(record.settlement.transactionHash)}
                   href={settlementExplorerUrl}
@@ -434,26 +465,55 @@ function shortHash(value: string) {
   return value.length > 18 ? `${value.slice(0, 10)}...${value.slice(-8)}` : value;
 }
 
+function jobPaymentChainId(request: PaymentRequest | null | undefined, fallback: 56 | 97): 56 | 97 {
+  if (request?.status !== "ready") return fallback;
+  if (request.mode === "escrow") return request.chainId === 97 ? 97 : 56;
+  try {
+    return bnbX402ChainId(request);
+  } catch {
+    return fallback;
+  }
+}
+
 function jobStatusLabel(record: BnbActivationRecord) {
   if (record.status === "paid" || record.status === "released") return "Paid";
   if (record.status === "refunded") return "Refunded";
   if (record.delivery?.status === "delivered" || record.work?.status === "completed" || record.status === "delivered" || record.status === "work_completed") return "Delivered";
   if (record.delivery?.status === "running" || record.work?.status === "running" || record.status === "running") return "Running";
-  if (record.payment?.transactionStatus === "success" || record.status === "funded" || record.status === "payment_confirmed") return "Funded";
+  if (record.payment?.transactionStatus === "success" || record.status === "funded" || record.status === "payment_confirmed") return "Payment sent";
   if (record.status === "failed") return "Failed";
   if (record.limits.walletConfirmationRequired === false) return "Run";
-  return "Awaiting funding";
+  return "Awaiting payment";
 }
 
 function nextActionCopy(record: BnbActivationRecord) {
   const label = jobStatusLabel(record);
   const paymentNotRequired = record.limits.walletConfirmationRequired === false;
   if (label === "Run") return "";
-  if (label === "Awaiting funding") return record.limits.walletConfirmationRequired ? "Fund the job to start." : "";
-  if (label === "Funded") return "";
+  if (label === "Awaiting payment") return record.limits.walletConfirmationRequired ? "Pay to start." : "";
+  if (label === "Payment sent") return "";
   if (label === "Running") return "";
   if (label === "Delivered") return paymentNotRequired ? "Review the result." : "Review the delivery.";
   if (label === "Paid") return "Payment has been released.";
   if (label === "Refunded") return "Payment has been refunded.";
   return "Check the job state and retry if needed.";
+}
+
+function userFacingJobIssue(value: string) {
+  const text = value.trim();
+  if (!text) return "";
+  if (/requires external sign-in/i.test(text)) return "This agent needs a separate sign-in.";
+  if (/cannot be run from hive|not available for jobs|no callable|does not expose a callable|no supported execution/i.test(text)) {
+    return "This agent is not available for jobs.";
+  }
+  if (/endpoint|adapter|callable|matching/i.test(text) && /cannot run|does not expose|failed|rejected|not available/i.test(text)) {
+    return "This agent cannot run this job.";
+  }
+  return text
+    .replace(/\bMCP\b|\bA2A\b|\bx402\b/g, "agent")
+    .replace(/\bendpoint\b/gi, "agent")
+    .replace(/\badapter\b/gi, "agent")
+    .replace(/\bcallable\b/gi, "available")
+    .replace(/\s+/g, " ")
+    .trim();
 }

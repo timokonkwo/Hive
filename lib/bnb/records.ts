@@ -5,6 +5,7 @@ import { getBnbAgent } from "@/lib/bnb/catalog";
 import { getBscChainId } from "@/lib/bnb/chain";
 import { readBnbEscrowPayment } from "@/lib/bnb/escrow";
 import { readBnbSessionGrant, readBnbSessionRevoke } from "@/lib/bnb/session";
+import { encryptBnbX402PaymentHeader, sanitizeBnbX402PaymentSnapshot, validateBnbX402PaymentHeader } from "@/lib/bnb/x402";
 import type {
   BnbAccessRequestRecord,
   BnbActivationRecord,
@@ -24,8 +25,15 @@ type BnbStoredRecord =
   | BnbTermixComparisonRecord
   | BnbAltanaSessionRecord;
 
+type BnbX402AuthorizationReservation = {
+  _id: string;
+  recordId: string;
+  createdAt: string;
+};
+
 type ProcessRecordStore = {
   activations: BnbActivationRecord[];
+  x402Authorizations: Map<string, string>;
   accessRequests: BnbAccessRequestRecord[];
   termixComparisons: BnbTermixComparisonRecord[];
   altanaSessions: BnbAltanaSessionRecord[];
@@ -46,6 +54,7 @@ function getProcessStore() {
   if (!globalForBnbRecords.__hiveBnbRecords) {
     globalForBnbRecords.__hiveBnbRecords = {
       activations: [],
+      x402Authorizations: new Map(),
       accessRequests: [],
       termixComparisons: [],
       altanaSessions: [],
@@ -134,6 +143,8 @@ export async function createBnbActivationRecord({
   expiry,
   clientAddress,
   walletConfirmationRequired = true,
+  payment,
+  executionTarget,
 }: {
   agent: BnbAgentProfile;
   taskTemplate: string;
@@ -142,6 +153,8 @@ export async function createBnbActivationRecord({
   expiry: string;
   clientAddress?: string;
   walletConfirmationRequired?: boolean;
+  payment?: BnbActivationRecord["payment"];
+  executionTarget?: BnbActivationRecord["executionTarget"];
 }) {
   const now = new Date().toISOString();
   const record: BnbActivationRecord = {
@@ -161,6 +174,7 @@ export async function createBnbActivationRecord({
       agentWallet: agent.agentWallet,
     },
     ...(jobSpec ? { jobSpec } : {}),
+    ...(executionTarget ? { executionTarget } : {}),
     delivery: {
       status: "pending",
     },
@@ -170,6 +184,7 @@ export async function createBnbActivationRecord({
       expires: expiry,
       walletConfirmationRequired,
     },
+    ...(payment ? { payment } : {}),
   };
 
   return saveBnbRecord(COLLECTIONS.BNB_ACTIVATIONS, record, (stored) => {
@@ -553,6 +568,7 @@ export async function confirmBnbActivationPayment({
     updatedAt: now,
     status: payment.transactionStatus === "success" ? "funded" : payment.transactionStatus === "reverted" ? "payment_reverted" : "payment_submitted",
     payment: {
+      mode: "escrow",
       chainId: getBscChainId(),
       contractAddress: payment.contractAddress,
       transactionHash: payment.transactionHash,
@@ -573,6 +589,7 @@ export async function confirmBnbActivationPayment({
 
       if (updated) return stripMongoId(updated);
     } catch (error) {
+      if (error instanceof BnbStorageError) throw error;
       if (!canUseProcessStorage()) {
         const message = error instanceof Error ? error.message : "Database update failed.";
         throw new BnbStorageError(`Payment receipt was not updated: ${message}`);
@@ -597,6 +614,146 @@ export async function confirmBnbActivationPayment({
   };
   processStore.activations[recordIndex] = updated;
   return updated;
+}
+
+export async function confirmBnbActivationX402Payment({
+  recordId,
+  clientAddress,
+  paymentHeader,
+}: {
+  recordId: string;
+  clientAddress?: string;
+  paymentHeader: string;
+}) {
+  const now = new Date().toISOString();
+  const existing = await getBnbActivationRecord({ recordId, clientAddress });
+  if (!existing) return null;
+
+  const x402 = existing.payment?.x402;
+  const paymentRequirement = x402?.selectedRequirement;
+  if (existing.payment?.mode !== "x402" || !x402 || !paymentRequirement) {
+    throw new BnbStorageError("This payment is not available for this job.");
+  }
+  const closedStatuses: BnbActivationRecord["status"][] = ["running", "delivered", "work_completed", "paid", "released", "refunded"];
+  if (x402.status === "settled" || x402.status === "unconfirmed" || closedStatuses.includes(existing.status)) {
+    throw new BnbStorageError("This payment is already closed.");
+  }
+
+  const verified = await validateBnbX402PaymentHeader({
+    paymentHeader,
+    paymentRequirement,
+    x402Version: x402.x402Version,
+  });
+  if (x402.status === "verified") {
+    if (x402.paymentHeaderHash === verified.paymentHeaderHash) return existing;
+    throw new BnbStorageError("This payment is already closed.");
+  }
+  const encryptedPaymentHeader = encryptBnbX402PaymentHeader(paymentHeader);
+  const patch: Partial<BnbActivationRecord> = {
+    updatedAt: now,
+    status: "payment_confirmed",
+    payment: {
+      ...existing.payment,
+      mode: "x402",
+      chainId: existing.payment.chainId || getBscChainId(),
+      transactionStatus: "success",
+      x402: {
+        ...x402,
+        status: "verified",
+        paymentHeader: encryptedPaymentHeader,
+        paymentHeaderHash: verified.paymentHeaderHash,
+        payer: verified.payer || x402.payer,
+        verifiedAt: now,
+        error: undefined,
+      },
+    },
+  };
+
+  if (hasDatabaseConfig()) {
+    let authorizationReserved = false;
+    try {
+      const db = await getDb();
+      await db.collection<BnbX402AuthorizationReservation>(COLLECTIONS.BNB_X402_AUTHORIZATIONS).insertOne({
+        _id: verified.paymentHeaderHash,
+        recordId,
+        createdAt: now,
+      });
+      authorizationReserved = true;
+      const updated = await db
+        .collection<BnbActivationRecord & { _id?: unknown }>(COLLECTIONS.BNB_ACTIVATIONS)
+        .findOneAndUpdate({
+          recordId,
+          ...(clientAddress ? { clientAddress } : {}),
+          updatedAt: existing.updatedAt,
+          status: { $nin: closedStatuses },
+          "payment.mode": "x402",
+          "payment.x402.status": { $nin: ["settled", "unconfirmed"] },
+        }, { $set: patch }, { returnDocument: "after" });
+
+      if (updated) return stripMongoId(updated);
+      await db.collection<BnbX402AuthorizationReservation>(COLLECTIONS.BNB_X402_AUTHORIZATIONS).deleteOne({
+        _id: verified.paymentHeaderHash,
+        recordId,
+      });
+      authorizationReserved = false;
+      throw new BnbStorageError("Payment details changed. Reload this job and try again.");
+    } catch (error) {
+      if (error instanceof BnbStorageError) throw error;
+      if (isMongoDuplicateKeyError(error)) {
+        throw new BnbStorageError("This payment confirmation has already been used.");
+      }
+      if (authorizationReserved) {
+        try {
+          const db = await getDb();
+          await db.collection<BnbX402AuthorizationReservation>(COLLECTIONS.BNB_X402_AUTHORIZATIONS).deleteOne({
+            _id: verified.paymentHeaderHash,
+            recordId,
+          });
+        } catch {
+          // Preserve the original storage error.
+        }
+      }
+      const message = error instanceof Error ? error.message : "Database update failed.";
+      throw new BnbStorageError(`Payment receipt was not updated: ${message}`);
+    }
+  }
+
+  if (!canUseProcessStorage()) {
+    throw new BnbStorageError("Payment receipt storage is not configured.");
+  }
+
+  const processStore = getProcessStore();
+  const recordIndex = processStore.activations.findIndex((record) => {
+    if (record.recordId !== recordId) return false;
+    return clientAddress ? record.clientAddress === clientAddress : true;
+  });
+  if (recordIndex === -1) return null;
+  const current = processStore.activations[recordIndex];
+  if (
+    current.updatedAt !== existing.updatedAt
+    || current.payment?.mode !== "x402"
+    || current.payment.x402?.status === "settled"
+    || current.payment.x402?.status === "unconfirmed"
+    || closedStatuses.includes(current.status)
+  ) {
+    throw new BnbStorageError("Payment details changed. Reload this job and try again.");
+  }
+  const reservedRecordId = processStore.x402Authorizations.get(verified.paymentHeaderHash);
+  if (reservedRecordId && reservedRecordId !== recordId) {
+    throw new BnbStorageError("This payment confirmation has already been used.");
+  }
+  processStore.x402Authorizations.set(verified.paymentHeaderHash, recordId);
+
+  const updated = {
+    ...current,
+    ...patch,
+  };
+  processStore.activations[recordIndex] = updated;
+  return updated;
+}
+
+function isMongoDuplicateKeyError(error: unknown) {
+  return Boolean(error && typeof error === "object" && "code" in error && (error as { code?: unknown }).code === 11000);
 }
 
 export async function getBnbActivationRecord({
@@ -681,6 +838,162 @@ export async function updateBnbActivationRecord({
   };
   processStore.activations[recordIndex] = updated;
   return updated;
+}
+
+export async function commitBnbActivationRunResult({
+  recordId,
+  clientAddress,
+  attemptId,
+  patch,
+}: {
+  recordId: string;
+  clientAddress?: string;
+  attemptId: string;
+  patch: Partial<BnbActivationRecord>;
+}): Promise<{ applied: boolean; record: BnbActivationRecord | null }> {
+  if (!attemptId) {
+    return { applied: false, record: await getBnbActivationRecord({ recordId, clientAddress }) };
+  }
+
+  const update = {
+    ...patch,
+    updatedAt: new Date().toISOString(),
+  };
+
+  if (hasDatabaseConfig()) {
+    try {
+      const db = await getDb();
+      const updated = await db
+        .collection<BnbActivationRecord & { _id?: unknown }>(COLLECTIONS.BNB_ACTIVATIONS)
+        .findOneAndUpdate(
+          {
+            recordId,
+            ...(clientAddress ? { clientAddress } : {}),
+            status: "running",
+            "execution.state": "running",
+            "execution.attemptId": attemptId,
+          },
+          { $set: update },
+          { returnDocument: "after" }
+        );
+
+      if (updated) return { applied: true, record: stripMongoId(updated) };
+      return { applied: false, record: await getBnbActivationRecord({ recordId, clientAddress }) };
+    } catch (error) {
+      if (!canUseProcessStorage()) {
+        const message = error instanceof Error ? error.message : "Database update failed.";
+        throw new BnbStorageError(`Hire receipt was not updated: ${message}`);
+      }
+    }
+  }
+
+  if (!canUseProcessStorage()) {
+    throw new BnbStorageError("Hire receipt storage is not configured.");
+  }
+
+  const processStore = getProcessStore();
+  const recordIndex = processStore.activations.findIndex((record) => {
+    if (record.recordId !== recordId) return false;
+    return clientAddress ? record.clientAddress === clientAddress : true;
+  });
+  if (recordIndex === -1) return { applied: false, record: null };
+
+  const current = processStore.activations[recordIndex];
+  if (
+    current.status !== "running"
+    || current.execution?.state !== "running"
+    || current.execution.attemptId !== attemptId
+  ) {
+    return { applied: false, record: current };
+  }
+
+  const updated = {
+    ...current,
+    ...update,
+  };
+  processStore.activations[recordIndex] = updated;
+  return { applied: true, record: updated };
+}
+
+export async function claimBnbActivationRun({
+  recordId,
+  clientAddress,
+  patch,
+  staleBefore,
+}: {
+  recordId: string;
+  clientAddress?: string;
+  patch: Partial<BnbActivationRecord>;
+  staleBefore: string;
+}): Promise<{ claimed: boolean; record: BnbActivationRecord | null }> {
+  const update = {
+    ...patch,
+    updatedAt: new Date().toISOString(),
+  };
+
+  if (hasDatabaseConfig()) {
+    try {
+      const db = await getDb();
+      const updated = await db
+        .collection<BnbActivationRecord & { _id?: unknown }>(COLLECTIONS.BNB_ACTIVATIONS)
+        .findOneAndUpdate(
+          {
+            recordId,
+            ...(clientAddress ? { clientAddress } : {}),
+            status: { $nin: ["delivered", "work_completed", "paid", "released", "refunded"] },
+            $or: [
+              { "work.status": { $exists: false } },
+              { "work.status": { $nin: ["running", "completed"] } },
+              { "work.status": "running", "work.startedAt": { $lte: staleBefore } },
+            ],
+          },
+          { $set: update },
+          { returnDocument: "after" }
+        );
+
+      if (updated) return { claimed: true, record: stripMongoId(updated) };
+      return { claimed: false, record: await getBnbActivationRecord({ recordId, clientAddress }) };
+    } catch (error) {
+      if (!canUseProcessStorage()) {
+        const message = error instanceof Error ? error.message : "Database update failed.";
+        throw new BnbStorageError(`Hire receipt was not updated: ${message}`);
+      }
+    }
+  }
+
+  if (!canUseProcessStorage()) {
+    throw new BnbStorageError("Hire receipt storage is not configured.");
+  }
+
+  const processStore = getProcessStore();
+  const recordIndex = processStore.activations.findIndex((record) => {
+    if (record.recordId !== recordId) return false;
+    return clientAddress ? record.clientAddress === clientAddress : true;
+  });
+  if (recordIndex === -1) return { claimed: false, record: null };
+
+  const current = processStore.activations[recordIndex];
+  if (!canClaimBnbRun(current, staleBefore)) {
+    return { claimed: false, record: current };
+  }
+
+  const updated = {
+    ...current,
+    ...update,
+  };
+  processStore.activations[recordIndex] = updated;
+  return { claimed: true, record: updated };
+}
+
+function canClaimBnbRun(record: BnbActivationRecord, staleBefore: string) {
+  if (["delivered", "work_completed", "paid", "released", "refunded"].includes(record.status)) return false;
+  if (record.work?.status === "completed") return false;
+  if (record.status !== "running" && record.work?.status !== "running") return true;
+
+  const startedAt = record.work?.startedAt ? Date.parse(record.work.startedAt) : NaN;
+  const staleAt = Date.parse(staleBefore);
+  if (!Number.isFinite(startedAt) || !Number.isFinite(staleAt)) return false;
+  return startedAt <= staleAt;
 }
 
 export async function getBnbAccessRequestRecord({
@@ -804,7 +1117,7 @@ export async function listBnbRecords(limit = 25, ownerId?: string): Promise<BnbR
 
   if (activations && accessRequests && termixComparisons && altanaSessions) {
     return {
-      activations,
+      activations: activations.map(publicBnbActivationRecord),
       accessRequests,
       termixComparisons,
       altanaSessions,
@@ -815,12 +1128,23 @@ export async function listBnbRecords(limit = 25, ownerId?: string): Promise<BnbR
 
   const processStore = getProcessStore();
   return {
-    activations: processStore.activations.filter((record) => !ownerId || record.clientAddress === ownerId).slice(0, boundedLimit),
+    activations: processStore.activations.filter((record) => !ownerId || record.clientAddress === ownerId).slice(0, boundedLimit).map(publicBnbActivationRecord),
     accessRequests: processStore.accessRequests.filter((record) => !ownerId || record.clientAddress === ownerId).slice(0, boundedLimit),
     termixComparisons: processStore.termixComparisons.filter((record) => !ownerId || record.clientAddress === ownerId).slice(0, boundedLimit),
     altanaSessions: processStore.altanaSessions.filter((record) => !ownerId || record.clientAddress === ownerId).slice(0, boundedLimit),
     storage: "process",
     lastUpdated: new Date().toISOString(),
+  };
+}
+
+export function publicBnbActivationRecord(record: BnbActivationRecord): BnbActivationRecord {
+  if (!record.payment?.x402?.paymentHeader) return record;
+  return {
+    ...record,
+    payment: {
+      ...record.payment,
+      x402: sanitizeBnbX402PaymentSnapshot(record.payment.x402),
+    },
   };
 }
 

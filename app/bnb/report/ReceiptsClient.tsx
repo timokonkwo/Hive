@@ -210,7 +210,7 @@ export function ReceiptsClient({ embedded = false }: { embedded?: boolean } = {}
         body: JSON.stringify({ recordId: record.recordId, action }),
       });
       const prepared = await prepareResponse.json();
-      if (!prepareResponse.ok) throw new Error(prepared.error || "Could not prepare escrow transaction.");
+      if (!prepareResponse.ok) throw new Error(prepared.error || "Could not prepare payment transaction.");
       const settlementRequest = prepared.settlementRequest;
       if (settlementRequest.status !== "ready") throw new Error(settlementRequest.reason);
 
@@ -228,10 +228,10 @@ export function ReceiptsClient({ embedded = false }: { embedded?: boolean } = {}
         body: JSON.stringify({ recordId: record.recordId, action, transactionHash: hash }),
       });
       const payload = await confirmResponse.json();
-      if (!confirmResponse.ok) throw new Error(payload.error || "Escrow transaction was sent, but the record could not be updated.");
+      if (!confirmResponse.ok) throw new Error(payload.error || "Transaction was sent, but the record could not be updated.");
       if (payload.record) replaceActivation(payload.record);
     } catch (settlementError) {
-      setError(settlementError instanceof Error ? settlementError.message : "Could not update escrow.");
+      setError(settlementError instanceof Error ? settlementError.message : "Could not update payment.");
     } finally {
       setActionId("");
     }
@@ -306,7 +306,7 @@ export function ReceiptsClient({ embedded = false }: { embedded?: boolean } = {}
                 const output = record.delivery?.rawOutput || record.work?.output;
                 const dataSources = record.delivery?.dataSources || record.work?.dataSources;
                 const refundBlocker = bnbRefundUnavailableReason(record);
-                const showSettlementActions = !paymentNotRequired && completed && !closed;
+                const showSettlementActions = record.payment?.mode === "escrow" && completed && !closed;
                 return (
                   <article key={record.recordId} className="bnb-receipt-row">
                     <span>
@@ -333,7 +333,7 @@ export function ReceiptsClient({ embedded = false }: { embedded?: boolean } = {}
                           className="bnb-button bnb-focus disabled:cursor-not-allowed disabled:opacity-60"
                         >
                           {actionId === `${record.recordId}:run` ? <BnbButtonLoader /> : null}
-                          {actionId === `${record.recordId}:run` || running ? "Running..." : "Run agent"}
+                          {actionId === `${record.recordId}:run` || running ? "Running" : "Run agent"}
                         </button>
                       ) : null}
                       {showSettlementActions ? (
@@ -454,11 +454,11 @@ function jobStatusLabel(record: BnbActivationRecord) {
   if (record.status === "refunded") return "Refunded";
   if (record.delivery?.status === "delivered" || record.work?.status === "completed" || record.status === "delivered" || record.status === "work_completed") return "Delivered";
   if (record.delivery?.status === "running" || record.work?.status === "running" || record.status === "running") return "Running";
-  if (record.payment?.transactionStatus === "success" || record.status === "funded" || record.status === "payment_confirmed") return "Funded";
+  if (record.payment?.transactionStatus === "success" || record.status === "funded" || record.status === "payment_confirmed") return "Payment sent";
   if (record.status === "payment_submitted") return "Payment submitted";
   if (record.status === "failed") return "Failed";
   if (record.limits.walletConfirmationRequired === false) return "Run";
-  return "Awaiting funding";
+  return "Awaiting payment";
 }
 
 function ensureProtectedSession({

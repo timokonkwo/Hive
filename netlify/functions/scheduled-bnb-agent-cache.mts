@@ -2,10 +2,10 @@ import type { Config } from '@netlify/functions';
 
 export default async () => {
   const siteUrl = process.env.SITE_URL || process.env.URL || 'https://bnb.uphive.xyz';
-  const secret = process.env.CRON_SECRET || process.env.STEALTH_AGENT_SECRET;
+  const secret = process.env.CRON_SECRET;
 
   if (!secret) {
-    console.error('[BNB_AGENT_CACHE] No CRON_SECRET or STEALTH_AGENT_SECRET set');
+    console.error('[BNB_AGENT_CACHE] No CRON_SECRET set');
     return new Response(JSON.stringify({ error: 'Missing secret' }), { status: 500 });
   }
 

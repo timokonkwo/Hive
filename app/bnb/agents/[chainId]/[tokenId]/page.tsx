@@ -2,8 +2,10 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ArrowLeft, ArrowRight, BadgeCheck } from "lucide-react";
 import { isAddress } from "viem";
+import { recordBnbAnalyticsEvent } from "@/lib/bnb/analytics";
 import { getBnbAgent } from "@/lib/bnb/catalog";
 import { get8004scanAgentUrl, getBscExplorerAddressUrl } from "@/lib/bnb/chain";
+import { bnbAgentHirePath } from "@/lib/bnb/routes";
 import type { BnbAgentProfile } from "@/lib/bnb/types";
 import { ProfileCompareAction } from "./ProfileCompareAction";
 import { CopyValueButton } from "@/app/bnb/_components/CopyValueButton";
@@ -24,7 +26,6 @@ import {
   bnbCategoryLabel,
   bnbIsVerified,
   bnbListingDescription,
-  bnbProtocolSummary,
   bnbReviewLabel,
   bnbServiceLabel,
   bnbSpecificCapabilities,
@@ -40,6 +41,16 @@ export default async function BnbAgentDetailPage({
   const { chainId, tokenId } = await params;
   const agent = await getBnbAgent(chainId, tokenId);
   if (!agent) notFound();
+  recordBnbAnalyticsEvent({
+    name: "profile.view",
+    route: "bnb.agents.detail",
+    agent,
+    metadata: {
+      capabilityCount: agent.endpointCapabilities?.length || 0,
+      endpointCount: agent.executionEndpoints?.length || 0,
+      serviceCount: agent.services.length,
+    },
+  });
 
   const description = bnbListingDescription(agent);
   const canHire = canHireAgent(agent);
@@ -49,7 +60,6 @@ export default async function BnbAgentDetailPage({
   const visibleCapabilities = bnbSpecificCapabilities(agent).slice(0, 8);
   const visibleServices = bnbUsableServices(agent);
   const integrations = bnbAgentIntegrations(agent);
-  const protocols = bnbProtocolSummary(agent);
   const ownerAddress = isAddress(agent.ownerAddress) ? agent.ownerAddress : "";
   const agentWallet = isAddress(agent.agentWallet) ? agent.agentWallet : "";
   const identityUrl = externalAgentUrl(agent);
@@ -89,12 +99,8 @@ export default async function BnbAgentDetailPage({
 
           <div className="bnb-agent-cover-actions">
             {canHire ? (
-              <Link href={`/bnb/activate?chainId=${agent.chainId}&tokenId=${encodeURIComponent(agent.tokenId)}`} className="bnb-button bnb-focus">
+              <Link href={bnbAgentHirePath(agent)} className="bnb-button bnb-focus">
                 Hire agent <ArrowRight aria-hidden="true" size={16} />
-              </Link>
-            ) : identityUrl ? (
-              <Link href={identityUrl} className="bnb-button bnb-focus" target="_blank" rel="noopener noreferrer">
-                View source <ArrowRight aria-hidden="true" size={16} />
               </Link>
             ) : null}
             <ProfileCompareAction agent={agent} />
@@ -177,15 +183,6 @@ export default async function BnbAgentDetailPage({
               </section>
             ) : null}
 
-            {(protocols.length > 0 || agent.x402Support) ? (
-              <details className="bnb-agent-section bnb-agent-sidebar-card bnb-agent-technical-details">
-                <summary>Protocol details</summary>
-                <dl className="bnb-agent-identity-grid">
-                  {protocols.length > 0 ? <DataRow label="Protocols" value={protocols.join(", ")} /> : null}
-                  <DataRow label="Payment protocol" value={agent.x402Support ? "x402 supported" : "Not listed"} />
-                </dl>
-              </details>
-            ) : null}
           </aside>
         </div>
       </BnbContainer>

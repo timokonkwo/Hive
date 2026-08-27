@@ -98,15 +98,59 @@ Public agent search, MCP-style tool calls, BSC reads, and signed-in writes could
 
 Fix:
 
-The BNB API surface now uses Hive's existing `checkRateLimit` helper:
+The BNB API surface now uses `lib/bnb/rate-limit.ts`:
 
-- read routes use `RATE_LIMITS.READ`,
-- write and tool-execution routes use `RATE_LIMITS.WRITE`,
-- 429 responses include `Retry-After`.
+- read routes use process-local throttling to keep high-volume directory browsing cheap,
+- write, validation, run, payment, settlement, auth, cron, and moderation routes use Mongo-backed counters when `MONGODB_URI` is configured,
+- production write limits fail closed if durable limiter storage is unavailable,
+- production Mongo-backed limiter keys require a server-side auth secret instead of falling back to a static salt,
+- 429 responses include `Retry-After`,
+- limiter keys are hashed before Mongo storage.
 
 Status: fixed.
 
-Production blocker: resolved for initial deployment. A Redis/Upstash limiter is still recommended if traffic grows across many Netlify function instances.
+Production blocker: resolved for initial deployment. Redis/Upstash can still replace Mongo if traffic requires lower-latency distributed throttling.
+
+### Medium: API responses allowed the global report-only UI CSP to be the only policy
+
+Location:
+
+- `next.config.ts`
+
+Impact:
+
+API routes do not need executable content. Leaving them under only the global report-only policy made the safest surface looser than necessary.
+
+Fix:
+
+All `/api/*` routes now receive an enforced non-executable CSP:
+
+- `default-src 'none'`,
+- `frame-ancestors 'none'`,
+- `base-uri 'none'`,
+- `form-action 'none'`.
+
+Status: fixed for API routes. UI routes intentionally remain Report-Only until third-party scripts and inline payloads are migrated to a nonce-based policy.
+
+### Medium: Legacy agent dashboard persisted raw API keys in browser storage
+
+Location:
+
+- `app/agent/dashboard/page.tsx`
+- `app/agent/dashboard/tools/page.tsx`
+- `app/marketplace/[taskId]/page.tsx`
+- `lib/api-key.ts`
+- `lib/agent-session.ts`
+
+Impact:
+
+Raw agent API keys persisted in `sessionStorage` increased exposure if a browser session or same-origin script was compromised.
+
+Fix:
+
+Agent dashboard login still proves ownership with the API key and owner PIN, but successful verification now sets a signed httpOnly cookie bound to the current API-key hash. Agent APIs can authenticate that cookie through the shared `authenticateRequest` boundary. Regenerating the API key refreshes the cookie with the new hash, and logout clears it.
+
+Status: fixed. Server-to-server clients still use `x-hive-api-key`; browser dashboard pages no longer use the old `hive_agent_key` storage key.
 
 ### Medium: Runtime status incorrectly implied local agents were enabled in development
 

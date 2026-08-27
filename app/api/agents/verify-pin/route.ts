@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getDb, COLLECTIONS } from '@/lib/db';
 import { hashApiKey, extractApiKey } from '@/lib/api-key';
+import { setAgentSessionCookie } from '@/lib/agent-session';
 import { checkRateLimit, getClientIp } from '@/lib/rate-limit';
 import { createHash } from 'crypto';
 import { logger } from '@/lib/logger';
@@ -88,10 +89,12 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Invalid owner PIN.' }, { status: 403 });
     }
 
-    return NextResponse.json({
+    const response = NextResponse.json({
       verified: true,
       agent: agentPayload,
     });
+    setAgentSessionCookie(response, { agentId: agent._id.toString(), apiKeyHash });
+    return response;
   } catch (error: any) {
     logger.error('[HIVE] Verify PIN error:', error);
     return NextResponse.json({ error: 'Verification failed.' }, { status: 500 });

@@ -27,6 +27,10 @@ const DEFAULT_SCHEMA = JSON.stringify({
   required: ["input"],
 }, null, 2);
 
+const agentAuthHeaders = (key: string): HeadersInit => (
+  key ? { "x-hive-api-key": key } : {}
+);
+
 export default function AgentToolsPage() {
   const [fromRegistry, setFromRegistry] = useState(false);
   const [apiKey, setApiKey] = useState("");
@@ -46,7 +50,7 @@ export default function AgentToolsPage() {
     inputSchema: DEFAULT_SCHEMA,
   });
 
-  const headers = useMemo(() => ({ "x-hive-api-key": apiKey }), [apiKey]);
+  const headers = useMemo(() => agentAuthHeaders(apiKey), [apiKey]);
   const backHref = fromRegistry ? "/registry" : "/agent/dashboard";
   const backLabel = fromRegistry ? "Registry" : "Agent Hub";
 
@@ -54,16 +58,19 @@ export default function AgentToolsPage() {
     setFromRegistry(new URLSearchParams(window.location.search).get("from") === "registry");
   }, []);
 
-  const loadTools = useCallback(async (key = apiKey) => {
-    if (!key) return;
+  const loadTools = useCallback(async (key = apiKey, options: { silent?: boolean } = {}) => {
     setLoading(true);
     try {
+      const requestHeaders = agentAuthHeaders(key);
       const [profileRes, toolsRes] = await Promise.all([
-        fetch("/api/agents/me", { headers: { "x-hive-api-key": key } }),
-        fetch("/api/agents/me/tools", { headers: { "x-hive-api-key": key } }),
+        fetch("/api/agents/me", { headers: requestHeaders }),
+        fetch("/api/agents/me/tools", { headers: requestHeaders }),
       ]);
 
-      if (!profileRes.ok) throw new Error("Invalid API key.");
+      if (!profileRes.ok) {
+        if (options.silent && profileRes.status === 401) return;
+        throw new Error("Invalid API key.");
+      }
       const profile = await profileRes.json();
       setAgent(profile.agent);
 
@@ -71,21 +78,18 @@ export default function AgentToolsPage() {
         const data = await toolsRes.json();
         setTools(data.tools || []);
       }
-      sessionStorage.setItem("hive_agent_key", key);
     } catch (error: any) {
-      toast.error(error.message || "Could not load tools.");
+      if (!options.silent) {
+        toast.error(error.message || "Could not load tools.");
+      }
     } finally {
       setLoading(false);
     }
   }, [apiKey]);
 
   useEffect(() => {
-    const saved = sessionStorage.getItem("hive_agent_key");
-    if (saved) {
-      setApiKey(saved);
-      loadTools(saved);
-    }
-  }, [loadTools]);
+    loadTools("", { silent: true });
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const editTool = (tool: RegisteredTool) => {
     setForm({
@@ -99,7 +103,7 @@ export default function AgentToolsPage() {
   };
 
   const saveTool = async () => {
-    if (!apiKey) {
+    if (!apiKey && !agent) {
       toast.error("Enter your agent API key first.");
       return;
     }
@@ -206,7 +210,7 @@ export default function AgentToolsPage() {
             </div>
             <button
               onClick={() => loadTools()}
-              disabled={loading || !apiKey}
+              disabled={loading || (!apiKey && !agent)}
               className="inline-flex items-center gap-2 px-4 py-2 bg-zinc-900 border border-white/10 rounded text-xs font-bold text-zinc-300 hover:text-white disabled:opacity-50"
             >
               {loading ? <Loader2 size={14} className="animate-spin" /> : <RefreshCw size={14} />}

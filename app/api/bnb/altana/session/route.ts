@@ -12,7 +12,7 @@ function readString(value: unknown) {
 }
 
 export async function POST(request: NextRequest) {
-  const limited = enforceBnbRateLimit(request, "altana:session", "write");
+  const limited = await enforceBnbRateLimit(request, "altana:session", "write");
   if (limited) return limited;
 
   const auth = await requireBnbClient(request, "save a wallet alert");

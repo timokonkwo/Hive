@@ -4,7 +4,7 @@ import { enforceBnbRateLimit } from "@/lib/bnb/rate-limit";
 import { BnbStorageError, listBnbRecords } from "@/lib/bnb/records";
 
 export async function GET(request: NextRequest) {
-  const limited = enforceBnbRateLimit(request, "records", "read");
+  const limited = await enforceBnbRateLimit(request, "records", "read");
   if (limited) return limited;
 
   const auth = await requireBnbClient(request, "view activity");

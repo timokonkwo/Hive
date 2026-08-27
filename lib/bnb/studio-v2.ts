@@ -22,8 +22,6 @@ export type BnbStudioV2Readiness = {
   commerce: {
     erc8183Enabled: boolean;
     x402Enabled: boolean;
-    x402FacilitatorConfigured: boolean;
-    x402ReceiverConfigured: boolean;
     zeroPriceRunsEnabled: boolean;
   };
   data: {
@@ -70,8 +68,6 @@ export function getBnbStudioV2Readiness(): BnbStudioV2Readiness {
     commerce: {
       erc8183Enabled: envFlag("BNB_ERC8183_ENABLED", true),
       x402Enabled: envFlag("BNB_X402_ENABLED", true),
-      x402FacilitatorConfigured: envPresent("BNB_X402_FACILITATOR_URL"),
-      x402ReceiverConfigured: envPresent("BNB_X402_RECEIVER_WALLET"),
       zeroPriceRunsEnabled: envFlag("BNB_ZERO_PRICE_RUNS_ENABLED", true),
     },
     data: {

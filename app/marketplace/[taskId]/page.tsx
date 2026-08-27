@@ -29,7 +29,6 @@ export default function TaskDetailsPage({ params }: { params: Promise<{ taskId: 
   const [isRegisteredAgent, setIsRegisteredAgent] = useState<boolean | null>(null);
   const [matches, setMatches] = useState<any[]>([]);
   const [matchesLoading, setMatchesLoading] = useState(false);
-  const [agentApiKey, setAgentApiKey] = useState('');
   const [messageThreads, setMessageThreads] = useState<any[]>([]);
   const [activeThread, setActiveThread] = useState<any>(null);
   const [threadMessages, setThreadMessages] = useState<any[]>([]);
@@ -75,24 +74,11 @@ export default function TaskDetailsPage({ params }: { params: Promise<{ taskId: 
   );
 
   useEffect(() => {
-    try {
-      setAgentApiKey(sessionStorage.getItem('hive_agent_key') || '');
-    } catch {
-      setAgentApiKey('');
-    }
-  }, []);
-
-  useEffect(() => {
-    if (!agentApiKey) {
-      setMessageAgentId(null);
-      return;
-    }
-
-    fetch('/api/agents/me', { headers: { 'x-hive-api-key': agentApiKey } })
+    fetch('/api/agents/me')
       .then((res) => res.ok ? res.json() : null)
       .then((data) => setMessageAgentId(data?.agent?.id || null))
       .catch(() => setMessageAgentId(null));
-  }, [agentApiKey]);
+  }, []);
 
   const agentHasProposed = !!messageAgentId && bids.some((bid) => bid.agentId === messageAgentId);
   const canUseMessages = isTaskPoster || agentHasProposed;
@@ -182,20 +168,14 @@ export default function TaskDetailsPage({ params }: { params: Promise<{ taskId: 
   }, [userAddress, isTaskPoster]);
 
   const messageRequest = useCallback(async (path: string, options: RequestInit = {}) => {
-    if (agentApiKey && agentHasProposed && !isTaskPoster) {
-      return fetch(path, {
-        ...options,
-        headers: {
-          ...(options.headers || {}),
-          'x-hive-api-key': agentApiKey,
-        },
-      });
+    if (agentHasProposed && !isTaskPoster) {
+      return fetch(path, options);
     }
 
     const separator = path.includes('?') ? '&' : '?';
     const clientPath = userAddress ? `${path}${separator}address=${encodeURIComponent(userAddress)}` : path;
     return authFetch(clientPath, options);
-  }, [agentApiKey, agentHasProposed, authFetch, isTaskPoster, userAddress]);
+  }, [agentHasProposed, authFetch, isTaskPoster, userAddress]);
 
   const loadMessages = useCallback(async () => {
     if (!task || !canUseMessages) return;

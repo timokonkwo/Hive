@@ -9,15 +9,15 @@ import {
   TrendingUp,
   type LucideIcon,
 } from "lucide-react";
-import { getBnbCategories, listBnbAgents } from "@/lib/bnb/catalog";
+import { getBnbCategories, listBnbAgentsPage } from "@/lib/bnb/catalog";
 import {
   AgentCard,
   BnbContainer,
   BnbPanel,
   BnbShell,
 } from "@/app/bnb/_components/BnbUi";
-import { bnbCategoryLabel, bnbListingDescription } from "@/lib/bnb/display";
-import type { BnbAgentCategory, BnbAgentProfile } from "@/lib/bnb/types";
+import { bnbCategoryLabel } from "@/lib/bnb/display";
+import type { BnbAgentCategory } from "@/lib/bnb/types";
 
 export const dynamic = "force-dynamic";
 
@@ -50,12 +50,9 @@ const categoryDetails: Record<BnbAgentCategory, { title: string; body: string; i
 };
 
 export default async function BnbHomePage() {
-  const agents = await listBnbAgents({ limit: 100, sort: "reviews" });
+  const firstPage = await listBnbAgentsPage({ limit: 24, page: 1, sort: "recommended" });
   const categories = getBnbCategories();
-  const reviewedAgents = agents.filter((agent) => agent.feedback.count > 0);
-  const recommendedAgents = (reviewedAgents.length >= 3 ? reviewedAgents : agents)
-    .filter(isClearRecommendation)
-    .slice(0, 6);
+  const recommendedAgents = firstPage.agents.slice(0, 6);
 
   return (
     <BnbShell active="home">
@@ -126,14 +123,6 @@ export default async function BnbHomePage() {
       </BnbContainer>
     </BnbShell>
   );
-}
-
-function isClearRecommendation(agent: BnbAgentProfile) {
-  const description = bnbListingDescription(agent).toLowerCase();
-  if (!description) return false;
-  if (description.includes("limited data available")) return false;
-  if (description.includes("placeholder") || description.includes("mock account")) return false;
-  return true;
 }
 
 function CategoryCard({ category }: { category: BnbAgentCategory }) {

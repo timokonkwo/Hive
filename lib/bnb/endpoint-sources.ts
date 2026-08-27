@@ -158,7 +158,7 @@ async function fetchAgent402Agents(query: string, limit: number) {
       description: endpointDescription(record.description),
       endpoint,
       method: methodFrom(record.method, "GET"),
-      endpointLabel: "Agent402",
+      endpointLabel: endpointOperationName(record.name ?? record.slug, record.description, endpoint),
       provider: textFrom(record.sellerName ?? record.seller, "Agent402"),
       providerUrl: textFrom(record.sellerHome, ""),
       categoryText: textFrom(record.category, ""),
@@ -184,7 +184,7 @@ async function fetchAgent402Agents(query: string, limit: number) {
       description: endpointDescription(record.description),
       endpoint,
       method: methodFrom(record.method, "GET"),
-      endpointLabel: "Agent402",
+      endpointLabel: endpointOperationName(record.name ?? record.slug, record.description, endpoint),
       provider: textFrom(record.sellerName ?? record.seller, "Agent402"),
       providerUrl: textFrom(record.sellerHome, ""),
       categoryText: textFrom(record.category, ""),
@@ -222,7 +222,7 @@ async function fetch402IndexAgents(query: string, limit: number) {
       description: endpointDescription(record.description),
       endpoint,
       method: methodFrom(record.http_method, "GET"),
-      endpointLabel: "402Index",
+      endpointLabel: endpointOperationName(record.name, record.description, endpoint),
       provider: textFrom(asRecord(record.provider).name ?? record.provider_name ?? record.provider, "402Index"),
       providerUrl: textFrom(asRecord(record.provider).url ?? record.provider_url, ""),
       categoryText: textFrom(record.category, ""),
@@ -260,7 +260,7 @@ async function fetchX402DirectAgents(query: string, limit: number) {
       description: endpointDescription(record.description),
       endpoint,
       method: methodFrom(record.method ?? record.httpMethod, "GET"),
-      endpointLabel: "x402.direct",
+      endpointLabel: endpointOperationName(record.name ?? record.title, record.description, endpoint),
       provider: textFrom(record.provider ?? record.providerName, "x402.direct"),
       categoryText: textFrom(record.category, ""),
       tags: arrayFrom(record.tags ?? record.type ?? record.scheme),
@@ -296,7 +296,7 @@ async function fetchThe402Agents(query: string, limit: number) {
       description: endpointDescription(record.description),
       endpoint,
       method: "POST",
-      endpointLabel: "the402",
+      endpointLabel: endpointOperationName(record.name, record.description, endpoint),
       provider: textFrom(record.provider_name ?? record.provider, "the402"),
       providerUrl: textFrom(record.provider_url, ""),
       categoryText: textFrom(record.category, ""),
@@ -328,7 +328,7 @@ function normalizeEndpointAgent(seed: EndpointAgentSeed): BnbAgentProfile | null
   const endpoint: BnbExecutionEndpoint = {
     adapter,
     url: seed.endpoint,
-    label: seed.endpointLabel || (paymentNeeded ? "x402" : "API"),
+    label: endpointOperationName(seed.endpointLabel || seed.name, seed.description, seed.endpoint),
     verified: Boolean(seed.verified),
     source: seed.source,
     method: seed.method || "GET",
@@ -692,6 +692,47 @@ function endpointServiceName(value: unknown, description: unknown, endpoint: str
   const descriptiveFallback = desc.length >= 12 ? desc : nameFromEndpoint(endpoint);
   const candidate = isGenericEndpointName(raw) ? descriptiveFallback : raw || descriptiveFallback;
   return truncate(cleanEndpointText(candidate), 96) || "Endpoint service";
+}
+
+function endpointOperationName(value: unknown, description: unknown, endpoint: string) {
+  const raw = cleanEndpointText(textFrom(value));
+  const fallback = endpointServiceName("", description, endpoint);
+  const endpointName = operationNameFromEndpoint(endpoint);
+  const candidate = isEndpointIndexName(raw) || raw.length > 64
+    ? endpointName || fallback
+    : raw || endpointName || fallback;
+  return truncate(candidate, 64) || "Run service";
+}
+
+function isEndpointIndexName(value: string) {
+  return /^(?:agent\s*402|402\s*index|x402(?:\.direct)?|the\s*402|api|http|endpoint|service|tool)$/i.test(value.trim());
+}
+
+function operationNameFromEndpoint(endpoint: string) {
+  try {
+    const url = new URL(endpoint);
+    const words = decodeURIComponent(url.pathname)
+      .split("/")
+      .flatMap((segment) => segment.split(/[-_.]+/))
+      .map((word) => word.trim())
+      .filter((word) => word && !isGenericOperationWord(word) && !/^(?:[a-f0-9]{8,}|\d+)$/i.test(word))
+      .slice(-5)
+      .map(formatOperationWord);
+    if (words.length > 0) return words.join(" ");
+    return formatOperationWord(url.hostname.split(".")[0] || "");
+  } catch {
+    return "";
+  }
+}
+
+function isGenericOperationWord(value: string) {
+  return /^(?:api|v\d+|proxy|service|services|endpoint|endpoints|live|data|agent|agents|run)$/i.test(value);
+}
+
+function formatOperationWord(value: string) {
+  const lower = value.toLowerCase();
+  const acronym = ({ bsc: "BSC", defi: "DeFi", tvl: "TVL", apy: "APY", apr: "APR", dex: "DEX" } as Record<string, string>)[lower];
+  return acronym || `${value.slice(0, 1).toUpperCase()}${value.slice(1)}`;
 }
 
 function endpointDescription(value: unknown) {

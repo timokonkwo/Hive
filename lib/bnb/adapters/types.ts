@@ -1,4 +1,11 @@
-import type { BnbActivationRecord, BnbAgentProfile, BnbAgentWork, BnbExecutionEndpoint } from "@/lib/bnb/types";
+import type {
+  BnbActivationRecord,
+  BnbAgentProfile,
+  BnbAgentWork,
+  BnbEndpointCapabilityContract,
+  BnbExecutionEndpoint,
+  BnbX402PaymentSnapshot,
+} from "@/lib/bnb/types";
 
 export type BnbAdapterId = "mcp" | "a2a" | "x402" | "http";
 
@@ -8,17 +15,20 @@ export type BnbAdapterPreflightResult = {
   endpoint?: BnbExecutionEndpoint;
   reason?: string;
   capabilities?: string[];
+  capabilityContracts?: BnbEndpointCapabilityContract[];
+  payment?: BnbX402PaymentSnapshot;
 };
 
 export type BnbAdapterRunInput = {
   agent: BnbAgentProfile;
   record: BnbActivationRecord;
+  endpoint?: BnbExecutionEndpoint;
 };
 
 export type BnbAgentExecutionAdapter = {
   id: BnbAdapterId;
   canHandle(agent: BnbAgentProfile): boolean;
-  preflight(agent: BnbAgentProfile): Promise<BnbAdapterPreflightResult>;
+  preflight(agent: BnbAgentProfile, endpoint?: BnbExecutionEndpoint): Promise<BnbAdapterPreflightResult>;
   preflightJob?(input: BnbAdapterRunInput): Promise<BnbAdapterPreflightResult>;
   run(input: BnbAdapterRunInput): Promise<BnbAgentWork>;
 };

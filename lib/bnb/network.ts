@@ -46,6 +46,55 @@ function configuredChainId() {
   return null;
 }
 
+function configuredClientNetworkName() {
+  const value = process.env.NEXT_PUBLIC_BNB_NETWORK?.trim().toLowerCase();
+  if (value === "testnet" || value === "mainnet") return value;
+  return "";
+}
+
+function configuredClientChainId() {
+  const raw = process.env.NEXT_PUBLIC_BNB_BSC_CHAIN_ID?.trim();
+  const parsed = raw ? Number(raw) : NaN;
+  if (parsed === 97 || parsed === 56) return parsed;
+  return null;
+}
+
+export function getHiveBnbNetworkEnvStatus() {
+  const serverNetwork = configuredNetworkName();
+  const serverChainId = configuredChainId();
+  const clientNetwork = configuredClientNetworkName();
+  const clientChainId = configuredClientChainId();
+  const expectedServerChainId = serverNetwork === "mainnet" ? 56 : serverNetwork === "testnet" ? 97 : null;
+  const expectedClientChainId = clientNetwork === "mainnet" ? 56 : clientNetwork === "testnet" ? 97 : null;
+  const errors: string[] = [];
+
+  if (!serverNetwork) errors.push("BNB_NETWORK must be mainnet or testnet.");
+  if (!serverChainId) errors.push("BNB_BSC_CHAIN_ID must be 56 or 97.");
+  if (serverNetwork && serverChainId && serverChainId !== expectedServerChainId) {
+    errors.push("BNB_NETWORK and BNB_BSC_CHAIN_ID do not match.");
+  }
+  if (!clientNetwork) errors.push("NEXT_PUBLIC_BNB_NETWORK must be mainnet or testnet.");
+  if (!clientChainId) errors.push("NEXT_PUBLIC_BNB_BSC_CHAIN_ID must be 56 or 97.");
+  if (clientNetwork && clientChainId && clientChainId !== expectedClientChainId) {
+    errors.push("NEXT_PUBLIC_BNB_NETWORK and NEXT_PUBLIC_BNB_BSC_CHAIN_ID do not match.");
+  }
+  if (serverNetwork && clientNetwork && serverNetwork !== clientNetwork) {
+    errors.push("Server and client BNB networks do not match.");
+  }
+  if (serverChainId && clientChainId && serverChainId !== clientChainId) {
+    errors.push("Server and client BNB chain IDs do not match.");
+  }
+
+  return {
+    ready: errors.length === 0,
+    serverNetwork: serverNetwork || null,
+    serverChainId,
+    clientNetwork: clientNetwork || null,
+    clientChainId,
+    errors,
+  };
+}
+
 export function getHiveBnbNetworkConfig(): HiveBnbNetworkConfig {
   const chainId = configuredChainId();
   const network = configuredNetworkName();

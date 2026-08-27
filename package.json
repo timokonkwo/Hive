@@ -12,6 +12,7 @@
     "bnb:deploy:escrow": "forge create contracts/bnb/HiveBscAgentEscrow.sol:HiveBscAgentEscrow --rpc-url $BNB_BSC_RPC_URL --private-key $BNB_DEPLOYER_PRIVATE_KEY --broadcast",
     "bnb:deploy:sessions": "forge create contracts/bnb/HiveBscSessionRegistry.sol:HiveBscSessionRegistry --rpc-url $BNB_BSC_RPC_URL --private-key $BNB_DEPLOYER_PRIVATE_KEY --broadcast",
     "bnb:testnet:smoke": "node scripts/bnb-testnet-lifecycle-smoke.mjs",
+    "bnb:submission:qa": "node scripts/bnb-submission-qa.mjs",
     "bnb:worker": "node workers/bnb-worker/server.mjs",
     "build:sdk": "npm --prefix hive-agent-sdk run build",
     "build:mcp": "npm --prefix hive-mcp-server run build",
@@ -20,18 +21,20 @@
   "dependencies": {
     "@bagsfm/bags-sdk": "^1.3.1",
     "@luxenlabs/hive-agent": "^0.1.0",
-    "@privy-io/node": "^0.16.0",
     "@privy-io/react-auth": "^3.13.1",
     "@privy-io/wagmi": "^4.0.1",
     "@solana-program/memo": "^0.11.0",
     "@solana-program/system": "^0.12.0",
-    "@solana/kit": "^6.8.0",
+    "@solana/kit": "6.8.0",
     "@solana/spl-token": "^0.4.14",
     "@solana/web3.js": "^1.98.4",
+    "@stripe/stripe-js": "1.54.2",
     "@tailwindcss/typography": "^0.5.19",
     "@tanstack/react-query": "^5.90.20",
     "@tsparticles/react": "^3.0.0",
     "@tsparticles/slim": "^3.9.1",
+    "@x402/core": "^2.23.0",
+    "@x402/evm": "^2.23.0",
     "cloudinary": "^2.10.0",
     "date-fns": "^4.1.0",
     "framer-motion": "^12.31.0",
@@ -39,7 +42,7 @@
     "google-spreadsheet": "^5.0.2",
     "lucide-react": "^0.563.0",
     "mongodb": "^7.1.0",
-    "next": "16.1.6",
+    "next": "16.3.3",
     "react": "19.2.3",
     "react-dom": "19.2.3",
     "react-markdown": "^10.1.0",
@@ -47,7 +50,7 @@
     "sonner": "^2.0.7",
     "tsparticles": "^3.9.1",
     "viem": "^2.45.1",
-    "wagmi": "^3.4.2"
+    "wagmi": "3.4.2"
   },
   "devDependencies": {
     "@netlify/functions": "^5.1.5",
@@ -56,8 +59,7 @@
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "eslint": "^9",
-    "eslint-config-next": "16.1.6",
-    "netlify-cli": "^24.10.0",
+    "eslint-config-next": "16.3.3",
     "tailwindcss": "^4",
     "typescript": "^5"
   }

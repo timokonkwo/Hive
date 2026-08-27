@@ -95,6 +95,7 @@ export const HIVE_BSC_AGENT_ESCROW_ABI = [
 export type BnbEscrowPaymentRequest =
   | {
       status: "ready";
+      mode: "escrow";
       chainId: number;
       contractAddress: Hex;
       to: Hex;
@@ -220,14 +221,14 @@ export function buildBnbEscrowPaymentRequest(record: BnbActivationRecord): BnbEs
   if (!escrowAddress) {
     return {
       status: "setup_required",
-      reason: "Deploy the BSC escrow contract and set BNB_AGENT_ESCROW_ADDRESS.",
+      reason: "Payment is not configured.",
     };
   }
 
   if (!isAddress(record.agent.agentWallet)) {
     return {
       status: "agent_wallet_invalid",
-      reason: "This agent needs a valid BSC wallet before it can receive escrow payments.",
+      reason: "This agent needs a valid BSC wallet before it can receive payment.",
     };
   }
 
@@ -235,7 +236,7 @@ export function buildBnbEscrowPaymentRequest(record: BnbActivationRecord): BnbEs
   if (!value) {
     return {
       status: "budget_needs_bnb",
-      reason: `Use a positive ${getBscNativeSymbol()} budget to fund escrow.`,
+      reason: `Use a positive ${getBscNativeSymbol()} budget.`,
     };
   }
 
@@ -247,11 +248,12 @@ export function buildBnbEscrowPaymentRequest(record: BnbActivationRecord): BnbEs
     args: [getAddress(record.agent.agentWallet) as Hex, record.receiptId, taskHash, BigInt(expiresAt)],
   });
 
-  return {
-    status: "ready",
-    chainId: getBscChainId(),
-    contractAddress: escrowAddress,
-    to: escrowAddress,
+    return {
+      status: "ready",
+      mode: "escrow",
+      chainId: getBscChainId(),
+      contractAddress: escrowAddress,
+      to: escrowAddress,
     value: value.toString(),
     data,
     gasLimit: BNB_ESCROW_FUND_GAS_LIMIT.toString(),
@@ -265,7 +267,7 @@ export function buildBnbEscrowSettlementRequest(record: BnbActivationRecord, act
   if (!escrowAddress) {
     return {
       status: "setup_required",
-      reason: "Deploy the BSC escrow contract and set BNB_AGENT_ESCROW_ADDRESS.",
+      reason: "Payment is not configured.",
     };
   }
 
@@ -273,7 +275,7 @@ export function buildBnbEscrowSettlementRequest(record: BnbActivationRecord, act
   if (!jobId || !/^0x[0-9a-fA-F]{64}$/.test(jobId)) {
     return {
       status: "not_ready",
-      reason: "Escrow must be funded before this action is available.",
+      reason: "Payment must be confirmed before this action is available.",
     };
   }
 
@@ -300,16 +302,16 @@ export function buildBnbEscrowSettlementRequest(record: BnbActivationRecord, act
     value: "0",
     data,
     gasLimit: BNB_ESCROW_SETTLEMENT_GAS_LIMIT.toString(),
-    label: action === "release" ? "Release escrow" : "Refund expired escrow",
+    label: action === "release" ? "Release payment" : "Refund payment",
     action,
     jobId: jobId as Hex,
   };
 }
 
 export function getBnbEscrowRefundBlocker(record: BnbActivationRecord, nowSeconds = Math.floor(Date.now() / 1000)) {
-  if (!record.payment?.jobId) return "Escrow must be funded before refund is available.";
+  if (!record.payment?.jobId) return "Payment must be confirmed before refund is available.";
   const expiresAt = record.payment.expiresAt;
-  if (!expiresAt) return "Escrow expiry is still being verified. Try again in a moment.";
+  if (!expiresAt) return "Refund time is still being verified. Try again in a moment.";
   if (nowSeconds <= expiresAt) {
     return `Refund unlocks after ${new Date((expiresAt + 1) * 1000).toISOString()}.`;
   }
@@ -322,12 +324,12 @@ export function isBnbEscrowRefundAvailable(record: BnbActivationRecord, nowSecon
 
 export async function readBnbEscrowJob(jobId: string): Promise<BnbEscrowJobSnapshot> {
   if (!/^0x[0-9a-fA-F]{64}$/.test(jobId)) {
-    throw new Error("Invalid BSC escrow job ID.");
+    throw new Error("Invalid BSC payment job ID.");
   }
 
   const escrowAddress = getEscrowAddress();
   if (!escrowAddress) {
-    throw new BnbTransactionVerificationError("Deploy the BSC escrow contract and set BNB_AGENT_ESCROW_ADDRESS before reading escrow jobs.");
+    throw new BnbTransactionVerificationError("Payment is not configured.");
   }
 
   const [client, agent, amount, expiresAt, status, taskHash, receiptId] = await getBscClient().readContract({
@@ -366,7 +368,7 @@ export async function readBnbEscrowPayment(
 
   const escrowAddress = getEscrowAddress();
   if (!escrowAddress) {
-    throw new BnbTransactionVerificationError("Deploy the BSC escrow contract and set BNB_AGENT_ESCROW_ADDRESS before confirming payments.");
+    throw new BnbTransactionVerificationError("Payment is not configured.");
   }
 
   const hash = txHash as Hex;
@@ -402,25 +404,25 @@ export async function readBnbEscrowPayment(
   const fundedEvent = fundedEvents.find((event) => sameAddress(event.address, escrowAddress));
 
   if (!fundedEvent) {
-    throw new BnbTransactionVerificationError("Transaction does not contain a Hive escrow funding event from the configured BSC escrow contract.");
+    throw new BnbTransactionVerificationError("Transaction does not match this payment.");
   }
 
   if (expectedRecord) {
     const expectedAmount = nativeBnbAmountWei(expectedRecord.limits.budget);
     if (!expectedAmount) {
-      throw new BnbTransactionVerificationError("Saved hire has an invalid BNB budget and cannot be verified against escrow.");
+      throw new BnbTransactionVerificationError("Saved hire has an invalid BNB budget.");
     }
     if (!sameAddress(fundedEvent.args.agent, expectedRecord.agent.agentWallet)) {
-      throw new BnbTransactionVerificationError("Escrow transaction funded a different agent wallet.");
+      throw new BnbTransactionVerificationError("Payment was sent to a different agent wallet.");
     }
     if (fundedEvent.args.amount !== expectedAmount) {
-      throw new BnbTransactionVerificationError("Escrow transaction amount does not match the saved hire budget.");
+      throw new BnbTransactionVerificationError("Payment amount does not match the saved hire budget.");
     }
     if (fundedEvent.args.receiptId !== expectedRecord.receiptId) {
-      throw new BnbTransactionVerificationError("Escrow transaction receipt ID does not match the saved hire.");
+      throw new BnbTransactionVerificationError("Payment receipt does not match the saved hire.");
     }
     if (fundedEvent.args.taskHash !== taskHashForRecord(expectedRecord)) {
-      throw new BnbTransactionVerificationError("Escrow transaction task hash does not match the saved hire.");
+      throw new BnbTransactionVerificationError("Payment does not match the saved job details.");
     }
   }
 
@@ -446,7 +448,7 @@ export async function readBnbEscrowSettlement(
 
   const escrowAddress = getEscrowAddress();
   if (!escrowAddress) {
-    throw new BnbTransactionVerificationError("Deploy the BSC escrow contract and set BNB_AGENT_ESCROW_ADDRESS before confirming settlement.");
+    throw new BnbTransactionVerificationError("Payment is not configured.");
   }
 
   const hash = txHash as Hex;
@@ -484,11 +486,11 @@ export async function readBnbEscrowSettlement(
   const settlementEvent = settlementEvents.find((event) => sameAddress(event.address, escrowAddress));
 
   if (!settlementEvent) {
-    throw new BnbTransactionVerificationError("Transaction does not contain the expected Hive escrow settlement event.");
+    throw new BnbTransactionVerificationError("Transaction does not match this payment action.");
   }
 
   if (expectedJobId && settlementEvent.args.jobId !== expectedJobId) {
-    throw new BnbTransactionVerificationError("Escrow settlement transaction does not match the saved job.");
+    throw new BnbTransactionVerificationError("Payment action does not match the saved job.");
   }
 
   return {

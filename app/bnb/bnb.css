@@ -2361,14 +2361,13 @@ button.bnb-account-button:disabled {
 }
 
 .bnb-hire-summary strong,
-.bnb-delivery-box strong {
+.bnb-delivery-box > strong {
   color: var(--bnb-text);
   font-size: 13px;
   font-weight: 700;
 }
 
-.bnb-hire-summary pre,
-.bnb-delivery-box pre {
+.bnb-hire-summary pre {
   max-height: 360px;
   overflow: auto;
   white-space: pre-wrap;
@@ -2382,10 +2381,130 @@ button.bnb-account-button:disabled {
   padding: 12px;
 }
 
-.bnb-delivery-box-compact pre {
-  max-height: 260px;
+.bnb-delivery-box h4 {
+  margin: 0;
+  color: var(--bnb-text);
+  font-size: 14px;
+  line-height: 1.35;
+}
+
+.bnb-delivery-summary,
+.bnb-delivery-text,
+.bnb-delivery-table-note {
+  margin: 0;
+  color: var(--bnb-text-soft);
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+.bnb-delivery-text {
+  max-height: 420px;
+  overflow: auto;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.bnb-delivery-box-compact .bnb-delivery-text {
+  max-height: 280px;
   font-size: 12px;
   line-height: 1.55;
+}
+
+.bnb-delivery-facts {
+  display: grid;
+  margin: 0;
+  border-top: 1px solid var(--bnb-line);
+}
+
+.bnb-delivery-facts > div {
+  display: grid;
+  grid-template-columns: minmax(110px, 0.42fr) minmax(0, 1fr);
+  gap: 14px;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--bnb-line);
+}
+
+.bnb-delivery-facts dt,
+.bnb-delivery-facts dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.bnb-delivery-facts dt {
+  color: var(--bnb-text-muted);
+  font-weight: 700;
+}
+
+.bnb-delivery-facts dd {
+  color: var(--bnb-text-soft);
+}
+
+.bnb-delivery-table-wrap {
+  width: 100%;
+  overflow-x: auto;
+  border: 1px solid var(--bnb-line);
+  border-radius: 6px;
+}
+
+.bnb-delivery-table {
+  width: 100%;
+  min-width: 620px;
+  border-collapse: collapse;
+  table-layout: auto;
+  color: var(--bnb-text-soft);
+  font-size: 12px;
+}
+
+.bnb-delivery-table th,
+.bnb-delivery-table td {
+  max-width: 260px;
+  padding: 9px 10px;
+  border-bottom: 1px solid var(--bnb-line);
+  text-align: left;
+  vertical-align: top;
+  overflow-wrap: anywhere;
+}
+
+.bnb-delivery-table th {
+  color: var(--bnb-text-muted);
+  background: rgba(255, 255, 255, 0.035);
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.bnb-delivery-table tbody tr:last-child td {
+  border-bottom: 0;
+}
+
+.bnb-delivery-table a,
+.bnb-delivery-copy-value {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.bnb-delivery-copy-value {
+  white-space: nowrap;
+}
+
+.bnb-delivery-table-note {
+  padding: 8px 10px;
+  border-top: 1px solid var(--bnb-line);
+  font-size: 11px;
+}
+
+.bnb-delivery-actions {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.bnb-delivery-actions .bnb-button-dark {
+  width: auto;
+  min-height: 34px;
+  padding: 7px 10px;
+  font-size: 12px;
 }
 
 .bnb-delivery-sources {

@@ -182,7 +182,7 @@ function routeBnbSubdomain(request: NextRequest) {
   return NextResponse.rewrite(url);
 }
 
-export function middleware(request: NextRequest) {
+export function proxy(request: NextRequest) {
   const bnbSubdomainResponse = routeBnbSubdomain(request);
 
   if (bnbSubdomainResponse) {

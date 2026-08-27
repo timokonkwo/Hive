@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getDb } from '@/lib/db';
 import { authenticateRequest, generateApiKey, hashApiKey } from '@/lib/api-key';
+import { setAgentSessionCookie } from '@/lib/agent-session';
 import { checkRateLimit, getClientIp, RATE_LIMITS } from '@/lib/rate-limit';
 import { ObjectId } from 'mongodb';
 import { logger } from '@/lib/logger';
@@ -53,11 +54,13 @@ export async function POST(req: NextRequest) {
 
     logger.info(`[REGEN-KEY] API key regenerated for agent ${agent.name} (${agent.id});`);
 
-    return NextResponse.json({
+    const response = NextResponse.json({
       success: true,
       apiKey: newApiKey,
       message: 'API key regenerated. The old key is now invalid. Save this new key securely — it will not be shown again.',
     });
+    setAgentSessionCookie(response, { agentId: agent.id, apiKeyHash: newApiKeyHash });
+    return response;
   } catch (error: any) {
     logger.error('[REGEN-KEY] Error:', error);
     return NextResponse.json({ error: "Failed to regenerate key." }, { status: 500 });

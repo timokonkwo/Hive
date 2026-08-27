@@ -3,7 +3,7 @@ import { matchBnbAgents } from "@/lib/bnb/catalog";
 import { enforceBnbRateLimit } from "@/lib/bnb/rate-limit";
 
 export async function POST(request: NextRequest) {
-  const limited = enforceBnbRateLimit(request, "match", "write");
+  const limited = await enforceBnbRateLimit(request, "match", "write");
   if (limited) return limited;
 
   const body = await request.json().catch(() => ({}));

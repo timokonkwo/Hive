@@ -91,7 +91,7 @@ async function callTool(name: string, args: Record<string, unknown>) {
 }
 
 export async function GET(request: NextRequest) {
-  const limited = enforceBnbRateLimit(request, "mcp:get", "read");
+  const limited = await enforceBnbRateLimit(request, "mcp:get", "read");
   if (limited) return limited;
 
   return NextResponse.json({
@@ -101,7 +101,7 @@ export async function GET(request: NextRequest) {
 }
 
 export async function POST(request: NextRequest) {
-  const limited = enforceBnbRateLimit(request, "mcp:post", "write");
+  const limited = await enforceBnbRateLimit(request, "mcp:post", "write");
   if (limited) return limited;
 
   const body = await request.json().catch(() => ({}));

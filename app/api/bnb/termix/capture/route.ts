@@ -51,7 +51,7 @@ async function generateAgentOutput(target: string) {
 }
 
 export async function POST(request: NextRequest) {
-  const limited = enforceBnbRateLimit(request, "termix:capture", "write");
+  const limited = await enforceBnbRateLimit(request, "termix:capture", "write");
   if (limited) return limited;
 
   const auth = await requireBnbClient(request, "save a comparison");

@@ -4,7 +4,7 @@ import { getBnbEndpointProbeSummary } from "@/lib/bnb/endpoint-observability";
 import { getBnbRuntimeReadiness } from "@/lib/bnb/runtime";
 
 export async function GET(request: NextRequest) {
-  const limited = enforceBnbRateLimit(request, "runtime", "read");
+  const limited = await enforceBnbRateLimit(request, "runtime", "read");
   if (limited) return limited;
 
   const readiness = getBnbRuntimeReadiness();

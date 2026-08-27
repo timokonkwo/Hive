@@ -1,6 +1,7 @@
 import { endpointAuthHeaders, hasEndpointAuthHeaders } from "@/lib/bnb/endpoint-auth";
 import { safeFetchJson, validatePublicHttpsUrl } from "@/lib/bnb/endpoint-security";
-import type { BnbAgentProfile, BnbExecutionEndpoint } from "@/lib/bnb/types";
+import { normalizedEndpointCapabilityName } from "@/lib/bnb/capability-contracts";
+import type { BnbAgentProfile, BnbEndpointCapabilityContract, BnbExecutionEndpoint } from "@/lib/bnb/types";
 import type { BnbAgentExecutionAdapter, BnbAdapterPreflightResult, BnbAdapterRunInput } from "@/lib/bnb/adapters/types";
 import { completedAdapterWork } from "@/lib/bnb/adapters/types";
 
@@ -20,7 +21,8 @@ type A2aCard = {
 
 const A2A_PREFLIGHT_METHOD = "hive/preflight";
 
-function a2aEndpoint(agent: BnbAgentProfile) {
+function a2aEndpoint(agent: BnbAgentProfile, selected?: BnbExecutionEndpoint) {
+  if (selected?.adapter === "a2a") return selected;
   return agent.executionEndpoints?.find((endpoint) => endpoint.adapter === "a2a");
 }
 
@@ -51,6 +53,17 @@ function parseCard(payload: unknown): A2aCard {
   };
 }
 
+function a2aCapabilityContracts(skills: NonNullable<A2aCard["skills"]>): BnbEndpointCapabilityContract[] {
+  return skills
+    .map((skill) => ({
+      name: skill.name || skill.id || "",
+      kind: "skill" as const,
+      ...(skill.description ? { description: skill.description } : {}),
+      ...(skill.tags && skill.tags.length > 0 ? { tags: skill.tags } : {}),
+    }))
+    .filter((skill) => skill.name);
+}
+
 async function fetchCard(endpoint: BnbExecutionEndpoint) {
   const { response, payload } = await safeFetchJson(endpoint.url, {
     method: "GET",
@@ -58,7 +71,7 @@ async function fetchCard(endpoint: BnbExecutionEndpoint) {
     timeoutMs: 7_000,
     maxBytes: 192 * 1024,
   });
-  if (!response.ok) throw new Error(`A2A Agent Card failed with HTTP ${response.status}.`);
+  if (!response.ok) throw new Error(`Agent details could not be loaded with HTTP ${response.status}.`);
   const card = parseCard(payload);
   const serviceUrl = card.url || endpoint.url;
   const checked = validatePublicHttpsUrl(serviceUrl);
@@ -88,7 +101,7 @@ function protectedA2aReason(status: number, payload: unknown) {
     return "This agent requires external sign-in.";
   }
   if (status === 403 || /forbidden|csrf|sec-fetch/.test(text)) {
-    return "This agent cannot be run from Hive.";
+    return "This agent is not available for jobs.";
   }
   return "";
 }
@@ -116,7 +129,7 @@ async function assertPublicA2aService(serviceUrl: string, card: A2aCard) {
   const protectedReason = protectedA2aReason(response.status, payload);
   if (protectedReason) throw new Error(protectedReason);
   if (!isJsonRpcProbeResponse(response.status, payload)) {
-    throw new Error("This agent cannot be run from Hive.");
+    throw new Error("This agent is not available for jobs.");
   }
 }
 
@@ -158,7 +171,7 @@ function stringifyA2aOutput(payload: unknown) {
   ].map((item) => item.trim()).filter(Boolean).join("\n\n");
 
   if (text) return text;
-  if (isA2aTransportOnlyPayload(resultValue) || isEmptyA2aPayload(result)) throw new Error("A2A agent returned no result.");
+  if (isA2aTransportOnlyPayload(resultValue) || isEmptyA2aPayload(result)) throw new Error("This agent returned no result.");
   return JSON.stringify(resultValue, null, 2);
 }
 
@@ -236,6 +249,10 @@ function isEmptyA2aPayload(value: unknown): boolean {
 
 function matchingSkills(card: A2aCard, capability: string, taskType: string) {
   const skills = card.skills || [];
+  const selectedSkill = skills.filter((skill) => (
+    normalizedEndpointCapabilityName(skill.name || skill.id || "") === normalizedEndpointCapabilityName(taskType)
+  ));
+  if (selectedSkill.length > 0) return selectedSkill;
   if (capability === "custom") return skills;
 
   return skills.filter((skill) => {
@@ -287,9 +304,9 @@ export const a2aAdapter: BnbAgentExecutionAdapter = {
     return Boolean(a2aEndpoint(agent));
   },
 
-  async preflight(agent: BnbAgentProfile): Promise<BnbAdapterPreflightResult> {
-    const endpoint = a2aEndpoint(agent);
-    if (!endpoint) return { ok: false, adapter: "a2a", reason: "No A2A endpoint is listed." };
+  async preflight(agent: BnbAgentProfile, selected?: BnbExecutionEndpoint): Promise<BnbAdapterPreflightResult> {
+    const endpoint = a2aEndpoint(agent, selected);
+    if (!endpoint) return { ok: false, adapter: "a2a", reason: "This agent is not available for jobs." };
 
     try {
       const { card, serviceUrl } = await fetchCard(endpoint);
@@ -299,20 +316,21 @@ export const a2aAdapter: BnbAgentExecutionAdapter = {
         adapter: "a2a",
         endpoint,
         capabilities: (card.skills || []).map((skill) => skill.name || skill.id || "").filter(Boolean).slice(0, 20),
+        capabilityContracts: a2aCapabilityContracts(card.skills || []),
       };
     } catch (error) {
       return {
         ok: false,
         adapter: "a2a",
         endpoint,
-        reason: error instanceof Error ? error.message : "A2A preflight failed.",
+        reason: error instanceof Error ? error.message : "Agent check failed.",
       };
     }
   },
 
-  async preflightJob({ agent, record }: BnbAdapterRunInput): Promise<BnbAdapterPreflightResult> {
-    const endpoint = a2aEndpoint(agent);
-    if (!endpoint) return { ok: false, adapter: "a2a", reason: "No A2A endpoint is listed." };
+  async preflightJob({ agent, record, endpoint: selected }: BnbAdapterRunInput): Promise<BnbAdapterPreflightResult> {
+    const endpoint = a2aEndpoint(agent, selected);
+    if (!endpoint) return { ok: false, adapter: "a2a", reason: "This agent is not available for jobs." };
 
     try {
       const { card, serviceUrl } = await fetchCard(endpoint);
@@ -327,6 +345,7 @@ export const a2aAdapter: BnbAgentExecutionAdapter = {
           endpoint,
           reason: `This agent cannot run this ${capabilityLabel(capability)} job. Choose another agent.`,
           capabilities: (card.skills || []).map((skill) => skill.name || skill.id || "").filter(Boolean).slice(0, 20),
+          capabilityContracts: a2aCapabilityContracts(card.skills || []),
         };
       }
 
@@ -335,20 +354,21 @@ export const a2aAdapter: BnbAgentExecutionAdapter = {
         adapter: "a2a",
         endpoint,
         capabilities: (skills.length > 0 ? skills : card.skills || []).map((skill) => skill.name || skill.id || "").filter(Boolean).slice(0, 20),
+        capabilityContracts: a2aCapabilityContracts(skills.length > 0 ? skills : card.skills || []),
       };
     } catch (error) {
       return {
         ok: false,
         adapter: "a2a",
         endpoint,
-        reason: error instanceof Error ? error.message : "A2A job check failed.",
+        reason: error instanceof Error ? error.message : "Agent check failed.",
       };
     }
   },
 
-  async run({ agent, record }: BnbAdapterRunInput) {
-    const endpoint = a2aEndpoint(agent);
-    if (!endpoint) throw new Error("No A2A endpoint is listed for this agent.");
+  async run({ agent, record, endpoint: selected }: BnbAdapterRunInput) {
+    const endpoint = a2aEndpoint(agent, selected);
+    if (!endpoint) throw new Error("This agent is not available for jobs.");
     const startedAt = new Date().toISOString();
     const { serviceUrl } = await fetchCard(endpoint);
     const { response, payload } = await safeFetchJson(serviceUrl, {
@@ -360,12 +380,12 @@ export const a2aAdapter: BnbAgentExecutionAdapter = {
     });
     if (!response.ok) {
       const protectedReason = protectedA2aReason(response.status, payload);
-      throw new Error(protectedReason || `A2A message/send failed with HTTP ${response.status}.`);
+      throw new Error(protectedReason || `Agent request failed with HTTP ${response.status}.`);
     }
     const error = asRecord(payload).error;
     if (error) {
       const message = asRecord(error).message;
-      throw new Error(typeof message === "string" ? message : "A2A task failed.");
+      throw new Error(typeof message === "string" ? message : "Agent run failed.");
     }
 
     return completedAdapterWork(

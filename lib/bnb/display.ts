@@ -21,7 +21,7 @@ const GENERATED_DESCRIPTION_PATTERNS = [
   /entertainment/i,
 ];
 
-const GENERIC_CAPABILITIES = new Set(["web", "api", "http", "https", "unknown", "general"]);
+const GENERIC_CAPABILITIES = new Set(["web", "api", "http", "https", "unknown", "general", "mcp", "a2a", "oasf", "email", "erc 8183", "erc8183", "x402"]);
 const GENERIC_SERVICE_LABELS = new Set(["api", "discord", "http", "https", "mcp", "telegram", "twitter", "unknown", "web", "website", "x"]);
 const UNLISTED_SERVICE_PRICES = new Set(["", "free", "not listed", "not set", "price not set", "price on request"]);
 
@@ -46,11 +46,11 @@ export function bnbCategoryLabel(category: BnbAgentCategory) {
   return bnbCategoryLabels[category];
 }
 
-export function bnbStatusLabel(agent: Pick<BnbAgentProfile, "activationStatus" | "executionStatus">) {
+export function bnbStatusLabel(agent: Pick<BnbAgentProfile, "activationStatus" | "executionStatus" | "executionEndpoints" | "hasActionableEndpointCapabilities">) {
   return bnbAgentReadinessLabel({ ...agent, agentWallet: "" });
 }
 
-export function bnbCanHireAgent(agent: Pick<BnbAgentProfile, "activationStatus" | "executionStatus" | "agentWallet">) {
+export function bnbCanHireAgent(agent: Pick<BnbAgentProfile, "activationStatus" | "executionStatus" | "agentWallet" | "executionEndpoints" | "hasActionableEndpointCapabilities">) {
   return isBnbAgentHireable(agent);
 }
 

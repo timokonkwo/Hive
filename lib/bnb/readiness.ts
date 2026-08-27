@@ -1,4 +1,3 @@
-import { isAddress } from "viem";
 import type { BnbAgentProfile } from "@/lib/bnb/types";
 
 export type BnbMarketplaceReadinessStatus = "available" | "profile" | "unavailable";
@@ -10,15 +9,23 @@ export type BnbMarketplaceReadiness = {
   reason: string;
 };
 
-type BnbReadinessAgent = Pick<BnbAgentProfile, "activationStatus" | "executionStatus" | "agentWallet">;
+type BnbReadinessAgent = Pick<
+  BnbAgentProfile,
+  "activationStatus" | "executionStatus" | "agentWallet" | "executionEndpoints" | "hasActionableEndpointCapabilities"
+>;
 
 export function classifyBnbAgentReadiness(agent: BnbReadinessAgent): BnbMarketplaceReadiness {
   const executionStatus = agent.executionStatus;
-  const available = executionStatus === "ready_to_run"
-    || executionStatus === "connectable"
-    || (!executionStatus && agent.activationStatus === "callable");
+  const available = agent.hasActionableEndpointCapabilities !== false && (
+    executionStatus === "ready_to_run"
+    || (!executionStatus && agent.activationStatus === "callable")
+    || (
+      executionStatus === "connectable"
+      && hasCandidateExecutionEndpoint(agent)
+    )
+  );
 
-  if (available && isAddress(agent.agentWallet)) {
+  if (available) {
     return {
       status: "available",
       canHire: true,
@@ -27,12 +34,12 @@ export function classifyBnbAgentReadiness(agent: BnbReadinessAgent): BnbMarketpl
     };
   }
 
-  if (available) {
+  if (agent.hasActionableEndpointCapabilities === false) {
     return {
-      status: "unavailable",
+      status: "profile",
       canHire: false,
-      label: "Unavailable",
-      reason: "The agent wallet is not a valid BSC address.",
+      label: "Profile",
+      reason: "This agent is not available for jobs.",
     };
   }
 
@@ -49,7 +56,7 @@ export function classifyBnbAgentReadiness(agent: BnbReadinessAgent): BnbMarketpl
     status: "profile",
     canHire: false,
     label: "Profile",
-    reason: "No callable job endpoint is available.",
+    reason: "This agent is not available for jobs.",
   };
 }
 
@@ -58,7 +65,21 @@ export function isBnbAgentHireable(agent: BnbReadinessAgent) {
 }
 
 export function bnbAgentReadinessLabel(agent: BnbReadinessAgent) {
-  if (agent.executionStatus === "ready_to_run" || agent.executionStatus === "connectable" || (!agent.executionStatus && agent.activationStatus === "callable")) return "Available";
+  if (agent.hasActionableEndpointCapabilities === false) return "Profile";
+  if (isBnbAgentHireable(agent)) return "Available";
   if (agent.executionStatus === "unavailable") return "Unavailable";
   return "Profile";
+}
+
+function hasCandidateExecutionEndpoint(agent: BnbReadinessAgent) {
+  return Boolean(agent.executionEndpoints?.some((endpoint) => {
+    if (endpoint.adapter === "web") return false;
+    if (/\{[^}]+\}|<[^>]+>|\$\{[^}]+\}/.test(endpoint.url)) return false;
+    try {
+      const url = new URL(endpoint.url);
+      return url.protocol === "https:" && !url.username && !url.password && Boolean(url.hostname);
+    } catch {
+      return false;
+    }
+  }));
 }

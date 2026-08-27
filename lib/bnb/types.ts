@@ -27,6 +27,36 @@ export type BnbExecutionEndpoint = {
   paymentRequired?: boolean;
 };
 
+export type BnbEndpointCapabilityKind = "tool" | "skill" | "http";
+
+export type BnbEndpointCapabilityContract = {
+  name: string;
+  kind: BnbEndpointCapabilityKind;
+  adapter?: "mcp" | "a2a" | "x402" | "http";
+  endpointUrl?: string;
+  description?: string;
+  inputSchema?: unknown;
+  tags?: string[];
+  paymentRequired?: boolean;
+};
+
+export type BnbEndpointCapabilitySnapshot = {
+  agentKey: string;
+  chainId: number;
+  tokenId: string;
+  adapter: "mcp" | "a2a" | "x402" | "http";
+  endpointUrl: string;
+  endpointLabel: string;
+  endpointSource?: BnbExecutionEndpointSource;
+  endpointVerified?: boolean;
+  paymentRequired?: boolean;
+  ok: boolean;
+  capabilities: BnbEndpointCapabilityContract[];
+  reason?: string;
+  checkedAt: string;
+  expiresAt: string;
+};
+
 export type BnbAgentService = {
   name: string;
   type: "erc8183" | "a2a" | "mcp" | "x402" | "http" | "web" | "unknown";
@@ -70,6 +100,8 @@ export type BnbAgentProfile = {
   activationStatus: BnbActivationStatus;
   executionStatus?: BnbExecutionStatus;
   executionEndpoints?: BnbExecutionEndpoint[];
+  endpointCapabilities?: BnbEndpointCapabilityContract[];
+  hasActionableEndpointCapabilities?: boolean;
   scoreBreakdown?: BnbScoreBreakdown;
   sourceFreshness: {
     source: BnbAgentSource;
@@ -97,6 +129,7 @@ export type BnbAgentQuery = {
   q?: string | null;
   activation?: string | null;
   execution?: string | null;
+  integration?: string | null;
   sort?: string | null;
   limit?: number;
   page?: number;
@@ -109,6 +142,29 @@ export type BnbAgentPageResult = {
   total: number;
   hasMore: boolean;
   source: string;
+};
+
+export type BnbListingModerationStatus = "hidden" | "blocked";
+
+export type BnbListingModerationReason =
+  | "broken_endpoint"
+  | "malformed_profile"
+  | "wrong_category"
+  | "unsafe_endpoint"
+  | "spam"
+  | "policy"
+  | "other";
+
+export type BnbListingModerationRecord = {
+  key: string;
+  chainId: number;
+  tokenId: string;
+  status: BnbListingModerationStatus;
+  reason: BnbListingModerationReason;
+  note?: string;
+  actorId?: string;
+  createdAt: string;
+  updatedAt: string;
 };
 
 export type BnbPartnerTrack = "TermiX" | "PancakeSwap" | "Altana";
@@ -155,6 +211,109 @@ export type BnbRecordStorage = {
   savedAt: string;
 };
 
+export type BnbPaymentMode = "none" | "escrow" | "x402";
+
+export type BnbX402PaymentRequirement = {
+  scheme: "exact";
+  network: string;
+  amount?: string;
+  maxAmountRequired?: string;
+  resource?: string;
+  description?: string;
+  mimeType?: string;
+  payTo: string;
+  asset: string;
+  maxTimeoutSeconds: number;
+  outputSchema?: Record<string, unknown>;
+  extra?: Record<string, unknown>;
+};
+
+export type BnbX402PaymentHeaderCipher = {
+  version: "v1";
+  algorithm: "aes-256-gcm";
+  iv: string;
+  tag: string;
+  ciphertext: string;
+  hash: string;
+  createdAt: string;
+};
+
+export type BnbX402PaymentSnapshot = {
+  x402Version: number;
+  resource?: {
+    url?: string;
+    description?: string;
+    mimeType?: string;
+    serviceName?: string;
+  };
+  paymentRequirements: BnbX402PaymentRequirement[];
+  selectedRequirement: BnbX402PaymentRequirement;
+  extensions?: Record<string, unknown>;
+  paymentHeader?: BnbX402PaymentHeaderCipher;
+  paymentHeaderHash?: string;
+  transaction?: string;
+  network?: string;
+  payer?: string;
+  status?: "pending" | "verified" | "settled" | "unconfirmed" | "failed";
+  verifiedAt?: string;
+  settledAt?: string;
+  error?: string;
+};
+
+export type BnbEscrowPaymentSnapshot = {
+  chainId: number;
+  contractAddress?: string;
+  transactionHash?: string;
+  transactionStatus?: "success" | "reverted" | "pending";
+  explorerUrl?: string;
+  blockNumber?: string;
+  jobId?: string;
+  expiresAt?: number;
+};
+
+export type BnbPaymentSnapshot = BnbEscrowPaymentSnapshot & {
+  mode?: BnbPaymentMode;
+  x402?: BnbX402PaymentSnapshot;
+};
+
+export type BnbPaymentRequest =
+  | {
+      status: "ready";
+      mode: "escrow";
+      chainId: number;
+      contractAddress: string;
+      to: string;
+      value: string;
+      data: string;
+      gasLimit: string;
+      amountLabel: string;
+      expiresAt: number;
+      label?: string;
+    }
+  | {
+      status: "ready";
+      mode: "x402";
+      x402Version: number;
+      paymentRequirements: BnbX402PaymentRequirement[];
+      selectedPaymentRequirement: BnbX402PaymentRequirement;
+      extensions?: Record<string, unknown>;
+      amountLabel: string;
+      network: string;
+      asset: string;
+      payTo: string;
+      resource: string;
+    }
+  | {
+      status: "not_required";
+      mode: "none";
+      reason: "";
+    }
+  | {
+      status: "setup_required" | "budget_needs_bnb" | "agent_wallet_invalid" | "not_ready";
+      mode?: BnbPaymentMode;
+      reason: string;
+    };
+
 export type BnbTransactionRequest =
   | {
       status: "ready";
@@ -179,12 +338,21 @@ export type BnbAgentWork = {
   adapter?: string;
   runId?: string;
   error?: string;
+  paymentSettlement?: {
+    mode: "x402";
+    status: "settled" | "unconfirmed";
+    transaction?: string;
+    network?: string;
+    payer?: string;
+    settledAt: string;
+  };
 };
 
 export type BnbJobCapability = "rebalancing" | "concentrated_liquidity" | "grid_trading" | "yield_optimisation" | "health_factor" | "custom";
 
 export type BnbHireIntentInput = {
   capability?: BnbJobCapability;
+  endpointCapability?: string;
   taskType?: string;
   outcome: string;
   target?: string;
@@ -196,6 +364,7 @@ export type BnbHireIntentInput = {
 export type BnbJobSpec = {
   capability: BnbJobCapability;
   taskType: string;
+  endpointCapability?: BnbEndpointCapabilityContract;
   summary: string;
   expectedOutput: string;
   fields: Record<string, string>;
@@ -206,17 +375,27 @@ export type BnbJobPreflightResult = {
   status: "ready" | "needs_input" | "blocked";
   canProceed: boolean;
   paymentRequired?: boolean;
+  paymentMode?: BnbPaymentMode;
   jobSpec?: BnbJobSpec;
   missingInputs: string[];
   warnings: string[];
   assumptions: string[];
+  selectedExecution?: BnbExecutionTarget;
   adapterPreflight: Array<{
     ok: boolean;
     adapter: "mcp" | "a2a" | "x402" | "http";
     endpoint?: BnbExecutionEndpoint;
     reason?: string;
     capabilities?: string[];
+    capabilityContracts?: BnbEndpointCapabilityContract[];
   }>;
+};
+
+export type BnbExecutionTarget = {
+  adapter: "mcp" | "a2a" | "x402" | "http";
+  endpoint: BnbExecutionEndpoint;
+  capability?: BnbEndpointCapabilityContract;
+  selectedAt: string;
 };
 
 export type BnbAgentDelivery = {
@@ -225,6 +404,23 @@ export type BnbAgentDelivery = {
   rawOutput?: string;
   dataSources?: string[];
   adapter?: string;
+  runId?: string;
+  startedAt?: string;
+  completedAt?: string;
+  error?: string;
+};
+
+export type BnbActivationExecution = {
+  state: "running" | "completed" | "failed";
+  attemptId: string;
+  idempotencyKey: string;
+  requestHash: string;
+  jobHash: string;
+  adapter?: "mcp" | "a2a" | "x402" | "http";
+  endpoint?: Pick<BnbExecutionEndpoint, "adapter" | "url" | "label" | "verified" | "source">;
+  capability?: Pick<BnbEndpointCapabilityContract, "name" | "kind" | "description" | "tags" | "paymentRequired">;
+  requestArgs?: Record<string, string>;
+  sources?: string[];
   runId?: string;
   startedAt?: string;
   completedAt?: string;
@@ -256,6 +452,7 @@ export type BnbActivationRecord = {
   clientAddress?: string;
   agent: Pick<BnbAgentProfile, "chainId" | "tokenId" | "name" | "activationStatus" | "executionStatus" | "agentWallet">;
   jobSpec?: BnbJobSpec;
+  executionTarget?: BnbExecutionTarget;
   delivery?: BnbAgentDelivery;
   limits: {
     task: string;
@@ -264,16 +461,8 @@ export type BnbActivationRecord = {
     walletConfirmationRequired: boolean;
   };
   work?: BnbAgentWork;
-  payment?: {
-    chainId: number;
-    contractAddress?: string;
-    transactionHash?: string;
-    transactionStatus?: "success" | "reverted" | "pending";
-    explorerUrl?: string;
-    blockNumber?: string;
-    jobId?: string;
-    expiresAt?: number;
-  };
+  execution?: BnbActivationExecution;
+  payment?: BnbPaymentSnapshot;
   settlement?: {
     action: "release" | "refund";
     transactionHash?: string;

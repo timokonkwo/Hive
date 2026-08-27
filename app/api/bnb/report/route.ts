@@ -1,10 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireBnbClient } from "@/lib/bnb/auth";
+import { recordBnbAnalyticsEvent } from "@/lib/bnb/analytics";
 import { enforceBnbRateLimit } from "@/lib/bnb/rate-limit";
 import { BnbStorageError, listBnbRecords } from "@/lib/bnb/records";
 
 export async function GET(request: NextRequest) {
-  const limited = enforceBnbRateLimit(request, "report", "read");
+  const limited = await enforceBnbRateLimit(request, "report", "read");
   if (limited) return limited;
 
   const auth = await requireBnbClient(request, "view activity");
@@ -14,6 +15,18 @@ export async function GET(request: NextRequest) {
   const limit = Number(searchParams.get("limit") || 25);
   try {
     const records = await listBnbRecords(Number.isFinite(limit) ? limit : 25, auth.client.userId);
+    recordBnbAnalyticsEvent({
+      name: "report.view",
+      route: "api.bnb.report",
+      clientAddress: auth.client.userId,
+      metadata: {
+        activations: records.activations.length,
+        accessRequests: records.accessRequests.length,
+        termixComparisons: records.termixComparisons.length,
+        altanaSessions: records.altanaSessions.length,
+        storage: records.storage,
+      },
+    });
 
     return NextResponse.json(records);
   } catch (error) {

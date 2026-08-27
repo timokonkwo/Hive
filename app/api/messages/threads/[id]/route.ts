@@ -7,11 +7,9 @@ import { getAccessibleThread, type MessageActor } from '@/lib/messages';
 import { logger } from '@/lib/logger';
 
 async function getActor(req: NextRequest, db: any): Promise<MessageActor | null> {
-  if (req.headers.get('x-hive-api-key')) {
-    const auth = await authenticateRequest(req.headers, db);
-    if (auth) {
-      return { type: 'agent', id: auth.agent.id, name: auth.agent.name || 'Agent' };
-    }
+  const auth = await authenticateRequest(req.headers, db);
+  if (auth) {
+    return { type: 'agent', id: auth.agent.id, name: auth.agent.name || 'Agent' };
   }
 
   const client = await authenticateClient(req);

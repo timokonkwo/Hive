@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireBnbClient } from "@/lib/bnb/auth";
+import { recordBnbAnalyticsEvent } from "@/lib/bnb/analytics";
 import { BnbTransactionVerificationError } from "@/lib/bnb/errors";
+import { recordBnbIncident } from "@/lib/bnb/incidents";
 import { enforceBnbRateLimit } from "@/lib/bnb/rate-limit";
 import {
   buildBnbEscrowSettlementRequest,
@@ -9,7 +11,7 @@ import {
   type BnbEscrowSettlementAction,
 } from "@/lib/bnb/escrow";
 import type { BnbActivationRecord } from "@/lib/bnb/types";
-import { BnbStorageError, getBnbActivationRecord, updateBnbActivationRecord } from "@/lib/bnb/records";
+import { BnbStorageError, getBnbActivationRecord, publicBnbActivationRecord, updateBnbActivationRecord } from "@/lib/bnb/records";
 
 function readString(value: unknown) {
   return typeof value === "string" ? value.trim() : "";
@@ -38,16 +40,19 @@ async function withVerifiedEscrowExpiry(record: BnbActivationRecord): Promise<Bn
 }
 
 export async function POST(request: NextRequest) {
-  const limited = enforceBnbRateLimit(request, "activate:settlement", "write");
+  const limited = await enforceBnbRateLimit(request, "activate:settlement", "write");
   if (limited) return limited;
 
-  const auth = await requireBnbClient(request, "update escrow");
+  const auth = await requireBnbClient(request, "update payment");
   if (auth.response) return auth.response;
+
+  let recordId = "";
+  let action: BnbEscrowSettlementAction | null = null;
 
   try {
     const body = await request.json().catch(() => ({}));
-    const recordId = readString(body.recordId);
-    const action = asSettlementAction(readString(body.action));
+    recordId = readString(body.recordId);
+    action = asSettlementAction(readString(body.action));
     const transactionHash = readString(body.transactionHash);
 
     if (!recordId || !action) {
@@ -59,8 +64,12 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Hire receipt was not found" }, { status: 404 });
     }
 
+    if (record.payment?.mode && record.payment.mode !== "escrow") {
+      return NextResponse.json({ error: "This action is not available for this job." }, { status: 409 });
+    }
+
     if (record.status === "paid" || record.status === "released" || record.status === "refunded") {
-      return NextResponse.json({ error: "This escrow receipt is already closed." }, { status: 409 });
+      return NextResponse.json({ error: "This payment is already closed." }, { status: 409 });
     }
 
     if (record.limits.walletConfirmationRequired === false || !record.payment?.jobId || record.payment.transactionStatus !== "success") {
@@ -116,20 +125,57 @@ export async function POST(request: NextRequest) {
         },
       },
     });
+    recordBnbAnalyticsEvent({
+      name: "settlement.updated",
+      route: "api.bnb.activate.settlement",
+      clientAddress: auth.client.userId,
+      agent: settlementRecord.agent,
+      recordId: settlementRecord.recordId,
+      receiptId: settlementRecord.receiptId,
+      status: updated?.status || status,
+      ok: settlement.transactionStatus === "success",
+      metadata: {
+        action,
+        transactionStatus: settlement.transactionStatus,
+      },
+    });
+    if (settlement.transactionStatus === "reverted") {
+      recordBnbIncident({
+        kind: "settlement.failed",
+        route: "api.bnb.activate.settlement",
+        record: updated || settlementRecord,
+        status: updated?.status || status,
+        reason: "Payment action transaction reverted.",
+        metadata: {
+          action,
+          transactionStatus: settlement.transactionStatus,
+        },
+      });
+    }
 
     return NextResponse.json({
       status: updated?.status || status,
-      message: settlement.transactionStatus === "success" ? "Escrow updated on BSC." : "Escrow transaction submitted.",
-      record: updated,
+      message: settlement.transactionStatus === "success" ? "Payment updated on BSC." : "Payment transaction submitted.",
+      record: updated ? publicBnbActivationRecord(updated) : null,
       settlement,
     });
   } catch (error) {
+    recordBnbIncident({
+      kind: "settlement.failed",
+      route: "api.bnb.activate.settlement",
+      recordId,
+      status: error instanceof BnbStorageError ? "storage_failed" : error instanceof BnbTransactionVerificationError ? "verification_failed" : "failed",
+      reason: error,
+      metadata: {
+        action: action || "",
+      },
+    });
     if (error instanceof BnbTransactionVerificationError) {
       return NextResponse.json({ error: error.message }, { status: 400 });
     }
     if (error instanceof BnbStorageError) {
       return NextResponse.json({ error: error.message }, { status: 503 });
     }
-    return NextResponse.json({ error: error instanceof Error ? error.message : "Could not update escrow." }, { status: 500 });
+    return NextResponse.json({ error: error instanceof Error ? error.message : "Could not update payment." }, { status: 500 });
   }
 }

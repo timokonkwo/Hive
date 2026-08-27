@@ -6,7 +6,7 @@ export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ address: string }> }
 ) {
-  const limited = enforceBnbRateLimit(request, "bsc:address", "read");
+  const limited = await enforceBnbRateLimit(request, "bsc:address", "read");
   if (limited) return limited;
 
   const { address } = await params;

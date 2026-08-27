@@ -61,7 +61,7 @@ export async function GET(req: Request) {
         logger.info(`[CRON-FEES] Claiming fees for mint ${baseMintStr} (${claimableAmount} raw);...`);
 
         // Generate claim transaction instructions from Bags SDK
-        const txs = await bags.sdk.fee.getClaimTransaction(walletPubKey, position);
+        const txs = await bags.sdk.fee.getClaimTransactions(walletPubKey, position.baseMint);
 
         for (const tx of txs) {
           // Fetch blockhash, sign and broadcast

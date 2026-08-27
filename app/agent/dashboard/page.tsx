@@ -13,6 +13,10 @@ import Link from "next/link";
 
 const USDC_MINT_SOLANA = "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v";
 
+const agentAuthHeaders = (key: string): HeadersInit => (
+  key ? { "x-hive-api-key": key } : {}
+);
+
 async function createSolanaWalletProof(solWallet: any, address: string, action = "link_wallet") {
   if (!solWallet.signMessage) {
     throw new Error("Your Solana wallet does not support message signing. Use Phantom, Solflare, or Backpack.");
@@ -216,75 +220,20 @@ export default function AgentDashboardPage() {
     setStakedBalance(agent?.stakedAmount || 0);
   }, [agent?.stakedAmount]);
 
-  // Restore session on mount
+  // Restore dashboard session from the httpOnly cookie set during login.
   useEffect(() => {
-    const savedKey = sessionStorage.getItem('hive_agent_key');
-    if (savedKey) {
-      setApiKey(savedKey);
-      // Auto-restore session
-      (async () => {
-        setLoading(true);
-        try {
-          const profileRes = await fetch('/api/agents/me', { headers: { 'x-hive-api-key': savedKey } });
-          if (profileRes.ok) {
-            const profileData = await profileRes.json();
-            setAgent(profileData.agent);
-            setStats(profileData.stats);
-            // Fetch payments
-            const paymentsRes = await fetch('/api/agents/payments', { headers: { 'x-hive-api-key': savedKey } });
-            if (paymentsRes.ok) {
-              const pd = await paymentsRes.json();
-              setPayments(pd.payments || []);
-              setPaymentSummary(pd.summary || null);
-            }
-            const [webhooksRes, deliveriesRes] = await Promise.all([
-              fetch('/api/webhooks', { headers: { 'x-hive-api-key': savedKey } }),
-              fetch('/api/webhooks/deliveries?limit=8', { headers: { 'x-hive-api-key': savedKey } }),
-            ]);
-            if (webhooksRes.ok) {
-              const wh = await webhooksRes.json();
-              setWebhooks(wh.webhooks || []);
-            }
-            if (deliveriesRes.ok) {
-              const deliveries = await deliveriesRes.json();
-              setWebhookDeliveries(deliveries.deliveries || []);
-            }
-	            const opportunitiesRes = await fetch('/api/agents/me/opportunities?limit=5', { headers: { 'x-hive-api-key': savedKey } });
-	            if (opportunitiesRes.ok) {
-	              const opportunitiesData = await opportunitiesRes.json();
-	              setOpportunities(opportunitiesData.opportunities || []);
-	            }
-	            const [pluginsRes, installedPluginsRes] = await Promise.all([
-	              fetch('/api/plugins'),
-	              fetch('/api/agents/me/plugins', { headers: { 'x-hive-api-key': savedKey } }),
-	            ]);
-	            if (pluginsRes.ok) {
-	              const pluginsData = await pluginsRes.json();
-	              setPluginCatalog(pluginsData.plugins || []);
-	            }
-	            if (installedPluginsRes.ok) {
-	              const installedData = await installedPluginsRes.json();
-	              setInstalledPlugins(installedData.plugins || []);
-	            }
-	            if (profileData.agent?.solanaAddress) {
-	              fetchBalances(profileData.agent.solanaAddress);
-            }
-            fetchPoints(savedKey);
-          } else {
-            // Key expired or invalid — clear it
-            sessionStorage.removeItem('hive_agent_key');
-          }
-        } catch {
-          sessionStorage.removeItem('hive_agent_key');
-        } finally {
-          setLoading(false);
-        }
-      })();
-    }
+    (async () => {
+      setLoading(true);
+      try {
+        await loadFullDashboard("");
+      } finally {
+        setLoading(false);
+      }
+    })();
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const logout = () => {
-    sessionStorage.removeItem('hive_agent_key');
+    void fetch('/api/agents/session', { method: 'DELETE' }).catch(() => undefined);
     setApiKey('');
     setOwnerPin('');
     setAgent(null);
@@ -321,7 +270,7 @@ export default function AgentDashboardPage() {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          "x-hive-api-key": apiKey
+          ...agentAuthHeaders(apiKey),
         },
         body: JSON.stringify({
           agentId: agent.id,
@@ -337,8 +286,7 @@ export default function AgentDashboardPage() {
         setToolTokenSymbol("");
         setToolTokenImage("");
         // Reload agent details
-        const key = sessionStorage.getItem('hive_agent_key') || apiKey;
-        const profileRes = await fetch('/api/agents/me', { headers: { 'x-hive-api-key': key } });
+        const profileRes = await fetch('/api/agents/me', { headers: agentAuthHeaders(apiKey) });
         if (profileRes.ok) {
           const profileData = await profileRes.json();
           setAgent(profileData.agent);
@@ -408,8 +356,7 @@ export default function AgentDashboardPage() {
         setNeedsPinSetup(false);
         setNewPin("");
         setConfirmPin("");
-        // Now load the full dashboard
-        await loadFullDashboard();
+        await loadFullDashboard(apiKey);
       } else {
         toast.error(data.error || "Failed to set PIN");
       }
@@ -454,12 +401,12 @@ export default function AgentDashboardPage() {
   }, []);
 
   const loadWebhooks = useCallback(async (key = apiKey) => {
-    if (!key) return;
     setWebhookLoading(true);
     try {
+      const headers = agentAuthHeaders(key);
       const [webhooksRes, deliveriesRes] = await Promise.all([
-        fetch('/api/webhooks', { headers: { 'x-hive-api-key': key } }),
-        fetch('/api/webhooks/deliveries?limit=8', { headers: { 'x-hive-api-key': key } }),
+        fetch('/api/webhooks', { headers }),
+        fetch('/api/webhooks/deliveries?limit=8', { headers }),
       ]);
 
       if (webhooksRes.ok) {
@@ -479,11 +426,10 @@ export default function AgentDashboardPage() {
   }, [apiKey]);
 
   const loadOpportunities = useCallback(async (key = apiKey) => {
-    if (!key) return;
     setOpportunitiesLoading(true);
     try {
       const res = await fetch('/api/agents/me/opportunities?limit=5', {
-        headers: { 'x-hive-api-key': key },
+        headers: agentAuthHeaders(key),
       });
       if (res.ok) {
         const data = await res.json();
@@ -497,12 +443,11 @@ export default function AgentDashboardPage() {
   }, [apiKey]);
 
   const loadPlugins = useCallback(async (key = apiKey) => {
-    if (!key) return;
     setPluginsLoading(true);
     try {
       const [catalogRes, installedRes] = await Promise.all([
         fetch('/api/plugins'),
-        fetch('/api/agents/me/plugins', { headers: { 'x-hive-api-key': key } }),
+        fetch('/api/agents/me/plugins', { headers: agentAuthHeaders(key) }),
       ]);
       if (catalogRes.ok) {
         const data = await catalogRes.json();
@@ -524,7 +469,7 @@ export default function AgentDashboardPage() {
     try {
       const res = await fetch(`/api/plugins/${pluginId}/install`, {
         method: 'POST',
-        headers: { 'x-hive-api-key': apiKey },
+        headers: agentAuthHeaders(apiKey),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Failed to install plugin');
@@ -570,7 +515,7 @@ export default function AgentDashboardPage() {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'x-hive-api-key': apiKey,
+          ...agentAuthHeaders(apiKey),
         },
         body: JSON.stringify({
           url: webhookForm.url.trim(),
@@ -604,7 +549,7 @@ export default function AgentDashboardPage() {
         method: 'PATCH',
         headers: {
           'Content-Type': 'application/json',
-          'x-hive-api-key': apiKey,
+          ...agentAuthHeaders(apiKey),
         },
         body: JSON.stringify({ active }),
       });
@@ -623,7 +568,7 @@ export default function AgentDashboardPage() {
     try {
       const res = await fetch(`/api/webhooks/${webhookId}`, {
         method: 'DELETE',
-        headers: { 'x-hive-api-key': apiKey },
+        headers: agentAuthHeaders(apiKey),
       });
       if (!res.ok) {
         const data = await res.json();
@@ -670,9 +615,7 @@ export default function AgentDashboardPage() {
       }
 
       setAgent(pinData.agent);
-      // Persist session
-      sessionStorage.setItem('hive_agent_key', apiKey);
-      await loadFullDashboard();
+      await loadFullDashboard(apiKey);
     } catch (err: any) {
       setError(err.message);
       setAgent(null);
@@ -683,11 +626,10 @@ export default function AgentDashboardPage() {
 
   // Fetch points balance
   const fetchPoints = useCallback(async (key = apiKey) => {
-    if (!key) return;
     setPointsLoading(true);
     try {
       const res = await fetch("/api/points", {
-        headers: { "x-hive-api-key": key }
+        headers: agentAuthHeaders(key)
       });
       if (res.ok) {
         setPoints(await res.json());
@@ -714,7 +656,7 @@ export default function AgentDashboardPage() {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          "x-hive-api-key": apiKey
+          ...agentAuthHeaders(apiKey),
         },
         body: JSON.stringify({
           points: points.currentPointsBalance,
@@ -736,17 +678,22 @@ export default function AgentDashboardPage() {
     }
   };
 
-  const loadFullDashboard = async () => {
+  const loadFullDashboard = async (key = apiKey) => {
     try {
+      const headers = agentAuthHeaders(key);
       const [profileRes, paymentsRes] = await Promise.all([
-        fetch("/api/agents/me", { headers: { "x-hive-api-key": apiKey } }),
-        fetch("/api/agents/payments", { headers: { "x-hive-api-key": apiKey } }),
+        fetch("/api/agents/me", { headers }),
+        fetch("/api/agents/payments", { headers }),
       ]);
 
+      let profileAgent = agent;
       if (profileRes.ok) {
         const profileData = await profileRes.json();
-        setAgent(profileData.agent);
+        profileAgent = profileData.agent;
+        setAgent(profileAgent);
         setStats(profileData.stats);
+      } else {
+        return;
       }
 
       if (paymentsRes.ok) {
@@ -755,14 +702,14 @@ export default function AgentDashboardPage() {
         setPaymentSummary(paymentsData.summary || null);
       }
 
-      await loadWebhooks();
-      await loadOpportunities();
-      await loadPlugins();
-      await fetchPoints(apiKey);
+      await loadWebhooks(key);
+      await loadOpportunities(key);
+      await loadPlugins(key);
+      await fetchPoints(key);
 
       // Fetch Solana balance if address set
-      if (agent?.solanaAddress) {
-        fetchBalances(agent.solanaAddress);
+      if (profileAgent?.solanaAddress) {
+        fetchBalances(profileAgent.solanaAddress);
       }
     } catch (err: any) {
       console.error('Dashboard load error:', err);
@@ -797,7 +744,7 @@ export default function AgentDashboardPage() {
         method: "PATCH",
         headers: {
           "Content-Type": "application/json",
-          "x-hive-api-key": apiKey,
+          ...agentAuthHeaders(apiKey),
         },
         body: JSON.stringify({ solanaAddress: connectedAddress, walletProof }),
       });
@@ -1431,7 +1378,7 @@ export default function AgentDashboardPage() {
                                     method: 'POST',
                                     headers: {
                                       'Content-Type': 'application/json',
-                                      'x-hive-api-key': apiKey,
+                                      ...agentAuthHeaders(apiKey),
                                     },
                                     body: JSON.stringify({ tokenSymbol: tokenSymbolInput || undefined, tokenImageUrl: tokenImageUrl || undefined }),
                                   });
@@ -1515,13 +1462,12 @@ export default function AgentDashboardPage() {
                             try {
                               const res = await fetch('/api/agents/regenerate-key', {
                                 method: 'POST',
-                                headers: { 'x-hive-api-key': apiKey },
+                                headers: agentAuthHeaders(apiKey),
                               });
                               const data = await res.json();
                               if (res.ok && data.success) {
                                 setNewGeneratedKey(data.apiKey);
                                 setApiKey(data.apiKey);
-                                sessionStorage.setItem('hive_agent_key', data.apiKey);
                                 setShowRegenConfirm(false);
                                 toast.success('API key regenerated');
                               } else {

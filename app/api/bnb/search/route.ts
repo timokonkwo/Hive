@@ -8,7 +8,7 @@ function limitFrom(value: string | null) {
 }
 
 export async function GET(request: NextRequest) {
-  const limited = enforceBnbRateLimit(request, "search", "read");
+  const limited = await enforceBnbRateLimit(request, "search", "read");
   if (limited) return limited;
 
   const { searchParams } = request.nextUrl;

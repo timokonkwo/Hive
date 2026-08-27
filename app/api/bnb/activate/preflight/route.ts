@@ -1,10 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireBnbClient } from "@/lib/bnb/auth";
-import { preflightBnbAgentJob } from "@/lib/bnb/adapters/registry";
+import { bindBnbJobSpecToExecutionTarget, executionTargetFromPreflight, preflightBnbAgentJob, selectBnbJobPreflight } from "@/lib/bnb/adapters/registry";
+import { recordBnbAnalyticsEvent } from "@/lib/bnb/analytics";
 import { getBnbAgent } from "@/lib/bnb/catalog";
 import { buildBnbIntentJobSpec, capabilityForBnbAgent, isBnbJobCapabilityAllowedForAgent, unsupportedBnbJobCapabilityReason } from "@/lib/bnb/jobs";
 import { enforceBnbRateLimit } from "@/lib/bnb/rate-limit";
-import { getBnbHireBlocker, shouldRequireBnbEscrow } from "@/lib/bnb/runtime";
+import { getBnbHireBlocker, resolveBnbPaymentModeForPreflight } from "@/lib/bnb/runtime";
 import type { BnbActivationRecord, BnbAgentProfile, BnbHireIntentInput, BnbJobPreflightResult } from "@/lib/bnb/types";
 
 function readString(value: unknown) {
@@ -18,6 +19,7 @@ function readIntent(value: unknown): BnbHireIntentInput | null {
   const record = value as Record<string, unknown>;
   return {
     capability: readString(record.capability) as BnbHireIntentInput["capability"],
+    endpointCapability: readString(record.endpointCapability),
     taskType: readString(record.taskType),
     outcome: readString(record.outcome),
     target: readString(record.target),
@@ -64,7 +66,7 @@ function withDefaultWalletTarget(intent: BnbHireIntentInput, walletAddress: stri
 }
 
 function shouldPreflightJob(agent: BnbAgentProfile) {
-  return Boolean(agent.executionEndpoints?.some((endpoint) => endpoint.adapter === "mcp" || endpoint.adapter === "a2a"));
+  return Boolean(agent.executionEndpoints?.some((endpoint) => endpoint.adapter === "mcp" || endpoint.adapter === "a2a" || endpoint.adapter === "http" || endpoint.adapter === "x402"));
 }
 
 function buildPreflightRecord(agent: BnbAgentProfile, jobSpec: BnbJobPreflightResult["jobSpec"], clientAddress: string): BnbActivationRecord {
@@ -97,7 +99,7 @@ function buildPreflightRecord(agent: BnbAgentProfile, jobSpec: BnbJobPreflightRe
 }
 
 export async function POST(request: NextRequest) {
-  const limited = enforceBnbRateLimit(request, "activate:preflight", "write");
+  const limited = await enforceBnbRateLimit(request, "activate:preflight", "write");
   if (limited) return limited;
 
   const auth = await requireBnbClient(request, "check and hire an agent");
@@ -131,15 +133,18 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: normalizedJob.error }, { status: 400 });
   }
 
+  const preflightRecord = buildPreflightRecord(agent, normalizedJob.spec, auth.client.userId);
   const adapterPreflight = shouldPreflightJob(agent)
-    ? await preflightBnbAgentJob(agent, buildPreflightRecord(agent, normalizedJob.spec, auth.client.userId))
+    ? await preflightBnbAgentJob(agent, preflightRecord)
     : [];
-  const adapterReady = adapterPreflight.some((result) => result.ok);
+  const selectedPreflight = selectBnbJobPreflight(preflightRecord, adapterPreflight);
+  const adapterReady = Boolean(selectedPreflight);
   const runnableAgent = agent.executionStatus === "connectable" && adapterReady
     ? { ...agent, executionStatus: "ready_to_run" as const, activationStatus: "callable" as const }
     : agent;
-  const paymentRequired = shouldRequireBnbEscrow(runnableAgent);
-  const hireBlocker = getBnbHireBlocker(runnableAgent, { requireEscrow: paymentRequired });
+  const paymentMode = resolveBnbPaymentModeForPreflight(runnableAgent, selectedPreflight);
+  const paymentRequired = paymentMode !== "none";
+  const hireBlocker = getBnbHireBlocker(runnableAgent, { paymentMode });
   const adapterBlocker = adapterPreflight.length > 0 && !adapterReady
     ? adapterPreflight.find((result) => !result.ok && result.reason)?.reason || "This agent cannot run the selected job."
     : "";
@@ -147,20 +152,41 @@ export async function POST(request: NextRequest) {
   const warnings = [
     ...normalizedJob.warnings,
   ];
+  const selectedExecution = executionTargetFromPreflight(selectedPreflight, normalizedJob.spec.endpointCapability);
   const result: BnbJobPreflightResult = {
     status: blocker ? (adapterBlocker ? "needs_input" : "blocked") : "ready",
     canProceed: !blocker,
     paymentRequired,
-    jobSpec: normalizedJob.spec,
+    paymentMode,
+    jobSpec: bindBnbJobSpecToExecutionTarget(normalizedJob.spec, selectedExecution),
     missingInputs: normalizedJob.missingInputs,
     warnings,
     assumptions: normalizedJob.assumptions,
+    selectedExecution,
     adapterPreflight,
   };
+  recordBnbAnalyticsEvent({
+    name: "job.validation",
+    route: "api.bnb.activate.preflight",
+    clientAddress: auth.client.userId,
+    agent: runnableAgent,
+    status: result.status,
+    ok: result.canProceed,
+    metadata: {
+      capability: normalizedJob.spec.capability,
+      taskType: normalizedJob.spec.taskType,
+      paymentRequired,
+      paymentMode,
+      missingInputs: normalizedJob.missingInputs.length,
+      warnings: warnings.length,
+      adapterChecks: adapterPreflight.length,
+      adapterReady,
+    },
+  });
 
   return NextResponse.json({
     ...result,
-    message: blocker || "Job validated.",
+    message: blocker || "Ready.",
     agent: {
       chainId: runnableAgent.chainId,
       tokenId: runnableAgent.tokenId,

@@ -1,37 +1,248 @@
 import type { BnbJobSpec } from "@/lib/bnb/types";
 
-export function formatBnbDeliveryText(output: string | undefined, jobSpec?: BnbJobSpec) {
-  if (!output) return "";
+export type BnbNormalizedDelivery = {
+  status: "usable" | "empty" | "wrong_result" | "failed";
+  kind: "text" | "facts" | "table" | "notice";
+  title?: string;
+  summary?: string;
+  text?: string;
+  facts?: Array<{ label: string; value: string }>;
+  table?: {
+    title: string;
+    columns: Array<{ key: string; label: string }>;
+    rows: Array<Array<{ value: string; displayValue: string; kind: "text" | "number" | "address" | "url" }>>;
+    total: number;
+    truncated: boolean;
+  };
+  hasStructuredData: boolean;
+};
+
+export function normalizeBnbDelivery(output: string | undefined, jobSpec?: BnbJobSpec): BnbNormalizedDelivery {
+  if (!output?.trim()) return noticeDelivery("empty", "No result", "The agent returned no work.");
 
   const parsed = parseJson(output);
   if (parsed !== null) {
-    const emptyReport = formatEmptyPayload(parsed);
-    if (emptyReport) return emptyReport;
+    if (formatEmptyPayload(parsed)) return noticeDelivery("empty", "No result", "The agent returned no work.", true);
 
-    const transportStatusReport = formatTransportStatusPayload(parsed);
-    if (transportStatusReport) return transportStatusReport;
+    if (formatTransportStatusPayload(parsed)) return noticeDelivery("empty", "No result", "The agent only returned a status acknowledgement.", true);
 
-    const directoryReport = formatAgentDirectoryPayload(parsed);
-    if (directoryReport) return directoryReport;
+    if (formatAgentDirectoryPayload(parsed)) {
+      return noticeDelivery("wrong_result", "Wrong result", "The agent returned an agent directory.", true);
+    }
 
-    const documentationReport = formatDocumentationPayload(parsed, jobSpec);
-    if (documentationReport) return documentationReport;
+    if (formatDocumentationPayload(parsed, jobSpec)) {
+      return noticeDelivery("wrong_result", "Wrong result", "The agent returned documentation.", true);
+    }
 
     const parsedRecord = asRecord(parsed);
     const healthReport = formatHealthIndicators(parsedRecord, jobSpec);
-    if (healthReport) return healthReport;
+    if (healthReport) return textDelivery(healthReport, true, "Health check");
 
-    const mismatchReport = formatCapabilityMismatchPayload(parsed, jobSpec);
-    if (mismatchReport) return mismatchReport;
+    if (formatCapabilityMismatchPayload(parsed, jobSpec)) {
+      return noticeDelivery("wrong_result", "Wrong result", "The result does not match this job.", true);
+    }
+
+    const error = structuredError(parsedRecord);
+    if (error) return noticeDelivery("failed", "Run failed", error, true);
+
+    const collection = selectDisplayCollection(parsed);
+    if (collection) return tableDelivery(collection);
 
     const structuredReport = formatStructuredPayload(parsed);
-    if (structuredReport) return structuredReport;
+    if (structuredReport) {
+      const facts = collectDeliveryFacts("data" in parsedRecord ? asRecord(parsedRecord.data) : parsedRecord);
+      if (facts.length > 0) {
+        return {
+          status: "usable",
+          kind: "facts",
+          title: structuredTitle(parsedRecord),
+          facts,
+          hasStructuredData: true,
+        };
+      }
+      return textDelivery(structuredReport, true, structuredTitle(parsedRecord));
+    }
   }
 
-  const documentationReport = formatDocumentationPayload(output, jobSpec);
-  if (documentationReport) return documentationReport;
+  if (formatTransportStatusPayload(output)) {
+    return noticeDelivery("empty", "No result", "The agent only returned a status acknowledgement.");
+  }
 
-  return output;
+  if (formatDocumentationPayload(output, jobSpec)) {
+    return noticeDelivery("wrong_result", "Wrong result", "The agent returned documentation.");
+  }
+
+  return textDelivery(output.trim(), false);
+}
+
+export function bnbDeliveryFailureReason(delivery: BnbNormalizedDelivery) {
+  if (delivery.status === "empty") return "This agent returned no result.";
+  if (delivery.status === "wrong_result") return "This agent returned a different result.";
+  if (delivery.status === "failed") return delivery.summary || "This agent could not complete the job.";
+  return "";
+}
+
+export function formatBnbDeliveryText(output: string | undefined, jobSpec?: BnbJobSpec) {
+  return normalizedDeliveryText(normalizeBnbDelivery(output, jobSpec));
+}
+
+function noticeDelivery(
+  status: Exclude<BnbNormalizedDelivery["status"], "usable">,
+  title: string,
+  summary: string,
+  hasStructuredData = false,
+): BnbNormalizedDelivery {
+  return { status, kind: "notice", title, summary, hasStructuredData };
+}
+
+function textDelivery(text: string, hasStructuredData: boolean, title?: string): BnbNormalizedDelivery {
+  return {
+    status: "usable",
+    kind: "text",
+    ...(title ? { title } : {}),
+    text,
+    hasStructuredData,
+  };
+}
+
+function normalizedDeliveryText(delivery: BnbNormalizedDelivery) {
+  if (delivery.kind === "table" && delivery.table) {
+    const lines = [delivery.title, delivery.summary, formatNormalizedTable(delivery.table)].filter(Boolean);
+    return lines.join("\n");
+  }
+  if (delivery.kind === "facts" && delivery.facts) {
+    return [delivery.title, ...delivery.facts.map((fact) => `${fact.label}: ${fact.value}`)].filter(Boolean).join("\n");
+  }
+  return [delivery.title, delivery.summary, delivery.text].filter(Boolean).join("\n");
+}
+
+function formatNormalizedTable(table: NonNullable<BnbNormalizedDelivery["table"]>) {
+  const lines = [`${table.title}: ${table.total} returned.`];
+  for (const [index, row] of table.rows.entries()) {
+    lines.push(`${index + 1}. ${table.columns.map((column, columnIndex) => `${column.label}: ${row[columnIndex]?.displayValue || "-"}`).join("; ")}`);
+  }
+  if (table.truncated) lines.push(`Showing first ${table.rows.length} of ${table.total}.`);
+  return lines.join("\n");
+}
+
+function structuredError(record: Record<string, unknown>) {
+  return readDisplayValue(record.error) || readDisplayValue(asRecord(record.data).error);
+}
+
+function structuredTitle(record: Record<string, unknown>) {
+  const operation = readDisplayValue(record.operation);
+  const project = readDisplayValue(record.project);
+  if (operation) return humanizeKey(operation.replace(/^get/i, "")) || "Result";
+  if (project) return formatProtocolName(project);
+  return "Result";
+}
+
+function collectDeliveryFacts(record: Record<string, unknown>) {
+  return simpleEntries(record, "", 0)
+    .slice(0, 18)
+    .map((line) => {
+      const separator = line.indexOf(":");
+      return separator > 0
+        ? { label: line.slice(0, separator), value: line.slice(separator + 1).trim() }
+        : { label: "Result", value: line };
+    });
+}
+
+function tableDelivery(collection: DisplayCollection): BnbNormalizedDelivery {
+  const table = normalizeDisplayCollection(collection);
+  return {
+    status: "usable",
+    kind: "table",
+    title: table.title,
+    summary: `${table.total} result${table.total === 1 ? "" : "s"}`,
+    table,
+    hasStructuredData: true,
+  };
+}
+
+function normalizeDisplayCollection(collection: DisplayCollection): NonNullable<BnbNormalizedDelivery["table"]> {
+  const items = collection.items.slice(0, DISPLAY_COLLECTION_LIMIT);
+  const keys = selectDisplayColumns(items);
+  return {
+    title: collection.label === "Items" ? "Results" : collection.label,
+    columns: keys.map((key) => ({ key, label: displayColumnLabel(key) })),
+    rows: items.map((item) => keys.map((key) => deliveryCell(key, item[key]))),
+    total: collection.items.length,
+    truncated: collection.items.length > items.length,
+  };
+}
+
+const deliveryColumnPriority = [
+  "name", "token", "symbol", "asset", "pair", "pool", "vault", "id",
+  "protocol", "project", "platform", "chain", "chainName", "network", "status",
+  "apy", "apr", "tvl", "poolTvl", "liquidity", "price", "balance", "amount",
+  "healthFactor", "currentLoanToValue", "transactionHash", "address", "tokenAddress", "vaultAddress", "poolAddress",
+];
+
+function selectDisplayColumns(items: Record<string, unknown>[]) {
+  const counts = new Map<string, number>();
+  for (const item of items.slice(0, 25)) {
+    for (const [key, value] of Object.entries(item)) {
+      if (!isScalar(value) || readDisplayValue(value).length === 0) continue;
+      counts.set(key, (counts.get(key) || 0) + 1);
+    }
+  }
+  return Array.from(counts.keys())
+    .sort((left, right) => {
+      const leftPriority = deliveryColumnPriority.indexOf(left);
+      const rightPriority = deliveryColumnPriority.indexOf(right);
+      if (leftPriority !== -1 || rightPriority !== -1) {
+        return (leftPriority === -1 ? Number.MAX_SAFE_INTEGER : leftPriority)
+          - (rightPriority === -1 ? Number.MAX_SAFE_INTEGER : rightPriority);
+      }
+      return (counts.get(right) || 0) - (counts.get(left) || 0) || left.localeCompare(right);
+    })
+    .slice(0, 8);
+}
+
+function displayColumnLabel(key: string) {
+  const normalized = key.toLowerCase().replace(/[^a-z0-9]+/g, "");
+  const labels: Record<string, string> = {
+    apy: "APY",
+    apr: "APR",
+    tvl: "TVL",
+    pooltvl: "Pool TVL",
+    id: "ID",
+    predictionid: "Prediction ID",
+    healthfactor: "Health factor",
+    currentloantovalue: "Current LTV",
+    transactionhash: "Transaction hash",
+  };
+  return labels[normalized] || humanizeKey(key);
+}
+
+function deliveryCell(key: string, value: unknown): NonNullable<BnbNormalizedDelivery["table"]>["rows"][number][number] {
+  const raw = readDisplayValue(value);
+  if (!raw) return { value: "", displayValue: "-", kind: "text" };
+  if (isAddressValue(raw)) return { value: raw, displayValue: shortAddress(raw), kind: "address" };
+  if (/^https?:\/\/[^\s]+$/i.test(raw)) return { value: raw, displayValue: sourceHost(raw), kind: "url" };
+
+  const normalizedKey = key.toLowerCase();
+  if (normalizedKey === "apy" || normalizedKey === "apr") {
+    return { value: raw, displayValue: rateMetric(normalizedKey.toUpperCase(), value).replace(`${normalizedKey.toUpperCase()} `, ""), kind: "number" };
+  }
+  if (["tvl", "pooltvl", "liquidity"].includes(normalizedKey)) {
+    return { value: raw, displayValue: moneyMetric("", value).trim(), kind: "number" };
+  }
+  if (typeof value === "number") return { value: raw, displayValue: formatCompactNumber(value), kind: "number" };
+  return { value: raw, displayValue: raw.length > 120 ? `${raw.slice(0, 117)}...` : raw, kind: "text" };
+}
+
+function sourceHost(value: string) {
+  try {
+    return new URL(value).hostname.replace(/^www\./i, "");
+  } catch {
+    return value;
+  }
+}
+
+function isAddressValue(value: string) {
+  return /^0x[a-fA-F0-9]{40}$/.test(value);
 }
 
 function formatEmptyPayload(payload: unknown) {
@@ -83,7 +294,11 @@ function transportStatusText(value: unknown): string {
 }
 
 function isTransportStatusText(value: string) {
-  return /^(ok|success|successful|succeeded|complete|completed|accepted|submitted|queued|running|done|200)$/i.test(value.trim());
+  const statuses = value
+    .split(/\r?\n/)
+    .map((line) => line.trim().replace(/^(?:status|state|message)\s*:\s*/i, ""))
+    .filter(Boolean);
+  return statuses.length > 0 && statuses.every((status) => /^(ok|success|successful|succeeded|complete|completed|accepted|submitted|queued|running|done|200)$/i.test(status));
 }
 
 const capabilityOutputTerms: Record<NonNullable<BnbJobSpec["capability"]>, string[]> = {
@@ -97,12 +312,36 @@ const capabilityOutputTerms: Record<NonNullable<BnbJobSpec["capability"]>, strin
 
 function formatCapabilityMismatchPayload(payload: unknown, jobSpec?: BnbJobSpec) {
   if (!jobSpec || jobSpec.capability === "custom") return "";
+  const selectedOperation = jobSpec.endpointCapability?.name || "";
+  const returnedOperation = payloadOperation(payload);
+  if (selectedOperation) {
+    if (!returnedOperation || operationsMatch(selectedOperation, returnedOperation)) return "";
+    return [
+      "This is not the requested result.",
+      "The agent returned data from a different operation.",
+    ].join("\n");
+  }
   if (payloadMatchesCapability(payload, jobSpec.capability)) return "";
 
   return [
     "This is not the requested result.",
     "The agent returned data that does not match the selected job.",
   ].join("\n");
+}
+
+function payloadOperation(payload: unknown) {
+  const record = asRecord(payload);
+  const data = asRecord(record.data);
+  return firstDisplayValue(record, ["operation", "tool", "action", "method"])
+    || firstDisplayValue(data, ["operation", "tool", "action", "method"]);
+}
+
+function operationsMatch(left: string, right: string) {
+  const normalizedLeft = normalizeProtocol(left);
+  const normalizedRight = normalizeProtocol(right);
+  return normalizedLeft === normalizedRight
+    || normalizedLeft.endsWith(normalizedRight)
+    || normalizedRight.endsWith(normalizedLeft);
 }
 
 function payloadMatchesCapability(payload: unknown, capability: BnbJobSpec["capability"]) {
@@ -310,13 +549,16 @@ const DISPLAY_COLLECTION_LIMIT = 50;
 const DISPLAY_ARRAY_LIMIT = 25;
 
 function formatNestedCollectionPayload(payload: unknown) {
-  const collections = collectDisplayCollections(payload, {}, "Items", 0)
-    .filter((collection) => collection.items.length > 0)
-    .sort((left, right) => right.score - left.score);
-  const selected = collections[0];
+  const selected = selectDisplayCollection(payload);
   if (!selected) return "";
 
   return formatDisplayCollection(selected);
+}
+
+function selectDisplayCollection(payload: unknown) {
+  return collectDisplayCollections(payload, {}, "Items", 0)
+    .filter((collection) => collection.items.length > 0)
+    .sort((left, right) => right.score - left.score)[0];
 }
 
 function collectDisplayCollections(
@@ -329,7 +571,7 @@ function collectDisplayCollections(
 
   if (Array.isArray(value)) {
     const records = value.map((item) => mergeContext(asRecord(item), context));
-    const displayRecords = records.filter(isDisplayResultRecord);
+    const displayRecords = records.filter(isTabularResultRecord);
     const nested = records.flatMap((record) => collectDisplayCollections(record, contextualScalars(record), label, depth + 1));
     if (displayRecords.length === 0) return nested;
 
@@ -356,7 +598,7 @@ function collectDisplayCollections(
     if (Array.isArray(child)) {
       const records = child
         .map((item) => mergeContext(asRecord(item), nextContext))
-        .filter(isDisplayResultRecord);
+        .filter(isTabularResultRecord);
       const nested = collectDisplayCollections(child, nextContext, childLabel, depth + 1);
       if (records.length === 0) return nested;
 
@@ -423,10 +665,12 @@ function collectionScore(label: string, records: Record<string, unknown>[]) {
   return labelScore + recordScore + Math.min(records.length, 20);
 }
 
-function isDisplayResultRecord(record: Record<string, unknown>) {
+function isTabularResultRecord(record: Record<string, unknown>) {
   if (Object.keys(record).length === 0) return false;
+  const scalarCount = Object.values(record).filter((value) => isScalar(value) && readDisplayValue(value).length > 0).length;
+  if (scalarCount < 2) return false;
   if (Object.values(record).some(Array.isArray) && resultRecordScore(record) < 4) return false;
-  return resultRecordScore(record) >= 4;
+  return true;
 }
 
 function resultRecordScore(record: Record<string, unknown>) {

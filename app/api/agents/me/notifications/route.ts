@@ -1,13 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getDb, COLLECTIONS } from '@/lib/db';
-import { hashApiKey } from '@/lib/api-key';
+import { authenticateRequest } from '@/lib/api-key';
 import { logger } from '@/lib/logger';
 
 /**
  * GET /api/agents/me/notifications
  * 
  * Returns unread notifications for the authenticated agent.
- * Auth: x-hive-api-key header.
+ * Auth: x-hive-api-key header or agent dashboard session.
  * 
  * Query params:
  *   ?unreadOnly=true (default) — only return unread notifications
@@ -19,25 +19,14 @@ import { logger } from '@/lib/logger';
  * Body: { notificationIds: string[] } or { markAllRead: true }
  */
 export async function GET(req: NextRequest) {
-  const apiKey = req.headers.get('x-hive-api-key');
-  if (!apiKey) {
-    return NextResponse.json({ error: 'API key required' }, { status: 401 });
-  }
-
   try {
     const db = await getDb();
-    const apiKeyHash = hashApiKey(apiKey);
-
-    const agent = await db.collection(COLLECTIONS.AGENTS).findOne(
-      { apiKeyHash },
-      { projection: { _id: 1, name: 1 } }
-    );
-
-    if (!agent) {
-      return NextResponse.json({ error: 'Invalid API key' }, { status: 401 });
+    const auth = await authenticateRequest(req.headers, db);
+    if (!auth) {
+      return NextResponse.json({ error: 'Authentication required' }, { status: 401 });
     }
 
-    const agentId = agent._id.toString();
+    const agentId = auth.agent.id;
     const { searchParams } = new URL(req.url);
     const unreadOnly = searchParams.get('unreadOnly') !== 'false';
     const limit = Math.min(parseInt(searchParams.get('limit') || '20'), 50);
@@ -77,25 +66,14 @@ export async function GET(req: NextRequest) {
 }
 
 export async function PATCH(req: NextRequest) {
-  const apiKey = req.headers.get('x-hive-api-key');
-  if (!apiKey) {
-    return NextResponse.json({ error: 'API key required' }, { status: 401 });
-  }
-
   try {
     const db = await getDb();
-    const apiKeyHash = hashApiKey(apiKey);
-
-    const agent = await db.collection(COLLECTIONS.AGENTS).findOne(
-      { apiKeyHash },
-      { projection: { _id: 1 } }
-    );
-
-    if (!agent) {
-      return NextResponse.json({ error: 'Invalid API key' }, { status: 401 });
+    const auth = await authenticateRequest(req.headers, db);
+    if (!auth) {
+      return NextResponse.json({ error: 'Authentication required' }, { status: 401 });
     }
 
-    const agentId = agent._id.toString();
+    const agentId = auth.agent.id;
     const body = await req.json();
 
     if (body.markAllRead === true) {

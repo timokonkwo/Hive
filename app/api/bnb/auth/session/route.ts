@@ -7,7 +7,7 @@ function readString(value: unknown) {
 }
 
 export async function POST(request: NextRequest) {
-  const limited = enforceBnbRateLimit(request, "auth:session", "write");
+  const limited = await enforceBnbRateLimit(request, "auth:session", "write");
   if (limited) return limited;
 
   const body = await request.json().catch(() => ({}));

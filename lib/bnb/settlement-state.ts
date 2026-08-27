@@ -10,7 +10,7 @@ export function canRefundBnbEscrow(record: RefundableRecord, nowSeconds = Math.f
 }
 
 export function bnbRefundUnavailableReason(record: RefundableRecord, nowSeconds = Math.floor(Date.now() / 1000)) {
-  if (!record.payment?.jobId) return "Escrow must be funded before refund is available.";
+  if (!record.payment?.jobId) return "Payment must be confirmed before refund is available.";
   const expiresAt = record.payment.expiresAt;
   if (!expiresAt) return "";
   if (nowSeconds <= expiresAt) return `Refund unlocks after ${formatRefundUnlockTime(expiresAt)}.`;

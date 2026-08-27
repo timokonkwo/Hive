@@ -3,13 +3,14 @@ import { requireBnbClient } from "@/lib/bnb/auth";
 import { getBnbAgent } from "@/lib/bnb/catalog";
 import { buildBnbEscrowPaymentRequest } from "@/lib/bnb/escrow";
 import { enforceBnbRateLimit } from "@/lib/bnb/rate-limit";
-import { BnbStorageError, getBnbActivationRecord } from "@/lib/bnb/records";
-import { shouldRequireBnbEscrow } from "@/lib/bnb/runtime";
+import { BnbStorageError, getBnbActivationRecord, publicBnbActivationRecord } from "@/lib/bnb/records";
+import { resolveBnbPaymentMode } from "@/lib/bnb/runtime";
+import { buildBnbX402PaymentRequest } from "@/lib/bnb/x402";
 
 type Params = Promise<{ recordId: string }>;
 
 export async function GET(request: NextRequest, { params }: { params: Params }) {
-  const limited = enforceBnbRateLimit(request, "jobs:detail", "read");
+  const limited = await enforceBnbRateLimit(request, "jobs:detail", "read");
   if (limited) return limited;
 
   const auth = await requireBnbClient(request, "view this job");
@@ -28,16 +29,19 @@ export async function GET(request: NextRequest, { params }: { params: Params }) 
     }
 
     const agent = await getBnbAgent(record.agent.chainId, record.agent.tokenId);
-    const paymentRequired = agent ? shouldRequireBnbEscrow(agent) : record.limits.walletConfirmationRequired !== false;
+    const paymentMode = record.payment?.mode || (agent ? resolveBnbPaymentMode(agent) : record.limits.walletConfirmationRequired === false ? "none" : "escrow");
     const paymentRequest = record.payment?.transactionStatus === "success"
       ? null
-      : paymentRequired
+      : paymentMode === "escrow"
         ? buildBnbEscrowPaymentRequest(record)
-        : {
+        : paymentMode === "x402"
+          ? buildBnbX402PaymentRequest(record.payment?.x402)
+          : {
           status: "not_required" as const,
+          mode: "none" as const,
           reason: "",
         };
-    return NextResponse.json({ record, paymentRequest });
+    return NextResponse.json({ record: publicBnbActivationRecord(record), paymentRequest });
   } catch (error) {
     if (error instanceof BnbStorageError) {
       return NextResponse.json({ error: error.message }, { status: 503 });

@@ -1,9 +1,14 @@
 import { isAddress } from "viem";
-import { getHiveBnbNetworkConfig } from "@/lib/bnb/network";
+import { getHiveBnbNetworkConfig, getHiveBnbNetworkEnvStatus } from "@/lib/bnb/network";
+import { isBnbAnalyticsEnabled } from "@/lib/bnb/analytics";
+import { isStrictBscAgentDiscoveryEnabled } from "@/lib/bnb/discovery-policy";
 import { getBnbEndpointSourceReadiness } from "@/lib/bnb/endpoint-sources";
+import { isBnbIncidentWebhookConfigured } from "@/lib/bnb/incidents";
 import { classifyBnbAgentReadiness, isBnbAgentHireable } from "@/lib/bnb/readiness";
 import { getBnbStudioV2Readiness } from "@/lib/bnb/studio-v2";
-import type { BnbAgentProfile } from "@/lib/bnb/types";
+import { isBnbX402SettlementConfigured } from "@/lib/bnb/x402";
+import type { BnbAgentProfile, BnbPaymentMode } from "@/lib/bnb/types";
+import type { BnbAdapterPreflightResult } from "@/lib/bnb/adapters/types";
 
 function envFlag(name: string) {
   return process.env[name]?.trim() === "true";
@@ -55,19 +60,38 @@ function processStorageAllowed() {
   return envFlag("BNB_ALLOW_PROCESS_STORAGE") || (process.env.NODE_ENV !== "production" && !envPresent("MONGODB_URI"));
 }
 
-export function canHireBnbAgent(agent: Pick<BnbAgentProfile, "activationStatus" | "executionStatus" | "agentWallet">) {
+function hasPaidX402Endpoint(agent: Pick<BnbAgentProfile, "services" | "x402Support" | "executionEndpoints">) {
+  if (agent.executionEndpoints?.some((endpoint) => endpoint.adapter === "x402" && endpoint.paymentRequired)) return true;
+  return agent.services.some((service) => service.type === "x402" && Boolean(service.endpoint) && hasPositiveListedPaymentPrice(service.price || ""));
+}
+
+export function canHireBnbAgent(agent: Pick<BnbAgentProfile, "activationStatus" | "executionStatus" | "agentWallet" | "executionEndpoints" | "hasActionableEndpointCapabilities">) {
   return isBnbAgentHireable(agent);
 }
 
 export function getBnbRuntimeReadiness() {
   const network = getHiveBnbNetworkConfig();
+  const networkEnv = getHiveBnbNetworkEnvStatus();
   const studioV2 = getBnbStudioV2Readiness();
   const mongoConfigured = envPresent("MONGODB_URI");
   const processFallbackAllowed = processStorageAllowed();
   const storageReady = mongoConfigured || processFallbackAllowed;
   const escrowConfigured = hasValidEnvAddress("BNB_AGENT_ESCROW_ADDRESS");
+  const x402Configured = isBnbX402SettlementConfigured();
+  const zeroPriceRunsReady = zeroPriceRunsEnabled() && !forceEscrowForUnpricedAgents();
   const sessionRegistryConfigured = hasValidEnvAddress("BNB_SESSION_REGISTRY_ADDRESS");
   const workerConfigured = envPresent("BNB_AGENT_WORKER_URL");
+  const cronSecretConfigured = envPresent("CRON_SECRET");
+  const strictBscOnly = isStrictBscAgentDiscoveryEnabled();
+  const launchBlockers = [
+    ...(network.network === "mainnet" && network.chainId === 56 ? [] : ["BNB runtime is not on mainnet."]),
+    ...(networkEnv.ready ? [] : networkEnv.errors),
+    ...(mongoConfigured ? [] : ["MongoDB storage is not configured."]),
+    ...(workerConfigured ? [] : ["The agent worker is not configured."]),
+    ...(envFlag("BNB_8004SCAN_LIVE") ? [] : ["Live ERC-8004 discovery is disabled."]),
+    ...(strictBscOnly ? [] : ["Strict BSC discovery is disabled."]),
+    ...(cronSecretConfigured ? [] : ["The cache cron secret is not configured."]),
+  ];
 
   return {
     storage: {
@@ -80,6 +104,8 @@ export function getBnbRuntimeReadiness() {
       chainId: network.chainId,
       nativeSymbol: network.nativeSymbol,
       explorerUrl: network.explorerUrl,
+      configurationReady: networkEnv.ready,
+      configurationErrors: networkEnv.errors,
       bscRpcConfigured: envPresent("BNB_BSC_RPC_URL"),
       bscChainIdConfigured: envPresent("BNB_BSC_CHAIN_ID"),
       clientBscRpcConfigured: envPresent("NEXT_PUBLIC_BNB_BSC_RPC_URL"),
@@ -95,48 +121,92 @@ export function getBnbRuntimeReadiness() {
     },
     discovery: {
       live8004scanEnabled: envFlag("BNB_8004SCAN_LIVE"),
+      strictBscOnly,
       configuredAgents: envPresent("BNB_HIVE_AGENTS_JSON"),
       endpointSources: getBnbEndpointSourceReadiness(),
     },
     observability: {
       endpointProbeStorageReady: mongoConfigured,
+      endpointCapabilityStorageReady: mongoConfigured,
+      analyticsStorageReady: isBnbAnalyticsEnabled(),
+      incidentWebhookConfigured: isBnbIncidentWebhookConfigured(),
+      cacheCronConfigured: cronSecretConfigured,
     },
     actions: {
       canCreateRequest: storageReady,
-      canCreateHire: storageReady && escrowConfigured,
+      canCreateHire: storageReady && (escrowConfigured || x402Configured || zeroPriceRunsReady),
+      canCreatePaidHire: storageReady && (escrowConfigured || x402Configured),
+      canRunWithoutPayment: storageReady && zeroPriceRunsReady,
       canFundEscrow: escrowConfigured,
+      canPayX402: x402Configured,
       canGrantSession: storageReady && sessionRegistryConfigured,
       canRunAgent: storageReady,
+    },
+    launch: {
+      ready: launchBlockers.length === 0,
+      blockers: launchBlockers,
     },
     studioV2,
   };
 }
 
 export function shouldRequireBnbEscrow(agent: Pick<BnbAgentProfile, "services" | "x402Support">) {
+  return resolveBnbPaymentMode(agent) === "escrow";
+}
+
+export function shouldRequireBnbX402(agent: Pick<BnbAgentProfile, "services" | "x402Support" | "executionEndpoints">) {
+  return resolveBnbPaymentMode(agent) === "x402";
+}
+
+export function resolveBnbPaymentMode(agent: Pick<BnbAgentProfile, "services" | "x402Support" | "executionEndpoints">): BnbPaymentMode {
   const listedPayment = hasListedPayment(agent);
+  if (hasPaidX402Endpoint(agent)) return "x402";
+
   const configured = configuredEscrowRequirement();
-  if (configured === false) return false;
-  if (!listedPayment && zeroPriceRunsEnabled() && !forceEscrowForUnpricedAgents()) return false;
-  if (listedPayment) return configured ?? true;
-  if (!zeroPriceRunsEnabled()) return configured ?? true;
-  return configured === true && forceEscrowForUnpricedAgents();
+  if (configured === false) return "none";
+  if (!listedPayment && zeroPriceRunsEnabled() && !forceEscrowForUnpricedAgents()) return "none";
+  if (listedPayment) return (configured ?? true) ? "escrow" : "none";
+  if (!zeroPriceRunsEnabled()) return (configured ?? true) ? "escrow" : "none";
+  return configured === true && forceEscrowForUnpricedAgents() ? "escrow" : "none";
+}
+
+export function resolveBnbPaymentModeForPreflight(
+  agent: Pick<BnbAgentProfile, "services" | "x402Support" | "executionEndpoints">,
+  selected: BnbAdapterPreflightResult | undefined,
+): BnbPaymentMode {
+  if (!selected?.endpoint) return resolveBnbPaymentMode(agent);
+
+  const endpointPrice = agent.services.find((service) => service.endpoint === selected.endpoint?.url)?.price || "";
+  const paymentRequired = selected.endpoint.paymentRequired === true
+    || selected.capabilityContracts?.some((capability) => capability.paymentRequired === true) === true
+    || hasPositiveListedPaymentPrice(endpointPrice)
+    || (agent.executionEndpoints?.length === 1 && hasListedPayment(agent));
+  if (paymentRequired) return selected.adapter === "x402" || selected.endpoint.adapter === "x402" ? "x402" : "escrow";
+
+  const configured = configuredEscrowRequirement();
+  if (!zeroPriceRunsEnabled()) return (configured ?? true) ? "escrow" : "none";
+  return configured === true && forceEscrowForUnpricedAgents() ? "escrow" : "none";
 }
 
 export function getBnbHireBlocker(
-  agent: Pick<BnbAgentProfile, "activationStatus" | "executionStatus" | "agentWallet">,
-  options: { requireEscrow?: boolean } = {},
+  agent: Pick<BnbAgentProfile, "activationStatus" | "executionStatus" | "agentWallet" | "executionEndpoints" | "hasActionableEndpointCapabilities">,
+  options: { requireEscrow?: boolean; paymentMode?: BnbPaymentMode } = {},
 ) {
   const readiness = getBnbRuntimeReadiness();
-  const requireEscrow = options.requireEscrow ?? true;
+  const paymentMode = options.paymentMode || (options.requireEscrow === false ? "none" : "escrow");
+  const requireEscrow = paymentMode === "escrow";
 
   if (!readiness.actions.canCreateHire) {
     if (!readiness.storage.ready) return "BNB record storage is not configured.";
-    if (requireEscrow) return "BNB escrow is not configured.";
+    if (requireEscrow) return "Payment is not configured.";
+    if (paymentMode === "x402") return "Payment is not configured.";
   }
+
+  if (paymentMode === "x402" && !readiness.actions.canPayX402) return "Payment is not configured.";
 
   const agentReadiness = classifyBnbAgentReadiness(agent);
   if (!agentReadiness.canHire) {
-    if (agentReadiness.status === "profile") return "This agent does not expose a callable endpoint for this job.";
+    if (agentReadiness.status === "profile") return "This agent is not available for jobs.";
     if (agentReadiness.status === "unavailable") return "This agent is unavailable.";
     return agentReadiness.reason;
   }

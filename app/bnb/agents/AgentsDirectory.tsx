@@ -24,6 +24,7 @@ import {
   bnbStatusLabel,
   bnbUsableServices,
 } from "@/lib/bnb/display";
+import { bnbAgentHirePath, bnbAgentProfilePath } from "@/lib/bnb/routes";
 
 type CategoryCount = {
   category: BnbAgentCategory;
@@ -98,6 +99,8 @@ const sortOptions = [
   { value: "newest", label: "Newest" },
 ];
 
+const LARGE_PAGE_COUNT_LAST_LINK_LIMIT = 500;
+
 export function AgentsDirectory({
   agents,
   categories,
@@ -129,6 +132,8 @@ export function AgentsDirectory({
   const start = agents.length === 0 ? 0 : (page - 1) * pageSize + 1;
   const end = agents.length === 0 ? 0 : start + agents.length - 1;
   const paginationItems = compactPagination(page, pageCount);
+  const canGoPrevious = page > 1;
+  const canGoNext = hasMore || page < pageCount;
 
   useEffect(() => {
     if (!initialized.current) {
@@ -347,10 +352,10 @@ export function AgentsDirectory({
           <span>Showing {start}-{end}</span>
           <div>
             <Link
-              href={pageHref(Math.max(1, page - 1))}
+              href={pageHref(canGoPrevious ? page - 1 : page)}
               className="bnb-page-link bnb-focus"
-              aria-disabled={page <= 1}
-              data-disabled={page <= 1 ? "true" : undefined}
+              aria-disabled={!canGoPrevious}
+              data-disabled={!canGoPrevious ? "true" : undefined}
             >
               Previous
             </Link>
@@ -369,10 +374,10 @@ export function AgentsDirectory({
               )
             ))}
             <Link
-              href={pageHref(hasMore ? page + 1 : Math.min(pageCount, page + 1))}
+              href={pageHref(canGoNext ? page + 1 : page)}
               className="bnb-page-link bnb-focus"
-              aria-disabled={!hasMore && page >= pageCount}
-              data-disabled={!hasMore && page >= pageCount ? "true" : undefined}
+              aria-disabled={!canGoNext}
+              data-disabled={!canGoNext ? "true" : undefined}
             >
               Next
             </Link>
@@ -675,7 +680,7 @@ function readComparedAgents() {
 }
 
 function profileHref(agent: BnbAgentProfile) {
-  return `/bnb/agents/${agent.chainId}/${encodeURIComponent(agent.tokenId)}`;
+  return bnbAgentProfilePath(agent);
 }
 
 function compactPagination(page: number, pageCount: number): Array<number | "ellipsis"> {
@@ -683,21 +688,26 @@ function compactPagination(page: number, pageCount: number): Array<number | "ell
     return Array.from({ length: pageCount }, (_, index) => index + 1);
   }
 
-  const pages = new Set([1, pageCount]);
-  for (let item = Math.max(1, page - 2); item <= Math.min(pageCount, page + 2); item += 1) {
+  const boundedPage = Math.min(Math.max(page, 1), pageCount);
+  const showLastPage = pageCount <= LARGE_PAGE_COUNT_LAST_LINK_LIMIT || boundedPage >= pageCount - 2;
+  const pages = new Set([1]);
+  if (showLastPage) pages.add(pageCount);
+  for (let item = Math.max(1, boundedPage - 2); item <= Math.min(pageCount, boundedPage + 2); item += 1) {
     pages.add(item);
   }
 
   const sorted = Array.from(pages).sort((a, b) => a - b);
-  return sorted.flatMap((item, index) => {
+  const result = sorted.flatMap((item, index) => {
     const previous = sorted[index - 1];
     if (previous && item - previous > 1) return ["ellipsis" as const, item];
     return [item];
   });
+  if (!showLastPage && sorted[sorted.length - 1] < pageCount) result.push("ellipsis");
+  return result;
 }
 
 function hireHref(agent: BnbAgentProfile) {
-  return `/bnb/activate?chainId=${agent.chainId}&tokenId=${encodeURIComponent(agent.tokenId)}`;
+  return bnbAgentHirePath(agent);
 }
 
 function toSavedAgent(agent: BnbAgentProfile): SavedAgent {

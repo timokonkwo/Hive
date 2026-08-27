@@ -8,7 +8,7 @@ import {
 import { enforceBnbRateLimit } from "@/lib/bnb/rate-limit";
 
 export async function GET(request: NextRequest) {
-  const limited = enforceBnbRateLimit(request, "partners", "read");
+  const limited = await enforceBnbRateLimit(request, "partners", "read");
   if (limited) return limited;
 
   return NextResponse.json({

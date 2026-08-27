@@ -1,6 +1,19 @@
 import { endpointAuthHeaders } from "@/lib/bnb/endpoint-auth";
 import { safeFetchJson } from "@/lib/bnb/endpoint-security";
-import type { BnbAgentProfile, BnbExecutionEndpoint } from "@/lib/bnb/types";
+import { normalizedEndpointCapabilityName } from "@/lib/bnb/capability-contracts";
+import {
+  asSchemaRecord as asRecord,
+  chainNameForSchema,
+  coerceSchemaValue as coerceToolValue,
+  directSchemaFieldValue,
+  firstEvmAddress,
+  isGenericSelectionValue,
+  normalizeEndpointInputSchema as normalizeInputSchema,
+  normalizeSchemaPropertyName as normalizePropertyName,
+  poolForSchema,
+  protocolForSchema,
+} from "@/lib/bnb/adapters/schema-arguments";
+import type { BnbAgentProfile, BnbEndpointCapabilityContract, BnbExecutionEndpoint } from "@/lib/bnb/types";
 import type { BnbAgentExecutionAdapter, BnbAdapterPreflightResult, BnbAdapterRunInput } from "@/lib/bnb/adapters/types";
 import { completedAdapterWork } from "@/lib/bnb/adapters/types";
 
@@ -10,7 +23,8 @@ type McpTool = {
   inputSchema?: unknown;
 };
 
-function mcpEndpoint(agent: BnbAgentProfile) {
+function mcpEndpoint(agent: BnbAgentProfile, selected?: BnbExecutionEndpoint) {
+  if (selected?.adapter === "mcp") return selected;
   return agent.executionEndpoints?.find((endpoint) => endpoint.adapter === "mcp");
 }
 
@@ -21,34 +35,6 @@ function jsonRpc(method: string, params?: unknown) {
     method,
     ...(params ? { params } : {}),
   });
-}
-
-function asRecord(value: unknown): Record<string, unknown> {
-  return typeof value === "object" && value !== null ? value as Record<string, unknown> : {};
-}
-
-function parseRecord(value: unknown): Record<string, unknown> {
-  if (typeof value === "string") {
-    try {
-      return asRecord(JSON.parse(value));
-    } catch {
-      return {};
-    }
-  }
-
-  return asRecord(value);
-}
-
-function normalizeInputSchema(value: unknown): Record<string, unknown> {
-  const schema = parseRecord(value);
-  if (schema.properties || schema.type === "object") return schema;
-
-  for (const key of ["inputSchema", "input_schema", "parameters", "schema", "jsonSchema", "json_schema"]) {
-    const nested = parseRecord(schema[key]);
-    if (nested.properties || nested.type === "object") return nested;
-  }
-
-  return schema;
 }
 
 function parseTools(payload: unknown): McpTool[] {
@@ -64,6 +50,15 @@ function parseTools(payload: unknown): McpTool[] {
     .filter((tool) => tool.name);
 }
 
+function mcpCapabilityContracts(tools: McpTool[]): BnbEndpointCapabilityContract[] {
+  return tools.map((tool) => ({
+    name: tool.name,
+    kind: "tool",
+    ...(tool.description ? { description: tool.description } : {}),
+    ...(tool.inputSchema !== undefined ? { inputSchema: normalizeInputSchema(tool.inputSchema) } : {}),
+  }));
+}
+
 async function listTools(endpoint: BnbExecutionEndpoint) {
   const { response, payload } = await safeFetchJson(endpoint.url, {
     method: "POST",
@@ -74,9 +69,9 @@ async function listTools(endpoint: BnbExecutionEndpoint) {
   });
   const protectedReason = protectedMcpReason(response.status, payload);
   if (protectedReason) throw new Error(protectedReason);
-  if (!response.ok) throw new Error(`Agent tools could not be loaded with HTTP ${response.status}.`);
+  if (!response.ok) throw new Error(`Agent request failed with HTTP ${response.status}.`);
   const tools = parseTools(payload);
-  if (tools.length === 0) throw new Error("This agent did not return callable tools.");
+  if (tools.length === 0) throw new Error("This agent did not return any jobs.");
   return tools;
 }
 
@@ -95,7 +90,7 @@ function protectedMcpReason(status: number, payload: unknown) {
     return "This agent requires external sign-in.";
   }
   if (status === 403 || /forbidden|csrf|sec-fetch/.test(text)) {
-    return "This agent cannot be run from Hive.";
+    return "This agent is not available for jobs.";
   }
   return "";
 }
@@ -103,6 +98,23 @@ function protectedMcpReason(status: number, payload: unknown) {
 function chooseTool(tools: McpTool[], agent: BnbAgentProfile, record: BnbAdapterRunInput["record"]) {
   const capability = record.jobSpec?.capability || "custom";
   const taskType = record.jobSpec?.taskType || record.limits.task;
+  const selectedCapability = record.jobSpec?.endpointCapability?.name;
+  const selectedTool = selectedCapability
+    ? tools.find((tool) => normalizedEndpointCapabilityName(tool.name) === normalizedEndpointCapabilityName(selectedCapability))
+    : null;
+  if (selectedCapability && !selectedTool) {
+    throw new Error("The selected job is no longer available for this agent.");
+  }
+  if (selectedTool) {
+    const text = toolContractText(selectedTool);
+    const capabilityBlocker = capability === "custom"
+      ? customToolBlocker(selectedTool, text)
+      : capabilityToolBlocker(selectedTool, text, capability, taskType);
+    if (capabilityBlocker) throw new Error(capabilityBlocker);
+    toolArguments(selectedTool, agent, record);
+    return selectedTool;
+  }
+
   const terms = record.limits.task
     .toLowerCase()
     .split(/[^a-z0-9]+/)
@@ -129,7 +141,7 @@ function chooseTool(tools: McpTool[], agent: BnbAgentProfile, record: BnbAdapter
         toolArguments(tool, agent, record);
         score += 2;
       } catch (error) {
-        argsError = error instanceof Error ? error.message : "This tool needs more job details.";
+        argsError = error instanceof Error ? error.message : "This job needs more details.";
         score -= 12;
       }
     }
@@ -152,10 +164,10 @@ function chooseTool(tools: McpTool[], agent: BnbAgentProfile, record: BnbAdapter
 function capabilityToolBlocker(tool: McpTool, text: string, capability: string, taskType = "") {
   if (capability === "custom") return "";
   if (isDirectoryTool(tool, text)) {
-    return `This agent exposes a directory tool, not a ${capabilityLabel(capability)} tool.`;
+    return "This agent returned agent listings instead of this job.";
   }
   if (isDocumentationTool(tool, text)) {
-    return `This agent exposes documentation, not a ${capabilityLabel(capability)} tool.`;
+    return "This agent returned documentation instead of this job.";
   }
 
   const schema = normalizeInputSchema(tool.inputSchema);
@@ -168,13 +180,13 @@ function capabilityToolBlocker(tool: McpTool, text: string, capability: string, 
       /getenabledcollateral|enabledcollateral|collateralassets|supportedcollateral|listcollateral/.test(compact) &&
       !/(healthfactor|healthindicator|liquidation|borrowposition|userhealth)/.test(compact)
     ) {
-      return "This agent does not expose a health-factor tool for this job.";
+      return "This agent is not available for this job.";
     }
   }
 
   if (capability === "concentrated_liquidity") {
     if (!isV3DiscoveryTask(taskType) && /getdexinfo|listdex|supportedfees|supportedpools/.test(compact) && !/(create|position|range|liquidity|tick)/.test(compact)) {
-      return "This agent exposes discovery data, not a liquidity-position tool.";
+      return "This agent returned discovery data instead of this job.";
     }
   }
 
@@ -182,8 +194,8 @@ function capabilityToolBlocker(tool: McpTool, text: string, capability: string, 
 }
 
 function customToolBlocker(tool: McpTool, text: string) {
-  if (isDirectoryTool(tool, text)) return "This agent cannot run this job. Choose another agent.";
-  if (isDocumentationTool(tool, text)) return "This agent cannot run this job. Choose another agent.";
+  if (isDirectoryTool(tool, text)) return "This agent returned agent listings instead of this job.";
+  if (isDocumentationTool(tool, text)) return "This agent returned documentation instead of this job.";
   return "";
 }
 
@@ -349,8 +361,7 @@ function valueForToolProperty(
 ) {
   const fields = record.jobSpec?.fields || {};
   const lower = normalizePropertyName(key);
-  const directKey = Object.keys(fields).find((fieldKey) => normalizePropertyName(fieldKey) === lower);
-  const direct = fields[key] || fields[lower] || (directKey ? fields[directKey] : "");
+  const direct = directSchemaFieldValue(fields, key);
 
   if (lower === "chainnames" || lower === "chainname" || lower === "chains" || lower === "chain") {
     return coerceToolValue(property, chainNameForSchema(property));
@@ -381,10 +392,12 @@ function valueForToolProperty(
     lower === "lendingproject" ||
     lower === "lendingprotocol"
   ) {
-    return coerceToolValue(property, protocolForSchema(property, direct || fields.protocol || inferProtocol(record.limits.task)));
+    const protocol = protocolForSchema(property, agent, record, direct);
+    return protocol ? coerceToolValue(property, protocol) : undefined;
   }
   if (lower === "pool" || lower === "poolname" || lower === "poolid") {
-    return coerceToolValue(property, poolForSchema(property, direct || fields.poolOrPair || "", fields.protocol || inferProtocol(record.limits.task)));
+    const pool = poolForSchema(property, agent, record, direct || fields.poolOrPair);
+    return pool ? coerceToolValue(property, pool) : undefined;
   }
   if (direct) return coerceToolValue(property, direct);
 
@@ -412,179 +425,12 @@ function valueForToolProperty(
   return undefined;
 }
 
-function coerceToolValue(property: Record<string, unknown>, value: unknown): unknown {
-  if (value === undefined || value === null || value === "") return undefined;
-  if (schemaTypeIncludes(property, "array")) {
-    const values = Array.isArray(value) ? value : [value];
-    const enumValues = enumValuesForSchema(property);
-    const coerced = values
-      .map((item) => enumValues.length > 0 ? enumValueForSchema(property, [String(item)]) : item)
-      .filter((item) => item !== undefined && item !== null && item !== "");
-    return coerced.length > 0 ? coerced : undefined;
-  }
-  if (schemaTypeIncludes(property, "integer")) {
-    const parsed = Number.parseInt(String(value), 10);
-    return Number.isFinite(parsed) ? parsed : undefined;
-  }
-  if (schemaTypeIncludes(property, "number")) {
-    const parsed = Number.parseFloat(String(value));
-    return Number.isFinite(parsed) ? parsed : undefined;
-  }
-  if (schemaTypeIncludes(property, "boolean")) {
-    if (typeof value === "boolean") return value;
-    if (/^(true|yes|1)$/i.test(String(value))) return true;
-    if (/^(false|no|0)$/i.test(String(value))) return false;
-    return undefined;
-  }
-  if (enumValuesForSchema(property).length > 0) {
-    return enumValueForSchema(property, [String(value)]) || undefined;
-  }
-  return String(value);
-}
-
-function schemaTypeIncludes(property: Record<string, unknown>, expected: string): boolean {
-  const type = property.type;
-  if (type === expected) return true;
-  if (Array.isArray(type) && type.includes(expected)) return true;
-  return schemaVariants(property).some((variant) => schemaTypeIncludes(variant, expected));
-}
-
-function chainNameForSchema(property: Record<string, unknown>): string {
-  const itemSchema = asRecord(property.items);
-  const enumValues = [
-    ...(Array.isArray(property.enum) ? property.enum : []),
-    ...(Array.isArray(itemSchema.enum) ? itemSchema.enum : []),
-    ...schemaVariants(property).flatMap((variant) => {
-      const variantItems = asRecord(variant.items);
-      return [
-        ...(Array.isArray(variant.enum) ? variant.enum : []),
-        ...(Array.isArray(variantItems.enum) ? variantItems.enum : []),
-      ];
-    }),
-  ].filter((item): item is string => typeof item === "string");
-  const preferred = ["BSC", "BNB Smart Chain", "BNB Chain", "bsc", "bnb"];
-  return preferred.find((candidate) => enumValues.includes(candidate)) || enumValues[0] || "BSC";
-}
-
-function schemaVariants(property: Record<string, unknown>): Record<string, unknown>[] {
-  return ["anyOf", "oneOf", "allOf"]
-    .flatMap((key) => Array.isArray(property[key]) ? property[key] as unknown[] : [])
-    .map(parseRecord);
-}
-
-function normalizePropertyName(value: string) {
-  return value.replace(/[_\-\s]+/g, "").toLowerCase();
-}
-
-function firstEvmAddress(...values: Array<string | undefined>) {
-  for (const value of values) {
-    if (!value) continue;
-    const match = value.match(/0x[a-fA-F0-9]{40}/);
-    if (match) return match[0];
-  }
-  return "";
-}
-
 function assetForTool(fields: Record<string, string>) {
-  if (fields.customAsset) return fields.customAsset;
-  if (fields.asset && fields.asset !== "Custom token address") return fields.asset;
-  if (fields.assetOrWallet && !firstEvmAddress(fields.assetOrWallet)) return fields.assetOrWallet;
-  if (fields.intentTarget && !firstEvmAddress(fields.intentTarget)) return fields.intentTarget;
+  if (fields.customAsset && !isGenericSelectionValue(fields.customAsset)) return fields.customAsset;
+  if (fields.asset && fields.asset !== "Custom token address" && !isGenericSelectionValue(fields.asset)) return fields.asset;
+  if (fields.assetOrWallet && !firstEvmAddress(fields.assetOrWallet) && !isGenericSelectionValue(fields.assetOrWallet)) return fields.assetOrWallet;
+  if (fields.intentTarget && !firstEvmAddress(fields.intentTarget) && !isGenericSelectionValue(fields.intentTarget)) return fields.intentTarget;
   return "";
-}
-
-function inferProtocol(task: string) {
-  if (/\bvenus\b/i.test(task)) return "Venus";
-  if (/\blista\b/i.test(task)) return "Lista";
-  return "Venus";
-}
-
-function protocolForSchema(property: Record<string, unknown>, protocol: string) {
-  const aliases = protocolAliases(protocol);
-  return enumValueForSchema(property, aliases) || aliases[0];
-}
-
-function poolForSchema(property: Record<string, unknown>, requestedPool: string, protocol: string) {
-  const requestedMatch = enumValueForSchema(property, poolAliases(requestedPool));
-  if (requestedMatch) return requestedMatch;
-
-  const protocolMatch = enumValueForSchema(property, poolAliases(protocol));
-  if (protocolMatch) return protocolMatch;
-
-  return enumValueForSchema(property, poolAliases("core")) || firstEnumValueForSchema(property) || requestedPool;
-}
-
-function protocolAliases(protocol: string) {
-  const normalized = protocol.trim().toLowerCase();
-  if (normalized.includes("lista")) return ["lista", "Lista", "LISTA"];
-  if (normalized.includes("venus")) return ["venus", "Venus", "VENUS"];
-  return ["venus", "Venus", "VENUS"];
-}
-
-function poolAliases(value: string) {
-  const normalized = value.trim().toLowerCase();
-  if (normalized.includes("liquid") || normalized.includes("lst") || normalized.includes("staked")) {
-    return [
-      value,
-      "Liquid Staked BNB",
-      "Liquid Staked BNB Pool",
-      "Liquid Staking",
-      "LST",
-      "lst",
-    ];
-  }
-  if (normalized.includes("stable")) {
-    return [
-      value,
-      "Stablecoins",
-      "Stablecoin",
-      "Stablecoin Pool",
-      "Stable",
-      "stable",
-    ];
-  }
-  if (normalized.includes("core") || normalized.includes("venus") || normalized.includes("all") || !normalized) {
-    return [
-      value,
-      "Core",
-      "Core Pool",
-      "core",
-      "core pool",
-      "Main",
-      "Main Pool",
-      "main",
-      "main pool",
-      "Venus",
-      "venus",
-    ];
-  }
-  return [value];
-}
-
-function enumValuesForSchema(property: Record<string, unknown>) {
-  const itemSchema = asRecord(property.items);
-  return [
-    ...(Array.isArray(property.enum) ? property.enum : []),
-    ...(Array.isArray(itemSchema.enum) ? itemSchema.enum : []),
-    ...schemaVariants(property).flatMap((variant) => {
-      const variantItems = asRecord(variant.items);
-      return [
-        ...(Array.isArray(variant.enum) ? variant.enum : []),
-        ...(Array.isArray(variantItems.enum) ? variantItems.enum : []),
-      ];
-    }),
-  ].filter((item): item is string => typeof item === "string");
-}
-
-function enumValueForSchema(property: Record<string, unknown>, candidates: string[]) {
-  const enumValues = enumValuesForSchema(property);
-  if (enumValues.length === 0) return "";
-  const lowerCandidates = candidates.map((candidate) => candidate.toLowerCase());
-  return enumValues.find((value) => lowerCandidates.includes(value.toLowerCase())) || "";
-}
-
-function firstEnumValueForSchema(property: Record<string, unknown>) {
-  return enumValuesForSchema(property)[0] || "";
 }
 
 function humanList(values: string[]) {
@@ -628,9 +474,9 @@ export const mcpAdapter: BnbAgentExecutionAdapter = {
     return Boolean(mcpEndpoint(agent));
   },
 
-  async preflight(agent: BnbAgentProfile): Promise<BnbAdapterPreflightResult> {
-    const endpoint = mcpEndpoint(agent);
-    if (!endpoint) return { ok: false, adapter: "mcp", reason: "No supported execution endpoint is listed for this agent." };
+  async preflight(agent: BnbAgentProfile, selected?: BnbExecutionEndpoint): Promise<BnbAdapterPreflightResult> {
+    const endpoint = mcpEndpoint(agent, selected);
+    if (!endpoint) return { ok: false, adapter: "mcp", reason: "This agent is not available for jobs." };
 
     try {
       const tools = await listTools(endpoint);
@@ -639,20 +485,21 @@ export const mcpAdapter: BnbAgentExecutionAdapter = {
         adapter: "mcp",
         endpoint,
         capabilities: tools.map((tool) => tool.name).slice(0, 20),
+        capabilityContracts: mcpCapabilityContracts(tools),
       };
     } catch (error) {
       return {
         ok: false,
         adapter: "mcp",
         endpoint,
-        reason: error instanceof Error ? error.message : "MCP preflight failed.",
+        reason: error instanceof Error ? error.message : "Agent check failed.",
       };
     }
   },
 
-  async preflightJob({ agent, record }: BnbAdapterRunInput): Promise<BnbAdapterPreflightResult> {
-    const endpoint = mcpEndpoint(agent);
-    if (!endpoint) return { ok: false, adapter: "mcp", reason: "No supported execution endpoint is listed for this agent." };
+  async preflightJob({ agent, record, endpoint: selected }: BnbAdapterRunInput): Promise<BnbAdapterPreflightResult> {
+    const endpoint = mcpEndpoint(agent, selected);
+    if (!endpoint) return { ok: false, adapter: "mcp", reason: "This agent is not available for jobs." };
 
     try {
       const tools = await listTools(endpoint);
@@ -663,20 +510,21 @@ export const mcpAdapter: BnbAgentExecutionAdapter = {
         adapter: "mcp",
         endpoint,
         capabilities: [tool.name],
+        capabilityContracts: mcpCapabilityContracts([tool]),
       };
     } catch (error) {
       return {
         ok: false,
         adapter: "mcp",
         endpoint,
-        reason: error instanceof Error ? error.message : "MCP job arguments could not be prepared.",
+        reason: error instanceof Error ? error.message : "Job details could not be prepared.",
       };
     }
   },
 
-  async run({ agent, record }: BnbAdapterRunInput) {
-    const endpoint = mcpEndpoint(agent);
-    if (!endpoint) throw new Error("No supported execution endpoint is listed for this agent.");
+  async run({ agent, record, endpoint: selected }: BnbAdapterRunInput) {
+    const endpoint = mcpEndpoint(agent, selected);
+    if (!endpoint) throw new Error("This agent is not available for jobs.");
     const startedAt = new Date().toISOString();
     const tools = await listTools(endpoint);
     const tool = chooseTool(tools, agent, record);

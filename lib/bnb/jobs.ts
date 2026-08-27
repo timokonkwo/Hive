@@ -1,6 +1,19 @@
-import type { BnbAgentCategory, BnbAgentProfile, BnbHireIntentInput, BnbJobCapability, BnbJobSpec } from "@/lib/bnb/types";
+import {
+  bnbJobCapabilityForEndpointContract,
+  humanizeEndpointCapabilityName,
+  isActionableBnbEndpointCapability,
+  normalizedEndpointCapabilityName,
+} from "@/lib/bnb/capability-contracts";
+import type {
+  BnbAgentCategory,
+  BnbAgentProfile,
+  BnbEndpointCapabilityContract,
+  BnbHireIntentInput,
+  BnbJobCapability,
+  BnbJobSpec,
+} from "@/lib/bnb/types";
 
-export type BnbJobFieldKind = "text" | "textarea" | "select" | "amount" | "integer" | "address_or_text";
+export type BnbJobFieldKind = "text" | "textarea" | "select" | "amount" | "integer" | "address" | "address_or_text" | "json";
 
 export type BnbJobFieldDefinition = {
   key: string;
@@ -22,8 +35,11 @@ export type BnbJobCapabilityDefinition = {
   label: string;
   defaultTaskType: string;
   taskTypes: readonly string[];
+  taskLabels?: Record<string, string>;
   expectedOutput: string;
   fields: BnbJobFieldDefinition[];
+  schemaDerived?: boolean;
+  endpointCapabilities?: Record<string, BnbEndpointCapabilityContract>;
 };
 
 export const BNB_YIELD_SOURCE_CONNECTED_WALLET = "Connected wallet";
@@ -97,7 +113,7 @@ export const BNB_JOB_CAPABILITIES: Record<BnbJobCapability, BnbJobCapabilityDefi
     label: "Yield Optimisation",
     defaultTaskType: "Compare yield routes",
     taskTypes: ["Compare yield routes", "Find stablecoin yield", "Review current yield position"],
-    expectedOutput: "Ranked yield routes with assumptions and risks",
+    expectedOutput: "Ranked yield routes with risk notes",
     fields: [
       { key: "yieldSource", label: "Source", placeholder: "Select source", required: true, kind: "select", options: BNB_YIELD_SOURCE_OPTIONS },
       { key: "asset", label: "Asset", placeholder: "Select asset", required: false, kind: "select", options: BNB_YIELD_ASSETS },
@@ -137,7 +153,7 @@ export const BNB_RISK_PREFERENCES = ["Low", "Balanced", "Aggressive"] as const;
 
 export type BnbAgentCapabilitySource = Pick<
   BnbAgentProfile,
-  "category" | "name" | "description" | "capabilities" | "services" | "sourceMetrics"
+  "category" | "name" | "description" | "capabilities" | "services" | "sourceMetrics" | "endpointCapabilities" | "hasActionableEndpointCapabilities"
 >;
 
 export function capabilityForBnbCategory(category: BnbAgentCategory): BnbJobCapability {
@@ -182,6 +198,11 @@ export function capabilityForBnbAgent(agent: BnbAgentCapabilitySource): BnbJobCa
 }
 
 export function allowedBnbJobCapabilitiesForAgent(agent: BnbAgentCapabilitySource): BnbJobCapability[] {
+  const contractDefinitions = endpointCapabilityDefinitionsForAgent(agent);
+  if (agent.endpointCapabilities && agent.endpointCapabilities.length > 0) {
+    return contractDefinitions.map((definition) => definition.capability);
+  }
+  if (agent.hasActionableEndpointCapabilities === false) return [];
   return [capabilityForBnbAgent(agent)];
 }
 
@@ -199,6 +220,7 @@ export function unsupportedBnbJobCapabilityReason(
 ) {
   const requested = getBnbJobCapability(capability || "").label;
   const allowed = allowedBnbJobCapabilitiesForAgent(agent).map((item) => getBnbJobCapability(item).label).join(", ");
+  if (!allowed) return `${agent.name} is not available for jobs.`;
   return `${agent.name} supports ${allowed}. It cannot run ${requested} jobs.`;
 }
 
@@ -209,11 +231,276 @@ export function getBnbJobCapability(capability: string | null | undefined) {
   return BNB_JOB_CAPABILITIES.custom;
 }
 
-export function getBnbAgentJobCapability(agent: BnbAgentCapabilitySource, capability: string | null | undefined) {
+export function getBnbAgentJobCapability(
+  agent: BnbAgentCapabilitySource,
+  capability: string | null | undefined,
+  taskType?: string | null,
+) {
   const requested = getBnbJobCapability(capability || capabilityForBnbAgent(agent));
   const allowed = allowedBnbJobCapabilitiesForAgent(agent);
+  const contractDefinition = endpointCapabilityDefinitionForAgent(agent, requested.capability, taskType);
+  if (contractDefinition) return contractDefinition;
+  if (allowed.length === 0) return emptyBnbJobDefinition(requested.capability);
   const base = allowed.includes(requested.capability) ? requested : getBnbJobCapability(allowed[0]);
   return refineBnbJobDefinitionForAgent(base, agent);
+}
+
+export function hasUsableBnbEndpointCapabilities(agent: BnbAgentCapabilitySource) {
+  if (agent.endpointCapabilities && agent.endpointCapabilities.length > 0) {
+    return endpointCapabilityDefinitionsForAgent(agent).length > 0;
+  }
+  return agent.hasActionableEndpointCapabilities !== false;
+}
+
+export function bnbJobTaskLabel(definition: BnbJobCapabilityDefinition, taskType: string) {
+  return definition.taskLabels?.[taskType] || humanizeEndpointCapabilityName(taskType);
+}
+
+export function getBnbJobSpecDefinition(spec: BnbJobSpec): BnbJobCapabilityDefinition {
+  const base = getBnbJobCapability(spec.capability);
+  if (!spec.endpointCapability) return base;
+  return {
+    ...base,
+    defaultTaskType: spec.taskType,
+    taskTypes: [spec.taskType],
+    taskLabels: { [spec.taskType]: humanizeEndpointCapabilityName(spec.endpointCapability.name) },
+    expectedOutput: spec.expectedOutput,
+    fields: endpointCapabilityFields(spec.endpointCapability, spec.capability),
+    schemaDerived: true,
+    endpointCapabilities: { [spec.taskType]: spec.endpointCapability },
+  };
+}
+
+function endpointCapabilityDefinitionForAgent(
+  agent: BnbAgentCapabilitySource,
+  capability: BnbJobCapability,
+  taskType?: string | null,
+) {
+  const definition = endpointCapabilityDefinitionsForAgent(agent)
+    .find((item) => item.capability === capability);
+  return definition ? refineEndpointCapabilityDefinition(definition, taskType) : null;
+}
+
+function endpointCapabilityDefinitionsForAgent(agent: BnbAgentCapabilitySource): BnbJobCapabilityDefinition[] {
+  const contracts = uniqueEndpointCapabilities(agent.endpointCapabilities || [])
+    .filter(isActionableBnbEndpointCapability);
+  if (contracts.length === 0) return [];
+
+  const grouped = new Map<BnbJobCapability, BnbEndpointCapabilityContract[]>();
+  for (const contract of contracts) {
+    const capability = bnbJobCapabilityForEndpointContract(contract);
+    const items = grouped.get(capability) || [];
+    items.push(contract);
+    grouped.set(capability, items);
+  }
+
+  return Array.from(grouped.entries()).map(([capability, items]) => {
+    const base = getBnbJobCapability(capability);
+    const taskTypes = items.map((item) => item.name);
+    const taskLabels = Object.fromEntries(items.map((item) => [item.name, humanizeEndpointCapabilityName(item.name)]));
+    const endpointCapabilities = Object.fromEntries(items.map((item) => [item.name, item]));
+    const selected = items[0];
+    return {
+      ...base,
+      defaultTaskType: taskTypes[0] || base.defaultTaskType,
+      taskTypes,
+      taskLabels,
+      expectedOutput: `${humanizeEndpointCapabilityName(selected.name)} result`,
+      fields: endpointCapabilityFields(selected, capability),
+      schemaDerived: true,
+      endpointCapabilities,
+    };
+  });
+}
+
+function refineEndpointCapabilityDefinition(
+  definition: BnbJobCapabilityDefinition,
+  taskType?: string | null,
+): BnbJobCapabilityDefinition {
+  if (!definition.schemaDerived || !definition.endpointCapabilities) return definition;
+  const selectedTask = taskType && definition.taskTypes.includes(taskType)
+    ? taskType
+    : definition.defaultTaskType;
+  const contract = definition.endpointCapabilities[selectedTask] || definition.endpointCapabilities[definition.defaultTaskType];
+  if (!contract) return definition;
+  return {
+    ...definition,
+    defaultTaskType: definition.defaultTaskType,
+    expectedOutput: `${humanizeEndpointCapabilityName(contract.name)} result`,
+    fields: endpointCapabilityFields(contract, definition.capability),
+  };
+}
+
+function emptyBnbJobDefinition(capability: BnbJobCapability): BnbJobCapabilityDefinition {
+  const base = getBnbJobCapability(capability);
+  return {
+    ...base,
+    taskTypes: [],
+    fields: [],
+  };
+}
+
+function endpointCapabilityForTask(
+  definition: BnbJobCapabilityDefinition,
+  taskType: string,
+  requestedName?: string,
+) {
+  if (!definition.schemaDerived || !definition.endpointCapabilities) return null;
+  const requestedKey = requestedName ? normalizedEndpointCapabilityName(requestedName) : "";
+  if (requestedKey) {
+    const requested = Object.values(definition.endpointCapabilities)
+      .find((contract) => normalizedEndpointCapabilityName(contract.name) === requestedKey);
+    if (requested) return requested;
+  }
+  return definition.endpointCapabilities[taskType] || definition.endpointCapabilities[definition.defaultTaskType] || null;
+}
+
+function uniqueEndpointCapabilities(contracts: BnbEndpointCapabilityContract[]) {
+  const byName = new Map<string, BnbEndpointCapabilityContract>();
+  for (const contract of contracts) {
+    const key = `${contract.kind}:${normalizedEndpointCapabilityName(contract.name)}`;
+    if (!key || key === `${contract.kind}:`) continue;
+    const previous = byName.get(key);
+    if (!previous || (!previous.inputSchema && contract.inputSchema)) byName.set(key, contract);
+  }
+  return Array.from(byName.values()).slice(0, 40);
+}
+
+function endpointCapabilityFields(contract: BnbEndpointCapabilityContract, capability: BnbJobCapability): BnbJobFieldDefinition[] {
+  const schema = jsonSchemaObject(contract.inputSchema);
+  const properties = schemaProperties(schema);
+  const required = schemaRequired(schema);
+  const fields = Object.entries(properties)
+    .slice(0, 16)
+    .map(([key, property]) => schemaPropertyField(key, property, required.includes(key)))
+    .filter((field): field is BnbJobFieldDefinition => Boolean(field));
+  if (fields.length > 0) return fields;
+  if (capability === "custom") {
+    return BNB_JOB_CAPABILITIES.custom.fields;
+  }
+  return [];
+}
+
+function schemaPropertyField(key: string, property: Record<string, unknown>, required: boolean): BnbJobFieldDefinition | null {
+  const label = schemaLabel(key, property);
+  const enumValues = schemaTypeIncludes(property, "boolean") ? ["true", "false"] : schemaEnumValues(property);
+  const kind = schemaFieldKind(key, property, enumValues);
+  const maxLength = schemaNumber(property.maxLength, kind === "json" ? 5000 : kind === "address" ? 42 : kind === "textarea" ? 1200 : 240);
+  const minLength = schemaNumber(property.minLength, kind === "address" ? 42 : undefined);
+  const min = schemaNumber(property.minimum ?? property.exclusiveMinimum, undefined);
+  const max = schemaNumber(property.maximum ?? property.exclusiveMaximum, undefined);
+  const multiline = kind === "textarea" || kind === "json";
+
+  return {
+    key,
+    label,
+    placeholder: schemaPlaceholder(label, kind),
+    required,
+    kind,
+    multiline,
+    ...(enumValues.length > 0 ? { options: enumValues } : {}),
+    ...(min !== undefined ? { min } : {}),
+    ...(max !== undefined ? { max } : {}),
+    ...(minLength !== undefined ? { minLength } : {}),
+    maxLength,
+  };
+}
+
+function schemaFieldKind(key: string, property: Record<string, unknown>, enumValues: string[]): BnbJobFieldKind {
+  if (enumValues.length > 0 || schemaTypeIncludes(property, "boolean")) return "select";
+  if (schemaTypeIncludes(property, "integer")) return "integer";
+  if (schemaTypeIncludes(property, "number")) return "amount";
+  if (schemaTypeIncludes(property, "object")) return "json";
+  if (schemaTypeIncludes(property, "array")) return schemaEnumValues(asRecord(property.items)).length > 0 ? "select" : "textarea";
+  if (isAddressSchemaField(key, property)) return "address";
+  if (schemaText(property).length > 160 || /instructions?|notes?|description|request|prompt|query|message|task/i.test(key)) return "textarea";
+  return "text";
+}
+
+function schemaPlaceholder(label: string, kind: BnbJobFieldKind) {
+  if (kind === "select") return `Select ${label.toLowerCase()}`;
+  if (kind === "address") return "0x...";
+  if (kind === "amount") return "0.0";
+  if (kind === "integer") return "0";
+  if (kind === "json") return "{}";
+  return `Enter ${label.toLowerCase()}`;
+}
+
+function schemaLabel(key: string, property: Record<string, unknown>) {
+  const title = typeof property.title === "string" ? property.title.trim() : "";
+  if (title) return title;
+  return humanizeEndpointCapabilityName(key)
+    .replace(/\bId\b/g, "ID")
+    .replace(/\bUrl\b/g, "URL");
+}
+
+function jsonSchemaObject(value: unknown) {
+  const schema = asRecord(value);
+  if (schema.properties || schema.type === "object") return schema;
+  for (const key of ["inputSchema", "input_schema", "parameters", "schema", "jsonSchema", "json_schema"]) {
+    const nested = asRecord(schema[key]);
+    if (nested.properties || nested.type === "object") return nested;
+  }
+  return schema;
+}
+
+function schemaProperties(schema: Record<string, unknown>) {
+  return Object.fromEntries(
+    Object.entries(asRecord(schema.properties))
+      .map(([key, value]) => [key, asRecord(value)])
+      .filter(([key]) => typeof key === "string" && key.length > 0),
+  ) as Record<string, Record<string, unknown>>;
+}
+
+function schemaRequired(schema: Record<string, unknown>) {
+  return Array.isArray(schema.required)
+    ? schema.required.filter((item): item is string => typeof item === "string")
+    : [];
+}
+
+function schemaEnumValues(property: Record<string, unknown>): string[] {
+  const itemSchema = asRecord(property.items);
+  const values: unknown[] = [
+    ...(Array.isArray(property.enum) ? property.enum : []),
+    ...(Array.isArray(itemSchema.enum) ? itemSchema.enum : []),
+    ...schemaVariants(property).flatMap((variant) => schemaEnumValues(variant)),
+  ];
+  return Array.from(new Set(values.map((value) => String(value)).filter(Boolean))).slice(0, 60);
+}
+
+function schemaTypeIncludes(property: Record<string, unknown>, expected: string): boolean {
+  const type = property.type;
+  if (type === expected) return true;
+  if (Array.isArray(type) && type.includes(expected)) return true;
+  return schemaVariants(property).some((variant) => schemaTypeIncludes(variant, expected));
+}
+
+function schemaVariants(property: Record<string, unknown>): Record<string, unknown>[] {
+  return ["anyOf", "oneOf", "allOf"]
+    .flatMap((key) => Array.isArray(property[key]) ? property[key] as unknown[] : [])
+    .map(asRecord);
+}
+
+function schemaNumber(value: unknown, fallback: number | undefined) {
+  const number = typeof value === "number" ? value : typeof value === "string" ? Number.parseFloat(value) : Number.NaN;
+  return Number.isFinite(number) ? number : fallback;
+}
+
+function schemaText(property: Record<string, unknown>) {
+  return [
+    property.title,
+    property.description,
+  ].filter((value): value is string => typeof value === "string").join(" ");
+}
+
+function isAddressSchemaField(key: string, property: Record<string, unknown>) {
+  const text = `${key} ${schemaText(property)} ${property.format || ""}`.toLowerCase();
+  return /(?:^|[^a-z])(address|wallet|account|owner|useraddress|recipient)(?:[^a-z]|$)/.test(text)
+    || property.format === "ethereum-address";
+}
+
+function asRecord(value: unknown): Record<string, unknown> {
+  return typeof value === "object" && value !== null ? value as Record<string, unknown> : {};
 }
 
 export function supportedBnbProtocolsForAgent(agent: BnbAgentCapabilitySource, capability: BnbJobCapability) {
@@ -322,6 +609,10 @@ export function validateBnbJobField(field: BnbJobFieldDefinition, rawValue: stri
     return `Choose a valid ${field.label.toLowerCase()}.`;
   }
 
+  if (field.kind === "address" && !isEvmAddress(value)) {
+    return `${field.label} is not a valid EVM address.`;
+  }
+
   if (field.kind === "integer") {
     if (!/^\d+$/.test(value)) return `${field.label} must be a whole number.`;
     const parsed = Number.parseInt(value, 10);
@@ -341,6 +632,14 @@ export function validateBnbJobField(field: BnbJobFieldDefinition, rawValue: stri
     return `${field.label} is not a valid EVM address.`;
   }
 
+  if (field.kind === "json") {
+    try {
+      JSON.parse(value);
+    } catch {
+      return `${field.label} must be valid JSON.`;
+    }
+  }
+
   return "";
 }
 
@@ -354,6 +653,7 @@ export function visibleBnbJobFields(
   definition: BnbJobCapabilityDefinition,
   options: { fields?: Record<string, string>; taskType?: string } = {},
 ) {
+  if (definition.schemaDerived) return definition.fields;
   return definition.fields.filter((field) => {
     if (field.key === "riskPreference") return false;
     if (definition.capability === "concentrated_liquidity") {
@@ -377,6 +677,7 @@ export function summaryBnbJobFields(
   walletAddress?: string,
 ) {
   return visibleBnbJobFields(definition, { fields, taskType }).filter((field) => {
+    if (definition.schemaDerived) return true;
     if (definition.capability !== "yield_optimisation") return true;
     if (yieldBnbJobUsesConnectedWallet(taskType, fields)) return field.key !== "asset" && field.key !== "customAsset";
     if (field.key === "customAsset") return fields.asset === BNB_CUSTOM_TOKEN_OPTION;
@@ -426,6 +727,19 @@ export function applyBnbJobFieldDefaults(capability: BnbJobCapability, taskType:
   return next;
 }
 
+export function applyBnbJobDefinitionFieldDefaults(
+  definition: BnbJobCapabilityDefinition,
+  taskType: string,
+  current: Record<string, string>,
+) {
+  const next: Record<string, string> = {};
+  for (const field of definition.fields) {
+    next[field.key] = current[field.key] || initialBnbJobFieldValue(field, definition.capability, taskType);
+  }
+  if (definition.schemaDerived) return next;
+  return applyBnbJobFieldDefaults(definition.capability, taskType, next);
+}
+
 export function bnbJobFieldValue({
   capability,
   field,
@@ -440,6 +754,7 @@ export function bnbJobFieldValue({
   const value = fields[field.key] || "";
   if (value) return value;
   if (capability === "health_factor" && field.key === "walletOrPosition" && walletAddress) return walletAddress;
+  if (walletAddress && isWalletAddressJobField(field)) return walletAddress;
   return "";
 }
 
@@ -494,7 +809,9 @@ export function validateBnbYieldFields(
 
 function validateBnbJobDefinitionFields(definition: BnbJobCapabilityDefinition, taskType: string, fields: Record<string, string>) {
   for (const field of visibleBnbJobFields(definition, { fields, taskType })) {
-    const required = isBnbJobFieldRequired(definition.capability, taskType, fields, field);
+    const required = definition.schemaDerived
+      ? field.required
+      : isBnbJobFieldRequired(definition.capability, taskType, fields, field);
     const value = fields[field.key] || "";
     const fieldError = required
       ? validateBnbJobField({ ...field, required: true }, value)
@@ -506,12 +823,20 @@ function validateBnbJobDefinitionFields(definition: BnbJobCapabilityDefinition, 
 }
 
 export function buildBnbIntentJobSpec(input: BnbHireIntentInput, agent?: BnbAgentCapabilitySource): { ok: true; spec: BnbJobSpec; assumptions: string[]; warnings: string[]; missingInputs: string[] } | { ok: false; error: string } {
-  const definition = agent ? getBnbAgentJobCapability(agent, input.capability) : getBnbJobCapability(input.capability);
+  const definition = agent ? getBnbAgentJobCapability(agent, input.capability, input.taskType) : getBnbJobCapability(input.capability);
   const advancedFields = input.advancedFields && typeof input.advancedFields === "object" ? input.advancedFields : {};
   const request = readField(advancedFields, "request");
   const rawOutcome = readIntentString(input.outcome);
-  const outcome = definition.capability === "custom" && !rawOutcome ? request : rawOutcome;
-  if (outcome.length < 12) {
+  const taskType = input.taskType && definition.taskTypes.includes(input.taskType)
+    ? input.taskType
+    : definition.defaultTaskType;
+  const endpointCapability = endpointCapabilityForTask(definition, taskType, input.endpointCapability);
+  const outcome = definition.schemaDerived && !rawOutcome
+    ? `Run ${bnbJobTaskLabel(definition, taskType)} and return the result.`
+    : definition.capability === "custom" && !rawOutcome
+      ? request
+      : rawOutcome;
+  if (!definition.schemaDerived && outcome.length < 12) {
     return { ok: false, error: "Describe the result you want from this agent." };
   }
 
@@ -523,17 +848,14 @@ export function buildBnbIntentJobSpec(input: BnbHireIntentInput, agent?: BnbAgen
   const riskPreference = BNB_RISK_PREFERENCES.includes(input.riskPreference || "Balanced")
     ? input.riskPreference || "Balanced"
     : "Balanced";
-  const taskType = input.taskType && definition.taskTypes.includes(input.taskType)
-    ? input.taskType
-    : definition.defaultTaskType;
   const instructions = readIntentString(input.instructions);
   const fields: Record<string, string> = {
-    ...(definition.capability === "custom" ? {} : { outcome }),
+    ...(definition.capability === "custom" || definition.schemaDerived ? {} : { outcome }),
     riskPreference,
   };
 
   if (target) fields.intentTarget = target;
-  if (definition.capability === "yield_optimisation") fields.yieldSource = defaultBnbYieldSource(taskType);
+  if (definition.capability === "yield_optimisation" && !definition.schemaDerived) fields.yieldSource = defaultBnbYieldSource(taskType);
 
   for (const field of definition.fields) {
     const value = readField(advancedFields, field.key);
@@ -544,6 +866,7 @@ export function buildBnbIntentJobSpec(input: BnbHireIntentInput, agent?: BnbAgen
 
   const walletAddress = readField(advancedFields, "walletAddress");
   if (isEvmAddress(walletAddress)) fields.walletAddress = walletAddress;
+  applyWalletFieldDefaults(definition, fields, walletAddress);
 
   if (definition.capability === "health_factor") {
     const walletOrPosition = fields.walletOrPosition || target;
@@ -553,7 +876,7 @@ export function buildBnbIntentJobSpec(input: BnbHireIntentInput, agent?: BnbAgen
     fields.walletOrPosition = walletOrPosition;
   }
 
-  if (definition.capability === "yield_optimisation") {
+  if (definition.capability === "yield_optimisation" && !definition.schemaDerived) {
     const yieldFields = normalizeYieldFields(fields, target);
     if (!yieldFields.ok) return yieldFields;
   }
@@ -568,25 +891,19 @@ export function buildBnbIntentJobSpec(input: BnbHireIntentInput, agent?: BnbAgen
     return { ok: false, error: boundsError };
   }
 
-  const assumptions = [
-    "Hive will use the agent's supported endpoint and available public BSC data.",
-    ...(target ? [] : ["No target was supplied; the agent must infer the relevant wallet, pair, or position from the request."]),
-    "No trading or fund movement happens until the user confirms a wallet transaction.",
-  ];
-  const warnings = [
-    ...(riskPreference === "Aggressive" ? ["Aggressive risk allows wider recommendations, but payment release still requires user review."] : []),
-  ];
-  const missingInputs = target ? [] : ["Target wallet, pair, or position may be needed for a precise result."];
+  const assumptions: string[] = [];
+  const warnings: string[] = [];
+  const missingInputs: string[] = [];
   const summary = [
-    taskType,
-    definition.capability === "custom" ? "" : `Outcome: ${outcome}`,
-    target ? definition.capability === "yield_optimisation" && fields.yieldSource === BNB_YIELD_SOURCE_CONNECTED_WALLET ? `Wallet: ${target}` : `Target: ${target}` : "",
+    bnbJobTaskLabel(definition, taskType),
+    definition.capability === "custom" || definition.schemaDerived ? "" : `Outcome: ${outcome}`,
+    target && !definition.schemaDerived ? definition.capability === "yield_optimisation" && fields.yieldSource === BNB_YIELD_SOURCE_CONNECTED_WALLET ? `Wallet: ${target}` : `Target: ${target}` : "",
     `Risk: ${riskPreference}`,
     ...summaryBnbJobFields(definition, fields, taskType, fields.walletAddress || target).map((field) => {
       const value = fields[field.key];
       return value ? `${field.label}: ${value}` : "";
     }),
-    ...(definition.capability === "yield_optimisation" && fields.yieldSource === BNB_YIELD_SOURCE_CONNECTED_WALLET ? ["Scope: All wallet assets"] : []),
+    ...(definition.capability === "yield_optimisation" && !definition.schemaDerived && fields.yieldSource === BNB_YIELD_SOURCE_CONNECTED_WALLET ? ["Scope: All wallet assets"] : []),
     instructions ? `Notes: ${instructions}` : "",
   ].filter(Boolean).join("\n");
 
@@ -595,6 +912,7 @@ export function buildBnbIntentJobSpec(input: BnbHireIntentInput, agent?: BnbAgen
     spec: {
       capability: definition.capability,
       taskType,
+      ...(endpointCapability ? { endpointCapability } : {}),
       summary,
       expectedOutput: definition.expectedOutput,
       fields,
@@ -636,12 +954,13 @@ export function buildBnbJobSpec(input: {
   fields?: Record<string, unknown> | null;
   instructions?: string | null;
 }, agent?: BnbAgentCapabilitySource): { ok: true; spec: BnbJobSpec } | { ok: false; error: string } {
-  const definition = agent ? getBnbAgentJobCapability(agent, input.capability) : getBnbJobCapability(input.capability);
+  const definition = agent ? getBnbAgentJobCapability(agent, input.capability, input.taskType) : getBnbJobCapability(input.capability);
   const incomingFields = input.fields && typeof input.fields === "object" ? input.fields : {};
   const fields: Record<string, string> = {};
   const taskType = typeof input.taskType === "string" && input.taskType.trim() ? input.taskType.trim() : definition.defaultTaskType;
   if (!definition.taskTypes.includes(taskType)) return { ok: false, error: "Choose a valid task." };
-  if (definition.capability === "yield_optimisation") fields.yieldSource = defaultBnbYieldSource(taskType);
+  const endpointCapability = endpointCapabilityForTask(definition, taskType);
+  if (definition.capability === "yield_optimisation" && !definition.schemaDerived) fields.yieldSource = defaultBnbYieldSource(taskType);
 
   for (const field of definition.fields) {
     const value = readField(incomingFields, field.key);
@@ -652,11 +971,12 @@ export function buildBnbJobSpec(input: {
 
   const walletAddress = readField(incomingFields, "walletAddress");
   if (isEvmAddress(walletAddress)) fields.walletAddress = walletAddress;
+  applyWalletFieldDefaults(definition, fields, walletAddress);
 
   const instructions = typeof input.instructions === "string" ? input.instructions.trim() : "";
   if (instructions.length > 1200) return { ok: false, error: "Notes are too long." };
 
-  if (definition.capability === "yield_optimisation") {
+  if (definition.capability === "yield_optimisation" && !definition.schemaDerived) {
     const yieldFields = normalizeYieldFields(fields, fields.intentTarget || "");
     if (!yieldFields.ok) return yieldFields;
   }
@@ -672,6 +992,7 @@ export function buildBnbJobSpec(input: {
   const summary = summarizeBnbJobSpec({
     capability: definition.capability,
     taskType,
+    ...(endpointCapability ? { endpointCapability } : {}),
     summary: "",
     expectedOutput: definition.expectedOutput,
     fields,
@@ -683,6 +1004,7 @@ export function buildBnbJobSpec(input: {
     spec: {
       capability: definition.capability,
       taskType,
+      ...(endpointCapability ? { endpointCapability } : {}),
       summary,
       expectedOutput: definition.expectedOutput,
       fields,
@@ -734,6 +1056,24 @@ function isEvmAddress(value: string) {
   return /^0x[a-fA-F0-9]{40}$/.test(value);
 }
 
+function applyWalletFieldDefaults(definition: BnbJobCapabilityDefinition, fields: Record<string, string>, walletAddress: string) {
+  if (!isEvmAddress(walletAddress)) return;
+  for (const field of definition.fields) {
+    if (!fields[field.key] && isWalletAddressJobField(field)) {
+      fields[field.key] = walletAddress;
+    }
+  }
+}
+
+function isWalletAddressJobField(field: BnbJobFieldDefinition) {
+  const normalized = field.key.replace(/[^a-z0-9]+/gi, "").toLowerCase();
+  const label = field.label.replace(/[^a-z0-9]+/gi, "").toLowerCase();
+  const text = `${normalized} ${label}`;
+  if (/(token|asset|pool|contract|router|spender|vault|pair|market)/.test(text)) return false;
+  return /(walletaddress|useraddress|accountaddress|owneraddress|borroweraddress|senderaddress|address user|wallet account)/.test(text)
+    || normalized === "address";
+}
+
 export function validateBnbJobPriceBounds(capability: BnbJobCapability, fields: Record<string, string>) {
   return validatePriceBounds(capability, fields);
 }
@@ -773,7 +1113,7 @@ export function legacyBnbJobSpec(taskTemplate: string, taskDetails: string): Bnb
 }
 
 export function summarizeBnbJobSpec(spec: BnbJobSpec) {
-  const definition = getBnbJobCapability(spec.capability);
+  const definition = getBnbJobSpecDefinition(spec);
   const lines = summaryBnbJobFields(definition, spec.fields, spec.taskType, spec.fields.walletAddress)
     .map((field) => {
       const value = spec.fields[field.key];
@@ -786,5 +1126,5 @@ export function summarizeBnbJobSpec(spec: BnbJobSpec) {
     lines.push("Scope: All wallet assets");
   }
   if (spec.instructions) lines.push(`Notes: ${spec.instructions}`);
-  return [spec.taskType, ...lines].join("\n");
+  return [bnbJobTaskLabel(definition, spec.taskType), ...lines].join("\n");
 }

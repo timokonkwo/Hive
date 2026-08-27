@@ -1,6 +1,6 @@
 # BNB Agent Studio V2 Execution Tracker
 
-Last updated: 2026-08-23
+Last updated: 2026-08-27
 
 This tracker is the implementation source of truth for the BNB Agent Studio V2 marketplace work. The product is intended for real users. Do not mark a unit complete until the code is implemented, tested, and safe to deploy.
 
@@ -36,7 +36,7 @@ This tracker is the implementation source of truth for the BNB Agent Studio V2 m
 | Phase 0: Safety Baseline and Config Contract | Complete | Added tracker, current-runtime env contract, readiness checks, and tests. |
 | Phase 1: Marketplace Readiness Gate | Complete | Centralized readiness and removed non-callable hire/request CTAs. |
 | Phase 2: Agent-Specific Capability Forms | Complete | Render only the selected agent's supported tasks and arguments. |
-| Phase 3: Payment and Run State Repair | In progress | Zero-price policy is now explicit; remaining x402/escrow UI work is pending. |
+| Phase 3: Payment and Run State Repair | In progress | Zero-price, escrow, and priced BNB x402 orchestration are implemented; live paid-endpoint browser validation remains. |
 | Phase 4: Reference Studio V2 Agents | In progress | Reference-agent config loading is wired; real Studio V2 agents are pending. |
 | Phase 5: Delivery Formatting and Evidence | In progress | Convert outputs into human summaries and receipt evidence. |
 | Phase 6: 8004scan Pro Data Quality | In progress | Pro key precedence and cache controls are wired; richer profile data remains pending. |
@@ -46,6 +46,411 @@ This tracker is the implementation source of truth for the BNB Agent Studio V2 m
 | Phase 9: TermiX Agent Advantage Report | Not started | Capture three real agent-vs-manual comparisons. |
 | Phase 10: Production Hardening | In progress | Add deployment safety, rate limits, ownership checks, moderation, analytics, and alerts. |
 | Phase 11: Submission Freeze | Not started | Deploy, smoke test, record video, and submit. |
+
+## Execution Reliability Breakdown
+
+This section breaks the remaining implementation into units that can be completed, tested, and reviewed independently. The goal is a marketplace that can discover many ERC-8004 identities, promote genuinely usable agents, validate jobs against actual endpoint contracts, run work once, and present results without exposing raw protocol payloads as the primary user experience.
+
+### Unit A: Endpoint Capability Inventory
+
+**Status:** Complete
+
+**Purpose:** Build one canonical contract for what an endpoint can do. MCP tools, A2A skills, x402/HTTP operations, and future Agent Studio V2 task commerce entries must normalize into the same shape before ranking, form generation, validation, or execution.
+
+**Components**
+
+- `lib/bnb/types.ts`
+- `lib/bnb/endpoint-capabilities.ts`
+- `lib/bnb/adapters/types.ts`
+- `lib/bnb/adapters/mcp.ts`
+- `lib/bnb/adapters/a2a.ts`
+- `lib/bnb/adapters/http.ts`
+- `lib/bnb/adapters/registry.ts`
+- `lib/db.ts`
+- `.env.example`
+- `tests/bnb-product-regressions.test.mjs`
+
+**Implementation Requirements**
+
+- Persist one capability snapshot per `chainId + tokenId + adapter + endpointUrl`.
+- Store `ok`, `reason`, endpoint label/source/verification, payment requirement, and normalized capabilities.
+- Include tool or skill name, kind, description, JSON schema, tags, and payment requirement when available.
+- Bound TTL through `BNB_ENDPOINT_CAPABILITY_TTL_SECONDS`.
+- Never let Mongo, index creation, JSON serialization, or endpoint-cache failures block discovery or execution.
+- Reuse fresh durable snapshots before re-probing an endpoint.
+- Keep the existing short in-memory cache for hot request bursts.
+- Keep endpoint probe observability separate from capability inventory.
+
+**Tests**
+
+- Unit/regression: DB collection name exists.
+- Unit/regression: capability types exist and are included in adapter preflight results.
+- Unit/regression: MCP preflight stores tools with schemas.
+- Unit/regression: A2A preflight stores skills with tags.
+- Unit/regression: HTTP/x402 preflight stores operation metadata and payment requirement.
+- Unit/regression: registry reads fresh durable snapshots before live endpoint probing.
+- Unit/regression: registry records durable snapshots after live preflight.
+- Unit/regression: cache failures are caught and do not block runtime resolution.
+- Unit/regression: TTL env is documented and bounded.
+- Static copy scan: no endpoint/cache/debug wording leaks into primary marketplace UI.
+
+**Acceptance**
+
+- A provider-agnostic capability record exists for every successfully inspected endpoint.
+- Marketplace ranking and form generation can move to contract-backed decisions without provider-specific one-off logic.
+
+**Verification**
+
+- Date: 2026-08-25
+- Added canonical endpoint capability types and Mongo-backed durable snapshots.
+- MCP tools, A2A skills, and HTTP/x402 operations now return normalized capability contracts.
+- Adapter registry now reuses fresh durable snapshots before live endpoint preflight and records snapshots after live preflight.
+- Runtime readiness exposes endpoint capability storage as a non-secret boolean.
+- `npm test -- tests/bnb-product-regressions.test.mjs`: passed with 71 tests.
+- `npm run typecheck`: passed.
+- `npm run lint -- --quiet`: passed.
+- `npm run build`: passed.
+- `git diff --check`: passed.
+- Known non-fatal build output remained limited to the MetaMask optional React Native storage warning, bigint pure-JS fallback, and local sitemap MongoDB DNS refusal.
+
+### Unit B: Contract-Backed Marketplace Ranking
+
+**Status:** In progress
+
+**Purpose:** Sort and filter all agents without hiding identities. Agents with verified callable contracts come first, endpoint-backed but unverified agents come next, then profile-only ERC-8004 identities.
+
+**Components**
+
+- `lib/bnb/catalog.ts`
+- `lib/bnb/agent-cache.ts`
+- `lib/bnb/readiness.ts`
+- `lib/bnb/display.ts`
+- `app/bnb/agents/AgentsDirectory.tsx`
+- `app/api/bnb/agents/route.ts`
+
+**Implementation Requirements**
+
+- Define ranking inputs from capability inventory, endpoint health, source trust, category fit, review score, and freshness.
+- Do not default-hide `Other` agents; rank them below hackathon-relevant BNB categories unless the user filters for them.
+- Clamp pagination to valid ranges while preserving the requested query when possible.
+- Preserve all agents in totals and pages.
+- Keep all user-facing filters simple: `All`, `Available`, `Profiles`, category, protocol/works-with, and sort.
+- Do not show counts like "0 ready BSC agents" or diagnostic phrases.
+
+**Tests**
+
+- Unit/regression: available agents sort above profile-only agents.
+- Unit/regression: BNB category agents sort above `Other` by default.
+- Unit/regression: all agents remain pageable when no execution filter is selected.
+- Unit/regression: invalid or out-of-range pages clamp without empty pages or page reset loops.
+- Integration: `/api/bnb/agents?page=<last>` returns agents when total indicates a last page.
+- Browser QA: page 1, middle page, last page, search, category, and status filters.
+
+**Acceptance**
+
+- Users see useful agents first without losing the full onchain directory.
+
+**Progress**
+
+- Date: 2026-08-25
+- Catalog reads, cached page reads, and profile detail reads now apply fresh endpoint capability snapshots before scoring or returning agents.
+- Successful fresh endpoint snapshots can promote an agent to `ready_to_run`; failed fresh snapshots demote stale `ready_to_run` state to `connectable` without removing the agent from the marketplace.
+- Enriched capability names are merged into agent capability text for search and ranking.
+- Cache upserts now persist capability-enriched candidates.
+- Directory and API pagination now use the actual page result total instead of inflating totals from global network stats.
+- Huge directory result sets no longer render an unreliable deep last-page shortcut; users can move through real pages with next/previous and nearby page links.
+
+**Verification**
+
+- Date: 2026-08-25
+- `npm test -- tests/bnb-product-regressions.test.mjs`: passed with 71 tests.
+- `npm run typecheck`: passed.
+- `npm run lint -- --quiet`: passed.
+- `npm run build`: passed.
+- Known non-fatal build output remained limited to the MetaMask optional React Native storage warning, bigint pure-JS fallback, and local sitemap MongoDB DNS refusal.
+
+### Unit C: Schema-Driven Job Builder
+
+**Status:** Complete
+
+**Purpose:** Generate forms from actual endpoint contracts instead of generic category assumptions.
+
+**Components**
+
+- `lib/bnb/jobs.ts`
+- `lib/bnb/endpoint-capabilities.ts`
+- `app/bnb/activate/ActivationForm.tsx`
+- `app/api/bnb/activate/preflight/route.ts`
+- `app/api/bnb/activate/route.ts`
+
+**Implementation Requirements**
+
+- Choose only capabilities exposed by the selected agent.
+- Render schema fields with correct controls, enum options, required states, and defaults.
+- Auto-fill connected wallet only for wallet-address fields.
+- Ask for assets only when the selected operation requires an asset.
+- Reject unknown required fields before payment or run.
+- Preserve advanced details for freeform instructions, not as a catch-all for missing schema fields.
+
+**Tests**
+
+- Unit/regression: agent capability selector is derived from endpoint contracts.
+- Unit/regression: required schema fields render as required inputs.
+- Unit/regression: enum schema fields render as selects with allowed values.
+- Unit/regression: wallet defaults apply only to wallet/address fields.
+- Unit/regression: unsupported generic category choices cannot be submitted.
+- Integration: validation response includes missing fields with user-safe labels.
+- Browser QA: HeyAnon Venus, Beefy, V3 Pools, A2A public card, x402-priced endpoint.
+
+**Acceptance**
+
+- A user never pays or starts a run before the selected endpoint has all required inputs.
+
+**Verification**
+
+- Date: 2026-08-26
+- Capability choices now come from the selected agent's endpoint contracts when contract snapshots are available.
+- Schema-derived fields render required inputs, enum selects, JSON input areas, and wallet-address defaults.
+- Generic category choices are rejected when the selected agent does not expose that task.
+- Required endpoint arguments are validated before payment or execution.
+- `npm test -- tests/bnb-product-regressions.test.mjs`: passed with 71 tests.
+- `npm run typecheck`: passed.
+- `npm run lint -- --quiet`: passed.
+- `npm run build`: passed.
+- Known non-fatal build output remained limited to the MetaMask optional React Native storage warning, bigint pure-JS fallback, and local sitemap MongoDB DNS refusal.
+
+### Unit D: Execution Orchestrator
+
+**Status:** In progress
+
+**Purpose:** Replace adapter-specific run paths with one state machine that handles no-payment, escrow, x402, worker callbacks, retries, and result normalization consistently.
+
+**Components**
+
+- `lib/bnb/execution-orchestrator.ts`
+- `app/api/bnb/activate/run/route.ts`
+- `app/api/bnb/activate/callback/route.ts`
+- `app/api/bnb/activate/settlement/route.ts`
+- `lib/bnb/runtime.ts`
+- `lib/bnb/escrow.ts`
+- `lib/bnb/records.ts`
+
+**Implementation Requirements**
+
+- Persist run state transitions with idempotency keys.
+- Make `validate -> run` the normal path for zero-price public agents.
+- Make `validate -> review payment -> fund -> run` the normal path for escrow jobs.
+- Make `validate -> x402 payment -> run` the normal path for priced x402 endpoints.
+- Prevent duplicate runs for the same record.
+- Do not show release/refund actions on zero-price jobs.
+- Never execute a paid job unless funding or payment authorization is verified.
+- Store adapter, endpoint, capability, request args, sources, and hashes needed for audit.
+
+**Tests**
+
+- Unit/regression: no-payment runs skip escrow copy and settlement actions.
+- Unit/regression: escrow jobs require successful onchain funding before run.
+- Unit/regression: duplicate run calls return the existing completed work or running state.
+- Unit/regression: failed run records the error without losing payment state.
+- Unit/regression: settlement actions are unavailable for zero-price jobs.
+- Unit/regression: a signed x402 authorization must match the stored version, scheme, BNB network, asset, amount, payee, payer, and expiry.
+- Unit/regression: consumed x402 authorization ciphertext is removed after settlement and is never returned by public record APIs.
+- Integration: BSC Testnet smoke still passes fund -> run -> release -> paid.
+- Integration: public agent smoke passes validate -> run -> delivered.
+- Integration: priced BNB x402 smoke passes challenge -> wallet authorization -> replay -> settlement receipt.
+
+**Acceptance**
+
+- The run button represents one complete user action for the selected payment mode.
+
+**Progress**
+
+- Date: 2026-08-26
+- Added `lib/bnb/execution-orchestrator.ts` as the single run path for public and escrow-backed jobs.
+- Added atomic run claiming in `lib/bnb/records.ts` to prevent duplicate work execution and allow stale run recovery.
+- Run records now store idempotency key, request hash, job hash, selected endpoint, selected capability, request args, sources, run ID, and final execution state.
+- The run API now delegates to the orchestrator after auth, rate limiting, record lookup, and agent lookup.
+- Worker callbacks now use the same work-result finalization path as synchronous runs.
+- Empty, transport-only, documentation, directory, and capability-mismatch outputs are converted into failed deliveries instead of successful empty results.
+- Paid escrow jobs are blocked from execution unless onchain payment was verified.
+- Zero-price jobs remain executable without escrow and keep settlement actions unavailable.
+- Date: 2026-08-27
+- Added explicit immutable payment modes for free, escrow, and x402 jobs. Legacy records retain a bounded compatibility resolver.
+- Replaced the legacy x402 package with maintained `@x402/core` and `@x402/evm` v2 packages.
+- BNB x402 requirements now use exact CAIP-2 network matching (`eip155:56` or `eip155:97`) and reject unrelated-chain or legacy-v1 payment challenges.
+- The browser signs only the requirement returned by the selected resource server. Hive validates the signed version, scheme, network, asset, amount, payee, payer, and expiry before encrypting it at rest.
+- Paid HTTP execution replays the version-correct payment header to the resource server. Hive does not send buyer authorizations to an arbitrary facilitator.
+- Permit2 allowance reads and approval transactions use the maintained EVM x402 helpers and the connected wallet's configured BNB chain.
+- Settlement receipts are captured from the resource response, linked to BscScan when a transaction is returned, and consumed authorization ciphertext is removed.
+- Public job, activity, payment, run, callback, and settlement responses pass through the central record sanitizer.
+- Payment confirmation proceeds directly to the run; x402 and free jobs never render escrow release or refund actions.
+- Audit iteration 1 binds each job to one immutable adapter, endpoint, capability contract, and endpoint-specific payment mode. Execution no longer falls through to another transport or inherits pricing from an unrelated service on the same agent.
+- Audit iteration 1 also aligns the persisted job capability with the selected execution target, so validation, argument generation, execution, and evidence use the same endpoint contract.
+- Audit iteration 2 makes x402 authorizations single-use across Hive jobs through a hash-keyed reservation ledger, keeps authorization ciphertext out of public and worker payloads, and rejects changed payment requirements.
+- Audit iteration 2 gives every run a unique attempt ID. Worker callbacks must match that attempt, and terminal results use compare-and-set updates so late or duplicate callbacks cannot overwrite completed or settled work.
+
+**Verification**
+
+- Date: 2026-08-26
+- `npm test -- tests/bnb-product-regressions.test.mjs`: passed with 71 tests.
+- `npm run typecheck`: passed.
+- `npm run lint -- --quiet`: passed.
+- `npm run build`: passed.
+- Known non-fatal build output remained limited to the MetaMask optional React Native storage warning, bigint pure-JS fallback, and local sitemap MongoDB DNS refusal.
+- Date: 2026-08-27
+- `npm test -- --test-name-pattern="BNB"`: passed with 77 tests.
+- `npm run typecheck`: passed.
+- `npm run lint`: passed with no errors; the repository still has pre-existing warnings outside this unit.
+- `git diff --check`: passed.
+- Audit verification after endpoint binding, callback attempt isolation, and x402 replay protection: `npm test` passed with 82 tests, `npm run typecheck` passed, `npm run lint -- --quiet` passed, `npm run build` passed, and `git diff --check` passed.
+- Live paid-endpoint browser smoke remains open because it requires a currently reachable BNB x402 v2 resource and a wallet-funded payment asset. This is the only remaining Phase 3 acceptance check.
+
+### Unit E: Result Normalization and Evidence
+
+**Status:** In progress
+
+**Purpose:** Convert raw agent output into a concise, useful delivery while preserving full evidence behind a secondary audit view.
+
+**Components**
+
+- `lib/bnb/delivery.ts`
+- `app/bnb/_components/BnbDeliveryView.tsx`
+- `app/bnb/jobs/[recordId]/BnbJobClient.tsx`
+- `app/bnb/report/ReceiptsClient.tsx`
+
+**Implementation Requirements**
+
+- Detect transport-only payloads, documentation payloads, directory payloads, empty payloads, and capability mismatches.
+- Promote high-signal arrays and nested data into tables/lists in the primary delivery.
+- Keep raw JSON behind "Run data" or downloadable receipt content, not "Technical details".
+- Include source links and copied IDs without overwhelming the delivery.
+- Add typed renderers for DeFi positions, yield vaults, predictions, pools, balances, transactions, and generic tabular records.
+
+**Tests**
+
+- Unit/regression: Beefy vault arrays render APY/TVL rows in the primary delivery.
+- Unit/regression: raw JSON does not appear under a `Technical details` heading.
+- Unit/regression: empty `{}` renders as a failed/no-result delivery, not success.
+- Unit/regression: A2A `OK` only payload does not count as useful delivery.
+- Unit/regression: directory payloads and documentation payloads are flagged as wrong result.
+- Browser QA: delivery views on mobile and desktop for text, tables, sources, and failed runs.
+
+**Acceptance**
+
+- Normal users can understand what the agent returned without reading JSON.
+
+**Progress**
+
+- Date: 2026-08-26
+- Primary delivery view no longer exposes a `Technical details` panel.
+- Sources are deduplicated and displayed as simple source links instead of transport labels.
+- Empty payloads, transport-only acknowledgements, documentation responses, directory responses, capability mismatches, health checks, and nested collections are recognized.
+- Beefy-style vault arrays render as primary delivery rows with protocol, chain, APY, TVL, pool TVL, and shortened addresses.
+- The execution orchestrator marks empty, documentation, directory, and mismatched outputs as failed runs so they do not appear as successful deliveries.
+- Date: 2026-08-27
+- Replaced text-first delivery formatting with a normalized delivery contract shared by execution validation and every delivery view.
+- Consistent record arrays now render through a schema-agnostic semantic table extractor, including nested vaults, predictions, pools, positions, balances, transactions, and unfamiliar future record types without protocol-specific branches.
+- Tables use bounded rows and columns, semantic APY/APR/TVL formatting, copyable addresses, safe links, responsive overflow, and a downloadable raw-data artifact.
+- Empty objects, repeated status acknowledgements, documentation, endpoint-operation mismatches, and error payloads now have explicit unusable states; the execution orchestrator consumes those states instead of matching display text.
+- Endpoint-bound jobs compare returned operation metadata with the selected capability contract before using legacy category heuristics.
+- Added behavioral normalization tests that execute the TypeScript delivery module against nested Beefy vaults, arbitrary prediction records, empty and acknowledgement payloads, documentation, operation matches, operation mismatches, and row caps.
+
+**Verification**
+
+- Date: 2026-08-26
+- `npm test -- tests/bnb-product-regressions.test.mjs`: passed with 71 tests.
+- `npm run typecheck`: passed.
+- `npm run lint -- --quiet`: passed.
+- `npm run build`: passed.
+- Known non-fatal build output remained limited to the MetaMask optional React Native storage warning, bigint pure-JS fallback, and local sitemap MongoDB DNS refusal.
+- Date: 2026-08-27
+- `npm test`: passed with 82 tests.
+- `npm run typecheck`: passed.
+- `npm run lint -- --quiet`: passed.
+- `npm run build`: passed.
+- `git diff --check`: passed.
+- Browser QA for authenticated delivery records remains open.
+
+### Unit F: Production Reliability and Operations
+
+**Status:** In progress
+
+**Purpose:** Make the system operable under real traffic and provider variability.
+
+**Components**
+
+- `proxy.ts`
+- `lib/bnb/rate-limit.ts`
+- `lib/bnb/readiness.ts`
+- `lib/bnb/agent-cache.ts`
+- `lib/bnb/endpoint-observability.ts`
+- `lib/bnb/analytics.ts`
+- `lib/bnb/moderation.ts`
+- `app/api/bnb/runtime/route.ts`
+- `app/api/cron/bnb-agent-cache/route.ts`
+- `app/api/admin/bnb/moderation/route.ts`
+- `netlify/functions/scheduled-bnb-agent-cache.mts`
+
+**Implementation Requirements**
+
+- Add bounded concurrency and timeouts around all external endpoint calls.
+- Add retry policy only for safe idempotent reads.
+- Add rate limits for write, preflight, run, and cron routes.
+- Add structured observability for cache age, provider failure, endpoint success/failure, and run outcomes.
+- Add deployment readiness that reports missing env and stale caches without exposing secrets.
+- Add a security sweep for SSRF, auth bypass, payment bypass, replay, XSS, and unbounded payloads.
+- Keep dependency vulnerabilities in a separate tracked hardening unit.
+
+**Tests**
+
+- Unit/regression: all external fetches use public-URL validation, timeouts, and byte caps.
+- Unit/regression: write and run routes enforce auth and rate limits.
+- Unit/regression: readiness exposes non-secret booleans only.
+- Unit/regression: cron requires `CRON_SECRET`.
+- Unit/regression: endpoint health failures reduce ranking without removing agents.
+- Unit/regression: admin moderation excludes hidden or blocked listings before cache pagination, live runtime probing, profile detail lookup, and match results.
+- Unit/regression: admin moderation writes require shared admin auth, route-level rate limits, bounded JSON bodies, valid status, and explicit `chainId` plus `tokenId`.
+- Security audit: npm audit review, SSRF review, env exposure review, auth/session review.
+- Load smoke: cache read path remains bounded for large result sets.
+
+**Acceptance**
+
+- The marketplace remains useful when some providers fail, slow down, or return malformed data.
+
+**Progress**
+
+- Date: 2026-08-26
+- Audited the MCP and HTTP argument builders and moved schema parsing, enum coercion, address extraction, protocol selection, pool selection, and generic option filtering into `lib/bnb/adapters/schema-arguments.ts`.
+- Removed the unsafe fallback that treated unknown protocols as Venus/Core.
+- HTTP/x402 and MCP adapters now use the same schema argument rules.
+- Validation output no longer emits advisory assumptions or vague warnings in the primary hire flow.
+- Job detail pages now sanitize saved adapter errors before rendering them.
+- BNB cache cron now requires `CRON_SECRET`, uses timing-safe auth comparison, and has a route-level rate limit.
+- Runtime readiness exposes cache-cron configuration as a boolean only.
+- BNB rate limits are now route-aware for reads, writes, validation, runs, payments, and cron.
+- Added non-blocking server-side BNB analytics events for discovery, profile views, validation, hire creation, payment updates, settlement updates, run lifecycle, delivery readiness, and activity views.
+- BNB analytics hashes client identifiers and drops sensitive metadata keys and values before storage.
+- Audit iteration 1 fixed serverless analytics reliability by scheduling writes through Next `after()` with a safe fallback, added server-side profile-view analytics for direct profile page loads, and removed duplicate `run.started` analytics from terminal run records.
+- Audit iteration 2 fixed the directory `Works with` filter architecture by moving integration filtering into the canonical catalog/cache query before pagination and totals.
+- Added central BNB listing moderation storage and admin API. Hidden or blocked listings are excluded from cached directory pages before pagination, live discovery before runtime probing, profile lookup, and match results.
+- Added a short in-memory moderation key cache with invalidation on admin writes so public reads do not scan moderation storage on every request.
+- Migrated root request routing to `proxy.ts` for Next 16 while preserving BNB subdomain rewrites and markdown negotiation.
+- Upgraded `next` and `eslint-config-next` from `16.1.6` to `16.3.3` to remove the currently reported production Next.js advisories without a semver-major framework jump.
+- Current production dependency audit after the Next.js upgrade reports 58 production advisories: 23 high, 33 moderate, and 2 low.
+
+**Verification**
+
+- Date: 2026-08-26
+- `npm test -- tests/bnb-product-regressions.test.mjs`: passed with 73 tests.
+- `npm run typecheck`: passed.
+- `npm run lint -- --quiet`: passed.
+- `npm run build`: passed.
+- `npm audit --omit=dev --json`: still fails due remaining production dependency advisories.
+- `git diff --check`: passed.
+- Static copy scan found no banned MCP/A2A/endpoint/escrow/debug phrases in live BNB app, API, or library files.
+- Static convention scan found no stale root middleware filename references after the `proxy.ts` migration.
+- External BNB fetch scan found direct `await fetch` only in the bounded fetch helper and Netlify's same-origin scheduled cron caller.
+- Known non-fatal build output remained limited to the MetaMask optional React Native storage warning, bigint pure-JS fallback, and local sitemap MongoDB DNS refusal.
 
 ## Phase 0: Safety Baseline and Config Contract
 
@@ -148,7 +553,7 @@ This tracker is the implementation source of truth for the BNB Agent Studio V2 m
 - Pull endpoint-backed services from Agent402, 402Index, x402.direct, and the402.
 - Keep 8004Scan as an identity source; do not treat identities without endpoints as runnable.
 - Default `/bnb/agents` and `/api/bnb/agents` to all records instead of a zero-result ready-only view.
-- Mark priced x402 endpoints as listed/connectable until x402 payment support is implemented.
+- Promote priced x402 endpoints to runnable only when preflight returns an exact BNB x402 v2 payment requirement.
 - Resolve endpoint-source detail pages and API detail routes from stable encoded token IDs.
 - Remove dead static activation links for old local BNB agents.
 - Keep empty-state copy short and remove explanatory non-runnable UI text.
@@ -171,7 +576,7 @@ This tracker is the implementation source of truth for the BNB Agent Studio V2 m
 - Unit/regression: endpoint source env keys and defaults are present.
 - Unit/regression: catalog merges endpoint sources with configured and 8004Scan records.
 - Unit/regression: no local seeded BNB agents or `BNB_SHOW_LOCAL_AGENTS` fallback remain.
-- Unit/regression: paid x402 endpoints are not marked hireable without x402 payment support.
+- Unit/regression: paid x402 endpoints are hireable only when BNB x402 execution is configured and preflight returns a matching requirement.
 - Unit/regression: bounded HTTP/x402 adapter validates public HTTPS URLs, size, and timeout.
 - Unit/regression: default directory status is `all`; `Runnable` is opt-in.
 - Unit/regression: stale empty-state and non-runnable explanatory copy is absent.
@@ -301,10 +706,10 @@ This tracker is the implementation source of truth for the BNB Agent Studio V2 m
 - Settlement APIs now reject release/refund attempts unless the record has confirmed escrow funding.
 - Free-run API responses no longer return `This job does not require payment.` as user-facing copy.
 - x402 support alone no longer makes an agent paid; the resolver now requires a positive listed price.
-- Full x402 payment review and paid Studio V2 settlement work remains pending.
+- Full x402 payment review and paid resource replay are implemented for BNB x402 v2 endpoints.
 - Date: 2026-08-22
 - Zero-price directory and activation flows were retested through the shared regression suite after the endpoint-backed discovery repairs.
-- The remaining Phase 3 risk is paid execution: x402 payment collection and Studio V2 paid settlement still need an end-to-end implementation and browser smoke.
+- The remaining Phase 3 risk is live validation: a real BNB x402 v2 endpoint still needs an end-to-end wallet and browser smoke.
 
 ### Verification
 
@@ -314,7 +719,7 @@ This tracker is the implementation source of truth for the BNB Agent Studio V2 m
 - `npm run build`: passed.
 - `git diff --check`: passed.
 
-## Phase 4: Reference Studio V2 Agents
+## Phase 4: Reference Studio V2 Agents v (Don't do this)
 
 ### Units
 
@@ -611,7 +1016,23 @@ This tracker is the implementation source of truth for the BNB Agent Studio V2 m
 - Owner-scoped BNB record reads/writes were rechecked across job detail, activity, activation, run, payment, settlement, Altana session/revoke, and TermiX capture routes.
 - Secret-pattern scan found no committed secret values in tracked project files beyond placeholders and env variable references.
 - Dependency audit remains a production blocker: `npm audit --omit=dev --json` reports 60 production advisories: 25 high, 33 moderate, 2 low. Major/direct remediation candidates include `next`, `@bagsfm/bags-sdk`, `@solana/spl-token`, `@solana/web3.js`, `viem`, `wagmi`, and `@privy-io/react-auth`.
-- Remaining production risks: process-local rate limiting is not enough for serverless/multiple instances, CSP is still Report-Only with broad script allowances, and the legacy agent dashboard stores raw API keys in `sessionStorage`.
+- Remaining production risks: UI CSP is still Report-Only with broad script allowances, and dependency audit remediation remains open.
+- Date: 2026-08-26
+- Audit iteration 1 hardened listing moderation: invalid listing identities now fail before DB writes, public discovery ignores malformed IDs instead of crashing, and index creation is only cached after storage is available.
+- Audit iteration 2 aligned runtime readiness with unpaid public runs: hire creation is ready when storage exists and either escrow is configured or zero-price runs are enabled; paid-hire and unpaid-run readiness are exposed separately.
+- Analytics hashing now uses server-side secrets in production and omits client hashes when no server secret is configured.
+- Added an optional BNB incident webhook for failed agent runs, payment verification failures, reverted payment transactions, and reverted settlement transactions. Payloads are sanitized, signed when `BNB_MARKETPLACE_ERROR_WEBHOOK_SECRET` is configured, dispatched after response where possible, and sent only through the SSRF-safe endpoint fetch path.
+- Added concise env example entries for moderation, analytics, endpoint capability caching, and the incident webhook.
+- Validation: `npm test -- tests/bnb-product-regressions.test.mjs`, `npm run typecheck`, `npm run lint -- --quiet`, `npm run build`, `git diff --check`, and BNB direct-fetch scan passed. Build still shows the known MetaMask optional async-storage warning; sitemap dynamic-page lookup caught a sandbox Mongo SRV refusal without failing the build.
+- Audit iteration 3 moved BNB write, validation, run, payment, settlement, auth, cron, and moderation limits to Mongo-backed counters when MongoDB is configured. Read limits remain process-local to avoid putting high-volume directory browsing on the database.
+- Audit iteration 4 corrected the limiter storage boundary so only write-class routes use durable counters; production write limits fail closed if durable limiter storage is unavailable.
+- Date: 2026-08-27
+- Audit iteration 5 removed the static production salt fallback from Mongo-backed BNB rate-limit keys. Production write limits now fail closed if no server-side auth secret is configured.
+- Audit iteration 6 added an enforced non-executable CSP for API routes while leaving the UI CSP in Report-Only mode until third-party scripts and inline payloads can be nonce-controlled.
+- Regression coverage now verifies the rate-limit secret boundary and API CSP header policy.
+- Next hardening item completed: the legacy agent dashboard no longer persists raw API keys in browser storage. API-key/PIN login and PIN setup now create a signed httpOnly session cookie bound to the current API-key hash, key rotation refreshes that cookie, logout clears it, and dashboard/tools/task messaging paths restore from the cookie.
+- Cookie-backed agent sessions require a same-origin `Origin` or `Referer` check before shared agent auth accepts them on browser requests.
+- Validation: `npm test -- tests/bnb-product-regressions.test.mjs` passed with 76 tests, `npm run typecheck` passed, `npm run lint -- --quiet` passed, `npm run build` passed, `git diff --check` passed, and `npm run bnb:submission:qa -- --base-url http://localhost:3010` passed.
 
 ## Phase 11: Submission Freeze
 
@@ -649,3 +1070,10 @@ This tracker is the implementation source of truth for the BNB Agent Studio V2 m
 - TermiX report has three real comparisons.
 - PancakeSwap flow shows real LP or trader value.
 - User-facing UI avoids internal protocol jargon except in technical details.
+
+### Progress
+
+- Date: 2026-08-26
+- Added `npm run bnb:submission:qa` for repeatable Phase 11 route checks. It verifies local `/bnb`, `/bnb/agents`, `/bnb/report`, `/api/bnb/runtime`, and `/api/bnb/agents?limit=5`, or the clean public paths `/`, `/agents`, `/report`, `/api/bnb/runtime`, and `/api/bnb/agents?limit=5` when pointed at the deployed BNB subdomain.
+- The QA script fails on non-2xx responses, malformed runtime payloads, unexpected BNB chain IDs, and empty agent API results.
+- Local production route QA passed against `http://localhost:3010`: `/bnb`, `/bnb/agents`, `/bnb/report`, `/api/bnb/runtime`, and `/api/bnb/agents?limit=5` all returned valid responses, with runtime on chain `97` and 5 agents returned by the agent API.

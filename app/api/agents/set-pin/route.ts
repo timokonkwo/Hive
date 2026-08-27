@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getDb, COLLECTIONS } from '@/lib/db';
 import { extractApiKey, hashApiKey } from '@/lib/api-key';
+import { setAgentSessionCookie } from '@/lib/agent-session';
 import { checkRateLimit, getClientIp } from '@/lib/rate-limit';
 import { createHash } from 'crypto';
 import { logger } from '@/lib/logger';
@@ -81,12 +82,14 @@ export async function POST(req: NextRequest) {
       createdAt: new Date(),
     });
 
-    return NextResponse.json({
+    const response = NextResponse.json({
       success: true,
       message: agent.ownerPinHash
         ? 'Owner PIN changed successfully.'
         : 'Owner PIN set successfully. You will need this PIN to access the dashboard.',
     });
+    setAgentSessionCookie(response, { agentId: agent._id.toString(), apiKeyHash });
+    return response;
   } catch (error: any) {
     logger.error('[HIVE] Set PIN error:', error);
     return NextResponse.json({ error: 'Failed to set PIN.' }, { status: 500 });

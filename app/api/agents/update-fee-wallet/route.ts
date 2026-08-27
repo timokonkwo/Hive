@@ -1,8 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getDb, COLLECTIONS } from '@/lib/db';
-import { createHash } from 'crypto';
+import { authenticateRequest } from '@/lib/api-key';
 import { PublicKey } from '@solana/web3.js';
 import { checkRateLimit, getClientIp } from '@/lib/rate-limit';
+import { ObjectId } from 'mongodb';
 
 /**
  * POST /api/agents/update-fee-wallet
@@ -10,7 +11,7 @@ import { checkRateLimit, getClientIp } from '@/lib/rate-limit';
  * Allows an authenticated agent owner to set their Solana wallet
  * for receiving 50% of trading fees on their agent's token.
  *
- * Auth: x-hive-api-key (agent's API key)
+ * Auth: x-hive-api-key or agent dashboard session
  * Rate limited: 5 requests per 10 minutes per IP
  */
 export async function POST(req: NextRequest) {
@@ -23,19 +24,12 @@ export async function POST(req: NextRequest) {
       { status: 429, headers: { 'Retry-After': String(rl.resetInSeconds) } }
     );
   }
-  const apiKey = req.headers.get('x-hive-api-key');
-  if (!apiKey) {
-    return NextResponse.json({ error: 'API key required (x-hive-api-key header).' }, { status: 401 });
-  }
-
-  // Hash the API key to look up the agent
-  const apiKeyHash = createHash('sha256').update(apiKey).digest('hex');
   const db = await getDb();
-
-  const agent = await db.collection(COLLECTIONS.AGENTS).findOne({ apiKeyHash });
-  if (!agent) {
-    return NextResponse.json({ error: 'Invalid API key.' }, { status: 401 });
+  const auth = await authenticateRequest(req.headers, db);
+  if (!auth) {
+    return NextResponse.json({ error: 'Authentication required.' }, { status: 401 });
   }
+  const agent = auth.agent;
 
   // Verify agent is tokenized
   if (!agent.isTokenized || agent.tokenLaunchStatus !== 'launched') {
@@ -90,7 +84,7 @@ export async function POST(req: NextRequest) {
   // This can be triggered by the admin or a cron job.
 
   await db.collection(COLLECTIONS.AGENTS).updateOne(
-    { _id: agent._id },
+    { _id: new ObjectId(agent.id) },
     {
       $set: {
         creatorFeeWallet: trimmedWallet,
@@ -103,7 +97,7 @@ export async function POST(req: NextRequest) {
   // Log activity
   await db.collection(COLLECTIONS.ACTIVITY).insertOne({
     type: 'AgentFeeWalletSet',
-    agentId: agent._id.toString(),
+    agentId: agent.id,
     actorName: agent.name,
     metadata: {
       walletAddress: trimmedWallet,

@@ -19,7 +19,7 @@ function validationError(message: string) {
 }
 
 export async function POST(request: NextRequest) {
-  const limited = enforceBnbRateLimit(request, "access-request", "write");
+  const limited = await enforceBnbRateLimit(request, "access-request", "write");
   if (limited) return limited;
 
   const auth = await requireBnbClient(request, "request access");
@@ -73,7 +73,7 @@ export async function POST(request: NextRequest) {
 }
 
 export async function PATCH(request: NextRequest) {
-  const limited = enforceBnbRateLimit(request, "access-request:cancel", "write");
+  const limited = await enforceBnbRateLimit(request, "access-request:cancel", "write");
   if (limited) return limited;
 
   const auth = await requireBnbClient(request, "cancel this request");

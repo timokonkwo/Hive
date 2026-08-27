@@ -25,6 +25,7 @@ import {
   bnbReviewLabel,
   bnbStatusLabel,
 } from "@/lib/bnb/display";
+import { bnbAgentHirePath, bnbAgentProfilePath } from "@/lib/bnb/routes";
 
 type BnbNavItem = "home" | "agents" | "verify" | "account";
 
@@ -219,12 +220,13 @@ export function AgentCard({ agent }: { agent: BnbAgentProfile }) {
   const price = priceLabel(agent);
   const description = listingDescription(agent);
   const displayName = bnbAgentDisplayName(agent);
+  const canHire = canHireAgent(agent);
 
   return (
     <article className="bnb-agent-row">
       <div className="bnb-agent-main">
         <h3 className="bnb-agent-name">
-          <Link href={`/bnb/agents/${agent.chainId}/${encodeURIComponent(agent.tokenId)}`} className="bnb-focus">
+          <Link href={bnbAgentProfilePath(agent)} className="bnb-focus">
             {displayName}
           </Link>
           {bnbIsVerified(agent) ? (
@@ -240,9 +242,14 @@ export function AgentCard({ agent }: { agent: BnbAgentProfile }) {
         </div>
       </div>
       <div className="bnb-agent-side">
-        <Link href={`/bnb/agents/${agent.chainId}/${encodeURIComponent(agent.tokenId)}`} className="bnb-button-dark bnb-focus">
+        <Link href={bnbAgentProfilePath(agent)} className="bnb-button-dark bnb-focus">
           View profile
         </Link>
+        {canHire ? (
+          <Link href={bnbAgentHirePath(agent)} className="bnb-button bnb-focus">
+            Hire
+          </Link>
+        ) : null}
       </div>
     </article>
   );

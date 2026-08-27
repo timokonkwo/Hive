@@ -332,7 +332,7 @@ export async function POST(req: NextRequest) {
           const dp = Number(position.dammPoolClaimableLamportsUserShare || position.dammPoolClaimableAmount || 0);
           if (vp + dp <= 0) continue;
 
-          const claimTxs = await bags.sdk.fee.getClaimTransaction(bags.keypair.publicKey, position);
+          const claimTxs = await bags.sdk.fee.getClaimTransactions(bags.keypair.publicKey, position.baseMint);
 
           for (const tx of claimTxs) {
             tx.partialSign(bags.keypair);

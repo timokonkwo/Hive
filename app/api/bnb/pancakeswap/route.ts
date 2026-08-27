@@ -8,7 +8,7 @@ function readString(value: unknown) {
 }
 
 export async function GET(request: NextRequest) {
-  const limited = enforceBnbRateLimit(request, "pancakeswap:get", "read");
+  const limited = await enforceBnbRateLimit(request, "pancakeswap:get", "read");
   if (limited) return limited;
 
   return NextResponse.json({
@@ -18,7 +18,7 @@ export async function GET(request: NextRequest) {
 }
 
 export async function POST(request: NextRequest) {
-  const limited = enforceBnbRateLimit(request, "pancakeswap:post", "write");
+  const limited = await enforceBnbRateLimit(request, "pancakeswap:post", "write");
   if (limited) return limited;
 
   const body = await request.json().catch(() => ({}));

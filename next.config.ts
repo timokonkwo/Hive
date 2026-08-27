@@ -80,6 +80,10 @@ const nextConfig: NextConfig = {
         source: '/api/(.*)',
         headers: [
           { key: 'X-Robots-Tag', value: 'noindex, nofollow' },
+          {
+            key: 'Content-Security-Policy',
+            value: "default-src 'none'; frame-ancestors 'none'; base-uri 'none'; form-action 'none'",
+          },
         ],
       },
       // Admin pages — no caching, no indexing
