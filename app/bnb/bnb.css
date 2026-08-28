@@ -4395,8 +4395,8 @@ button.bnb-account-button:disabled {
   .bnb-directory-list,
   .bnb-directory-row,
   .bnb-filter-sheet-panel {
-    width: calc(100vw - 32px);
-    max-width: calc(100vw - 32px);
+    width: 100%;
+    max-width: 100%;
   }
 
   .bnb-category-tabs,
@@ -4412,7 +4412,7 @@ button.bnb-account-button:disabled {
   .bnb-section-header,
   .bnb-panel,
   .bnb-agent-row {
-    max-width: calc(100vw - 32px);
+    max-width: 100%;
   }
 
   .bnb-header-actions {

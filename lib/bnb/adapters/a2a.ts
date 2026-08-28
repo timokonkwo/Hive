@@ -17,6 +17,7 @@ type A2aCard = {
   capabilities?: {
     streaming?: boolean;
   };
+  registrations?: Array<{ agentRegistry?: string }>;
 };
 
 const A2A_PREFLIGHT_METHOD = "hive/preflight";
@@ -50,6 +51,11 @@ function parseCard(payload: unknown): A2aCard {
     authentication: record.authentication,
     supportsAuthenticatedExtendedCard: record.supportsAuthenticatedExtendedCard === true,
     capabilities: asRecord(record.capabilities) as A2aCard["capabilities"],
+    registrations: Array.isArray(record.registrations)
+      ? record.registrations.map(asRecord).map((registration) => ({
+        agentRegistry: typeof registration.agentRegistry === "string" ? registration.agentRegistry : undefined,
+      }))
+      : [],
   };
 }
 
@@ -108,7 +114,8 @@ function protectedA2aReason(status: number, payload: unknown) {
 
 function isJsonRpcProbeResponse(status: number, payload: unknown) {
   const record = asRecord(payload);
-  if (status >= 200 && status < 300) return typeof payload !== "string";
+  if (record.jsonrpc !== "2.0") return false;
+  if (status >= 200 && status < 300) return "result" in record || "error" in record;
   if (status !== 400 && status !== 422) return false;
 
   const error = asRecord(record.error);
@@ -116,7 +123,19 @@ function isJsonRpcProbeResponse(status: number, payload: unknown) {
   return /method|unknown|not found|invalid|jsonrpc|params/.test(message);
 }
 
-async function assertPublicA2aService(serviceUrl: string, card: A2aCard) {
+function assertA2aCardChain(card: A2aCard, chainId: number) {
+  const declaredChains = (card.registrations || [])
+    .map((registration) => registration.agentRegistry?.match(/^eip155:(\d+):/i)?.[1])
+    .filter((value): value is string => Boolean(value))
+    .map(Number)
+    .filter(Number.isSafeInteger);
+  if (declaredChains.length > 0 && !declaredChains.includes(chainId)) {
+    throw new Error("This agent is not available on the selected BNB network.");
+  }
+}
+
+async function assertPublicA2aService(serviceUrl: string, card: A2aCard, chainId: number) {
+  assertA2aCardChain(card, chainId);
   if (cardRequiresAuth(card, serviceUrl)) throw new Error("This agent requires external sign-in.");
 
   const { response, payload } = await safeFetchJson(serviceUrl, {
@@ -310,7 +329,7 @@ export const a2aAdapter: BnbAgentExecutionAdapter = {
 
     try {
       const { card, serviceUrl } = await fetchCard(endpoint);
-      await assertPublicA2aService(serviceUrl, card);
+      await assertPublicA2aService(serviceUrl, card, agent.chainId);
       return {
         ok: true,
         adapter: "a2a",
@@ -334,7 +353,7 @@ export const a2aAdapter: BnbAgentExecutionAdapter = {
 
     try {
       const { card, serviceUrl } = await fetchCard(endpoint);
-      await assertPublicA2aService(serviceUrl, card);
+      await assertPublicA2aService(serviceUrl, card, agent.chainId);
       const capability = record.jobSpec?.capability || "custom";
       const taskType = record.jobSpec?.taskType || record.limits.task;
       const skills = matchingSkills(card, capability, taskType);

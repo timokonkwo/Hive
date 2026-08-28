@@ -15,7 +15,7 @@ const MIN_CAPABILITY_TTL_SECONDS = 5 * 60;
 const MAX_CAPABILITY_TTL_SECONDS = 7 * 24 * 60 * 60;
 const MAX_CAPABILITIES_PER_ENDPOINT = 80;
 const MAX_SCHEMA_JSON_BYTES = 48 * 1024;
-const CAPABILITY_PROBE_VERSION = "v3";
+const CAPABILITY_PROBE_VERSION = "v4";
 
 type SnapshotAdapter = BnbEndpointCapabilitySnapshot["adapter"];
 type ApplyCapabilitySnapshotOptions = {
@@ -71,11 +71,16 @@ export async function readBnbEndpointCapabilitySnapshot(
 
   try {
     await ensureCapabilityIndexes();
-    const doc = await db.collection<BnbEndpointCapabilityDocument>(COLLECTIONS.BNB_ENDPOINT_CAPABILITIES).findOne({
-      _id: bnbEndpointCapabilityKey(agent, adapter, endpoint),
-      probeContext: capabilityProbeContext(),
-      expiresAt: { $gt: new Date() },
-    });
+    const doc = await db.collection<BnbEndpointCapabilityDocument>(COLLECTIONS.BNB_ENDPOINT_CAPABILITIES)
+      .find({
+        probeContext: capabilityProbeContext(),
+        adapter,
+        endpointUrl: endpoint.url,
+        expiresAt: { $gt: new Date() },
+      })
+      .sort({ checkedAt: -1 })
+      .limit(1)
+      .next();
     return doc ? snapshotFromDocument(doc) : null;
   } catch {
     return null;
@@ -136,27 +141,44 @@ export async function applyBnbEndpointCapabilitySnapshots(
   try {
     await ensureCapabilityIndexes();
     const agentKeys = Array.from(new Set(agents.map(bnbEndpointCapabilityAgentKey)));
+    const endpointUrls = Array.from(new Set(agents.flatMap((agent) => (
+      agent.executionEndpoints || []
+    ).map((endpoint) => endpoint.url))));
     const docs = await db.collection<BnbEndpointCapabilityDocument>(COLLECTIONS.BNB_ENDPOINT_CAPABILITIES)
       .find({
-        agentKey: { $in: agentKeys },
         probeContext: capabilityProbeContext(),
         expiresAt: { $gt: new Date() },
+        $or: [
+          { agentKey: { $in: agentKeys } },
+          ...(endpointUrls.length > 0 ? [{ endpointUrl: { $in: endpointUrls } }] : []),
+        ],
       })
       .sort({ checkedAt: -1 })
-      .limit(Math.min(Math.max(agentKeys.length * 6, 50), 1_000))
+      .limit(Math.min(Math.max((agentKeys.length + endpointUrls.length) * 6, 50), 1_000))
       .toArray();
     const snapshotsByAgent = new Map<string, BnbEndpointCapabilitySnapshot[]>();
+    const snapshotsByEndpoint = new Map<string, BnbEndpointCapabilitySnapshot[]>();
     for (const doc of docs) {
+      const snapshot = snapshotFromDocument(doc);
       const snapshots = snapshotsByAgent.get(doc.agentKey) || [];
-      snapshots.push(snapshotFromDocument(doc));
+      snapshots.push(snapshot);
       snapshotsByAgent.set(doc.agentKey, snapshots);
+      const endpointKey = endpointSnapshotKey(snapshot);
+      const endpointSnapshots = snapshotsByEndpoint.get(endpointKey) || [];
+      endpointSnapshots.push(snapshot);
+      snapshotsByEndpoint.set(endpointKey, endpointSnapshots);
     }
 
-    return agents.map((agent) => applyCapabilitySnapshotsToAgent(
-      agent,
-      snapshotsByAgent.get(bnbEndpointCapabilityAgentKey(agent)) || [],
-      options,
-    ));
+    return agents.map((agent) => {
+      const sharedSnapshots = (agent.executionEndpoints || []).flatMap((endpoint) => (
+        snapshotsByEndpoint.get(endpointKey(endpoint)) || []
+      ));
+      return applyCapabilitySnapshotsToAgent(
+        agent,
+        [...(snapshotsByAgent.get(bnbEndpointCapabilityAgentKey(agent)) || []), ...sharedSnapshots],
+        options,
+      );
+    });
   } catch {
     return agents;
   }
@@ -397,6 +419,7 @@ async function ensureCapabilityIndexes() {
     const collection = db.collection<BnbEndpointCapabilityDocument>(COLLECTIONS.BNB_ENDPOINT_CAPABILITIES);
     await Promise.all([
       collection.createIndex({ agentKey: 1, adapter: 1 }),
+      collection.createIndex({ probeContext: 1, adapter: 1, endpointUrl: 1, expiresAt: 1 }),
       collection.createIndex({ ok: 1, checkedAt: -1 }),
       collection.createIndex({ "capabilities.name": 1 }),
       collection.createIndex({ expiresAt: 1 }, { expireAfterSeconds: 0 }),

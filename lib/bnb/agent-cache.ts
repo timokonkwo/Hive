@@ -57,7 +57,7 @@ type CacheUpsertOptions = {
 };
 
 let indexesReady: Promise<void> | null = null;
-const RUNTIME_PROOF_VERSION = 3;
+const RUNTIME_PROOF_VERSION = 4;
 
 export function isBnbAgentCacheEnabled() {
   return process.env.BNB_AGENT_CACHE_ENABLED !== "false" && Boolean(process.env.MONGODB_URI);
@@ -146,9 +146,34 @@ export async function readCachedBnbPromotionCandidates(limit = 12): Promise<BnbA
     .find({
       source: { $ne: "8004scan" },
       category: { $ne: "Other" },
-      executionStatus: { $in: ["ready_to_run", "connectable"] },
+      executionStatus: "ready_to_run",
       hasCallableEndpoint: true,
-      "agent.hasActionableEndpointCapabilities": { $ne: false },
+      "agent.hasActionableEndpointCapabilities": true,
+      runtimeProofVersion: RUNTIME_PROOF_VERSION,
+      runtimeProofChainId: getBscChainId(),
+      runtimeProofAt: { $gte: new Date(Date.now() - runtimeProofTtlMs()) },
+      cachedAt: { $gte: new Date(Date.now() - getBnbAgentCacheStaleMs()) },
+      ...(moderatedKeys.length > 0 ? { _id: { $nin: moderatedKeys } } : {}),
+    })
+    .sort(cacheSort("recommended"))
+    .limit(safeLimit)
+    .toArray();
+  const capabilityAgents = await applyBnbEndpointCapabilitySnapshots(docs.map(agentFromCacheDocument));
+  return applyBnbEndpointProbeHealth(capabilityAgents);
+}
+
+export async function readCachedBnbRuntimeCandidates(limit = 50): Promise<BnbAgentProfile[]> {
+  const db = await getBnbAgentCacheDb();
+  if (!db) return [];
+  await ensureBnbAgentCacheIndexes();
+
+  const safeLimit = Math.min(Math.max(Math.trunc(limit), 1), 100);
+  const moderatedKeys = await activeBnbListingModerationKeys();
+  const docs = await db.collection<BnbAgentCacheDocument>(COLLECTIONS.BNB_AGENT_CACHE)
+    .find({
+      ...(isStrictBscAgentDiscoveryEnabled() ? { source: "8004scan" } : {}),
+      category: { $ne: "Other" },
+      hasCallableEndpoint: true,
       cachedAt: { $gte: new Date(Date.now() - getBnbAgentCacheStaleMs()) },
       ...(moderatedKeys.length > 0 ? { _id: { $nin: moderatedKeys } } : {}),
     })
@@ -280,12 +305,11 @@ export async function upsertBnbAgentCache(agents: BnbAgentProfile[], options: Ca
         ...(options.runtimeProbed ? { runtimeProofAt: now } : {}),
         ...(options.runtimeProbed ? { runtimeProofVersion: RUNTIME_PROOF_VERSION } : {}),
         ...(options.runtimeProbed ? { runtimeProofChainId: getBscChainId() } : {}),
-        ...(options.queueHydration ? { hydrationStatus: "pending", hydrateAfter: now } : {}),
       },
       $setOnInsert: {
         hydrateAttempts: 0,
-        ...(!options.queueHydration ? { hydrateAfter: doc.hydrateAfter } : {}),
-        ...(!options.hydrated && !options.queueHydration ? { hydrationStatus: doc.hydrationStatus } : {}),
+        hydrateAfter: doc.hydrateAfter,
+        ...(!options.hydrated ? { hydrationStatus: doc.hydrationStatus } : {}),
       },
     };
 
@@ -303,6 +327,21 @@ export async function upsertBnbAgentCache(agents: BnbAgentProfile[], options: Ca
   });
 
   await db.collection<BnbAgentCacheDocument>(COLLECTIONS.BNB_AGENT_CACHE).bulkWrite(writes, { ordered: false });
+  if (options.queueHydration) {
+    await db.collection<BnbAgentCacheDocument>(COLLECTIONS.BNB_AGENT_CACHE).updateMany(
+      {
+        _id: { $in: agents.map((agent) => cacheKey(agent.chainId, agent.tokenId)) },
+        needsHydration: true,
+        $or: [
+          { runtimeProofVersion: { $ne: RUNTIME_PROOF_VERSION } },
+          { runtimeProofChainId: { $ne: getBscChainId() } },
+          { runtimeProofAt: { $lt: new Date(now.getTime() - runtimeProofTtlMs()) } },
+          { runtimeProofAt: { $exists: false } },
+        ],
+      },
+      { $set: { hydrationStatus: "pending", hydrateAfter: now } },
+    );
+  }
   return { stored: writes.length };
 }
 
@@ -485,11 +524,11 @@ function cacheFilter(query: BnbAgentQuery) {
   if (query.category) filter.category = query.category;
   if (query.activation) filter.activationStatus = query.activation;
   if (query.execution === "hireable") {
-    filter.executionStatus = { $in: ["ready_to_run", "connectable"] };
-    filter["agent.hasActionableEndpointCapabilities"] = { $ne: false };
-    filter["agent.executionEndpoints"] = {
-      $elemMatch: { adapter: { $in: ["mcp", "a2a", "x402", "http"] } },
-    };
+    filter.executionStatus = "ready_to_run";
+    filter["agent.hasActionableEndpointCapabilities"] = true;
+    filter.runtimeProofVersion = RUNTIME_PROOF_VERSION;
+    filter.runtimeProofChainId = getBscChainId();
+    filter.runtimeProofAt = { $gte: new Date(Date.now() - runtimeProofTtlMs()) };
   } else if (query.execution) {
     filter.executionStatus = query.execution;
   }

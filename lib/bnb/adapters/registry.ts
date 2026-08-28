@@ -264,7 +264,7 @@ function boundedInMemoryExpiry(now: number, snapshotExpiresAt: string) {
 }
 
 function endpointCacheKey(adapter: BnbAgentExecutionAdapter, agent: BnbAgentProfile, endpoint: BnbExecutionEndpoint) {
-  return `${adapter.id}:${agent.chainId}:${agent.tokenId}:${endpoint.adapter}:${endpoint.url}:${endpoint.verified ? "1" : "0"}`;
+  return `${adapter.id}:${agent.chainId}:${endpoint.adapter}:${endpoint.url}`;
 }
 
 function hasCallableEndpoint(agent: BnbAgentProfile) {

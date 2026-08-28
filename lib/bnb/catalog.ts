@@ -22,6 +22,7 @@ import {
   overlayCachedBnbAgentDetails,
   readCachedBnbAgentsPage,
   readCachedBnbPromotionCandidates,
+  readCachedBnbRuntimeCandidates,
   recordBnbAgentCacheRun,
   upsertBnbAgentCache,
 } from "@/lib/bnb/agent-cache";
@@ -937,7 +938,13 @@ async function fetch8004AgentPage({
   }
 
   try {
-    const payload = await fetch8004Json(url);
+    let payload = await fetch8004Json(url);
+    if (!isUsable8004AgentPage(payload) && sortBy) {
+      const fallbackUrl = new URL(url);
+      fallbackUrl.searchParams.delete("sortBy");
+      fallbackUrl.searchParams.delete("sortOrder");
+      payload = await fetch8004Json(fallbackUrl);
+    }
     if (!payload) return { agents: [], page: safePage, limit: safeLimit, total: 0, hasMore: false };
     const pagination = asRecord(asRecord(payload).meta).pagination;
     const paginationRecord = asRecord(pagination);
@@ -957,6 +964,14 @@ async function fetch8004AgentPage({
   } catch {
     return { agents: [], page: safePage, limit: safeLimit, total: 0, hasMore: false };
   }
+}
+
+function isUsable8004AgentPage(payload: unknown) {
+  const record = asRecord(payload);
+  if (record.success === false) return false;
+  const pagination = asRecord(asRecord(record.meta).pagination);
+  return Array.isArray(record.data)
+    && (record.data.length > 0 || Number(pagination.total ?? 0) === 0);
 }
 
 async function fetch8004NetworkStats(): Promise<BnbAgentNetworkStats | null> {
@@ -1217,15 +1232,17 @@ async function listDefaultRecommendedBnbAgentsPage(query: BnbAgentQuery): Promis
   const cachedPromotions = strictBscOnly
     ? []
     : await readCachedBnbPromotionCandidates(DEFAULT_PROMOTED_AGENT_LIMIT);
+  const cachedRuntimeCandidates = await readCachedBnbRuntimeCandidates(DEFAULT_PROMOTED_AGENT_LIMIT * 4);
   const discoveredPromotions = !strictBscOnly && cachedPromotions.length === 0
     ? await listBnbEndpointSourceAgents({ limit: 50 })
     : [];
   const promotedCandidates = await applyBnbListingModeration(uniqueAgents([
     ...getBaseBnbAgents(),
     ...cachedPromotions,
+    ...cachedRuntimeCandidates,
     ...discoveredPromotions,
   ]));
-  const promotedWithCapabilities = await applyBnbEndpointCapabilitySnapshots(promotedCandidates);
+  const promotedWithCapabilities = await ensureBnbRuntimeProofs(promotedCandidates, get8004DetailHydrationLimit());
   const promotedWithHealth = await applyBnbEndpointProbeHealth(promotedWithCapabilities.map((agent) => ({
     ...agent,
     scoreBreakdown: scoreBnbAgent(agent),
@@ -1264,7 +1281,7 @@ async function listDefaultRecommendedBnbAgentsPage(query: BnbAgentQuery): Promis
       onlyLikelyExecution: true,
       limit: get8004DetailHydrationLimit(),
     });
-    const refreshedTop = await applyBnbEndpointCapabilitySnapshots(hydratedTop);
+    const refreshedTop = await ensureBnbRuntimeProofs(hydratedTop, get8004DetailHydrationLimit());
     sourceAgents = await applyBnbEndpointProbeHealth(refreshedTop.map((agent) => ({
       ...agent,
       scoreBreakdown: scoreBnbAgent(agent),
@@ -1679,6 +1696,31 @@ function uniqueAgents(agents: BnbAgentProfile[]) {
   });
 }
 
+async function ensureBnbRuntimeProofs(agents: BnbAgentProfile[], limit: number) {
+  const withSnapshots = await applyBnbEndpointCapabilitySnapshots(agents);
+  const safeLimit = Math.max(Math.trunc(limit), 0);
+  if (safeLimit === 0) return withSnapshots;
+  const seenEndpoints = new Set<string>();
+  const representatives: BnbAgentProfile[] = [];
+
+  for (const agent of withSnapshots) {
+    if (isBnbAgentHireable(agent)) continue;
+    const endpointKeys = (agent.executionEndpoints || [])
+      .filter(isCallableExecutionEndpoint)
+      .map((endpoint) => `${endpoint.adapter}:${endpoint.url}`);
+    if (endpointKeys.length === 0 || endpointKeys.every((key) => seenEndpoints.has(key))) continue;
+    endpointKeys.forEach((key) => seenEndpoints.add(key));
+    representatives.push(agent);
+    if (representatives.length >= safeLimit) break;
+  }
+
+  if (representatives.length === 0) return withSnapshots;
+  const probed = await resolveBnbAgentsRuntime(representatives);
+  const probedByAgent = new Map(probed.map((agent) => [`${agent.chainId}:${agent.tokenId}`, agent]));
+  const merged = withSnapshots.map((agent) => probedByAgent.get(`${agent.chainId}:${agent.tokenId}`) || agent);
+  return applyBnbEndpointCapabilitySnapshots(merged);
+}
+
 export async function listBnbAgents(query: BnbAgentQuery = {}) {
   const result = await listBnbAgentsPage(query);
   return result.agents;
@@ -1692,7 +1734,7 @@ export async function listBnbAgentsPage(query: BnbAgentQuery = {}): Promise<BnbA
     if (cachedFallback) return cachedFallback;
   }
 
-  const cacheCanAnswerQuery = Boolean(query.execution || query.activation);
+  const cacheCanAnswerQuery = Boolean(query.execution || query.activation) && query.execution !== "hireable";
   const cached = cacheCanAnswerQuery ? await readCachedBnbAgentsPage(query) : null;
   if (cached) return cached;
 
@@ -1708,8 +1750,8 @@ export async function listBnbAgentsPage(query: BnbAgentQuery = {}): Promise<BnbA
   const sourcePage = defaultRankedWindow ? 1 : page;
   const runtimeFiltered = query.execution === "hireable" || query.execution === "ready_to_run" || query.execution === "connectable" || query.execution === "unavailable";
   const executionDiscovery = query.execution !== "listed_only" && runtimeFiltered;
-  const profileDiscovery = !runtimeFiltered || query.execution === "listed_only";
-  const [executionPage, profilePage, marketplacePage, semanticAgents, endpointAgents] = await Promise.all([
+  const profileDiscovery = !runtimeFiltered || query.execution === "listed_only" || query.execution === "hireable";
+  const [executionPage, profilePage, marketplacePage, semanticAgents, endpointAgents, cachedRuntimeAgents] = await Promise.all([
     executionDiscovery
       ? fetch8004ExecutionCandidates({
         limit: sourceWindowLimit,
@@ -1737,6 +1779,9 @@ export async function listBnbAgentsPage(query: BnbAgentQuery = {}): Promise<BnbA
     !isStrictBscAgentDiscoveryEnabled() && page === 1 && (sourceSearch || runtimeFiltered)
       ? listBnbEndpointSourceAgents({ q: query.q, category: query.category, limit: Math.min(limit, 32) })
       : Promise.resolve([]),
+    executionDiscovery
+      ? readCachedBnbRuntimeCandidates(Math.min(Math.max(limit * 2, 24), 100))
+      : Promise.resolve([]),
   ]);
   const baseAgents = !isStrictBscAgentDiscoveryEnabled() && page === 1 ? getBaseBnbAgents() : [];
   const liveCandidates = uniqueAgents([...semanticAgents, ...marketplacePage.agents, ...executionPage.agents, ...profilePage.agents])
@@ -1745,8 +1790,10 @@ export async function listBnbAgentsPage(query: BnbAgentQuery = {}): Promise<BnbA
   const liveAgents = shouldHydrateLiveDetails
     ? await hydrate8004AgentDetails(liveCandidates, { limit: get8004DetailHydrationLimit() })
     : liveCandidates;
-  const candidates = await applyBnbListingModeration(uniqueAgents([...baseAgents, ...endpointAgents, ...liveAgents]));
-  const runtimeCandidates = executionDiscovery ? await resolveBnbAgentsRuntime(candidates) : candidates;
+  const candidates = await applyBnbListingModeration(uniqueAgents([...baseAgents, ...endpointAgents, ...cachedRuntimeAgents, ...liveAgents]));
+  const runtimeCandidates = executionDiscovery
+    ? await ensureBnbRuntimeProofs(candidates, Math.max(get8004DetailHydrationLimit(), 6))
+    : candidates;
   const capabilityCandidates = await applyBnbEndpointCapabilitySnapshots(runtimeCandidates);
   const scoredAgents = capabilityCandidates
     .filter((agent) => matchesQuery(agent, query))
@@ -1760,7 +1807,7 @@ export async function listBnbAgentsPage(query: BnbAgentQuery = {}): Promise<BnbA
   const sorted = defaultRankedWindow
     ? sortedPool.slice((page - 1) * limit, page * limit)
     : sortedPool.slice(0, limit);
-  await upsertBnbAgentCache(agents).catch(() => undefined);
+  await upsertBnbAgentCache(agents, { runtimeProbed: executionDiscovery }).catch(() => undefined);
 
   const sourceHasMore = executionPage.hasMore || profilePage.hasMore || marketplacePage.hasMore;
   const sourceTotal = profilePage.total > 0
@@ -1884,7 +1931,7 @@ export async function refreshBnbAgentDiscoveryCache({
         sortBy: sourceSortForCatalog("recommended"),
       });
       fetched += profilePage.agents.length;
-      const result = await upsertBnbAgentCache(profilePage.agents, { fetchedAt: startedAt });
+      const result = await upsertBnbAgentCache(profilePage.agents, { fetchedAt: startedAt, queueHydration: true });
       stored += result.stored;
     } catch (error) {
       errors.push(`8004 page ${page}: ${error instanceof Error ? error.message : "failed"}`);
@@ -1900,7 +1947,7 @@ export async function refreshBnbAgentDiscoveryCache({
         search: categorySearchText(category),
       });
       fetched += categoryPage.agents.length;
-      const result = await upsertBnbAgentCache(categoryPage.agents, { fetchedAt: startedAt });
+      const result = await upsertBnbAgentCache(categoryPage.agents, { fetchedAt: startedAt, queueHydration: true });
       stored += result.stored;
     } catch (error) {
       errors.push(`8004 ${category}: ${error instanceof Error ? error.message : "failed"}`);

@@ -129,7 +129,7 @@ describe('BNB marketplace product flows', () => {
     assert.doesNotMatch(requestForm, /clientAddress/);
   });
 
-  it('routes endpoint-backed agents into hire while keeping execution guarded', () => {
+  it('only exposes hire actions for agents with verified actionable capabilities', () => {
     assert.match(readiness, /export function classifyBnbAgentReadiness/);
     assert.match(readiness, /status:\s*"available"/);
     assert.match(readiness, /status:\s*"profile"/);
@@ -139,11 +139,9 @@ describe('BNB marketplace product flows', () => {
     assert.match(readiness, /This agent is not available for jobs/);
     assert.doesNotMatch(readiness, /agent wallet is not a valid BSC address/i);
     assert.match(readiness, /export function bnbAgentReadinessLabel/);
-    assert.match(readiness, /executionStatus === "ready_to_run"/);
-    assert.match(readiness, /executionStatus === "connectable"/);
-    assert.match(readiness, /agent\.hasActionableEndpointCapabilities !== false/);
-    assert.match(readiness, /hasCandidateExecutionEndpoint\(agent\)/);
-    assert.match(readiness, /endpoint\.adapter === "web"/);
+    assert.match(readiness, /executionStatus === "ready_to_run"[\s\S]*agent\.hasActionableEndpointCapabilities === true/);
+    assert.doesNotMatch(readiness, /executionStatus === "connectable"/);
+    assert.doesNotMatch(readiness, /hasCandidateExecutionEndpoint\(agent\)/);
     assert.doesNotMatch(readiness, /Endpoint found|Ready to run|identity_only|endpoint_found|run_ready/);
     assert.match(runtime, /isBnbAgentHireable\(agent\)/);
     assert.match(runtime, /classifyBnbAgentReadiness\(agent\)/);
@@ -153,6 +151,9 @@ describe('BNB marketplace product flows', () => {
     assert.match(display, /bnbAgentReadinessLabel/);
     assert.match(display, /isBnbAgentHireable/);
     assert.match(directory, /bnbCanHireAgent/);
+    assert.match(directory, /function currentSavedAgent/);
+    assert.match(directory, /status:\s*stored\.status === "Available" \? "Profile" : stored\.status/);
+    assert.match(directory, /canHire:\s*false/);
     assert.doesNotMatch(directory, /Connectable/);
     assert.doesNotMatch(directory, /Listed only/);
     assert.match(directory, /label:\s*"All agents"/);
@@ -288,6 +289,7 @@ describe('BNB marketplace product flows', () => {
     assert.doesNotMatch(directory, /label:\s*"Average score"|label:\s*"Supported protocols"|label:\s*"ERC-8004 identity"|label:\s*"Wallet"|label:\s*"x402"|label:\s*"Service endpoint"/);
     assert.match(bnbCss, /grid-template-columns:\s*minmax\(190px,\s*0\.86fr\)\s*minmax\(280px,\s*1\.24fr\)\s*minmax\(150px,\s*0\.5fr\)\s*minmax\(260px,\s*280px\)/);
     assert.match(bnbCss, /\.bnb-directory-actions \{[\s\S]*grid-template-columns:\s*repeat\(2,\s*minmax\(0,\s*1fr\)\)/);
+    assert.doesNotMatch(bnbCss, /\.bnb-home-hero,[\s\S]{0,500}width:\s*calc\(100vw\s*-\s*32px\)/);
     assert.match(bnbCss, /\.bnb-directory-actions \.bnb-button,/);
     assert.match(bnbCss, /\.bnb-wallet-panel/);
   });
@@ -822,8 +824,12 @@ describe('BNB marketplace product flows', () => {
     assert.match(catalog, /const sortedPool = sortAgents\(agents,\s*sort,\s*query\)/);
     assert.match(catalog, /function supportsBnbIntegration/);
     assert.match(catalog, /sortedPool\.slice\(\(page - 1\) \* limit,\s*page \* limit\)/);
-    assert.match(catalog, /await upsertBnbAgentCache\(agents\)/);
+    assert.match(catalog, /await upsertBnbAgentCache\(agents,\s*\{ runtimeProbed:\s*executionDiscovery \}\)/);
     assert.match(catalog, /fetch8004AgentDetail/);
+    assert.match(catalog, /if \(!isUsable8004AgentPage\(payload\) && sortBy\)/);
+    assert.match(catalog, /fallbackUrl\.searchParams\.delete\("sortBy"\)/);
+    assert.match(catalog, /fallbackUrl\.searchParams\.delete\("sortOrder"\)/);
+    assert.match(catalog, /record\.success === false/);
     assert.match(catalog, /await upsertBnbAgentCache\(\[scored\],\s*\{ hydrated:\s*true,\s*runtimeProbed:\s*true \}\)/);
     assert.match(catalog, /\/agents\/\$\{encodeURIComponent\(String\(chainId\)\)\}\/\$\{encodeURIComponent\(tokenId\)\}/);
     assert.match(catalog, /record\.agentWallet \?\? record\.agent_wallet/);
@@ -860,18 +866,24 @@ describe('BNB marketplace product flows', () => {
     assert.match(agentCache, /runtimeProbed\?:\s*boolean/);
     assert.match(agentCache, /doc\.runtimeProofVersion === RUNTIME_PROOF_VERSION[\s\S]*doc\.runtimeProofChainId === getBscChainId\(\)[\s\S]*!proofExpired/);
     assert.match(agentCache, /\? "connectable" as const/);
-    assert.match(agentCache, /query\.execution === "hireable"[\s\S]*filter\.executionStatus = \{ \$in: \["ready_to_run",\s*"connectable"\] \}/);
-    assert.match(agentCache, /agent\.hasActionableEndpointCapabilities/);
-    assert.match(agentCache, /agent\.executionEndpoints/);
+    assert.match(agentCache, /RUNTIME_PROOF_VERSION = 4/);
+    assert.match(agentCache, /query\.execution === "hireable"[\s\S]*filter\.executionStatus = "ready_to_run"/);
+    assert.match(agentCache, /filter\["agent\.hasActionableEndpointCapabilities"\] = true/);
+    assert.match(agentCache, /filter\.runtimeProofVersion = RUNTIME_PROOF_VERSION/);
+    assert.match(agentCache, /filter\.runtimeProofChainId = getBscChainId\(\)/);
+    assert.match(agentCache, /filter\.runtimeProofAt = \{ \$gte: new Date\(Date\.now\(\) - runtimeProofTtlMs\(\)\) \}/);
     assert.match(agentCache, /runtimeProofTtlMs/);
     assert.match(agentCache, /validatePublicHttpsUrl\(endpoint\.url\)\.ok/);
     assert.match(agentCache, /integrationSearchText\(query\.integration\)/);
     assert.match(agentCache, /query\.integration/);
     assert.match(agentCache, /runtimeProofAt:\s*now/);
-    assert.match(agentCache, /!options\.hydrated && !options\.queueHydration/);
-    assert.match(agentCache, /!options\.queueHydration \? \{ hydrateAfter:/);
+    assert.match(agentCache, /if \(options\.queueHydration\)/);
+    assert.match(agentCache, /runtimeProofVersion:\s*\{ \$ne:\s*RUNTIME_PROOF_VERSION \}/);
+    assert.match(agentCache, /runtimeProofAt:\s*\{ \$exists:\s*false \}/);
     assert.match(agentCache, /needsHydration:\s*needsHydration && !options\.hydrated/);
     assert.match(agentCache, /export async function claimBnbAgentHydrationBatch/);
+    assert.match(agentCache, /export async function readCachedBnbRuntimeCandidates/);
+    assert.match(agentCache, /hasCallableEndpoint:\s*true/);
     assert.match(agentCache, /hydrateLockedUntil/);
     assert.match(agentCache, /\$unset:\s*\{ hydrateError:\s*"",\s*hydrateLockedUntil:\s*"" \}/);
     assert.match(catalog, /export async function refreshBnbAgentDiscoveryCache/);
@@ -879,6 +891,16 @@ describe('BNB marketplace product flows', () => {
     assert.match(catalog, /applyBnbEndpointProbeHealth\(scored\)/);
     assert.match(catalog, /query\.execution === "hireable" && !isBnbAgentHireable\(agent\)/);
     assert.match(catalog, /const runtimeFiltered = query\.execution === "hireable"/);
+    assert.match(catalog, /query\.execution !== "hireable"/);
+    assert.match(catalog, /query\.execution === "listed_only" \|\| query\.execution === "hireable"/);
+    assert.match(catalog, /readCachedBnbRuntimeCandidates\(DEFAULT_PROMOTED_AGENT_LIMIT \* 4\)/);
+    assert.match(catalog, /\.\.\.cachedRuntimeCandidates/);
+    assert.match(catalog, /const \[executionPage, profilePage, marketplacePage, semanticAgents, endpointAgents, cachedRuntimeAgents\]/);
+    assert.match(catalog, /\.\.\.cachedRuntimeAgents/);
+    assert.match(catalog, /async function ensureBnbRuntimeProofs/);
+    assert.match(catalog, /representatives\.length >= safeLimit/);
+    assert.match(catalog, /ensureBnbRuntimeProofs\(hydratedTop,\s*get8004DetailHydrationLimit\(\)\)/);
+    assert.match(catalog, /upsertBnbAgentCache\(agents,\s*\{ runtimeProbed:\s*executionDiscovery \}\)/);
     assert.match(catalog, /fetch8004ProfileCandidates\(\{[\s\S]*page,[\s\S]*sortBy:\s*sourceSortForCatalog\("recommended"\)/);
     assert.match(catalog, /listBnbEndpointSourceAgents\(\{ limit:\s*Math\.min\(safePageSize,\s*50\) \}\)/);
     assert.match(catalog, /recordBnbAgentCacheRun\("refresh"/);
@@ -914,11 +936,15 @@ describe('BNB marketplace product flows', () => {
     assert.match(endpointCapabilities, /export function capabilityContractsFromPreflightResult/);
     assert.match(endpointCapabilities, /COLLECTIONS\.BNB_ENDPOINT_CAPABILITIES/);
     assert.match(endpointCapabilities, /collection\.createIndex\(\{ agentKey:\s*1,\s*adapter:\s*1 \}\)/);
+    assert.match(endpointCapabilities, /collection\.createIndex\(\{ probeContext:\s*1,\s*adapter:\s*1,\s*endpointUrl:\s*1,\s*expiresAt:\s*1 \}\)/);
+    assert.match(endpointCapabilities, /adapter,[\s\S]*endpointUrl:\s*endpoint\.url,[\s\S]*expiresAt:\s*\{ \$gt:\s*new Date\(\) \}/);
+    assert.match(endpointCapabilities, /const snapshotsByEndpoint = new Map/);
+    assert.match(endpointCapabilities, /snapshotsByEndpoint\.get\(endpointKey\(endpoint\)\)/);
     assert.match(endpointCapabilities, /collection\.createIndex\(\{ "capabilities\.name":\s*1 \}\)/);
     assert.match(endpointCapabilities, /collection\.createIndex\(\{ expiresAt:\s*1 \},\s*\{ expireAfterSeconds:\s*0 \}\)/);
     assert.match(endpointCapabilities, /MAX_CAPABILITIES_PER_ENDPOINT = 80/);
     assert.match(endpointCapabilities, /MAX_SCHEMA_JSON_BYTES = 48 \* 1024/);
-    assert.match(endpointCapabilities, /CAPABILITY_PROBE_VERSION = "v3"/);
+    assert.match(endpointCapabilities, /CAPABILITY_PROBE_VERSION = "v4"/);
     assert.match(endpointCapabilities, /function capabilityProbeContext\(\)/);
     assert.match(endpointCapabilities, /`\$\{CAPABILITY_PROBE_VERSION\}:eip155:\$\{getBscChainId\(\)\}`/);
     assert.match(endpointCapabilities, /probeContext:\s*capabilityProbeContext\(\)/);
@@ -1018,7 +1044,7 @@ describe('BNB marketplace product flows', () => {
     assert.match(agentCache, /const finalFilter = \{ \.\.\.filter,\s*\.\.\.moderationFilter,\s*cachedAt:/);
     assert.match(agentCache, /isBnbListingModerated\(chainId,\s*tokenId\)/);
     assert.match(catalog, /applyBnbListingModeration/);
-    assert.match(catalog, /const candidates = await applyBnbListingModeration\(uniqueAgents\(\[\.\.\.baseAgents,\s*\.\.\.endpointAgents,\s*\.\.\.liveAgents\]\)\)/);
+    assert.match(catalog, /const candidates = await applyBnbListingModeration\(uniqueAgents\(\[\.\.\.baseAgents,\s*\.\.\.endpointAgents,\s*\.\.\.cachedRuntimeAgents,\s*\.\.\.liveAgents\]\)\)/);
     assert.match(catalog, /isBnbListingModerated\(chainId,\s*decodedTokenId\)/);
     assert.match(catalog, /const visibleAgents = await applyBnbListingModeration\(uniqueAgents\(\[\.\.\.endpointAgents,\s*\.\.\.semanticAgents,\s*\.\.\.fallbackAgents\]\)\)/);
     assert.match(bnbModerationRoute, /verifyAdmin\(request\)/);
@@ -1192,7 +1218,7 @@ describe('BNB marketplace product flows', () => {
     assert.doesNotMatch(endpointSources, /return scored\[0\]\?\.score > 0 \? scored\[0\]\.category : "Yield Optimisation"/);
     assert.doesNotMatch(endpointSources, /if \(q\?\.trim\(\)\) return true/);
     assert.match(catalog, /listBnbEndpointSourceAgents/);
-    assert.match(catalog, /\.\.\.baseAgents,\s*\.\.\.endpointAgents,\s*\.\.\.liveAgents/);
+    assert.match(catalog, /\.\.\.baseAgents,\s*\.\.\.endpointAgents,\s*\.\.\.cachedRuntimeAgents,\s*\.\.\.liveAgents/);
     assert.match(catalog, /getBnbEndpointSourceAgent\(decodedTokenId\)/);
     assert.match(catalog, /function decodeTokenId\(tokenId:\s*string\)/);
     assert.doesNotMatch(catalog, /BNB_SHOW_LOCAL_AGENTS|LOCAL_BNB_AGENTS|hive-yield-scout|hive-health-sentinel/);
@@ -1249,7 +1275,7 @@ describe('BNB marketplace product flows', () => {
     assert.doesNotMatch(catalog, /"Yield Optimisation":\s*\[[^\]]*"venus"/);
     assert.doesNotMatch(catalog, /"Yield Optimisation":\s*\[[^\]]*"lista"/);
     assert.match(catalog, /marketplaceCategoryFromText/);
-    assert.match(catalog, /resolveBnbAgentsRuntime\(candidates\)/);
+    assert.match(catalog, /ensureBnbRuntimeProofs\(candidates,\s*Math\.max\(get8004DetailHydrationLimit\(\),\s*6\)\)/);
     assert.match(catalog, /function fetch8004ProfileCandidates/);
     assert.match(catalog, /const marketplaceCategories = BNB_AGENT_CATEGORIES\.filter\(\(category\) => category !== "Other"\)/);
     assert.match(catalog, /async function fetchDefaultMarketplaceCandidates/);
@@ -1300,7 +1326,7 @@ describe('BNB marketplace product flows', () => {
     assert.match(catalog, /resolveBnbAgentRuntime\(agent\)/);
     assert.match(catalog, /applyBnbEndpointCapabilitySnapshots\(runtimeCandidates\)/);
     assert.match(catalog, /const scoredAgents = capabilityCandidates/);
-    assert.match(catalog, /upsertBnbAgentCache\(agents\)/);
+    assert.match(catalog, /upsertBnbAgentCache\(agents,\s*\{ runtimeProbed:\s*executionDiscovery \}\)/);
     assert.match(home, /listBnbAgentsPage\(\{ limit:\s*24,\s*page:\s*1,\s*sort:\s*"recommended" \}\)/);
     assert.match(home, /firstPage\.agents\.slice\(0,\s*6\)/);
     assert.match(catalog, /applyBnbEndpointCapabilitySnapshots\(\[runtimeAgent\],\s*\{\s*includeContracts:\s*true\s*\}\)/);
@@ -1435,6 +1461,11 @@ describe('BNB marketplace product flows', () => {
     assert.match(a2aAdapter, /tags:\s*skill\.tags/);
     assert.match(a2aAdapter, /capabilityContracts:\s*a2aCapabilityContracts\(card\.skills \|\| \[\]\)/);
     assert.match(a2aAdapter, /capabilityContracts:\s*a2aCapabilityContracts\(skills\.length > 0 \? skills : card\.skills \|\| \[\]\)/);
+    assert.match(a2aAdapter, /if \(record\.jsonrpc !== "2\.0"\) return false/);
+    assert.match(a2aAdapter, /return "result" in record \|\| "error" in record/);
+    assert.match(a2aAdapter, /registration\.agentRegistry\?\.match\(\/\^eip155:/);
+    assert.match(a2aAdapter, /!declaredChains\.includes\(chainId\)/);
+    assert.match(a2aAdapter, /assertPublicA2aService\(serviceUrl, card, agent\.chainId\)/);
     assert.match(a2aAdapter, /isEmptyA2aPayload/);
     assert.match(a2aAdapter, /isA2aTransportOnlyPayload/);
     assert.match(a2aAdapter, /isTransportStatusText/);
@@ -1455,6 +1486,8 @@ describe('BNB marketplace product flows', () => {
     assert.match(a2aAdapter, /yield\|apy\|apr\|vault\|farm\|staking\|deposit\|earn\|stablecoin\|usdd/);
     assert.match(a2aAdapter, /This agent cannot run this \$\{capabilityLabel\(capability\)\} job/);
     assert.match(adapterRegistry, /preflightBnbAgentAdapters/);
+    assert.match(adapterRegistry, /return `\$\{adapter\.id\}:\$\{agent\.chainId\}:\$\{endpoint\.adapter\}:\$\{endpoint\.url\}`/);
+    assert.doesNotMatch(adapterRegistry, /adapter\.id\}:\$\{agent\.chainId\}:\$\{agent\.tokenId\}/);
     assert.match(adapterRegistry, /preflightBnbAgentJob/);
     assert.match(adapterRegistry, /ENDPOINT_PREFLIGHT_CACHE_TTL_MS/);
     assert.match(adapterRegistry, /endpointPreflightCache/);

@@ -167,11 +167,13 @@ export function AgentsDirectory({
     return Object.fromEntries(entries);
   }, [agents]);
 
-  const savedList = Object.values(savedAgents).map(cleanSavedAgent);
-  const comparison = compareAgents
-    .map((key) => visibleAgentMap[key] || savedAgents[key])
+  const savedList = Object.values(savedAgents)
+    .map((agent) => currentSavedAgent(agent, visibleAgentMap[agent.key]))
     .filter((agent): agent is SavedAgent => Boolean(agent));
-  const cleanedComparison = comparison.map(cleanSavedAgent);
+  const comparison = compareAgents
+    .map((key) => currentSavedAgent(savedAgents[key], visibleAgentMap[key]))
+    .filter((agent): agent is SavedAgent => Boolean(agent));
+  const cleanedComparison = comparison;
 
   function setSaved(agent: BnbAgentProfile) {
     const saved = toSavedAgent(agent);
@@ -743,6 +745,16 @@ function cleanSavedAgent(agent: SavedAgent): SavedAgent {
     ...(price ? { price } : { price: undefined }),
     ...(reviews ? { reviews } : { reviews: undefined }),
   };
+}
+
+function currentSavedAgent(stored: SavedAgent | undefined, current: SavedAgent | undefined) {
+  if (current) return cleanSavedAgent(current);
+  if (!stored) return undefined;
+  return cleanSavedAgent({
+    ...stored,
+    status: stored.status === "Available" ? "Profile" : stored.status,
+    canHire: false,
+  });
 }
 
 function canHireAgent(agent: BnbAgentProfile) {
