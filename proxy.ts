@@ -132,7 +132,12 @@ function normalizeHost(host: string | null) {
 }
 
 function isBnbSubdomainRequest(request: NextRequest) {
-  return BNB_SUBDOMAIN_HOSTS.has(normalizeHost(request.headers.get('host')));
+  const configuredHosts = (process.env.BNB_APP_HOSTS || '')
+    .split(',')
+    .map((host) => normalizeHost(host))
+    .filter(Boolean);
+  return new Set([...BNB_SUBDOMAIN_HOSTS, ...configuredHosts])
+    .has(normalizeHost(request.headers.get('host')));
 }
 
 function shouldLeaveBnbPathAlone(pathname: string) {

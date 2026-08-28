@@ -1265,7 +1265,6 @@ async function listDefaultRecommendedBnbAgentsPage(query: BnbAgentQuery): Promis
     const topSourcePage = await fetch8004AgentRange({
       offset: 0,
       limit: DEFAULT_RECOMMENDATION_WINDOW,
-      sortBy: "total_score",
     });
     if (topSourcePage.total === 0 && topSourcePage.agents.length === 0) return null;
     sourceTotal = topSourcePage.total;
@@ -1322,7 +1321,7 @@ async function listDefaultRecommendedBnbAgentsPage(query: BnbAgentQuery): Promis
 }
 
 async function fetchScored8004Range(offset: number, limit: number) {
-  const sourcePage = await fetch8004AgentRange({ offset, limit, sortBy: "total_score" });
+  const sourcePage = await fetch8004AgentRange({ offset, limit });
   const visibleAgents = await applyBnbListingModeration(sourcePage.agents);
   const cachedAgents = await overlayCachedBnbAgentDetails(visibleAgents);
   const capabilityAgents = await applyBnbEndpointCapabilitySnapshots(cachedAgents);

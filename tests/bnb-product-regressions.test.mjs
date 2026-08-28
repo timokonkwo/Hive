@@ -830,6 +830,11 @@ describe('BNB marketplace product flows', () => {
     assert.match(catalog, /fallbackUrl\.searchParams\.delete\("sortBy"\)/);
     assert.match(catalog, /fallbackUrl\.searchParams\.delete\("sortOrder"\)/);
     assert.match(catalog, /record\.success === false/);
+    assert.match(catalog, /const topSourcePage = await fetch8004AgentRange\(\{\s*offset:\s*0,\s*limit:\s*DEFAULT_RECOMMENDATION_WINDOW,\s*\}\)/);
+    assert.match(catalog, /const sourcePage = await fetch8004AgentRange\(\{ offset, limit \}\)/);
+    assert.doesNotMatch(catalog, /fetch8004AgentRange\(\{ offset, limit, sortBy:\s*"total_score" \}\)/);
+    assert.match(proxy, /process\.env\.BNB_APP_HOSTS/);
+    assert.match(proxy, /new Set\(\[\.\.\.BNB_SUBDOMAIN_HOSTS,\s*\.\.\.configuredHosts\]\)/);
     assert.match(catalog, /await upsertBnbAgentCache\(\[scored\],\s*\{ hydrated:\s*true,\s*runtimeProbed:\s*true \}\)/);
     assert.match(catalog, /\/agents\/\$\{encodeURIComponent\(String\(chainId\)\)\}\/\$\{encodeURIComponent\(tokenId\)\}/);
     assert.match(catalog, /record\.agentWallet \?\? record\.agent_wallet/);
