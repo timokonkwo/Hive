@@ -27,6 +27,8 @@ type BnbEndpointCapabilityDocument = Omit<BnbEndpointCapabilitySnapshot, "checke
   probeContext: string;
   checkedAt: Date;
   expiresAt: Date;
+  consecutiveFailures?: number;
+  lastFailureAt?: Date;
 };
 
 let indexesReady: Promise<void> | null = null;
@@ -45,6 +47,30 @@ export function getBnbEndpointCapabilityTtlMs() {
 
 export function bnbEndpointCapabilityAgentKey(agent: Pick<BnbAgentProfile, "chainId" | "tokenId">) {
   return `${agent.chainId}:${agent.tokenId}`;
+}
+
+export async function listBnbCurrentActionableCapabilityAgentKeys(limit = 1_000) {
+  const db = await getCapabilityDb();
+  if (!db) return [];
+
+  try {
+    await ensureCapabilityIndexes();
+    const safeLimit = Math.min(Math.max(Math.trunc(limit), 1), 5_000);
+    const docs = await db.collection<BnbEndpointCapabilityDocument>(COLLECTIONS.BNB_ENDPOINT_CAPABILITIES)
+      .find({
+        probeContext: capabilityProbeContext(),
+        ok: true,
+        expiresAt: { $gt: new Date() },
+      })
+      .sort({ checkedAt: -1 })
+      .limit(safeLimit)
+      .toArray();
+    return Array.from(new Set(docs
+      .filter((doc) => doc.capabilities.some(isActionableBnbEndpointCapability))
+      .map((doc) => doc.agentKey)));
+  } catch {
+    return [];
+  }
 }
 
 export function bnbEndpointCapabilityAdapter(adapter: BnbAdapterId, endpoint: BnbExecutionEndpoint): SnapshotAdapter {
@@ -71,11 +97,25 @@ export async function readBnbEndpointCapabilitySnapshot(
 
   try {
     await ensureCapabilityIndexes();
-    const doc = await db.collection<BnbEndpointCapabilityDocument>(COLLECTIONS.BNB_ENDPOINT_CAPABILITIES)
+    const collection = db.collection<BnbEndpointCapabilityDocument>(COLLECTIONS.BNB_ENDPOINT_CAPABILITIES);
+    const exact = await collection
+      .find({
+        probeContext: capabilityProbeContext(),
+        agentKey: bnbEndpointCapabilityAgentKey(agent),
+        adapter,
+        endpointUrl: endpoint.url,
+        expiresAt: { $gt: new Date() },
+      })
+      .sort({ checkedAt: -1 })
+      .limit(1)
+      .next();
+    if (exact) return snapshotFromDocument(exact);
+    const doc = await collection
       .find({
         probeContext: capabilityProbeContext(),
         adapter,
         endpointUrl: endpoint.url,
+        ok: true,
         expiresAt: { $gt: new Date() },
       })
       .sort({ checkedAt: -1 })
@@ -99,9 +139,25 @@ export async function recordBnbEndpointCapabilities(agent: BnbAgentProfile, resu
     const endpoint = result.endpoint;
     const capabilities = capabilityContractsFromPreflightResult(result);
     const adapter = result.adapter === "x402" ? "x402" : bnbEndpointCapabilityAdapter(result.adapter, endpoint);
+    const id = bnbEndpointCapabilityKey(agent, adapter, endpoint);
+    const collection = db.collection<BnbEndpointCapabilityDocument>(COLLECTIONS.BNB_ENDPOINT_CAPABILITIES);
+    const existing = await collection.findOne({ _id: id });
+    const consecutiveFailures = result.ok ? 0 : (existing?.consecutiveFailures || 0) + 1;
+    const retainRecentSuccess = !result.ok
+      && existing?.ok === true
+      && existing.expiresAt > now
+      && consecutiveFailures < 3;
+
+    if (retainRecentSuccess) {
+      await collection.updateOne(
+        { _id: id },
+        { $set: { consecutiveFailures, lastFailureAt: now } },
+      );
+      return { stored: true };
+    }
 
     const document: BnbEndpointCapabilityDocument = {
-      _id: bnbEndpointCapabilityKey(agent, adapter, endpoint),
+      _id: id,
       probeContext: capabilityProbeContext(),
       agentKey: bnbEndpointCapabilityAgentKey(agent),
       chainId: agent.chainId,
@@ -117,11 +173,16 @@ export async function recordBnbEndpointCapabilities(agent: BnbAgentProfile, resu
       ...(result.reason ? { reason: truncate(cleanText(result.reason), 300) } : {}),
       checkedAt: now,
       expiresAt,
+      consecutiveFailures,
+      ...(!result.ok ? { lastFailureAt: now } : {}),
     };
 
-    await db.collection<BnbEndpointCapabilityDocument>(COLLECTIONS.BNB_ENDPOINT_CAPABILITIES).updateOne(
+    await collection.updateOne(
       { _id: document._id },
-      { $set: document },
+      {
+        $set: document,
+        ...(result.ok ? { $unset: { lastFailureAt: "" } } : {}),
+      },
       { upsert: true },
     );
     return { stored: true };
@@ -163,10 +224,12 @@ export async function applyBnbEndpointCapabilitySnapshots(
       const snapshots = snapshotsByAgent.get(doc.agentKey) || [];
       snapshots.push(snapshot);
       snapshotsByAgent.set(doc.agentKey, snapshots);
-      const endpointKey = endpointSnapshotKey(snapshot);
-      const endpointSnapshots = snapshotsByEndpoint.get(endpointKey) || [];
-      endpointSnapshots.push(snapshot);
-      snapshotsByEndpoint.set(endpointKey, endpointSnapshots);
+      if (snapshot.ok) {
+        const endpointKey = endpointSnapshotKey(snapshot);
+        const endpointSnapshots = snapshotsByEndpoint.get(endpointKey) || [];
+        endpointSnapshots.push(snapshot);
+        snapshotsByEndpoint.set(endpointKey, endpointSnapshots);
+      }
     }
 
     return agents.map((agent) => {
@@ -420,6 +483,7 @@ async function ensureCapabilityIndexes() {
     await Promise.all([
       collection.createIndex({ agentKey: 1, adapter: 1 }),
       collection.createIndex({ probeContext: 1, adapter: 1, endpointUrl: 1, expiresAt: 1 }),
+      collection.createIndex({ probeContext: 1, ok: 1, expiresAt: 1, checkedAt: -1 }),
       collection.createIndex({ ok: 1, checkedAt: -1 }),
       collection.createIndex({ "capabilities.name": 1 }),
       collection.createIndex({ expiresAt: 1 }, { expireAfterSeconds: 0 }),

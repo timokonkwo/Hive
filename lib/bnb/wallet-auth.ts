@@ -191,6 +191,16 @@ export function setBnbWalletSessionCookie(response: NextResponse, token: string)
   });
 }
 
+export function clearBnbWalletSessionCookie(response: NextResponse) {
+  response.cookies.set(BNB_WALLET_SESSION_COOKIE, "", {
+    httpOnly: true,
+    sameSite: "lax",
+    secure: process.env.NODE_ENV === "production",
+    path: "/",
+    maxAge: 0,
+  });
+}
+
 function readBnbWalletSessionToken(request: NextRequest) {
   return request.headers.get(BNB_WALLET_SESSION_HEADER)
     || request.cookies.get(BNB_WALLET_SESSION_COOKIE)?.value

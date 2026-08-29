@@ -5,9 +5,9 @@ import { useEffect, useState } from "react";
 import { useModalStatus } from "@privy-io/react-auth";
 import { useAccount, usePublicClient, useSendTransaction, useSwitchChain, useWalletClient } from "wagmi";
 import type { Hex } from "viem";
-import { ArrowLeft, CreditCard, Play } from "lucide-react";
+import { ArrowLeft, CheckCircle2, CreditCard, Play } from "lucide-react";
 import { BnbButtonLoader } from "@/app/bnb/_components/BnbButtonLoader";
-import { BnbContainer, BnbPanel } from "@/app/bnb/_components/BnbUi";
+import { BnbContainer } from "@/app/bnb/_components/BnbUi";
 import { CopyValueButton } from "@/app/bnb/_components/CopyValueButton";
 import { BnbDeliveryView } from "@/app/bnb/_components/BnbDeliveryView";
 import { useAuth } from "@/hooks/useAuth";
@@ -23,6 +23,7 @@ import {
   createBnbX402PaymentConfirmation,
   getBnbX402Permit2Approval,
 } from "@/lib/bnb/client-x402";
+import styles from "./job.module.css";
 
 type PaymentRequest = BnbPaymentRequest;
 
@@ -252,18 +253,22 @@ export function BnbJobClient({ recordId }: { recordId: string }) {
 
   if ((!ready && !address) || loading) {
     return (
-      <BnbContainer className="bnb-section">
-        <BnbPanel className="p-6">
-          <BnbButtonLoader size={20} />
-        </BnbPanel>
-      </BnbContainer>
+      <div className={styles.page}>
+        <BnbContainer className={styles.container}>
+          <div className={styles.stateSurface} role="status" aria-live="polite">
+            <BnbButtonLoader size={20} />
+            <span>Loading job</span>
+          </div>
+        </BnbContainer>
+      </div>
     );
   }
 
   if (!authenticated && !address) {
     return (
-      <BnbContainer className="bnb-section">
-        <BnbPanel className="bnb-job-empty">
+      <div className={styles.page}>
+        <BnbContainer className={styles.container}>
+          <section className={styles.emptyState}>
           <h2>Sign in to view this job</h2>
           <button
             type="button"
@@ -275,20 +280,23 @@ export function BnbJobClient({ recordId }: { recordId: string }) {
             {authAction === "login" || privyModalOpen ? <BnbButtonLoader /> : null}
             {authAction === "login" || privyModalOpen ? "Opening wallet..." : "Sign in"}
           </button>
-        </BnbPanel>
-      </BnbContainer>
+          </section>
+        </BnbContainer>
+      </div>
     );
   }
 
   if (!job) {
     return (
-      <BnbContainer className="bnb-section">
-        <BnbPanel className="bnb-job-empty">
+      <div className={styles.page}>
+        <BnbContainer className={styles.container}>
+          <section className={styles.emptyState}>
           <h2>Job unavailable</h2>
           <p>{error || "This job could not be loaded."}</p>
           <Link href="/bnb/account" className="bnb-button-dark bnb-focus">Back to account</Link>
-        </BnbPanel>
-      </BnbContainer>
+          </section>
+        </BnbContainer>
+      </div>
     );
   }
 
@@ -307,50 +315,42 @@ export function BnbJobClient({ recordId }: { recordId: string }) {
   const recordChainId = record.payment?.chainId || targetChainId;
   const fundedExplorerUrl = record.payment?.explorerUrl || (record.payment?.transactionHash ? getClientBnbExplorerTxUrl(record.payment.transactionHash, recordChainId) : "");
   const settlementExplorerUrl = record.settlement?.explorerUrl || (record.settlement?.transactionHash ? getClientBnbExplorerTxUrl(record.settlement.transactionHash, recordChainId) : "");
+  const taskTitle = record.jobSpec
+    ? bnbJobTaskLabel(getBnbJobSpecDefinition(record.jobSpec), record.jobSpec.taskType)
+    : record.limits.task;
+  const lifecycle = buildJobLifecycle({ record, paymentNotRequired, funded, running, delivered, failed, closed });
 
   return (
-    <BnbContainer className="bnb-section">
-      <Link href="/bnb/account#activity" className="bnb-agent-back bnb-focus">
-        <ArrowLeft aria-hidden="true" size={15} />
-        My hires
-      </Link>
+    <div className={styles.page}>
+      <BnbContainer className={styles.container}>
+        <Link href="/bnb/account#activity" className={styles.backLink}>
+          <ArrowLeft aria-hidden="true" size={16} />
+          My hires
+        </Link>
 
-      <div className="bnb-job-layout">
-        <main className="bnb-job-main">
-          <BnbPanel className="bnb-job-panel">
-            <div className="bnb-job-title-row">
-              <div>
-                <span className="bnb-eyebrow">{jobStatusLabel(record)}</span>
-                <h2>{record.agent.name}</h2>
-              </div>
-              {!paymentNotRequired ? <span className="bnb-chip bnb-chip-active">{record.limits.budget}</span> : null}
-            </div>
+        <header className={styles.jobHeader}>
+          <div className={styles.statusLine} data-state={failed ? "failed" : running ? "running" : delivered || closed ? "complete" : "pending"}>
+            {running ? <BnbButtonLoader /> : <span aria-hidden="true" />}
+            <strong>{jobStatusLabel(record)}</strong>
+          </div>
+          <h1>{taskTitle}</h1>
+          <p>{record.agent.name} · Record {shortHash(record.recordId)} · Created {formatJobDate(record.createdAt)}</p>
+        </header>
 
-            {record.jobSpec ? (
-              <div className="bnb-job-section">
-                <h3>{bnbJobTaskLabel(getBnbJobSpecDefinition(record.jobSpec), record.jobSpec.taskType)}</h3>
-                <pre>{record.jobSpec.summary}</pre>
-              </div>
-            ) : (
-              <div className="bnb-job-section">
-                <h3>Work</h3>
-                <pre>{record.limits.task}</pre>
-              </div>
-            )}
+        <dl className={styles.factRow} aria-label="Job facts">
+          {!paymentNotRequired ? <JobFact label="Maximum payment" value={record.limits.budget} /> : <JobFact label="Payment" value="Not required" />}
+          <JobFact label="Network" value={recordChainId === 97 ? "BNB Smart Chain Testnet" : "BNB Smart Chain"} />
+          <JobFact label="Time limit" value={record.limits.expires} />
+          <JobFact label="Updated" value={formatJobDate(record.updatedAt)} />
+        </dl>
 
-            <div className="bnb-job-section">
-              <h3>Delivery</h3>
-              {output ? <BnbDeliveryView output={output} jobSpec={record.jobSpec} dataSources={dataSources} /> : <p>No delivery yet.</p>}
-              {deliveryError ? <p className="bnb-form-error">{deliveryError}</p> : null}
-            </div>
-          </BnbPanel>
-        </main>
-
-        <aside className="bnb-job-side">
-          <BnbPanel className="bnb-job-panel">
-            <h2>Next action</h2>
-            <p>{nextActionCopy(record)}</p>
-            <div className="bnb-job-actions">
+        <section className={styles.actionBand} aria-labelledby="next-action-title">
+          <div>
+            <span>Next action</span>
+            <h2 id="next-action-title">{nextActionTitle(record)}</h2>
+            {nextActionCopy(record) ? <p>{nextActionCopy(record)}</p> : null}
+          </div>
+          <div className={styles.primaryActions}>
               {job.paymentRequest?.status === "ready" && !funded ? (
                 <button type="button" className="bnb-button bnb-focus" onClick={fundJob} disabled={Boolean(action)} aria-busy={action === "fund"}>
                   {action === "fund" ? <BnbButtonLoader /> : <CreditCard aria-hidden="true" size={16} />}
@@ -379,54 +379,149 @@ export function BnbJobClient({ recordId }: { recordId: string }) {
                   )}
                 </>
               ) : null}
-              <Link href={`/bnb/agents/${record.agent.chainId}/${encodeURIComponent(record.agent.tokenId)}`} className="bnb-button-dark bnb-focus">
-                View agent
-              </Link>
             </div>
-            {job.paymentRequest && job.paymentRequest.status !== "ready" && job.paymentRequest.status !== "not_required" ? <p className="bnb-form-error">{userFacingJobIssue(job.paymentRequest.reason)}</p> : null}
-            {error ? <p className="bnb-form-error">{userFacingJobIssue(error)}</p> : null}
-          </BnbPanel>
+          {job.paymentRequest && job.paymentRequest.status !== "ready" && job.paymentRequest.status !== "not_required" ? <p className={styles.inlineError}>{userFacingJobIssue(job.paymentRequest.reason)}</p> : null}
+          {error ? <p className={styles.inlineError}>{userFacingJobIssue(error)}</p> : null}
+        </section>
 
-          <BnbPanel className="bnb-job-panel">
-            <h2>{paymentNotRequired ? "Run details" : "Payment"}</h2>
-            <dl>
-              {!paymentNotRequired ? <DataRow label="Budget" value={record.limits.budget} /> : null}
-              <DataRow label="Network" value={recordChainId === 97 ? "BNB Smart Chain Testnet" : "BNB Smart Chain"} />
-              <DataRow label="Expires" value={record.limits.expires} />
-              {record.payment?.contractAddress ? (
-                <DataRow
-                  label="Payment contract"
-                  value={record.payment.contractAddress}
-                  displayValue={shortHash(record.payment.contractAddress)}
-                  href={getClientBnbExplorerAddressUrl(record.payment.contractAddress, recordChainId)}
-                  copyValue={record.payment.contractAddress}
-                />
-              ) : null}
-              {record.payment?.jobId ? <DataRow label="Job ID" value={record.payment.jobId} displayValue={shortHash(record.payment.jobId)} copyValue={record.payment.jobId} /> : null}
-              {record.payment?.transactionHash ? (
-                <DataRow
-                  label="Payment"
-                  value={record.payment.transactionHash}
-                  displayValue={shortHash(record.payment.transactionHash)}
-                  href={fundedExplorerUrl}
-                  copyValue={record.payment.transactionHash}
-                />
-              ) : null}
-              {record.settlement?.transactionHash ? (
-                <DataRow
-                  label="Final transaction"
-                  value={record.settlement.transactionHash}
-                  displayValue={shortHash(record.settlement.transactionHash)}
-                  href={settlementExplorerUrl}
-                  copyValue={record.settlement.transactionHash}
-                />
-              ) : null}
-            </dl>
-          </BnbPanel>
-        </aside>
-      </div>
-    </BnbContainer>
+        <div className={styles.workbench}>
+          <aside className={styles.timeline} aria-labelledby="job-progress-title">
+            <h2 id="job-progress-title">Progress</h2>
+            <ol>
+              {lifecycle.map((step) => (
+                <li key={step.label} data-state={step.state} aria-current={step.state === "current" ? "step" : undefined}>
+                  <span aria-hidden="true">{step.state === "complete" ? <CheckCircle2 size={14} /> : step.state === "current" ? <BnbButtonLoader /> : null}</span>
+                  <div>
+                    <strong>{step.label}</strong>
+                    <p>{step.detail}</p>
+                  </div>
+                </li>
+              ))}
+            </ol>
+          </aside>
+
+          <main className={styles.resultArea}>
+            <div className={styles.resultHeading}>
+              <span>Result</span>
+              <h2>{output ? "Delivered work" : failed ? "Work stopped" : running ? "Agent is working" : "No result yet"}</h2>
+            </div>
+            {output ? (
+              <BnbDeliveryView output={output} jobSpec={record.jobSpec} dataSources={dataSources} />
+            ) : failed || deliveryError ? (
+              <div className={styles.failureState} role="alert">
+                <strong>{deliveryError || userFacingJobIssue(error || "The job stopped before delivery.")}</strong>
+                <p>{funded ? "The job record is saved and no payment was released." : "No payment was taken for this run."}</p>
+              </div>
+            ) : running ? (
+              <div className={styles.runningState} role="status" aria-live="polite">
+                <BnbButtonLoader />
+                <div><strong>Waiting for the agent result</strong><p>You can leave this page and return from My hires.</p></div>
+              </div>
+            ) : (
+              <div className={styles.pendingState}>
+                <Play aria-hidden="true" size={18} />
+                <div><strong>{funded ? "Ready to start" : "Waiting for payment"}</strong><p>{funded ? "Run the agent to begin work." : "Confirm payment before work begins."}</p></div>
+              </div>
+            )}
+          </main>
+        </div>
+
+        <details className={styles.recordDetails}>
+          <summary>Payment and record details</summary>
+          <dl>
+            {!paymentNotRequired ? <DataRow label="Budget" value={record.limits.budget} /> : null}
+            {record.payment?.contractAddress ? (
+              <DataRow label="Payment contract" value={record.payment.contractAddress} displayValue={shortHash(record.payment.contractAddress)} href={getClientBnbExplorerAddressUrl(record.payment.contractAddress, recordChainId)} copyValue={record.payment.contractAddress} />
+            ) : null}
+            {record.payment?.jobId ? <DataRow label="Job ID" value={record.payment.jobId} displayValue={shortHash(record.payment.jobId)} copyValue={record.payment.jobId} /> : null}
+            {record.payment?.transactionHash ? (
+              <DataRow label="Payment" value={record.payment.transactionHash} displayValue={shortHash(record.payment.transactionHash)} href={fundedExplorerUrl} copyValue={record.payment.transactionHash} />
+            ) : null}
+            {record.settlement?.transactionHash ? (
+              <DataRow label="Final transaction" value={record.settlement.transactionHash} displayValue={shortHash(record.settlement.transactionHash)} href={settlementExplorerUrl} copyValue={record.settlement.transactionHash} />
+            ) : null}
+          </dl>
+        </details>
+
+        <footer className={styles.footerActions}>
+          <Link href={`/bnb/agents/${record.agent.chainId}/${encodeURIComponent(record.agent.tokenId)}`} className="bnb-button-dark bnb-focus">View agent</Link>
+        </footer>
+      </BnbContainer>
+    </div>
   );
+}
+
+function JobFact({ label, value }: { label: string; value: string }) {
+  return <div><dt>{label}</dt><dd>{value}</dd></div>;
+}
+
+type JobLifecycleState = "complete" | "current" | "pending" | "failed";
+
+function buildJobLifecycle({
+  record,
+  paymentNotRequired,
+  funded,
+  running,
+  delivered,
+  failed,
+  closed,
+}: {
+  record: BnbActivationRecord;
+  paymentNotRequired: boolean;
+  funded: boolean;
+  running: boolean;
+  delivered: boolean;
+  failed: boolean;
+  closed: boolean;
+}) {
+  const steps: Array<{ label: string; detail: string; state: JobLifecycleState }> = [
+    { label: "Job created", detail: "Scope and limits saved", state: "complete" },
+    paymentNotRequired
+      ? { label: "Payment", detail: "No payment required", state: "complete" }
+      : {
+          label: "Payment",
+          detail: funded ? "Payment confirmed" : "Confirmation required",
+          state: funded ? "complete" : "current",
+        },
+    {
+      label: "Agent work",
+      detail: delivered ? "Work completed" : failed ? "Run stopped" : running ? "In progress" : funded ? "Ready to start" : "Waiting for payment",
+      state: delivered ? "complete" : failed ? "failed" : running || funded ? "current" : "pending",
+    },
+    {
+      label: "Result",
+      detail: delivered ? "Result delivered" : failed ? "No result delivered" : "Waiting for delivery",
+      state: delivered ? "complete" : failed ? "failed" : "pending",
+    },
+  ];
+
+  if (record.payment?.mode === "escrow") {
+    steps.push({
+      label: record.status === "refunded" ? "Refund" : "Payment release",
+      detail: record.status === "refunded" ? "Payment returned" : closed ? "Payment released" : "Waiting for approval",
+      state: closed ? "complete" : delivered ? "current" : "pending",
+    });
+  }
+
+  return steps;
+}
+
+function nextActionTitle(record: BnbActivationRecord) {
+  const label = jobStatusLabel(record);
+  if (label === "Run") return "Start the work";
+  if (label === "Awaiting payment") return "Confirm payment";
+  if (label === "Payment sent") return "Start the work";
+  if (label === "Running") return "Work is in progress";
+  if (label === "Delivered") return record.limits.walletConfirmationRequired === false ? "Review the result" : "Review and close payment";
+  if (label === "Paid") return "Job complete";
+  if (label === "Refunded") return "Refund complete";
+  return "Review the failure";
+}
+
+function formatJobDate(value: string | number | Date) {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "Unknown";
+  return new Intl.DateTimeFormat("en", { dateStyle: "medium", timeStyle: "short" }).format(date);
 }
 
 function DataRow({

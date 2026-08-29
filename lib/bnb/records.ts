@@ -114,12 +114,13 @@ async function saveBnbRecord<T extends BnbStoredRecord>(
   return stored;
 }
 
-async function listBnbCollection<T extends BnbStoredRecord>(collection: string, limit: number, ownerId?: string) {
+async function listBnbCollection<T extends BnbStoredRecord>(collection: string, limit: number, ownerIds?: string | string[]) {
   if (!hasDatabaseConfig()) return null;
 
   try {
     const db = await getDb();
-    const query = (ownerId ? { clientAddress: ownerId } : {}) as Filter<T & { _id?: unknown }>;
+    const owners = normalizeOwnerIds(ownerIds);
+    const query = (owners.length > 0 ? { clientAddress: { $in: owners } } : {}) as Filter<T & { _id?: unknown }>;
     const records = await db
       .collection<T & { _id?: unknown }>(collection)
       .find(query)
@@ -289,6 +290,45 @@ export async function createBnbTermixComparisonRecord({
     ...(dataSources && dataSources.length > 0 ? { dataSources } : {}),
     ...(qualityScore ? { qualityScore } : {}),
     ...(notes ? { notes } : {}),
+  };
+
+  return saveBnbRecord(COLLECTIONS.BNB_TERMIX_COMPARISONS, record, (stored) => {
+    getProcessStore().termixComparisons.unshift(stored);
+  });
+}
+
+export async function createBnbAgentComparisonRecord({
+  agents,
+  clientAddress,
+}: {
+  agents: BnbAgentProfile[];
+  clientAddress?: string;
+}) {
+  const now = new Date().toISOString();
+  const names = agents.map((agent) => agent.name);
+  const record: BnbTermixComparisonRecord = {
+    recordType: "comparison",
+    recordId: randomUUID(),
+    receiptId: `hive-agent-comparison-${Date.now()}`,
+    status: "saved",
+    createdAt: now,
+    updatedAt: now,
+    ...(clientAddress ? { clientAddress } : {}),
+    caseId: "agent-comparison",
+    title: "Agent comparison",
+    target: names.join(" and "),
+    manualTime: "unset",
+    agentTime: "unset",
+    agentTokenId: agents.map((agent) => agent.tokenId).join(","),
+    verdict: "pending",
+    comparisonType: "agents",
+    comparedAgents: agents.map((agent) => ({
+      chainId: agent.chainId,
+      tokenId: agent.tokenId,
+      name: agent.name,
+      activationStatus: agent.activationStatus,
+      executionStatus: agent.executionStatus,
+    })),
   };
 
   return saveBnbRecord(COLLECTIONS.BNB_TERMIX_COMPARISONS, record, (stored) => {
@@ -1105,14 +1145,16 @@ export async function cancelBnbAccessRequestRecord({
   });
 }
 
-export async function listBnbRecords(limit = 25, ownerId?: string): Promise<BnbRecordsSnapshot> {
+export async function listBnbRecords(limit = 25, ownerIds?: string | string[]): Promise<BnbRecordsSnapshot> {
   const boundedLimit = Math.min(Math.max(limit, 1), 100);
+  const owners = normalizeOwnerIds(ownerIds);
+  const ownsRecord = (record: BnbStoredRecord) => owners.length === 0 || owners.some((owner) => owner.toLowerCase() === record.clientAddress?.toLowerCase());
 
   const [activations, accessRequests, termixComparisons, altanaSessions] = await Promise.all([
-    listBnbCollection<BnbActivationRecord>(COLLECTIONS.BNB_ACTIVATIONS, boundedLimit, ownerId),
-    listBnbCollection<BnbAccessRequestRecord>(COLLECTIONS.BNB_ACCESS_REQUESTS, boundedLimit, ownerId),
-    listBnbCollection<BnbTermixComparisonRecord>(COLLECTIONS.BNB_TERMIX_COMPARISONS, boundedLimit, ownerId),
-    listBnbCollection<BnbAltanaSessionRecord>(COLLECTIONS.BNB_ALTANA_SESSIONS, boundedLimit, ownerId),
+    listBnbCollection<BnbActivationRecord>(COLLECTIONS.BNB_ACTIVATIONS, boundedLimit, owners),
+    listBnbCollection<BnbAccessRequestRecord>(COLLECTIONS.BNB_ACCESS_REQUESTS, boundedLimit, owners),
+    listBnbCollection<BnbTermixComparisonRecord>(COLLECTIONS.BNB_TERMIX_COMPARISONS, boundedLimit, owners),
+    listBnbCollection<BnbAltanaSessionRecord>(COLLECTIONS.BNB_ALTANA_SESSIONS, boundedLimit, owners),
   ]);
 
   if (activations && accessRequests && termixComparisons && altanaSessions) {
@@ -1128,13 +1170,18 @@ export async function listBnbRecords(limit = 25, ownerId?: string): Promise<BnbR
 
   const processStore = getProcessStore();
   return {
-    activations: processStore.activations.filter((record) => !ownerId || record.clientAddress === ownerId).slice(0, boundedLimit).map(publicBnbActivationRecord),
-    accessRequests: processStore.accessRequests.filter((record) => !ownerId || record.clientAddress === ownerId).slice(0, boundedLimit),
-    termixComparisons: processStore.termixComparisons.filter((record) => !ownerId || record.clientAddress === ownerId).slice(0, boundedLimit),
-    altanaSessions: processStore.altanaSessions.filter((record) => !ownerId || record.clientAddress === ownerId).slice(0, boundedLimit),
+    activations: processStore.activations.filter(ownsRecord).slice(0, boundedLimit).map(publicBnbActivationRecord),
+    accessRequests: processStore.accessRequests.filter(ownsRecord).slice(0, boundedLimit),
+    termixComparisons: processStore.termixComparisons.filter(ownsRecord).slice(0, boundedLimit),
+    altanaSessions: processStore.altanaSessions.filter(ownsRecord).slice(0, boundedLimit),
     storage: "process",
     lastUpdated: new Date().toISOString(),
   };
+}
+
+function normalizeOwnerIds(ownerIds?: string | string[]) {
+  const values = Array.isArray(ownerIds) ? ownerIds : ownerIds ? [ownerIds] : [];
+  return Array.from(new Set(values.map((value) => value.trim()).filter(Boolean)));
 }
 
 export function publicBnbActivationRecord(record: BnbActivationRecord): BnbActivationRecord {

@@ -1,0 +1,504 @@
+.page {
+  min-height: 100vh;
+  background: #f7f8f4;
+  color: #171815;
+}
+
+.pageHeader {
+  border-bottom: 1px solid #dfe2da;
+  background: #fcfcf8;
+  padding: 32px 0 26px;
+}
+
+.pageHeader span,
+.recordsHeader > div > span {
+  color: #73776f;
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1.4;
+}
+
+.pageHeader h1 {
+  margin: 8px 0 0;
+  color: #171815;
+  font-size: 36px;
+  font-weight: 620;
+  letter-spacing: 0;
+  line-height: 1.08;
+}
+
+.pageHeader p {
+  margin: 9px 0 0;
+  color: #60645d;
+  font-size: 14px;
+  line-height: 1.55;
+}
+
+.frame {
+  padding-top: 30px;
+  padding-bottom: 80px;
+}
+
+.embedded {
+  width: min(100% - 32px, 1180px);
+  margin: 0 auto;
+}
+
+.loadingState,
+.authState {
+  display: flex;
+  min-height: 320px;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  border: 1px solid #dfe2da;
+  border-radius: 8px;
+  background: #fcfcf8;
+  color: #60645d;
+  font-size: 13px;
+}
+
+.authState {
+  flex-direction: column;
+  padding: 36px;
+  text-align: center;
+}
+
+.authState > svg {
+  color: #60645d;
+}
+
+.authState h2 {
+  margin: 4px 0 0;
+  color: #171815;
+  font-size: 24px;
+  font-weight: 650;
+  letter-spacing: 0;
+}
+
+.authState p {
+  max-width: 460px;
+  margin: 0;
+  color: #60645d;
+  font-size: 13px;
+  line-height: 1.55;
+}
+
+.authState :global(.bnb-button) {
+  margin-top: 12px;
+}
+
+.errorBand {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 18px;
+  border-left: 2px solid #9b372e;
+  background: #fff;
+  padding: 13px 16px;
+  color: #8f2f27;
+  font-size: 12px;
+}
+
+.records {
+  display: block;
+  width: 100%;
+  min-width: 0;
+}
+
+.recordsHeader {
+  display: flex;
+  align-items: end;
+  justify-content: space-between;
+  gap: 20px;
+  border-bottom: 1px solid #cfd3ca;
+  padding-bottom: 16px;
+}
+
+.recordsHeader h2 {
+  margin: 5px 0 0;
+  color: #171815;
+  font-size: 22px;
+  font-weight: 650;
+  letter-spacing: 0;
+}
+
+.records :global(.bnb-button),
+.records :global(.bnb-button-dark),
+.authState :global(.bnb-button) {
+  min-height: 40px;
+  border-radius: 6px;
+}
+
+.records :global(.bnb-button),
+.authState :global(.bnb-button) {
+  border-color: #171815;
+  background: #171815;
+  color: #fff;
+}
+
+.records :global(.bnb-button-dark) {
+  border-color: #c7cbc2;
+  background: #fff;
+  color: #343731;
+}
+
+.filterBar {
+  display: flex;
+  overflow-x: auto;
+  border-bottom: 1px solid #dfe2da;
+  scrollbar-width: none;
+}
+
+.filterBar::-webkit-scrollbar {
+  display: none;
+}
+
+.filterBar button {
+  position: relative;
+  display: inline-flex;
+  flex: 0 0 auto;
+  min-height: 50px;
+  align-items: center;
+  gap: 7px;
+  border: 0;
+  background: transparent;
+  padding: 0 16px;
+  color: #73776f;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.filterBar button:first-child {
+  padding-left: 0;
+}
+
+.filterBar button[aria-selected="true"] {
+  color: #171815;
+}
+
+.filterBar button[aria-selected="true"]::after {
+  position: absolute;
+  right: 16px;
+  bottom: -1px;
+  left: 16px;
+  height: 2px;
+  background: #171815;
+  content: "";
+}
+
+.filterBar button:first-child[aria-selected="true"]::after {
+  left: 0;
+}
+
+.filterBar button span {
+  display: grid;
+  min-width: 19px;
+  height: 19px;
+  place-items: center;
+  border-radius: 999px;
+  background: #e9ebe5;
+  color: #60645d;
+  font-size: 10px;
+  font-variant-numeric: tabular-nums;
+}
+
+.columnHead,
+.activityRow {
+  display: grid;
+  grid-template-columns: minmax(320px, 1fr) 105px 125px 110px 156px;
+  gap: 18px;
+  align-items: center;
+}
+
+.columnHead {
+  min-height: 42px;
+  border-bottom: 1px solid #dfe2da;
+  color: #858a82;
+  font-size: 10px;
+  font-weight: 700;
+}
+
+.columnHead span:last-child {
+  text-align: right;
+}
+
+.activityRow {
+  min-height: 106px;
+  border-bottom: 1px solid #dfe2da;
+  padding: 17px 0;
+}
+
+.recordIdentity {
+  display: grid;
+  grid-template-columns: 34px minmax(0, 1fr);
+  gap: 12px;
+  min-width: 0;
+  align-items: start;
+}
+
+.recordIdentity > span {
+  display: grid;
+  width: 34px;
+  height: 34px;
+  place-items: center;
+  border: 1px solid #cfd3ca;
+  border-radius: 6px;
+  background: #fcfcf8;
+  color: #60645d;
+}
+
+.recordIdentity > div {
+  min-width: 0;
+}
+
+.recordIdentity small,
+.recordIdentity strong,
+.recordIdentity p {
+  display: block;
+}
+
+.recordIdentity small {
+  color: #858a82;
+  font-size: 10px;
+  font-weight: 650;
+  line-height: 1.4;
+}
+
+.recordIdentity strong {
+  margin-top: 3px;
+  color: #171815;
+  font-size: 13px;
+  font-weight: 650;
+  line-height: 1.4;
+  overflow-wrap: anywhere;
+}
+
+.recordIdentity strong a {
+  color: inherit;
+  text-decoration: none;
+}
+
+.recordIdentity p {
+  display: -webkit-box;
+  margin: 4px 0 0;
+  overflow: hidden;
+  color: #60645d;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  font-size: 11px;
+  line-height: 1.45;
+}
+
+.activityRow > time,
+.amount {
+  color: #60645d;
+  font-size: 11px;
+  line-height: 1.4;
+  font-variant-numeric: tabular-nums;
+  overflow-wrap: anywhere;
+}
+
+.amount {
+  color: #343731;
+  font-weight: 650;
+}
+
+.status {
+  display: inline-flex;
+  width: fit-content;
+  align-items: center;
+  gap: 7px;
+  color: #60645d;
+  font-size: 11px;
+  font-weight: 650;
+  line-height: 1.4;
+}
+
+.status i {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #9ca098;
+}
+
+.status[data-state="complete"] {
+  color: #286441;
+}
+
+.status[data-state="complete"] i {
+  background: #286441;
+}
+
+.status[data-state="current"] {
+  color: #2f5da8;
+}
+
+.status[data-state="current"] i {
+  background: #2f6fed;
+}
+
+.status[data-state="failed"] {
+  color: #9b372e;
+}
+
+.status[data-state="failed"] i {
+  background: #9b372e;
+}
+
+.rowActions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 7px;
+}
+
+.textAction {
+  display: inline-flex;
+  min-height: 38px;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  border: 0;
+  background: transparent;
+  padding: 0 6px;
+  color: #4f534d;
+  font: inherit;
+  font-size: 11px;
+  font-weight: 650;
+  text-decoration: underline;
+  text-underline-offset: 4px;
+  cursor: pointer;
+}
+
+.textAction:disabled {
+  cursor: wait;
+  opacity: 0.55;
+}
+
+.recordsLoading {
+  display: grid;
+  width: 100%;
+  min-height: 280px;
+  grid-column: 1 / -1;
+  place-items: center;
+  border-bottom: 1px solid #dfe2da;
+  color: #60645d;
+}
+
+.emptyState {
+  display: flex;
+  min-height: 280px;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+}
+
+.emptyState > svg {
+  color: #73776f;
+}
+
+.emptyState strong {
+  margin-top: 12px;
+  color: #343731;
+  font-size: 14px;
+  font-weight: 650;
+}
+
+.emptyState p {
+  max-width: 420px;
+  margin: 5px 0 0;
+  color: #73776f;
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.emptyState :global(.bnb-button) {
+  margin-top: 18px;
+}
+
+@media (max-width: 980px) {
+  .columnHead,
+  .activityRow {
+    grid-template-columns: minmax(280px, 1fr) 100px 120px 145px;
+  }
+
+  .columnHead span:nth-child(4),
+  .amount {
+    display: none;
+  }
+}
+
+@media (max-width: 760px) {
+  .pageHeader {
+    padding: 24px 0 21px;
+  }
+
+  .pageHeader h1 {
+    font-size: 30px;
+  }
+
+  .frame {
+    padding-top: 20px;
+    padding-bottom: 52px;
+  }
+
+  .recordsHeader {
+    align-items: center;
+  }
+
+  .columnHead {
+    display: none;
+  }
+
+  .activityRow {
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 10px 14px;
+    min-height: 0;
+    padding: 18px 0;
+  }
+
+  .recordIdentity {
+    grid-column: 1 / -1;
+  }
+
+  .activityRow > time {
+    grid-column: 1;
+    padding-left: 46px;
+  }
+
+  .status {
+    grid-column: 2;
+    grid-row: 2;
+  }
+
+  .rowActions {
+    grid-column: 1 / -1;
+    justify-content: stretch;
+    padding-left: 46px;
+  }
+
+  .rowActions :global(.bnb-button),
+  .rowActions :global(.bnb-button-dark) {
+    flex: 1;
+  }
+}
+
+@media (max-width: 440px) {
+  .recordsHeader :global(.bnb-button-dark) {
+    min-height: 38px;
+    padding: 0 11px;
+  }
+
+  .filterBar {
+    margin-right: -16px;
+  }
+
+  .authState {
+    padding: 28px 20px;
+  }
+}

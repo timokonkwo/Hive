@@ -1,11 +1,24 @@
+import { createHash } from "node:crypto";
+import type { Filter } from "mongodb";
 import { COLLECTIONS, getDb } from "@/lib/db";
-import { applyBnbEndpointCapabilitySnapshots } from "@/lib/bnb/endpoint-capabilities";
+import {
+  applyBnbEndpointCapabilitySnapshots,
+  listBnbCurrentActionableCapabilityAgentKeys,
+} from "@/lib/bnb/endpoint-capabilities";
 import { applyBnbEndpointProbeHealth } from "@/lib/bnb/endpoint-observability";
 import { validatePublicHttpsUrl } from "@/lib/bnb/endpoint-security";
+import { withBnbAgentImage } from "@/lib/bnb/agent-media";
 import { activeBnbListingModerationKeys, isBnbListingModerated } from "@/lib/bnb/moderation";
 import { getBscChainId } from "@/lib/bnb/chain";
 import { isStrictBscAgentDiscoveryEnabled } from "@/lib/bnb/discovery-policy";
-import type { BnbAgentPageResult, BnbAgentProfile, BnbAgentQuery, BnbAgentSource, BnbExecutionStatus } from "@/lib/bnb/types";
+import type {
+  BnbAgentPageResult,
+  BnbAgentProfile,
+  BnbAgentQuery,
+  BnbAgentSource,
+  BnbExecutionEndpoint,
+  BnbExecutionStatus,
+} from "@/lib/bnb/types";
 
 type BnbAgentCacheDocument = {
   _id: string;
@@ -38,6 +51,8 @@ type BnbAgentCacheDocument = {
   runtimeProofAt?: Date;
   runtimeProofVersion?: number;
   runtimeProofChainId?: number;
+  runtimeMetadataFingerprint?: string;
+  inspectedRuntimeMetadataFingerprint?: string;
   lastSeenAt: Date;
 };
 
@@ -152,7 +167,6 @@ export async function readCachedBnbPromotionCandidates(limit = 12): Promise<BnbA
       runtimeProofVersion: RUNTIME_PROOF_VERSION,
       runtimeProofChainId: getBscChainId(),
       runtimeProofAt: { $gte: new Date(Date.now() - runtimeProofTtlMs()) },
-      cachedAt: { $gte: new Date(Date.now() - getBnbAgentCacheStaleMs()) },
       ...(moderatedKeys.length > 0 ? { _id: { $nin: moderatedKeys } } : {}),
     })
     .sort(cacheSort("recommended"))
@@ -174,7 +188,6 @@ export async function readCachedBnbRuntimeCandidates(limit = 50): Promise<BnbAge
       ...(isStrictBscAgentDiscoveryEnabled() ? { source: "8004scan" } : {}),
       category: { $ne: "Other" },
       hasCallableEndpoint: true,
-      cachedAt: { $gte: new Date(Date.now() - getBnbAgentCacheStaleMs()) },
       ...(moderatedKeys.length > 0 ? { _id: { $nin: moderatedKeys } } : {}),
     })
     .sort(cacheSort("recommended"))
@@ -283,8 +296,14 @@ export async function upsertBnbAgentCache(agents: BnbAgentProfile[], options: Ca
   await ensureBnbAgentCacheIndexes();
 
   const now = options.fetchedAt || new Date();
+  const collection = db.collection<BnbAgentCacheDocument>(COLLECTIONS.BNB_AGENT_CACHE);
+  const agentKeys = agents.map((agent) => cacheKey(agent.chainId, agent.tokenId));
+  const existingDocs = await collection.find({ _id: { $in: agentKeys } }).toArray();
+  const existingById = new Map(existingDocs.map((doc) => [doc._id, doc]));
   const writes = agents.map((agent) => {
-    const doc = cacheDocument(agent, now, options);
+    const existing = existingById.get(cacheKey(agent.chainId, agent.tokenId));
+    const mergedAgent = mergeCachedAgentProfile(existing, agent, options, now);
+    const doc = cacheDocument(mergedAgent, now, options);
     const update: Record<string, unknown> = {
       $set: {
         chainId: doc.chainId,
@@ -298,6 +317,7 @@ export async function upsertBnbAgentCache(agents: BnbAgentProfile[], options: Ca
         needsHydration: doc.needsHydration,
         searchTokens: doc.searchTokens,
         sort: doc.sort,
+        runtimeMetadataFingerprint: doc.runtimeMetadataFingerprint,
         cachedAt: doc.cachedAt,
         refreshedAt: doc.refreshedAt,
         lastSeenAt: doc.lastSeenAt,
@@ -305,6 +325,9 @@ export async function upsertBnbAgentCache(agents: BnbAgentProfile[], options: Ca
         ...(options.runtimeProbed ? { runtimeProofAt: now } : {}),
         ...(options.runtimeProbed ? { runtimeProofVersion: RUNTIME_PROOF_VERSION } : {}),
         ...(options.runtimeProbed ? { runtimeProofChainId: getBscChainId() } : {}),
+        ...(options.hydrated ? {
+          inspectedRuntimeMetadataFingerprint: doc.runtimeMetadataFingerprint,
+        } : {}),
       },
       $setOnInsert: {
         hydrateAttempts: 0,
@@ -326,9 +349,9 @@ export async function upsertBnbAgentCache(agents: BnbAgentProfile[], options: Ca
     };
   });
 
-  await db.collection<BnbAgentCacheDocument>(COLLECTIONS.BNB_AGENT_CACHE).bulkWrite(writes, { ordered: false });
+  await collection.bulkWrite(writes, { ordered: false });
   if (options.queueHydration) {
-    await db.collection<BnbAgentCacheDocument>(COLLECTIONS.BNB_AGENT_CACHE).updateMany(
+    await collection.updateMany(
       {
         _id: { $in: agents.map((agent) => cacheKey(agent.chainId, agent.tokenId)) },
         needsHydration: true,
@@ -337,6 +360,12 @@ export async function upsertBnbAgentCache(agents: BnbAgentProfile[], options: Ca
           { runtimeProofChainId: { $ne: getBscChainId() } },
           { runtimeProofAt: { $lt: new Date(now.getTime() - runtimeProofTtlMs()) } },
           { runtimeProofAt: { $exists: false } },
+          { inspectedRuntimeMetadataFingerprint: { $exists: false } },
+          {
+            $expr: {
+              $ne: ["$runtimeMetadataFingerprint", "$inspectedRuntimeMetadataFingerprint"],
+            },
+          },
         ],
       },
       { $set: { hydrationStatus: "pending", hydrateAfter: now } },
@@ -352,23 +381,94 @@ export async function claimBnbAgentHydrationBatch(limit = getBnbAgentHydrationBa
 
   const now = new Date();
   const lockUntil = new Date(now.getTime() + 2 * 60 * 1000);
-  const candidates = await db.collection<BnbAgentCacheDocument>(COLLECTIONS.BNB_AGENT_CACHE)
-    .find({
-      needsHydration: true,
-      hydrationStatus: { $in: ["pending", "failed"] },
-      hydrateAfter: { $lte: now },
-      $or: [
-        { hydrateLockedUntil: { $exists: false } },
-        { hydrateLockedUntil: { $lte: now } },
-      ],
-    })
-    .sort({ hydrateAttempts: 1, lastSeenAt: -1 })
-    .limit(Math.min(Math.max(Math.trunc(limit), 1), 24))
-    .toArray();
+  const expiredProofAt = new Date(now.getTime() - runtimeProofTtlMs());
+  const collection = db.collection<BnbAgentCacheDocument>(COLLECTIONS.BNB_AGENT_CACHE);
+  const safeLimit = Math.min(Math.max(Math.trunc(limit), 1), 24);
+  const claimableFilter: Filter<BnbAgentCacheDocument> = {
+    hydrateAfter: { $lte: now },
+    $and: [
+      {
+        $or: [
+          {
+            needsHydration: true,
+            hydrationStatus: { $in: ["pending", "failed"] },
+            $or: [
+              { hasCallableEndpoint: false },
+              { runtimeProofVersion: { $ne: RUNTIME_PROOF_VERSION } },
+              { runtimeProofChainId: { $ne: getBscChainId() } },
+              { runtimeProofAt: { $lt: expiredProofAt } },
+              { runtimeProofAt: { $exists: false } },
+            ],
+          },
+          {
+            hasCallableEndpoint: true,
+            $or: [
+              { runtimeProofVersion: { $ne: RUNTIME_PROOF_VERSION } },
+              { runtimeProofChainId: { $ne: getBscChainId() } },
+              { runtimeProofAt: { $lt: expiredProofAt } },
+              { runtimeProofAt: { $exists: false } },
+            ],
+          },
+          {
+            hasCallableEndpoint: false,
+            $and: [
+              {
+                $or: [
+                  { "agent.services.type": { $in: ["mcp", "a2a", "x402", "http"] } },
+                  { "agent.mcpSupport": true },
+                  { "agent.a2aSupport": true },
+                  { "agent.x402Support": true },
+                ],
+              },
+              {
+                $or: [
+                  { inspectedRuntimeMetadataFingerprint: { $exists: false } },
+                  {
+                    $expr: {
+                      $ne: ["$runtimeMetadataFingerprint", "$inspectedRuntimeMetadataFingerprint"],
+                    },
+                  },
+                ],
+              },
+            ],
+          },
+        ],
+      },
+      {
+        $or: [
+          { hydrateLockedUntil: { $exists: false } },
+          { hydrateLockedUntil: { $lte: now } },
+        ],
+      },
+    ],
+  };
+  const priorityKeys = await listBnbCurrentActionableCapabilityAgentKeys();
+  const candidateSort = { "sort.readyRank": -1 as const, runtimeProofAt: -1 as const, hydrateAttempts: 1 as const, lastSeenAt: -1 as const };
+  const priorityCandidates = priorityKeys.length > 0
+    ? await collection
+      .find({ ...claimableFilter, _id: { $in: priorityKeys } })
+      .sort(candidateSort)
+      .limit(safeLimit)
+      .toArray()
+    : [];
+  const remaining = safeLimit - priorityCandidates.length;
+  const candidates = remaining > 0
+    ? [
+      ...priorityCandidates,
+      ...await collection
+        .find({
+          ...claimableFilter,
+          ...(priorityCandidates.length > 0 ? { _id: { $nin: priorityCandidates.map((candidate) => candidate._id) } } : {}),
+        })
+        .sort(candidateSort)
+        .limit(remaining)
+        .toArray(),
+    ]
+    : priorityCandidates;
 
   const claimed: BnbAgentProfile[] = [];
   for (const candidate of candidates) {
-    const result = await db.collection<BnbAgentCacheDocument>(COLLECTIONS.BNB_AGENT_CACHE).findOneAndUpdate(
+    const result = await collection.findOneAndUpdate(
       {
         _id: candidate._id,
         $or: [
@@ -410,6 +510,7 @@ export async function completeBnbAgentHydration(agent: BnbAgentProfile, hydrated
           runtimeProofAt: now,
           runtimeProofVersion: RUNTIME_PROOF_VERSION,
           runtimeProofChainId: getBscChainId(),
+          inspectedRuntimeMetadataFingerprint: runtimeMetadataFingerprint(hydrated),
         },
         $unset: { hydrateError: "", hydrateLockedUntil: "" },
       },
@@ -461,6 +562,7 @@ async function ensureBnbAgentCacheIndexes() {
       collection.createIndex({ category: 1, executionStatus: 1, "sort.readyRank": -1, "sort.totalScore": -1 }),
       collection.createIndex({ searchTokens: 1 }),
       collection.createIndex({ needsHydration: 1, hydrationStatus: 1, hydrateAfter: 1 }),
+      collection.createIndex({ hasCallableEndpoint: 1, inspectedRuntimeMetadataFingerprint: 1 }),
       db.collection(COLLECTIONS.BNB_AGENT_CACHE_RUNS).createIndex({ type: 1, createdAt: -1 }),
     ]);
   })().catch((error) => {
@@ -500,6 +602,7 @@ function cacheDocument(agent: BnbAgentProfile, now: Date, options: CacheUpsertOp
     hydrateAttempts: 0,
     hydrateAfter: now,
     searchTokens: tokenizeAgent(agent),
+    runtimeMetadataFingerprint: runtimeMetadataFingerprint(agent),
     sort: {
       readyRank: readyRank(agent),
       sourceRank: sourceRank(agent.sourceFreshness.source),
@@ -516,6 +619,100 @@ function cacheDocument(agent: BnbAgentProfile, now: Date, options: CacheUpsertOp
     ...(options.runtimeProbed ? { runtimeProofVersion: RUNTIME_PROOF_VERSION } : {}),
     ...(options.runtimeProbed ? { runtimeProofChainId: getBscChainId() } : {}),
   };
+}
+
+function runtimeMetadataFingerprint(agent: BnbAgentProfile) {
+  const revision = {
+    chainId: agent.chainId,
+    tokenId: agent.tokenId,
+    metadataUri: agent.metadataUri || "",
+    sourceAgentId: agent.sourceMetrics?.sourceAgentId || "",
+    sourceUpdatedAt: agent.sourceMetrics?.updatedAt || "",
+    supportedProtocols: [...(agent.sourceMetrics?.supportedProtocols || [])]
+      .map((protocol) => protocol.trim().toLowerCase())
+      .filter(Boolean)
+      .sort(),
+    mcpSupport: agent.mcpSupport,
+    a2aSupport: agent.a2aSupport,
+    x402Support: agent.x402Support,
+  };
+  return createHash("sha256").update(JSON.stringify(revision)).digest("hex");
+}
+
+function mergeCachedAgentProfile(
+  existing: BnbAgentCacheDocument | undefined,
+  incoming: BnbAgentProfile,
+  options: CacheUpsertOptions,
+  now: Date,
+): BnbAgentProfile {
+  if (!existing) return incoming;
+
+  const cached = existing.agent;
+  const incomingHasCallableEndpoint = Boolean(incoming.executionEndpoints?.length);
+  const cachedProofCurrent = existing.runtimeProofVersion === RUNTIME_PROOF_VERSION
+    && existing.runtimeProofChainId === getBscChainId()
+    && Boolean(existing.runtimeProofAt)
+    && now.getTime() - existing.runtimeProofAt!.getTime() <= runtimeProofTtlMs();
+  const preserveLastKnownRuntime = !incomingHasCallableEndpoint
+    && Boolean(cached.executionEndpoints?.length)
+    && cachedProofCurrent;
+  if ((options.hydrated || options.runtimeProbed) && !preserveLastKnownRuntime) return incoming;
+
+  const executionEndpoints = mergeExecutionEndpoints(cached.executionEndpoints || [], incoming.executionEndpoints || []);
+  const preserveRuntimeProof = Boolean(
+    cached.hasActionableEndpointCapabilities !== undefined
+    || cached.endpointCapabilities?.length
+    || cached.executionEndpoints?.length,
+  );
+
+  return {
+    ...cached,
+    ...incoming,
+    ...((incoming.imageUrl || cached.imageUrl) ? { imageUrl: incoming.imageUrl || cached.imageUrl } : {}),
+    services: mergeAgentServices(cached.services, incoming.services),
+    capabilities: Array.from(new Set([...cached.capabilities, ...incoming.capabilities])),
+    executionEndpoints,
+    ...(preserveRuntimeProof ? {
+      executionStatus: cached.executionStatus,
+      activationStatus: cached.activationStatus,
+      ...(cached.endpointCapabilities ? { endpointCapabilities: cached.endpointCapabilities } : {}),
+      ...(cached.hasActionableEndpointCapabilities !== undefined
+        ? { hasActionableEndpointCapabilities: cached.hasActionableEndpointCapabilities }
+        : {}),
+    } : {}),
+  };
+}
+
+function mergeExecutionEndpoints(
+  cached: NonNullable<BnbAgentProfile["executionEndpoints"]>,
+  incoming: NonNullable<BnbAgentProfile["executionEndpoints"]>,
+) {
+  const endpoints = new Map<string, BnbExecutionEndpoint>();
+  for (const endpoint of [...cached, ...incoming]) {
+    const key = `${endpoint.adapter}:${endpoint.url}`;
+    const previous = endpoints.get(key);
+    endpoints.set(key, previous ? {
+      ...previous,
+      ...endpoint,
+      verified: previous.verified || endpoint.verified,
+    } : endpoint);
+  }
+  return Array.from(endpoints.values());
+}
+
+function mergeAgentServices(cached: BnbAgentProfile["services"], incoming: BnbAgentProfile["services"]) {
+  const services = new Map<string, BnbAgentProfile["services"][number]>();
+  for (const service of [...cached, ...incoming]) {
+    const key = `${service.type}:${service.name.toLowerCase()}`;
+    const previous = services.get(key);
+    services.set(key, previous ? {
+      ...previous,
+      ...service,
+      endpoint: service.endpoint || previous.endpoint,
+      price: service.price || previous.price,
+    } : service);
+  }
+  return Array.from(services.values());
 }
 
 function cacheFilter(query: BnbAgentQuery) {
@@ -565,7 +762,8 @@ function cacheHitIsUsable(query: BnbAgentQuery, docs: BnbAgentCacheDocument[], t
 }
 
 function agentFromCacheDocument(doc: BnbAgentCacheDocument) {
-  const executionEndpoints = (doc.agent.executionEndpoints || [])
+  const cachedAgent = withBnbAgentImage(doc.agent);
+  const executionEndpoints = (cachedAgent.executionEndpoints || [])
     .filter((endpoint) => validatePublicHttpsUrl(endpoint.url).ok);
   const proofExpired = !doc.runtimeProofAt
     || Date.now() - doc.runtimeProofAt.getTime() > runtimeProofTtlMs();
@@ -574,9 +772,9 @@ function agentFromCacheDocument(doc: BnbAgentCacheDocument) {
     && !proofExpired;
   if (
     !proofCurrent &&
-    doc.agent.executionStatus === "ready_to_run"
+    cachedAgent.executionStatus === "ready_to_run"
   ) {
-    const agent = withoutRuntimeCapabilityProof(doc.agent);
+    const agent = withoutRuntimeCapabilityProof(cachedAgent);
     return {
       ...agent,
       executionEndpoints,
@@ -584,8 +782,8 @@ function agentFromCacheDocument(doc: BnbAgentCacheDocument) {
       activationStatus: executionEndpoints.length > 0 ? "request" as const : "discoverable" as const,
     };
   }
-  if (!proofCurrent && doc.agent.hasActionableEndpointCapabilities !== undefined) {
-    const agent = withoutRuntimeCapabilityProof(doc.agent);
+  if (!proofCurrent && cachedAgent.hasActionableEndpointCapabilities !== undefined) {
+    const agent = withoutRuntimeCapabilityProof(cachedAgent);
     return {
       ...agent,
       executionEndpoints,
@@ -593,15 +791,15 @@ function agentFromCacheDocument(doc: BnbAgentCacheDocument) {
       activationStatus: executionEndpoints.length > 0 ? "request" as const : "discoverable" as const,
     };
   }
-  if (executionEndpoints.length !== (doc.agent.executionEndpoints || []).length) {
+  if (executionEndpoints.length !== (cachedAgent.executionEndpoints || []).length) {
     return {
-      ...doc.agent,
+      ...cachedAgent,
       executionEndpoints,
-      executionStatus: executionEndpoints.length > 0 ? doc.agent.executionStatus : "listed_only" as const,
-      activationStatus: executionEndpoints.length > 0 ? doc.agent.activationStatus : "discoverable" as const,
+      executionStatus: executionEndpoints.length > 0 ? cachedAgent.executionStatus : "listed_only" as const,
+      activationStatus: executionEndpoints.length > 0 ? cachedAgent.activationStatus : "discoverable" as const,
     };
   }
-  return doc.agent;
+  return cachedAgent;
 }
 
 function withoutRuntimeCapabilityProof(agent: BnbAgentProfile) {

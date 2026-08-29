@@ -9,7 +9,7 @@ export default async () => {
     return new Response(JSON.stringify({ error: 'Missing secret' }), { status: 500 });
   }
 
-  const url = `${siteUrl}/api/cron/bnb-agent-cache?mode=all&pages=2&pageSize=50&batch=6`;
+  const url = `${siteUrl}/api/cron/bnb-agent-cache?mode=all&pages=2&pageSize=50&batch=24`;
   try {
     console.log(`[BNB_AGENT_CACHE] Triggering ${url}`);
     const response = await fetch(url, {

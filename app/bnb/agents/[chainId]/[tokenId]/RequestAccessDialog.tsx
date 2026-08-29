@@ -14,6 +14,7 @@ type RequestAccessDialogProps = {
 export function RequestAccessDialog({ agent, className = "bnb-button bnb-focus" }: RequestAccessDialogProps) {
   const [open, setOpen] = useState(false);
   const titleId = useId();
+  const triggerRef = useRef<HTMLButtonElement>(null);
   const closeRef = useRef<HTMLButtonElement>(null);
   const agentName = bnbAgentDisplayName(agent);
 
@@ -33,12 +34,13 @@ export function RequestAccessDialog({ agent, className = "bnb-button bnb-focus" 
     return () => {
       document.body.style.overflow = previousOverflow;
       document.removeEventListener("keydown", onKeyDown);
+      triggerRef.current?.focus();
     };
   }, [open]);
 
   return (
     <>
-      <button type="button" className={className} onClick={() => setOpen(true)}>
+      <button ref={triggerRef} type="button" className={className} onClick={() => setOpen(true)}>
         Request this agent <ArrowRight aria-hidden="true" size={16} />
       </button>
 

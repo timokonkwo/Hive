@@ -4,29 +4,30 @@ import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { useModalStatus, useWallets, type ConnectedWallet } from "@privy-io/react-auth";
 import { useSetActiveWallet } from "@privy-io/wagmi";
-import { useAccount, useSwitchChain } from "wagmi";
-import { CheckCircle2, LogOut, UserRound, Wallet } from "lucide-react";
+import { useAccount, useDisconnect, useSwitchChain } from "wagmi";
+import { ArrowRight, CircleUserRound, LogOut, Unplug, WalletCards } from "lucide-react";
 import { BnbButtonLoader } from "@/app/bnb/_components/BnbButtonLoader";
-import { BnbContainer, BnbPanel } from "@/app/bnb/_components/BnbUi";
+import { BnbContainer } from "@/app/bnb/_components/BnbUi";
 import { CopyValueButton } from "@/app/bnb/_components/CopyValueButton";
 import { useAuth } from "@/hooks/useAuth";
 import { getClientBnbChainId, getClientBnbNativeSymbol } from "@/lib/bnb/client-chain";
+import styles from "./account.module.css";
 
 type AuthUserView = {
-  email?: {
-    address?: string;
-  };
+  email?: { address?: string };
 };
 
 export function BnbAccountClient() {
   const { authenticated, connectWallet, login, logout, ready, user } = useAuth();
   const { address, chainId } = useAccount();
+  const { disconnectAsync } = useDisconnect();
   const { switchChainAsync } = useSwitchChain();
   const { isOpen: privyModalOpen } = useModalStatus();
-  const { wallets, ready: walletsReady } = useWallets();
+  const { wallets } = useWallets();
   const { setActiveWallet } = useSetActiveWallet();
   const [action, setAction] = useState("");
   const [error, setError] = useState("");
+  const [authReadyTimedOut, setAuthReadyTimedOut] = useState(false);
 
   const evmWallets = useMemo(
     () => wallets.filter((wallet): wallet is ConnectedWallet => wallet.type === "ethereum"),
@@ -41,10 +42,18 @@ export function BnbAccountClient() {
   const connectingWallet = action === "connect" || privyModalOpen;
 
   useEffect(() => {
-    if (!privyModalOpen && (action === "login" || action === "connect")) {
-      setAction("");
-    }
+    if (!privyModalOpen && (action === "login" || action === "connect")) setAction("");
   }, [action, privyModalOpen]);
+
+  useEffect(() => {
+    if (ready || authenticated || address) {
+      setAuthReadyTimedOut(false);
+      return;
+    }
+
+    const timeoutId = window.setTimeout(() => setAuthReadyTimedOut(true), 5_000);
+    return () => window.clearTimeout(timeoutId);
+  }, [address, authenticated, ready]);
 
   useEffect(() => {
     if (!authenticated || address || evmWallets.length === 0) return;
@@ -63,16 +72,12 @@ export function BnbAccountClient() {
   function signInWithBnbWallet() {
     setAction("login");
     setError("");
-    login({
-      loginMethods: ["wallet"],
-      walletChainType: "ethereum-only",
-    });
+    login({ loginMethods: ["wallet"], walletChainType: "ethereum-only" });
   }
 
   async function switchToBnb() {
     setAction("switch");
     setError("");
-
     try {
       await switchChainAsync({ chainId: targetChainId });
     } catch (switchError) {
@@ -82,24 +87,11 @@ export function BnbAccountClient() {
     }
   }
 
-  async function selectWallet(wallet: ConnectedWallet) {
-    setAction(`wallet:${wallet.address}`);
-    setError("");
-
-    try {
-      await setActiveWallet(wallet);
-    } catch (walletError) {
-      setError(walletError instanceof Error ? walletError.message : "Could not switch wallet.");
-    } finally {
-      setAction("");
-    }
-  }
-
   async function signOut() {
     setAction("logout");
     setError("");
-
     try {
+      await clearWalletSession();
       await logout();
     } catch (logoutError) {
       setError(logoutError instanceof Error ? logoutError.message : "Could not sign out.");
@@ -108,147 +100,107 @@ export function BnbAccountClient() {
     }
   }
 
-  if (!ready && !address) {
-    return (
-      <BnbContainer className="bnb-section">
-        <BnbPanel className="bnb-account-panel">
-          <p>Loading account...</p>
-        </BnbPanel>
-      </BnbContainer>
-    );
+  async function disconnectWallet() {
+    setAction("disconnect");
+    setError("");
+    try {
+      await clearWalletSession();
+      const activeWallet = evmWallets.find((wallet) => wallet.address.toLowerCase() === address?.toLowerCase());
+      activeWallet?.disconnect();
+      await disconnectAsync();
+      if (authenticated) await logout();
+    } catch (disconnectError) {
+      setError(disconnectError instanceof Error ? disconnectError.message : "Could not disconnect wallet.");
+    } finally {
+      setAction("");
+    }
+  }
+
+  if (!ready && !authenticated && !address && !authReadyTimedOut) {
+    return <BnbContainer className={styles.body}><div className={styles.loadingState} role="status"><BnbButtonLoader size={20} /><span>Loading account</span></div></BnbContainer>;
   }
 
   if (!authenticated && !address) {
     return (
-      <BnbContainer className="bnb-section">
-        <BnbPanel className="bnb-account-panel bnb-account-auth">
-          <div className="bnb-account-icon">
-            <UserRound aria-hidden="true" size={20} />
-          </div>
+      <BnbContainer className={styles.body}>
+        <section className={styles.authState}>
+          <CircleUserRound aria-hidden="true" size={21} />
           <h2>Sign in to Hive</h2>
-          <p>View your wallet, hires, requests, alerts, and payments from one account.</p>
+          <p>Sign in with a wallet to view jobs and manage payments.</p>
           <button type="button" className="bnb-button bnb-focus" onClick={signInWithBnbWallet} disabled={signingIn} aria-busy={signingIn}>
             {signingIn ? <BnbButtonLoader /> : null}
             {signingIn ? "Opening wallet..." : "Sign in"}
           </button>
-        </BnbPanel>
+        </section>
       </BnbContainer>
     );
   }
 
   return (
-    <BnbContainer className="bnb-section bnb-account-layout">
-      <BnbPanel className="bnb-account-panel">
-        <div className="bnb-account-panel-head">
+    <BnbContainer className={styles.body}>
+      {error ? <div className={styles.errorBand} role="alert">{error}</div> : null}
+
+      <section className={styles.readiness} aria-labelledby="wallet-readiness-title">
+        <div className={styles.readinessTitle}>
+          <span className={styles.readinessIcon} data-state={address && onBnb ? "connected" : address ? "wrong-network" : "not-connected"} aria-hidden="true"><WalletCards size={18} /></span>
           <div>
-            <h2>Wallet</h2>
-            <p>Use this wallet for BNB hires, alerts, and payments.</p>
+            <span>Active wallet</span>
+            <div className={styles.walletHeading}>
+              <h2 id="wallet-readiness-title">{address ? shortAddress(address) : "Not connected"}</h2>
+              {address ? <CopyValueButton value={address} label="wallet address" /> : null}
+            </div>
           </div>
-          <span className={`bnb-chip ${address && onBnb ? "bnb-chip-active" : ""}`}>
-            {address && onBnb ? "Ready" : address ? "Wrong network" : "No wallet"}
-          </span>
         </div>
-
-        <dl className="mt-5">
-          {email ? <AccountRow label="Signed in as" value={email} /> : null}
-          {!authenticated && address ? <AccountRow label="Signed in as" value="Wallet session" /> : null}
-          <AccountRow label="BNB wallet" value={address ? shortAddress(address) : "Not connected"} copyValue={address} />
-          <AccountRow label="Network" value={address ? onBnb ? `${nativeSymbol} network` : `Switch to ${nativeSymbol}` : "No wallet connected"} />
+        <dl className={styles.readinessFacts}>
+          <AccountFact label="Network" value={address ? onBnb ? "BNB Smart Chain" : "Wrong network" : "Not connected"} />
+          <AccountFact label="Signed in as" value={email || (address ? "Wallet session" : "Not signed in")} />
         </dl>
-
-        <div className="bnb-account-actions">
-          <button type="button" className="bnb-button bnb-focus" onClick={connectBnbWallet} disabled={connectingWallet} aria-busy={connectingWallet}>
+        <div className={styles.readinessActions}>
+          <button type="button" className="bnb-button-dark bnb-focus" onClick={connectBnbWallet} disabled={connectingWallet} aria-busy={connectingWallet}>
             {connectingWallet ? <BnbButtonLoader /> : null}
             {connectingWallet ? "Opening wallet..." : address ? "Change wallet" : "Connect wallet"}
           </button>
           {address && !onBnb ? (
-            <button type="button" className="bnb-button bnb-button-secondary bnb-focus" onClick={switchToBnb} disabled={action === "switch"} aria-busy={action === "switch"}>
+            <button type="button" className="bnb-button bnb-focus" onClick={switchToBnb} disabled={action === "switch"} aria-busy={action === "switch"}>
               {action === "switch" ? <BnbButtonLoader /> : null}
               {action === "switch" ? "Switching..." : "Switch network"}
             </button>
           ) : null}
-          {authenticated ? (
-            <button type="button" className="bnb-button-dark bnb-focus" onClick={() => void signOut()} disabled={action === "logout"} aria-busy={action === "logout"}>
-              {action === "logout" ? <BnbButtonLoader /> : <LogOut aria-hidden="true" size={15} />}
-              {action === "logout" ? "Signing out..." : "Sign out"}
+          {address ? (
+            <button type="button" className={`${styles.disconnect} bnb-focus`} onClick={() => void disconnectWallet()} disabled={action === "disconnect"} aria-busy={action === "disconnect"}>
+              {action === "disconnect" ? <BnbButtonLoader /> : <Unplug aria-hidden="true" size={15} />}
+              {action === "disconnect" ? "Disconnecting..." : "Disconnect wallet"}
             </button>
           ) : null}
         </div>
+      </section>
 
-        {error ? <p className="bnb-error mt-4 p-3 text-sm">{error}</p> : null}
-      </BnbPanel>
-
-      <BnbPanel className="bnb-account-panel">
-        <div className="bnb-account-panel-head">
-          <div>
-            <h2>Wallets</h2>
-            <p>Choose the wallet Hive should use for {nativeSymbol} transactions.</p>
-          </div>
-          <Wallet aria-hidden="true" size={18} />
-        </div>
-
-        {walletsReady && evmWallets.length > 0 ? (
-          <div className="bnb-account-wallets">
-            {evmWallets.map((wallet) => {
-              const active = sameAddress(wallet.address, address);
-              return (
-                <button
-                  key={`${wallet.walletClientType}:${wallet.address}`}
-                  type="button"
-                  className="bnb-account-wallet-row bnb-focus"
-                  data-active={active ? "true" : undefined}
-                  onClick={() => selectWallet(wallet)}
-                  disabled={action === `wallet:${wallet.address}`}
-                  aria-busy={action === `wallet:${wallet.address}`}
-                >
-                  <span>
-                    <strong>{wallet.meta?.name || wallet.walletClientType || "Wallet"}</strong>
-                    <small>{shortAddress(wallet.address)}</small>
-                  </span>
-                  <span>{active ? <><CheckCircle2 aria-hidden="true" size={15} /> Active</> : action === `wallet:${wallet.address}` ? <><BnbButtonLoader /> Switching...</> : "Use"}</span>
-                </button>
-              );
-            })}
-          </div>
-        ) : (
-          <div className="bnb-account-empty">
-            <p>No BNB wallet connected.</p>
-            <button type="button" className="bnb-button-dark bnb-focus" onClick={connectBnbWallet} disabled={connectingWallet} aria-busy={connectingWallet}>
-              {connectingWallet ? <BnbButtonLoader /> : null}
-              {connectingWallet ? "Opening wallet..." : "Connect wallet"}
-            </button>
-          </div>
-        )}
-
-        <div className="bnb-account-links">
-          <Link href={address ? `/bnb/status?address=${address}` : "/bnb/status"} className="bnb-text-action bnb-focus">
-            Check wallet
-          </Link>
-          <Link href="#activity" className="bnb-text-action bnb-focus">
-            View activity
-          </Link>
-        </div>
-      </BnbPanel>
+      <aside className={styles.accountLinks} aria-labelledby="account-links-title">
+        <div className={styles.sectionHeading}><div><span>Account</span><h2 id="account-links-title">Links</h2></div></div>
+        <nav aria-label="Account links">
+          <Link href="/bnb/activity" className="bnb-focus"><span><strong>Activity</strong><small>Jobs, requests, and alerts</small></span><ArrowRight aria-hidden="true" size={16} /></Link>
+          <Link href={address ? `/bnb/status?address=${address}` : "/bnb/status"} className="bnb-focus"><span><strong>Verify wallet</strong><small>Check BNB Chain activity</small></span><ArrowRight aria-hidden="true" size={16} /></Link>
+        </nav>
+        {authenticated ? (
+          <button type="button" className={styles.signOut} onClick={() => void signOut()} disabled={action === "logout"} aria-busy={action === "logout"}>
+            {action === "logout" ? <BnbButtonLoader /> : <LogOut aria-hidden="true" size={15} />}
+            {action === "logout" ? "Signing out..." : "Sign out"}
+          </button>
+        ) : null}
+      </aside>
     </BnbContainer>
   );
 }
 
-function AccountRow({ label, value, copyValue }: { label: string; value: string; copyValue?: string }) {
-  return (
-    <div className="bnb-data-row">
-      <dt>{label}</dt>
-      <dd className="bnb-data-value">
-        <span>{value}</span>
-        {copyValue ? <CopyValueButton value={copyValue} label={label} /> : null}
-      </dd>
-    </div>
-  );
-}
-
-function sameAddress(left?: string, right?: string) {
-  return Boolean(left && right && left.toLowerCase() === right.toLowerCase());
+function AccountFact({ label, value }: { label: string; value: string }) {
+  return <div><dt>{label}</dt><dd><span>{value}</span></dd></div>;
 }
 
 function shortAddress(address: string) {
   return address.length > 12 ? `${address.slice(0, 6)}...${address.slice(-4)}` : address;
+}
+
+async function clearWalletSession() {
+  const response = await fetch("/api/bnb/auth/session", { method: "DELETE", credentials: "include" });
+  if (!response.ok) throw new Error("Could not clear the wallet session.");
 }

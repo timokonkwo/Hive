@@ -1,9 +1,9 @@
-import { redirect } from "next/navigation";
-import { getBnbCategories, listBnbAgentsPage } from "@/lib/bnb/catalog";
-import { BnbContainer, BnbPageHeader, BnbShell } from "@/app/bnb/_components/BnbUi";
+import { getBnbAgentNetworkStats, getBnbCategories, listBnbAgentsPage } from "@/lib/bnb/catalog";
+import { BnbContainer, BnbShell } from "@/app/bnb/_components/BnbUi";
 import type { BnbAgentCategory } from "@/lib/bnb/types";
 import { bnbCategoryLabel } from "@/lib/bnb/display";
 import { AgentsDirectory } from "./AgentsDirectory";
+import styles from "./agents.module.css";
 
 type SearchParams = Promise<Record<string, string | string[] | undefined>>;
 
@@ -14,65 +14,34 @@ function paramValue(value: string | string[] | undefined) {
   return Array.isArray(value) ? value[0] : value;
 }
 
-function normalizePage(value: string | undefined) {
-  const page = Number(value || 1);
-  if (!Number.isFinite(page)) return 1;
-  return Math.max(Math.trunc(page), 1);
-}
-
 function normalizeStatus(value: string | undefined): string {
   if (!value) return defaultStatus;
   if (value === "all") return "all";
   if (value === "callable" || value === "available" || value === "ready_to_run" || value === "run_ready" || value === "hireable") return "hireable";
-  if (value === "connectable" || value === "endpoint_found" || value === "request") return "hireable";
-  if (value === "discoverable") return "listed_only";
-  if (value === "listed_only" || value === "unavailable") return value;
-  return "";
+  return "all";
 }
 
 function executionFromStatus(value: string): string | null {
-  if (value === "all") return null;
-  if (value === "hireable" || value === "ready_to_run" || value === "connectable" || value === "listed_only" || value === "unavailable") return value;
+  if (value === "hireable") return "hireable";
   return null;
 }
 
 function normalizeSort(value: string | undefined): string {
   if (value === "freshness") return "active";
-  if (value === "feedback") return "rated";
-  if (["recommended", "active", "rated", "reviewed", "newest"].includes(value || "")) return value || "recommended";
+  if (value === "feedback" || value === "reviews" || value === "rated") return "reviewed";
+  if (["recommended", "active", "reviewed"].includes(value || "")) return value || "recommended";
   return "recommended";
 }
 
 function sortForCatalog(value: string) {
   if (value === "recommended") return "recommended";
   if (value === "active") return "freshness";
-  if (value === "rated") return "feedback";
   if (value === "reviewed") return "reviews";
-  if (value === "newest") return "newest";
   return null;
 }
 
 function categoryLabel(category: BnbAgentCategory) {
   return bnbCategoryLabel(category);
-}
-
-function resultPaginationTotal({
-  total,
-  agentCount,
-  page,
-  pageSize,
-  hasMore,
-}: {
-  total: number;
-  agentCount: number;
-  page: number;
-  pageSize: number;
-  hasMore: boolean;
-}) {
-  const normalizedTotal = Number.isFinite(total) ? Math.max(Math.trunc(total), 0) : 0;
-  if (normalizedTotal > 0) return normalizedTotal;
-  if (agentCount === 0) return 0;
-  return (page - 1) * pageSize + agentCount + (hasMore ? pageSize : 0);
 }
 
 export default async function BnbAgentsPage({ searchParams }: { searchParams: SearchParams }) {
@@ -87,36 +56,30 @@ export default async function BnbAgentsPage({ searchParams }: { searchParams: Se
   const execution = executionFromStatus(status);
   const catalogSort = sortForCatalog(sort);
   const pageSize = 24;
-  const page = normalizePage(paramValue(params.page));
-  const result = await listBnbAgentsPage({
+  const query = {
     q,
     category,
     sort: catalogSort,
-    execution,
     integration,
     limit: pageSize,
-    page,
-  });
-  const paginationTotal = resultPaginationTotal({
-    total: result.total,
-    agentCount: result.agents.length,
-    page: result.page,
-    pageSize: result.pageSize,
-    hasMore: result.hasMore,
-  });
-  const pageCount = Math.max(1, Math.ceil(paginationTotal / pageSize));
-  if (paginationTotal > 0 && page > pageCount) {
-    const nextParams = new URLSearchParams();
-    if (q) nextParams.set("q", q);
-    if (category) nextParams.set("category", category);
-    if (status && status !== defaultStatus) nextParams.set("status", status);
-    if (integration) nextParams.set("integration", integration);
-    if (sort && sort !== "recommended") nextParams.set("sort", sort);
-    if (pageCount > 1) nextParams.set("page", String(pageCount));
-    const query = nextParams.toString();
-    redirect(query ? `/bnb/agents?${query}` : "/bnb/agents");
+    page: 1,
+  };
+  let result = await listBnbAgentsPage({ ...query, execution: status === "all" ? "hireable" : execution });
+  let initialMode: "available" | "profiles" | "done" = status === "hireable"
+    ? result.hasMore ? "available" : "done"
+    : result.hasMore ? "available" : "profiles";
+  let initialPage = initialMode === "available" ? 1 : 0;
+
+  if (status === "all" && result.agents.length === 0) {
+    result = await listBnbAgentsPage({ ...query, execution: null });
+    initialMode = result.hasMore ? "profiles" : "done";
+    initialPage = 1;
   }
-  const categoryCounts = categories.map((item) => ({
+
+  const unfilteredDirectory = !q && !category && !integration && status === "all";
+  const networkStats = unfilteredDirectory ? await getBnbAgentNetworkStats() : null;
+  const totalAgents = networkStats?.totalAgents || result.total;
+  const categoryCounts = categories.filter((item) => item !== "Other").map((item) => ({
     category: item,
     label: categoryLabel(item),
   }));
@@ -129,21 +92,27 @@ export default async function BnbAgentsPage({ searchParams }: { searchParams: Se
       : "Agents";
 
   return (
-    <BnbShell active="agents">
-      <BnbPageHeader title="Agents" />
+    <BnbShell active="agents" variant="landing">
+      <div className={styles.page}>
+        <section className={styles.pageHeader}>
+          <BnbContainer>
+            <h1>Agents</h1>
+            <p>Search the BNB Chain directory and see which agents can accept work now.</p>
+          </BnbContainer>
+        </section>
 
-      <BnbContainer className="bnb-section">
-        <AgentsDirectory
-          agents={agents}
-          categories={categoryCounts}
-          current={{ q, category, status, integration, sort }}
-          resultLabel={resultLabel}
-          page={page}
-          pageSize={pageSize}
-          totalAgents={paginationTotal}
-          hasMore={result.hasMore}
-        />
-      </BnbContainer>
+        <BnbContainer className={styles.directoryPage}>
+          <AgentsDirectory
+            agents={agents}
+            categories={categoryCounts}
+            current={{ q, category, status, integration, sort }}
+            resultLabel={resultLabel}
+            totalAgents={totalAgents}
+            initialMode={initialMode}
+            initialPage={initialPage}
+          />
+        </BnbContainer>
+      </div>
     </BnbShell>
   );
 }
