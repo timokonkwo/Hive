@@ -24,7 +24,7 @@ export default async function BnbActivatePage({ searchParams }: { searchParams: 
   const agent = await getBnbAgent(chainId, tokenId);
   if (!agent) notFound();
   if (!canHireBnbAgent(agent)) {
-    redirect(`/bnb/agents/${agent.chainId}/${encodeURIComponent(agent.tokenId)}`);
+    redirect(bnbAgentProfilePath(agent));
   }
 
   const agentName = bnbAgentDisplayName(agent);

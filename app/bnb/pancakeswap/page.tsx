@@ -25,7 +25,7 @@ export default function BnbPancakeSwapPage() {
             <h2>Available jobs</h2>
             <p>Pick the work you need. You can edit the task and budget before hiring.</p>
           </div>
-          <Link href="/bnb/match?intent=Rank%20PancakeSwap%20yield%20routes%20and%20explain%20risk" className="bnb-button bnb-focus">
+          <Link href="/match?intent=Rank%20PancakeSwap%20yield%20routes%20and%20explain%20risk" className="bnb-button bnb-focus">
             Match an agent
           </Link>
         </div>

@@ -76,7 +76,7 @@ export default async function BnbAgentDetailPage({
     <BnbShell active="agents" variant="landing">
       <div className={styles.page}>
         <BnbContainer className={styles.container}>
-          <Link href="/bnb/agents" className={styles.backLink}>
+          <Link href="/agents" className={styles.backLink}>
             <ArrowLeft aria-hidden="true" size={16} />
             All agents
           </Link>

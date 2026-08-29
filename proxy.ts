@@ -173,16 +173,12 @@ function routeBnbSubdomain(request: NextRequest) {
 
   const url = request.nextUrl.clone();
 
-  if (pathname === '/bnb') {
-    url.pathname = '/';
-    return NextResponse.redirect(url, 308);
+  // If the path is already prefixed with /bnb or /bnb/*, rewrite directly without redirecting
+  if (pathname === '/bnb' || pathname.startsWith('/bnb/')) {
+    return NextResponse.rewrite(url);
   }
 
-  if (pathname.startsWith('/bnb/')) {
-    url.pathname = pathname.slice('/bnb'.length) || '/';
-    return NextResponse.redirect(url, 308);
-  }
-
+  // Rewrite natural paths (/ -> /bnb, /agents -> /bnb/agents, /agents/56/123 -> /bnb/agents/56/123, etc.)
   url.pathname = pathname === '/' ? '/bnb' : `/bnb${pathname}`;
   return NextResponse.rewrite(url);
 }

@@ -178,8 +178,8 @@ export function BnbAccountClient() {
       <aside className={styles.accountLinks} aria-labelledby="account-links-title">
         <div className={styles.sectionHeading}><div><span>Account</span><h2 id="account-links-title">Links</h2></div></div>
         <nav aria-label="Account links">
-          <Link href="/bnb/activity" className="bnb-focus"><span><strong>Activity</strong><small>Jobs, requests, and alerts</small></span><ArrowRight aria-hidden="true" size={16} /></Link>
-          <Link href={address ? `/bnb/status?address=${address}` : "/bnb/status"} className="bnb-focus"><span><strong>Verify wallet</strong><small>Check BNB Chain activity</small></span><ArrowRight aria-hidden="true" size={16} /></Link>
+          <Link href="/activity" className="bnb-focus"><span><strong>Activity</strong><small>Jobs, requests, and alerts</small></span><ArrowRight aria-hidden="true" size={16} /></Link>
+          <Link href={address ? `/status?address=${address}` : "/status"} className="bnb-focus"><span><strong>Verify wallet</strong><small>Check BNB Chain activity</small></span><ArrowRight aria-hidden="true" size={16} /></Link>
         </nav>
         {authenticated ? (
           <button type="button" className={styles.signOut} onClick={() => void signOut()} disabled={action === "logout"} aria-busy={action === "logout"}>

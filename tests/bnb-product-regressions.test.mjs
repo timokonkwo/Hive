@@ -201,7 +201,7 @@ describe('BNB marketplace product flows', () => {
     assert.match(activateRoute, /executionTargetFromPreflight\(selectedPreflight/);
     assert.match(activateRoute, /This agent cannot run this job\./);
     assert.match(activatePage, /canHireBnbAgent\(agent\)/);
-    assert.match(activatePage, /redirect\(`\/bnb\/agents\/\$\{agent\.chainId\}/);
+    assert.match(activatePage, /redirect\(bnbAgentProfilePath\(agent\)\)/);
     assert.doesNotMatch(activatePage, /canCheck|canCheckAndHire|executionStatus === "connectable"/);
     assert.doesNotMatch(activatePage, /Not runnable through Hive|listed onchain|verified callable endpoint|Hive cannot run it yet/);
     assert.doesNotMatch(activatePage, /<RequestAccessForm agent=\{agent\}/);
@@ -790,7 +790,7 @@ describe('BNB marketplace product flows', () => {
 
   it('keeps account, wallet, and activity available from the header', () => {
     assert.match(bnbUi, /<BnbAccountButton active=\{active === "account"\} \/>/);
-    assert.match(accountButton, /href="\/bnb\/account"/);
+    assert.match(accountButton, /href="\/account"/);
     assert.match(accountButton, /address \? shortAddress\(address\) : "Account"/);
     assert.match(accountButton, /bnb-account-desktop-label/);
     assert.match(accountButton, /bnb-account-mobile-label/);
@@ -807,13 +807,13 @@ describe('BNB marketplace product flows', () => {
     assert.match(accountClient, /Disconnect wallet/);
     assert.match(accountClient, /disconnectAsync\(\)/);
     assert.match(accountClient, /fetch\("\/api\/bnb\/auth\/session", \{ method: "DELETE", credentials: "include" \}\)/);
-    assert.match(accountClient, /href="\/bnb\/activity"/);
+    assert.match(accountClient, /href="\/activity"/);
     assert.match(accountClient, /Signed in as/);
     assert.doesNotMatch(accountClient, /Account ID|accountId|Privy account/);
     assert.doesNotMatch(accountClient, /BnbPanel|bnb-account-/);
     assert.match(accountCss, /\.readiness\s*\{[\s\S]*grid-template-columns:/);
-    assert.match(reportPage, /redirect\("\/bnb\/activity"\)/);
-    assert.match(bnbUi, /href="\/bnb\/activity"[\s\S]*>Activity</);
+    assert.match(reportPage, /redirect\("\/activity"\)/);
+    assert.match(bnbUi, /href="\/activity"[\s\S]*>Activity</);
     assert.match(activityPage, /<BnbShell active="activity" variant="landing">/);
     assert.doesNotMatch(bnbUi, />Receipts</);
     assert.doesNotMatch(bnbUi, /\/bnb\/report/);
@@ -821,7 +821,7 @@ describe('BNB marketplace product flows', () => {
 
   it('shows and manages access requests from account activity', () => {
     assert.match(activityClient, /records\.accessRequests\.map/);
-    assert.match(activityClient, /\/bnb\/jobs\/\$\{encodeURIComponent\(record\.recordId\)\}/);
+    assert.match(activityClient, /\/jobs\/\$\{encodeURIComponent\(record\.recordId\)\}/);
     assert.match(activityClient, /cancelAccessRequest/);
     assert.match(activityClient, /\/api\/bnb\/access-request/);
     assert.match(activityClient, /Cancel request/);
@@ -848,7 +848,7 @@ describe('BNB marketplace product flows', () => {
   it('saves selected agent comparisons into account activity', () => {
     assert.match(directory, /authFetch\("\/api\/bnb\/comparisons"/);
     assert.match(directory, /Save comparison/);
-    assert.match(directory, /href="\/bnb\/activity\?filter=comparisons"/);
+    assert.match(directory, /href="\/activity\?filter=comparisons"/);
     assert.match(comparisonsRoute, /requireBnbClient\(request, "save a comparison"\)/);
     assert.match(comparisonsRoute, /identities\.length < 2 \|\| identities\.length > 3/);
     assert.match(comparisonsRoute, /Promise\.all\(identities\.map\(\(identity\) => getBnbAgent/);
@@ -857,7 +857,7 @@ describe('BNB marketplace product flows', () => {
     assert.match(records, /comparisonType: "agents"/);
     assert.match(records, /getProcessStore\(\)\.termixComparisons\.unshift/);
     assert.match(types, /comparedAgents\?: Array<Pick<BnbAgentProfile/);
-    assert.match(activityClient, /record\.comparisonType === "agents" \? "\/bnb\/agents" : "\/bnb\/termix"/);
+    assert.match(activityClient, /record\.comparisonType === "agents" \? "\/agents" : "\/termix"/);
     assert.match(agentsCss, /\.bnb-compare-tray \.bnb-link-button\)[\s\S]*color:\s*#fff/);
   });
 
@@ -878,7 +878,7 @@ describe('BNB marketplace product flows', () => {
     assert.match(statusPage, /listBnbAgents\(\{ q: query, limit: 20, sort: "recommended" \}\)/);
     assert.match(statusPage, /findExactAgent\(agents, query\)/);
     assert.match(statusPage, /const hireable = canHireBnbAgent\(agent\)/);
-    assert.match(statusPage, /hireable \? <Link href=\{`\/bnb\/activate\?/);
+    assert.match(statusPage, /hireable \? <Link href=\{bnbAgentHirePath\(agent\)\}/);
     assert.match(statusPage, /Can accept work/);
     assert.match(statusPage, /BNB Chain data could not be loaded\. Try again\./);
     assert.doesNotMatch(statusPage, /BnbPageHeader|BnbPanel|StatusBadge|CategoryChip/);
@@ -1453,7 +1453,7 @@ describe('BNB marketplace product flows', () => {
 
   it('uses one direct hire route and keeps source links secondary on profiles', () => {
     assert.match(bnbRoutes, /export function bnbAgentHirePath/);
-    assert.match(bnbRoutes, /`\/bnb\/activate\?chainId=\$\{agent\.chainId\}&tokenId=\$\{encodeURIComponent\(agent\.tokenId\)\}`/);
+    assert.match(bnbRoutes, /`\/activate\?chainId=\$\{agent\.chainId\}&tokenId=\$\{encodeURIComponent\(agent\.tokenId\)\}`/);
     assert.match(bnbUi, /canHire[\s\S]*href=\{bnbAgentHirePath\(agent\)\}[\s\S]*Hire/);
     assert.match(directory, /return bnbAgentHirePath\(agent\)/);
     assert.match(profilePage, /href=\{bnbAgentHirePath\(agent\)\}[\s\S]*Hire agent/);
@@ -1967,7 +1967,7 @@ describe('BNB marketplace product flows', () => {
     assert.doesNotMatch(deliveryView, /\{source\}<\/li>/);
     assert.match(activateForm, /<BnbDeliveryView output=\{output\}/);
     assert.match(jobClient, /<BnbDeliveryView output=\{output\} jobSpec=\{record\.jobSpec\} dataSources=\{dataSources\}/);
-    assert.match(activityClient, /href = `\/bnb\/jobs\/\$\{encodeURIComponent\(record\.recordId\)\}`/);
+    assert.match(activityClient, /href = `\/jobs\/\$\{encodeURIComponent\(record\.recordId\)\}`/);
     assert.doesNotMatch(bnbCss, /\.bnb-delivery-technical/);
   });
 

@@ -714,7 +714,7 @@ function ComparisonPanel({ agents, close }: { agents: SavedAgent[]; close: () =>
         <strong>Compare agents</strong>
         <div className="bnb-compare-head-actions">
           {saved ? (
-            <Link href="/bnb/activity?filter=comparisons" className="bnb-compare-saved bnb-focus">
+            <Link href="/activity?filter=comparisons" className="bnb-compare-saved bnb-focus">
               <Check aria-hidden="true" size={16} />
               View saved
             </Link>
