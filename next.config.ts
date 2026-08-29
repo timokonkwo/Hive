@@ -1,6 +1,18 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
+  images: {
+    remotePatterns: [
+      {
+        protocol: 'https',
+        hostname: 'api.8004scan.io',
+        port: '',
+        pathname: '/api/v1/media/agents/**',
+        search: '',
+      },
+    ],
+  },
+
   // Subdomain redirects
   async redirects() {
     return [
@@ -38,7 +50,7 @@ const nextConfig: NextConfig = {
               "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://www.googletagmanager.com https://www.google-analytics.com",
               "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
               "font-src 'self' https://fonts.gstatic.com",
-              "img-src 'self' data: blob: https://res.cloudinary.com https://*.googletagmanager.com https://*.google-analytics.com",
+              "img-src 'self' data: blob: https://api.8004scan.io https://res.cloudinary.com https://*.googletagmanager.com https://*.google-analytics.com",
               "connect-src 'self' https://auth.privy.io https://privy.uphive.xyz https://*.solana.com https://*.helius-rpc.com https://api.bags.fm https://dev.bags.fm https://www.google-analytics.com https://*.squids.live https://bsc-dataseed.bnbchain.org https://bsc-dataseed.binance.org https://*.bnbchain.org https://*.binance.org https://8004scan.io wss://*.privy.io",
               "frame-src https://auth.privy.io https://privy.uphive.xyz",
               "object-src 'none'",

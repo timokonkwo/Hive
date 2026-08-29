@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createBnbWalletSession, setBnbWalletSessionCookie } from "@/lib/bnb/wallet-auth";
+import { clearBnbWalletSessionCookie, createBnbWalletSession, setBnbWalletSessionCookie } from "@/lib/bnb/wallet-auth";
 import { enforceBnbRateLimit } from "@/lib/bnb/rate-limit";
 
 function readString(value: unknown) {
@@ -32,4 +32,10 @@ export async function POST(request: NextRequest) {
       { status: 401 },
     );
   }
+}
+
+export async function DELETE() {
+  const response = NextResponse.json({ disconnected: true });
+  clearBnbWalletSessionCookie(response);
+  return response;
 }

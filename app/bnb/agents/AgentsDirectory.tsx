@@ -3,9 +3,15 @@
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { BadgeCheck, GitCompareArrows, Heart, Search, SlidersHorizontal, X } from "lucide-react";
+import { useModalStatus } from "@privy-io/react-auth";
+import { useAccount } from "wagmi";
+import { BadgeCheck, Bookmark, Check, Save, Search, SlidersHorizontal, Star, X } from "lucide-react";
+import { BnbButtonLoader } from "@/app/bnb/_components/BnbButtonLoader";
+import { BnbAgentAvatar } from "@/app/bnb/_components/BnbAgentAvatar";
 import type { BnbAgentCategory, BnbAgentProfile } from "@/lib/bnb/types";
 import { BnbSelect } from "@/app/bnb/_components/BnbSelect";
+import { useAuth } from "@/hooks/useAuth";
+import { useBnbAuthFetch } from "@/hooks/useBnbAuthFetch";
 import {
   bnbAgentDisplayName,
   bnbAgentIntegrations,
@@ -25,6 +31,7 @@ import {
   bnbUsableServices,
 } from "@/lib/bnb/display";
 import { bnbAgentHirePath, bnbAgentProfilePath } from "@/lib/bnb/routes";
+import { type AgentFeedMode, useAgentDirectoryFeed } from "./useAgentDirectoryFeed";
 
 type CategoryCount = {
   category: BnbAgentCategory;
@@ -41,6 +48,8 @@ type DirectoryState = {
 
 type SavedAgent = {
   key: string;
+  chainId?: number;
+  tokenId?: string;
   name: string;
   category: string;
   status: string;
@@ -69,10 +78,9 @@ type AgentsDirectoryProps = {
   categories: CategoryCount[];
   current: DirectoryState;
   resultLabel: string;
-  page: number;
-  pageSize: number;
   totalAgents: number;
-  hasMore: boolean;
+  initialMode: AgentFeedMode;
+  initialPage: number;
 };
 
 const savedKey = "hive:bnb:saved-agents";
@@ -81,8 +89,6 @@ const compareKey = "hive:bnb:compare-agents";
 const availabilityOptions = [
   { value: "all", label: "All agents" },
   { value: "hireable", label: "Available" },
-  { value: "listed_only", label: "Profiles" },
-  { value: "unavailable", label: "Unavailable" },
 ];
 
 const integrationOptions = [
@@ -93,23 +99,18 @@ const integrationOptions = [
 
 const sortOptions = [
   { value: "recommended", label: "Recommended" },
-  { value: "active", label: "Most active" },
-  { value: "rated", label: "Highest rated" },
+  { value: "active", label: "Recently active" },
   { value: "reviewed", label: "Most reviewed" },
-  { value: "newest", label: "Newest" },
 ];
 
-const LARGE_PAGE_COUNT_LAST_LINK_LIMIT = 500;
-
 export function AgentsDirectory({
-  agents,
+  agents: initialAgents,
   categories,
   current,
   resultLabel,
-  page,
-  pageSize,
   totalAgents,
-  hasMore,
+  initialMode,
+  initialPage,
 }: AgentsDirectoryProps) {
   const router = useRouter();
   const pathname = usePathname();
@@ -121,19 +122,29 @@ export function AgentsDirectory({
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [savedOpen, setSavedOpen] = useState(false);
   const [compareOpen, setCompareOpen] = useState(false);
+  const filterTriggerRef = useRef<HTMLButtonElement>(null);
   const [savedAgents, setSavedAgents] = useState<Record<string, SavedAgent>>(() => readSavedAgents());
   const [compareAgents, setCompareAgents] = useState<string[]>(() => readComparedAgents());
   const initialized = useRef(false);
+  const {
+    agents,
+    total,
+    loading: loadingMore,
+    error: loadError,
+    done: feedDone,
+    loadMore,
+    sentinelRef,
+  } = useAgentDirectoryFeed({
+    initialAgents,
+    initialMode,
+    initialPage,
+    initialTotal: totalAgents,
+    query: current,
+  });
 
   const activeFilterCount = [q.trim(), category, status && status !== "all" ? status : "", integration, sort !== "recommended" ? sort : ""]
     .filter(Boolean)
     .length;
-  const pageCount = Math.max(1, Math.ceil(totalAgents / pageSize));
-  const start = agents.length === 0 ? 0 : (page - 1) * pageSize + 1;
-  const end = agents.length === 0 ? 0 : start + agents.length - 1;
-  const paginationItems = compactPagination(page, pageCount);
-  const canGoPrevious = page > 1;
-  const canGoNext = hasMore || page < pageCount;
 
   useEffect(() => {
     if (!initialized.current) {
@@ -162,6 +173,23 @@ export function AgentsDirectory({
     return () => window.clearTimeout(timeout);
   }, [category, current.category, current.integration, current.q, current.sort, current.status, integration, pathname, q, router, sort, status]);
 
+  useEffect(() => {
+    if (!filtersOpen && !compareOpen) return;
+
+    function closeOverlay(event: KeyboardEvent) {
+      if (event.key !== "Escape") return;
+      if (compareOpen) {
+        setCompareOpen(false);
+        return;
+      }
+      setFiltersOpen(false);
+      filterTriggerRef.current?.focus();
+    }
+
+    document.addEventListener("keydown", closeOverlay);
+    return () => document.removeEventListener("keydown", closeOverlay);
+  }, [compareOpen, filtersOpen]);
+
   const visibleAgentMap = useMemo(() => {
     const entries = agents.map((agent) => [agentKey(agent), toSavedAgent(agent)] as const);
     return Object.fromEntries(entries);
@@ -174,6 +202,18 @@ export function AgentsDirectory({
     .map((key) => currentSavedAgent(savedAgents[key], visibleAgentMap[key]))
     .filter((agent): agent is SavedAgent => Boolean(agent));
   const cleanedComparison = comparison;
+  const agentGroups = [
+    {
+      key: "available",
+      title: "Available",
+      agents: agents.filter(canHireAgent),
+    },
+    {
+      key: "profiles",
+      title: "Profiles",
+      agents: agents.filter((agent) => !canHireAgent(agent)),
+    },
+  ].filter((group) => group.agents.length > 0);
 
   function setSaved(agent: BnbAgentProfile) {
     const saved = toSavedAgent(agent);
@@ -211,44 +251,12 @@ export function AgentsDirectory({
     setSort("recommended");
   }
 
-  function pageHref(nextPage: number) {
-    const params = new URLSearchParams();
-    if (current.q) params.set("q", current.q);
-    if (current.category) params.set("category", current.category);
-    if (current.status && current.status !== "all") params.set("status", current.status);
-    if (current.integration) params.set("integration", current.integration);
-    if (current.sort && current.sort !== "recommended") params.set("sort", current.sort);
-    if (nextPage > 1) params.set("page", String(nextPage));
-    const query = params.toString();
-    return query ? `${pathname}?${query}` : pathname;
-  }
-
   return (
     <div className="bnb-directory">
-      <div className="bnb-directory-controls">
-        <div className="bnb-category-tabs" aria-label="Agent categories">
-          <button
-            type="button"
-            className="bnb-category-tab"
-            data-active={!category ? "true" : undefined}
-            onClick={() => setCategory("")}
-          >
-            All
-          </button>
-          {categories.map((item) => (
-            <button
-              key={item.category}
-              type="button"
-              className="bnb-category-tab"
-              data-active={category === item.category ? "true" : undefined}
-              onClick={() => setCategory(item.category)}
-            >
-              {item.label}
-            </button>
-          ))}
-        </div>
-
+      <div className="bnb-directory-commandbar">
+        <DirectorySearch q={q} setQ={setQ} />
         <button
+          ref={filterTriggerRef}
           type="button"
           className="bnb-mobile-filter-button bnb-focus"
           onClick={() => setFiltersOpen(true)}
@@ -256,21 +264,12 @@ export function AgentsDirectory({
           <SlidersHorizontal aria-hidden="true" size={16} />
           Filters{activeFilterCount > 0 ? ` (${activeFilterCount})` : ""}
         </button>
-
-        <div className="bnb-filter-panel bnb-directory-filter-panel">
-          <FilterFields
-            q={q}
-            setQ={setQ}
-            status={status}
-            setStatus={setStatus}
-            integration={integration}
-            setIntegration={setIntegration}
-            sort={sort}
-            setSort={setSort}
-            activeFilterCount={activeFilterCount}
-            clearFilters={clearFilters}
-          />
-        </div>
+        {savedList.length > 0 ? (
+          <button type="button" className="bnb-directory-saved-trigger bnb-focus" onClick={() => setSavedOpen((open) => !open)}>
+            <Bookmark aria-hidden="true" size={16} />
+            Saved <span>{savedList.length}</span>
+          </button>
+        ) : null}
       </div>
 
       {filtersOpen ? (
@@ -278,13 +277,22 @@ export function AgentsDirectory({
           <div className="bnb-filter-sheet-panel">
             <div className="bnb-filter-sheet-head">
               <strong>Filters</strong>
-              <button type="button" className="bnb-icon-button bnb-focus" onClick={() => setFiltersOpen(false)}>
+              <button
+                type="button"
+                className="bnb-icon-button bnb-focus"
+                aria-label="Close filters"
+                onClick={() => {
+                  setFiltersOpen(false);
+                  filterTriggerRef.current?.focus();
+                }}
+              >
                 <X aria-hidden="true" size={18} />
               </button>
             </div>
-            <FilterFields
-              q={q}
-              setQ={setQ}
+            <DirectoryFilters
+              categories={categories}
+              category={category}
+              setCategory={setCategory}
               status={status}
               setStatus={setStatus}
               integration={integration}
@@ -294,98 +302,109 @@ export function AgentsDirectory({
               activeFilterCount={activeFilterCount}
               clearFilters={clearFilters}
             />
+            <button
+              type="button"
+              className="bnb-filter-sheet-submit bnb-focus"
+              onClick={() => {
+                setFiltersOpen(false);
+                filterTriggerRef.current?.focus();
+              }}
+            >
+              Show results
+            </button>
           </div>
         </div>
       ) : null}
 
-      <div className="bnb-directory-resultbar">
-        <strong>{resultLabel}</strong>
-        <div>
-          {savedList.length > 0 ? (
-            <button type="button" className="bnb-link-button bnb-focus" onClick={() => setSavedOpen((open) => !open)}>
-              Saved agents {savedList.length}
-            </button>
+      <div className="bnb-directory-workspace">
+        <aside className="bnb-directory-rail" aria-label="Filter agents">
+          <DirectoryFilters
+            categories={categories}
+            category={category}
+            setCategory={setCategory}
+            status={status}
+            setStatus={setStatus}
+            integration={integration}
+            setIntegration={setIntegration}
+            sort={sort}
+            setSort={setSort}
+            activeFilterCount={activeFilterCount}
+            clearFilters={clearFilters}
+          />
+        </aside>
+
+        <section className="bnb-directory-results">
+          <div className="bnb-directory-resultbar" aria-live="polite">
+            <div>
+              <strong>{resultLabel}</strong>
+              <span>{agentCountSummary(agents.length, total)}</span>
+            </div>
+          </div>
+
+          {savedOpen ? (
+            <SavedAgents agents={savedList} remove={(key) => {
+              setSavedAgents((currentSaved) => {
+                const next = { ...currentSaved };
+                delete next[key];
+                window.localStorage.setItem(savedKey, JSON.stringify(next));
+                return next;
+              });
+            }} />
           ) : null}
-        </div>
+
+          {agents.length > 0 ? (
+            <div className="bnb-directory-groups">
+              {agentGroups.map((group) => (
+                <section key={group.key} className="bnb-directory-group" aria-labelledby={`agent-group-${group.key}`}>
+                  <div className="bnb-directory-group-head">
+                    <h2 id={`agent-group-${group.key}`}>{group.title}</h2>
+                  </div>
+                  <div className="bnb-directory-list">
+                    {group.agents.map((agent) => {
+                      const key = agentKey(agent);
+                      return (
+                        <DirectoryAgentRow
+                          key={key}
+                          agent={agent}
+                          query={q}
+                          saved={Boolean(savedAgents[key])}
+                          compared={compareAgents.includes(key)}
+                          compareDisabled={!compareAgents.includes(key) && compareAgents.length >= 3}
+                          onSave={() => setSaved(agent)}
+                          onCompare={() => setCompare(agent)}
+                        />
+                      );
+                    })}
+                  </div>
+                </section>
+              ))}
+            </div>
+          ) : (
+            <div className="bnb-empty-state">
+              <Search aria-hidden="true" size={22} />
+              <h2>No agents match these filters.</h2>
+              <p>Clear the filters and try a broader search.</p>
+              {activeFilterCount > 0 ? (
+                <button type="button" className="bnb-button-dark bnb-focus" onClick={clearFilters}>
+                  Clear filters
+                </button>
+              ) : null}
+            </div>
+          )}
+
+          <div ref={sentinelRef} className="bnb-directory-feed-status" aria-live="polite">
+            {loadingMore ? (
+              <span role="status" aria-label="Loading more agents"><BnbButtonLoader size={20} /></span>
+            ) : loadError ? (
+              <button type="button" className="bnb-directory-feed-retry bnb-focus" onClick={() => void loadMore()}>
+                Try again
+              </button>
+            ) : feedDone && agents.length > 0 ? (
+              <span>All agents loaded</span>
+            ) : null}
+          </div>
+        </section>
       </div>
-
-      {savedOpen ? (
-        <SavedAgents agents={savedList} remove={(key) => {
-          setSavedAgents((currentSaved) => {
-            const next = { ...currentSaved };
-            delete next[key];
-            window.localStorage.setItem(savedKey, JSON.stringify(next));
-            return next;
-          });
-        }} />
-      ) : null}
-
-      {agents.length > 0 ? (
-        <div className="bnb-directory-list">
-          {agents.map((agent) => {
-            const key = agentKey(agent);
-            return (
-              <DirectoryAgentRow
-                key={key}
-                agent={agent}
-                query={q}
-                saved={Boolean(savedAgents[key])}
-                compared={compareAgents.includes(key)}
-                compareDisabled={!compareAgents.includes(key) && compareAgents.length >= 3}
-                onSave={() => setSaved(agent)}
-                onCompare={() => setCompare(agent)}
-              />
-            );
-          })}
-        </div>
-      ) : (
-        <div className="bnb-empty-state">
-          <h2>No agents</h2>
-          {activeFilterCount > 0 ? (
-            <button type="button" className="bnb-button-dark bnb-focus" onClick={clearFilters}>
-              Clear filters
-            </button>
-          ) : null}
-        </div>
-      )}
-
-      {totalAgents > 0 ? (
-        <nav className="bnb-pagination" aria-label="Agent directory pagination">
-          <span>Showing {start}-{end}</span>
-          <div>
-            <Link
-              href={pageHref(canGoPrevious ? page - 1 : page)}
-              className="bnb-page-link bnb-focus"
-              aria-disabled={!canGoPrevious}
-              data-disabled={!canGoPrevious ? "true" : undefined}
-            >
-              Previous
-            </Link>
-            {paginationItems.map((item, index) => (
-              item === "ellipsis" ? (
-                <span key={`ellipsis:${index}`} className="bnb-page-ellipsis">...</span>
-              ) : (
-                <Link
-                  key={item}
-                  href={pageHref(item)}
-                  className="bnb-page-link bnb-focus"
-                  data-active={item === page ? "true" : undefined}
-                >
-                  {item}
-                </Link>
-              )
-            ))}
-            <Link
-              href={pageHref(canGoNext ? page + 1 : page)}
-              className="bnb-page-link bnb-focus"
-              aria-disabled={!canGoNext}
-              data-disabled={!canGoNext ? "true" : undefined}
-            >
-              Next
-            </Link>
-          </div>
-        </nav>
-      ) : null}
 
       {compareAgents.length > 0 ? (
         <div className="bnb-compare-tray">
@@ -418,9 +437,28 @@ export function AgentsDirectory({
   );
 }
 
-function FilterFields({
-  q,
-  setQ,
+function DirectorySearch({ q, setQ }: { q: string; setQ: (value: string) => void }) {
+  return (
+    <label className="bnb-directory-search">
+      <span>Search agents</span>
+      <span className="bnb-directory-search-field">
+        <Search aria-hidden="true" size={18} />
+        <input
+          value={q}
+          onChange={(event) => setQ(event.target.value)}
+          type="search"
+          autoComplete="off"
+          placeholder="Search by name, task, or capability"
+        />
+      </span>
+    </label>
+  );
+}
+
+function DirectoryFilters({
+  categories,
+  category,
+  setCategory,
   status,
   setStatus,
   integration,
@@ -430,8 +468,9 @@ function FilterFields({
   activeFilterCount,
   clearFilters,
 }: {
-  q: string;
-  setQ: (value: string) => void;
+  categories: CategoryCount[];
+  category: string;
+  setCategory: (value: string) => void;
   status: string;
   setStatus: (value: string) => void;
   integration: string;
@@ -442,36 +481,42 @@ function FilterFields({
   clearFilters: () => void;
 }) {
   return (
-    <div className="bnb-directory-filter-grid">
-      <label className="bnb-directory-search">
-        <span className="bnb-filter-label">Search</span>
-        <span className="bnb-filter-input-wrap">
-          <Search aria-hidden="true" size={16} />
-          <input
-            value={q}
-            onChange={(event) => setQ(event.target.value)}
-            type="search"
-            autoComplete="off"
-            placeholder="Search by agent name or capability"
-            className="bnb-input bnb-input-with-icon"
-          />
-        </span>
-      </label>
-      <label>
-        <span className="bnb-filter-label">Status</span>
-        <BnbSelect value={status} onChange={setStatus} options={availabilityOptions} ariaLabel="Status" />
-      </label>
-      <label>
-        <span className="bnb-filter-label">Works with</span>
+    <div className="bnb-directory-filter-stack">
+      <fieldset className="bnb-directory-filter-group">
+        <legend>Availability</legend>
+        {availabilityOptions.map((option) => (
+          <label key={option.value}>
+            <input type="radio" name="agent-status" value={option.value} checked={status === option.value} onChange={() => setStatus(option.value)} />
+            <span>{option.label}</span>
+          </label>
+        ))}
+      </fieldset>
+
+      <fieldset className="bnb-directory-filter-group">
+        <legend>Work type</legend>
+        <label>
+          <input type="radio" name="agent-category" value="" checked={!category} onChange={() => setCategory("")} />
+          <span>All work</span>
+        </label>
+        {categories.map((item) => (
+          <label key={item.category}>
+            <input type="radio" name="agent-category" value={item.category} checked={category === item.category} onChange={() => setCategory(item.category)} />
+            <span>{item.label}</span>
+          </label>
+        ))}
+      </fieldset>
+
+      <label className="bnb-directory-select-field">
+        <span>Works with</span>
         <BnbSelect value={integration} onChange={setIntegration} options={integrationOptions} ariaLabel="Works with" />
       </label>
-      <label>
-        <span className="bnb-filter-label">Sort by</span>
+      <label className="bnb-directory-select-field">
+        <span>Sort by</span>
         <BnbSelect value={sort} onChange={setSort} options={sortOptions} ariaLabel="Sort by" />
       </label>
       {activeFilterCount > 0 ? (
-        <button type="button" className="bnb-button-dark bnb-focus" onClick={clearFilters}>
-          Clear filters
+        <button type="button" className="bnb-directory-clear bnb-focus" onClick={clearFilters}>
+          Reset filters
         </button>
       ) : null}
     </div>
@@ -499,14 +544,19 @@ function DirectoryAgentRow({
   const reason = matchReason(agent, query);
   const canHire = canHireAgent(agent);
   const metadata = [
-    freshnessLabel(agent.lastActivity),
-    agent.feedback.count > 0 ? reviewText(agent) : "",
-    hasPrice(agent) ? priceText(agent) : "",
+    { key: "activity", value: freshnessLabel(agent.lastActivity) },
+    {
+      key: "reviews",
+      value: agent.feedback.count > 0 ? new Intl.NumberFormat("en-US").format(agent.feedback.count) : "",
+      star: agent.feedback.count > 0,
+    },
+    { key: "price", value: hasPrice(agent) ? priceText(agent) : "" },
   ];
   const sourceName = bnbAgentSourceName(agent);
 
   return (
     <article className="bnb-directory-row">
+      <BnbAgentAvatar agent={agent} className="bnb-directory-monogram" />
       <div className="bnb-directory-identity">
         <h2>
           <Link href={profileHref(agent)} className="bnb-focus">
@@ -525,33 +575,35 @@ function DirectoryAgentRow({
         {reason ? <span>{reason}</span> : null}
       </div>
 
-      <div className="bnb-directory-metadata">
-        {metadata.map((value, index) => (
+      <div className="bnb-directory-metadata" aria-label="Agent details">
+        {metadata.map((item) => (
           <span
-            key={`${agentKey(agent)}:${index}`}
-            className={value ? undefined : "bnb-directory-meta-empty"}
-            aria-hidden={value ? undefined : "true"}
+            key={`${agentKey(agent)}:${item.key}`}
+            className={item.value ? item.star ? "bnb-directory-review-count" : undefined : "bnb-directory-meta-empty"}
+            aria-label={item.star ? `${item.value} review${agent.feedback.count === 1 ? "" : "s"}` : undefined}
+            aria-hidden={item.value ? undefined : "true"}
           >
-            {value || " "}
+            {item.star ? <Star aria-hidden="true" size={12} fill="currentColor" /> : null}
+            {item.value || " "}
           </span>
         ))}
       </div>
 
       <div className="bnb-directory-actions">
-        <button type="button" className="bnb-row-action bnb-focus" onClick={onSave} data-active={saved ? "true" : undefined}>
-          <Heart aria-hidden="true" size={15} />
-          {saved ? "Saved" : "Save"}
-        </button>
         <button
           type="button"
-          className="bnb-row-action bnb-focus"
-          onClick={onCompare}
-          disabled={compareDisabled}
-          data-active={compared ? "true" : undefined}
+          className="bnb-directory-save bnb-focus"
+          aria-label={saved ? `Remove ${bnbAgentDisplayName(agent)} from saved agents` : `Save ${bnbAgentDisplayName(agent)}`}
+          title={saved ? "Remove from saved" : "Save agent"}
+          onClick={onSave}
+          data-active={saved ? "true" : undefined}
         >
-          <GitCompareArrows aria-hidden="true" size={15} />
-          Compare
+          <Bookmark aria-hidden="true" size={17} fill={saved ? "currentColor" : "none"} />
         </button>
+        <label className="bnb-directory-compare" data-disabled={compareDisabled ? "true" : undefined}>
+          <input type="checkbox" checked={compared} disabled={compareDisabled} onChange={onCompare} />
+          <span>Compare</span>
+        </label>
         <Link href={profileHref(agent)} className="bnb-button-dark bnb-focus">View profile</Link>
         {canHire ? (
           <Link href={hireHref(agent)} className="bnb-button bnb-focus">
@@ -594,6 +646,13 @@ function SavedAgents({ agents, remove }: { agents: SavedAgent[]; remove: (key: s
 }
 
 function ComparisonPanel({ agents, close }: { agents: SavedAgent[]; close: () => void }) {
+  const { authenticated, login } = useAuth();
+  const { address } = useAccount();
+  const { isOpen: privyModalOpen } = useModalStatus();
+  const { authFetch } = useBnbAuthFetch();
+  const [saving, setSaving] = useState(false);
+  const [saved, setSaved] = useState(false);
+  const [saveError, setSaveError] = useState("");
   const rows: ComparisonRow[] = [
     { label: "Category", value: (agent) => agent.category },
     { label: "Status", value: (agent) => agent.status },
@@ -619,14 +678,64 @@ function ComparisonPanel({ agents, close }: { agents: SavedAgent[]; close: () =>
   ];
   const visibleRows = rows.filter((row) => !row.hasValue || agents.some((agent) => row.hasValue?.(agent)));
 
+  async function saveComparison() {
+    setSaveError("");
+    if (!authenticated && !address) {
+      login({ loginMethods: ["wallet"], walletChainType: "ethereum-only" });
+      return;
+    }
+
+    const identities = agents.map(agentIdentity).filter((identity): identity is { chainId: number; tokenId: string } => Boolean(identity));
+    if (identities.length !== agents.length) {
+      setSaveError("Refresh the directory and select the agents again.");
+      return;
+    }
+
+    setSaving(true);
+    try {
+      const response = await authFetch("/api/bnb/comparisons", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ agents: identities }),
+      });
+      const payload = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(payload.error || "Could not save comparison.");
+      setSaved(true);
+    } catch (error) {
+      setSaveError(error instanceof Error ? error.message : "Could not save comparison.");
+    } finally {
+      setSaving(false);
+    }
+  }
+
   return (
     <div className="bnb-compare-panel" role="dialog" aria-modal="true" aria-label="Compare agents">
       <div className="bnb-compare-head">
         <strong>Compare agents</strong>
-        <button type="button" className="bnb-icon-button bnb-focus" onClick={close}>
-          <X aria-hidden="true" size={18} />
-        </button>
+        <div className="bnb-compare-head-actions">
+          {saved ? (
+            <Link href="/bnb/activity?filter=comparisons" className="bnb-compare-saved bnb-focus">
+              <Check aria-hidden="true" size={16} />
+              View saved
+            </Link>
+          ) : (
+            <button
+              type="button"
+              className="bnb-compare-save bnb-focus"
+              onClick={saveComparison}
+              disabled={saving || privyModalOpen}
+              aria-busy={saving || privyModalOpen}
+            >
+              {saving || privyModalOpen ? <BnbButtonLoader size={16} /> : <Save aria-hidden="true" size={16} />}
+              {saving ? "Saving" : !authenticated && !address ? "Sign in to save" : "Save comparison"}
+            </button>
+          )}
+          <button type="button" className="bnb-icon-button bnb-focus" aria-label="Close comparison" onClick={close}>
+            <X aria-hidden="true" size={18} />
+          </button>
+        </div>
       </div>
+      {saveError ? <p className="bnb-compare-error" role="alert">{saveError}</p> : null}
       <div className="bnb-compare-table-wrap">
         <table className="bnb-compare-table">
           <thead>
@@ -671,6 +780,13 @@ function readSavedAgents() {
   }
 }
 
+function agentCountSummary(shown: number, total: number) {
+  const formattedTotal = new Intl.NumberFormat("en-US").format(total);
+  const totalLabel = `${formattedTotal} agent${total === 1 ? "" : "s"}`;
+  if (shown === total) return totalLabel;
+  return `${shown} shown · ${formattedTotal} total`;
+}
+
 function readComparedAgents() {
   if (typeof window === "undefined") return [];
   try {
@@ -685,29 +801,6 @@ function profileHref(agent: BnbAgentProfile) {
   return bnbAgentProfilePath(agent);
 }
 
-function compactPagination(page: number, pageCount: number): Array<number | "ellipsis"> {
-  if (pageCount <= 7) {
-    return Array.from({ length: pageCount }, (_, index) => index + 1);
-  }
-
-  const boundedPage = Math.min(Math.max(page, 1), pageCount);
-  const showLastPage = pageCount <= LARGE_PAGE_COUNT_LAST_LINK_LIMIT || boundedPage >= pageCount - 2;
-  const pages = new Set([1]);
-  if (showLastPage) pages.add(pageCount);
-  for (let item = Math.max(1, boundedPage - 2); item <= Math.min(pageCount, boundedPage + 2); item += 1) {
-    pages.add(item);
-  }
-
-  const sorted = Array.from(pages).sort((a, b) => a - b);
-  const result = sorted.flatMap((item, index) => {
-    const previous = sorted[index - 1];
-    if (previous && item - previous > 1) return ["ellipsis" as const, item];
-    return [item];
-  });
-  if (!showLastPage && sorted[sorted.length - 1] < pageCount) result.push("ellipsis");
-  return result;
-}
-
 function hireHref(agent: BnbAgentProfile) {
   return bnbAgentHirePath(agent);
 }
@@ -716,6 +809,8 @@ function toSavedAgent(agent: BnbAgentProfile): SavedAgent {
   const services = bnbUsableServices(agent).map(bnbServiceLabel).slice(0, 3);
   return {
     key: agentKey(agent),
+    chainId: agent.chainId,
+    tokenId: agent.tokenId,
     name: bnbAgentDisplayName(agent),
     category: categoryLabel(agent.category),
     status: statusLabel(agent),
@@ -732,6 +827,16 @@ function toSavedAgent(agent: BnbAgentProfile): SavedAgent {
     hireHref: hireHref(agent),
     canHire: canHireAgent(agent),
   };
+}
+
+function agentIdentity(agent: SavedAgent) {
+  if (Number.isFinite(agent.chainId) && agent.tokenId) {
+    return { chainId: Number(agent.chainId), tokenId: agent.tokenId };
+  }
+  const [chainId, ...tokenIdParts] = agent.key.split(":");
+  const parsedChainId = Number(chainId);
+  const tokenId = tokenIdParts.join(":");
+  return Number.isFinite(parsedChainId) && tokenId ? { chainId: parsedChainId, tokenId } : null;
 }
 
 function cleanSavedAgent(agent: SavedAgent): SavedAgent {

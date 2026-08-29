@@ -27,18 +27,26 @@ import {
 } from "@/lib/bnb/display";
 import { bnbAgentHirePath, bnbAgentProfilePath } from "@/lib/bnb/routes";
 
-type BnbNavItem = "home" | "agents" | "verify" | "account";
+type BnbNavItem = "home" | "agents" | "activity" | "verify" | "account";
 
-export function BnbShell({ children, active = "home" }: { children: ReactNode; active?: BnbNavItem }) {
+export function BnbShell({
+  children,
+  active = "home",
+  variant = "default",
+}: {
+  children: ReactNode;
+  active?: BnbNavItem;
+  variant?: "default" | "landing";
+}) {
   return (
-    <main className="bnb-shell">
+    <main className={`bnb-shell ${variant === "landing" ? "bnb-shell-home" : ""}`}>
       <div className="bnb-frame">
         <header className="bnb-header">
           <BnbContainer className="bnb-header-inner">
             <Brand />
             <nav className="bnb-nav" aria-label="Hive navigation">
               <BnbNavLink href="/bnb/agents" active={active === "agents"}>Agents</BnbNavLink>
-              <BnbNavLink href="/bnb/account" active={active === "account"}>My hires</BnbNavLink>
+              <BnbNavLink href="/bnb/activity" active={active === "activity"}>Activity</BnbNavLink>
               <BnbNavLink href="/bnb/status" active={active === "verify"}>Verify</BnbNavLink>
             </nav>
             <div className="bnb-header-actions">
@@ -157,7 +165,7 @@ function BnbFooter() {
           <div>
             <h2>Marketplace</h2>
             <Link href="/bnb/agents" className="bnb-focus">Agents</Link>
-            <Link href="/bnb/account" className="bnb-focus">My hires</Link>
+            <Link href="/bnb/activity" className="bnb-focus">Activity</Link>
             <Link href="/bnb/status" className="bnb-focus">Verify</Link>
           </div>
           <div>

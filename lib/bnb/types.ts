@@ -84,6 +84,7 @@ export type BnbAgentProfile = {
   agentWallet: string;
   identityRegistry: string;
   metadataUri?: string;
+  imageUrl?: string;
   services: BnbAgentService[];
   capabilities: string[];
   x402Support: boolean;
@@ -514,6 +515,8 @@ export type BnbTermixComparisonRecord = {
   dataSources?: string[];
   qualityScore?: string;
   notes?: string;
+  comparisonType?: "manual_vs_agent" | "agents";
+  comparedAgents?: Array<Pick<BnbAgentProfile, "chainId" | "tokenId" | "name" | "activationStatus" | "executionStatus">>;
   storage?: BnbRecordStorage;
 };
 

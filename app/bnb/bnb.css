@@ -27,6 +27,103 @@
   overflow-x: hidden;
 }
 
+.bnb-shell.bnb-shell-home {
+  --bnb-bg: #fcfcf8;
+  --bnb-surface: #ffffff;
+  --bnb-elevated: #f3f4ef;
+  --bnb-carbon: #e7e9e2;
+  --bnb-muted: #f3f4ef;
+  --bnb-line: #dde0d8;
+  --bnb-line-strong: #b9bdb4;
+  --bnb-line-hover: #858a82;
+  --bnb-text: #171815;
+  --bnb-text-soft: #343731;
+  --bnb-text-muted: #60645d;
+  --bnb-text-dim: #858a82;
+  --bnb-hive: #171815;
+  --bnb-hive-hover: #30322e;
+  --bnb-hive-soft: #f3f4ef;
+  --bnb-hive-line: #b9bdb4;
+  --bnb-gold: #f3ba2f;
+  --bnb-gold-soft: #fff6dd;
+  --bnb-gold-line: #ddbd5a;
+  background: var(--bnb-bg);
+  color: var(--bnb-text);
+  color-scheme: light;
+}
+
+html:has(.bnb-shell-home),
+body:has(.bnb-shell-home) {
+  background: #fcfcf8;
+}
+
+.bnb-shell-home .bnb-header {
+  border-bottom-color: #dde0d8;
+  background: rgba(252, 252, 248, 0.94);
+  backdrop-filter: blur(12px);
+}
+
+.bnb-shell-home .bnb-brand-mark {
+  border-color: #d8dcd3;
+  background: #f3ba2f;
+}
+
+.bnb-shell-home .bnb-brand-context {
+  color: #7b641a;
+}
+
+.bnb-shell-home .bnb-nav-link:hover,
+.bnb-shell-home .bnb-nav-link:focus-visible,
+.bnb-shell-home .bnb-nav-link[data-active="true"] {
+  border-bottom-color: #171815;
+}
+
+.bnb-shell-home .bnb-nav-link:focus-visible,
+.bnb-shell-home .bnb-focus:focus-visible {
+  box-shadow: 0 0 0 2px #fcfcf8, 0 0 0 4px #2f6fed;
+}
+
+.bnb-shell-home .bnb-account-button {
+  border-color: #d8dcd3;
+  background: #fff;
+  color: #343731;
+}
+
+.bnb-shell-home .bnb-account-button:hover,
+.bnb-shell-home .bnb-account-button[data-active="true"] {
+  border-color: #b9bdb4;
+  background: #f3f4ef;
+  color: #171815;
+}
+
+.bnb-shell-home .bnb-footer {
+  border-top-color: #dde0d8;
+  background: #fcfcf8;
+}
+
+.bnb-shell-home .bnb-footer-links a:hover {
+  color: #171815;
+}
+
+.bnb-shell-home .bnb-footer-social .bnb-icon-button:hover {
+  border-color: #b9bdb4;
+  color: #171815;
+}
+
+@media (max-width: 900px) {
+  .bnb-shell-home .bnb-header-inner {
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+
+  .bnb-shell-home .bnb-brand {
+    max-width: 150px;
+  }
+
+  .bnb-shell-home .bnb-header-actions {
+    max-width: 120px;
+  }
+}
+
 html:has(.bnb-shell),
 body:has(.bnb-shell) {
   overflow-x: hidden;

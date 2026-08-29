@@ -1,9 +1,13 @@
+import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
+import { ArrowLeft } from "lucide-react";
+import { BnbContainer, BnbShell } from "@/app/bnb/_components/BnbUi";
 import { getBnbAgent } from "@/lib/bnb/catalog";
+import { bnbAgentDisplayName } from "@/lib/bnb/display";
 import { canHireBnbAgent } from "@/lib/bnb/runtime";
-import { BnbContainer, BnbPageHeader, BnbPanel, BnbShell } from "@/app/bnb/_components/BnbUi";
-import { bnbAgentDisplayName, bnbCategoryLabel, bnbListingDescription, bnbStatusLabel } from "@/lib/bnb/display";
+import { bnbAgentProfilePath } from "@/lib/bnb/routes";
 import { ActivationForm } from "./ActivationForm";
+import styles from "./hire.module.css";
 
 type SearchParams = Promise<Record<string, string | string[] | undefined>>;
 
@@ -19,38 +23,27 @@ export default async function BnbActivatePage({ searchParams }: { searchParams: 
 
   const agent = await getBnbAgent(chainId, tokenId);
   if (!agent) notFound();
-  const canHire = canHireBnbAgent(agent);
-  if (!canHire) {
+  if (!canHireBnbAgent(agent)) {
     redirect(`/bnb/agents/${agent.chainId}/${encodeURIComponent(agent.tokenId)}`);
   }
+
   const agentName = bnbAgentDisplayName(agent);
-  const description = bnbListingDescription(agent);
 
   return (
-    <BnbShell>
-      <BnbPageHeader
-        title={`Hire ${agentName}`}
-      />
-      <BnbContainer className="bnb-section grid gap-8 lg:grid-cols-[1fr_320px]">
-        <ActivationForm key={`${agent.chainId}:${agent.tokenId}`} agent={agent} />
-
-        <aside className="content-start">
-          <BnbPanel className="p-5">
-            <h2 className="text-xl font-semibold text-white">{agentName}</h2>
-            {description ? <p className="mt-2 text-sm leading-6 text-zinc-400">{description}</p> : null}
-            <dl className="mt-5">
-              <div className="bnb-data-row">
-                <dt>Category</dt>
-                <dd className="bnb-data-value"><span>{bnbCategoryLabel(agent.category)}</span></dd>
-              </div>
-              <div className="bnb-data-row">
-                <dt>Availability</dt>
-                <dd className="bnb-data-value"><span>{bnbStatusLabel(agent)}</span></dd>
-              </div>
-            </dl>
-          </BnbPanel>
-        </aside>
-      </BnbContainer>
+    <BnbShell active="agents" variant="landing">
+      <div className={styles.page}>
+        <BnbContainer className={styles.container}>
+          <Link href={bnbAgentProfilePath(agent)} className={styles.backLink}>
+            <ArrowLeft aria-hidden="true" size={16} />
+            Agent profile
+          </Link>
+          <header className={styles.pageHeader}>
+            <span>Hire agent</span>
+            <h1>{agentName}</h1>
+          </header>
+          <ActivationForm key={`${agent.chainId}:${agent.tokenId}`} agent={agent} />
+        </BnbContainer>
+      </div>
     </BnbShell>
   );
 }

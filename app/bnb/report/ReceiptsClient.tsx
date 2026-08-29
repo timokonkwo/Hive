@@ -1,29 +1,46 @@
 "use client";
 
-import { useEffect, useMemo, useState, type ReactNode } from "react";
 import Link from "next/link";
+import { usePathname, useRouter } from "next/navigation";
+import { useEffect, useMemo, useState } from "react";
 import { useModalStatus } from "@privy-io/react-auth";
 import { useAccount, useSendTransaction, useSwitchChain } from "wagmi";
 import type { Hex } from "viem";
-import { FileText } from "lucide-react";
+import { BellRing, BriefcaseBusiness, FileSearch, KeyRound, Scale } from "lucide-react";
 import { BnbButtonLoader } from "@/app/bnb/_components/BnbButtonLoader";
-import { BnbContainer, BnbPanel } from "@/app/bnb/_components/BnbUi";
-import { BnbDeliveryView } from "@/app/bnb/_components/BnbDeliveryView";
+import { BnbContainer } from "@/app/bnb/_components/BnbUi";
 import { useAuth } from "@/hooks/useAuth";
 import { useBnbAuthFetch } from "@/hooks/useBnbAuthFetch";
 import { getClientBnbChainId, getClientBnbNativeSymbol } from "@/lib/bnb/client-chain";
 import { bnbRefundUnavailableReason } from "@/lib/bnb/settlement-state";
-import type { BnbAccessRequestRecord, BnbActivationRecord, BnbRecordsSnapshot } from "@/lib/bnb/types";
+import type {
+  BnbAccessRequestRecord,
+  BnbActivationRecord,
+  BnbAltanaSessionRecord,
+  BnbRecordsSnapshot,
+  BnbTermixComparisonRecord,
+} from "@/lib/bnb/types";
+import styles from "./activity.module.css";
 
-type ActivityRow = {
-  id: string;
-  title: string;
-  detail: string;
-  meta: string;
-  href?: string;
-};
+export type ActivityFilter = "all" | "jobs" | "requests" | "alerts" | "comparisons";
 
-export function ReceiptsClient({ embedded = false }: { embedded?: boolean } = {}) {
+type ActivityEntry =
+  | { type: "jobs"; updatedAt: string; record: BnbActivationRecord }
+  | { type: "requests"; updatedAt: string; record: BnbAccessRequestRecord }
+  | { type: "alerts"; updatedAt: string; record: BnbAltanaSessionRecord }
+  | { type: "comparisons"; updatedAt: string; record: BnbTermixComparisonRecord };
+
+const filters: Array<{ value: ActivityFilter; label: string }> = [
+  { value: "all", label: "All" },
+  { value: "jobs", label: "Jobs" },
+  { value: "requests", label: "Access requests" },
+  { value: "alerts", label: "Wallet alerts" },
+  { value: "comparisons", label: "Comparisons" },
+];
+
+export function ReceiptsClient({ embedded = false, initialFilter = "all" }: { embedded?: boolean; initialFilter?: ActivityFilter } = {}) {
+  const router = useRouter();
+  const pathname = usePathname();
   const { authenticated, login, ready, connectWallet } = useAuth();
   const { address, chainId } = useAccount();
   const { isOpen: privyModalOpen } = useModalStatus();
@@ -33,12 +50,18 @@ export function ReceiptsClient({ embedded = false }: { embedded?: boolean } = {}
   const targetChainId = getClientBnbChainId();
   const nativeSymbol = getClientBnbNativeSymbol();
   const [records, setRecords] = useState<BnbRecordsSnapshot | null>(null);
-  const [loading, setLoading] = useState(false);
+  const [filter, setFilterState] = useState<ActivityFilter>(initialFilter);
+  const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [actionId, setActionId] = useState("");
   const [authBusy, setAuthBusy] = useState(false);
+  const [authReadyTimedOut, setAuthReadyTimedOut] = useState(false);
   const [walletBusy, setWalletBusy] = useState(false);
   const [reloadKey, setReloadKey] = useState(0);
+
+  useEffect(() => {
+    setFilterState(initialFilter);
+  }, [initialFilter]);
 
   useEffect(() => {
     if (!privyModalOpen) {
@@ -48,13 +71,22 @@ export function ReceiptsClient({ embedded = false }: { embedded?: boolean } = {}
   }, [privyModalOpen]);
 
   useEffect(() => {
-    if ((!ready && !address) || (!authenticated && !address)) return;
+    if (ready || authenticated || address) {
+      setAuthReadyTimedOut(false);
+      return;
+    }
+    const timeout = window.setTimeout(() => setAuthReadyTimedOut(true), 5000);
+    return () => window.clearTimeout(timeout);
+  }, [address, authenticated, ready]);
+
+  useEffect(() => {
+    if (!authenticated && !address) return;
 
     let cancelled = false;
     setLoading(true);
     setError("");
 
-    authFetch("/api/bnb/records?limit=25")
+    authFetch("/api/bnb/records?limit=25", { cache: "no-store" })
       .then(async (response) => {
         const payload = await response.json();
         if (!response.ok) {
@@ -74,70 +106,42 @@ export function ReceiptsClient({ embedded = false }: { embedded?: boolean } = {}
     };
   }, [address, authenticated, authFetch, ready, reloadKey]);
 
-  const rows = useMemo(() => {
-    if (!records) return [];
+  const entries = useMemo(() => activityEntries(records), [records]);
+  const visibleEntries = filter === "all" ? entries : entries.filter((entry) => entry.type === filter);
+  const counts = useMemo(() => ({
+    all: entries.length,
+    jobs: entries.filter((entry) => entry.type === "jobs").length,
+    requests: entries.filter((entry) => entry.type === "requests").length,
+    alerts: entries.filter((entry) => entry.type === "alerts").length,
+    comparisons: entries.filter((entry) => entry.type === "comparisons").length,
+  }), [entries]);
 
-    const hires: ActivityRow[] = records.activations.map((record) => ({
-      id: record.recordId,
-      title: record.agent.name,
-      detail: record.limits.task,
-      meta: jobStatusLabel(record),
-      href: `/bnb/jobs/${encodeURIComponent(record.recordId)}`,
-    }));
-
-    const accessRequests: ActivityRow[] = records.accessRequests.map((record) => ({
-      id: record.recordId,
-      title: record.agent.name,
-      detail: record.task,
-      meta: accessRequestStatus(record),
-      href: `/bnb/agents/${record.agent.chainId}/${encodeURIComponent(record.agent.tokenId)}`,
-    }));
-
-    const comparisons: ActivityRow[] = records.termixComparisons.map((record) => ({
-      id: record.recordId,
-      title: record.title,
-      detail: `${record.target} / ${record.manualTime || "manual time"} vs ${record.agentTime || "agent time"}`,
-      meta: record.qualityScore ? `${record.verdict} / ${record.qualityScore}` : record.verdict,
-      href: "/bnb/termix",
-    }));
-
-    const alerts: ActivityRow[] = records.altanaSessions.map((record) => ({
-      id: record.recordId,
-      title: record.title,
-      detail: record.walletAddress ? `${record.walletLabel} / ${record.walletAddress}` : record.walletLabel,
-      meta: record.status === "stopped" ? "Stopped" : "Active",
-      href: "/bnb/altana",
-    }));
-
-    return [...hires, ...accessRequests, ...comparisons, ...alerts];
-  }, [records]);
+  function setFilter(next: ActivityFilter) {
+    setFilterState(next);
+    if (embedded) return;
+    const params = new URLSearchParams();
+    if (next !== "all") params.set("filter", next);
+    const query = params.toString();
+    router.replace(query ? `${pathname}?${query}` : pathname, { scroll: false });
+  }
 
   function replaceActivation(record: BnbActivationRecord) {
-    setRecords((current) => {
-      if (!current) return current;
-      return {
-        ...current,
-        activations: current.activations.map((item) => item.recordId === record.recordId ? record : item),
-      };
-    });
+    setRecords((current) => current ? {
+      ...current,
+      activations: current.activations.map((item) => item.recordId === record.recordId ? record : item),
+    } : current);
   }
 
   function replaceAccessRequest(record: BnbAccessRequestRecord) {
-    setRecords((current) => {
-      if (!current) return current;
-      return {
-        ...current,
-        accessRequests: current.accessRequests.map((item) => item.recordId === record.recordId ? record : item),
-      };
-    });
+    setRecords((current) => current ? {
+      ...current,
+      accessRequests: current.accessRequests.map((item) => item.recordId === record.recordId ? record : item),
+    } : current);
   }
 
   function signInWithBnbWallet() {
     setAuthBusy(true);
-    login({
-      loginMethods: ["wallet"],
-      walletChainType: "ethereum-only",
-    });
+    login({ loginMethods: ["wallet"], walletChainType: "ethereum-only" });
   }
 
   async function cancelAccessRequest(record: BnbAccessRequestRecord) {
@@ -200,10 +204,7 @@ export function ReceiptsClient({ embedded = false }: { embedded?: boolean } = {}
     setError("");
 
     try {
-      if (chainId !== targetChainId) {
-        await switchChainAsync({ chainId: targetChainId });
-      }
-
+      if (chainId !== targetChainId) await switchChainAsync({ chainId: targetChainId });
       const prepareResponse = await authFetch("/api/bnb/activate/settlement", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -221,7 +222,6 @@ export function ReceiptsClient({ embedded = false }: { embedded?: boolean } = {}
         gas: settlementRequest.gasLimit ? BigInt(settlementRequest.gasLimit) : undefined,
         chainId: targetChainId,
       });
-
       const confirmResponse = await authFetch("/api/bnb/activate/settlement", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -237,210 +237,227 @@ export function ReceiptsClient({ embedded = false }: { embedded?: boolean } = {}
     }
   }
 
-  if (!ready && !address) {
-    return (
-      <ActivityFrame embedded={embedded}>
-        <BnbPanel className="p-6">
-          <BnbButtonLoader size={20} />
-        </BnbPanel>
-      </ActivityFrame>
-    );
+  const authInitializing = !ready && !authenticated && !address && !authReadyTimedOut;
+
+  if (authInitializing) {
+    return <ActivityFrame embedded={embedded}><div className={styles.loadingState} role="status"><BnbButtonLoader size={20} /><span>Loading activity</span></div></ActivityFrame>;
   }
 
   if (!authenticated && !address) {
     if (embedded) return null;
-
     return (
-      <BnbContainer className="bnb-section">
-        <BnbPanel className="p-6">
-          <h2 className="text-xl font-semibold text-white">Sign in to view activity</h2>
-          <p className="mt-2 text-sm leading-6 text-zinc-400">Your hires, requests, alerts, and payments are private to your Hive account.</p>
-          <button type="button" onClick={signInWithBnbWallet} disabled={authBusy || privyModalOpen} aria-busy={authBusy || privyModalOpen} className="bnb-button bnb-focus mt-5">
+      <ActivityFrame embedded={embedded}>
+        <section className={styles.authState}>
+          <KeyRound aria-hidden="true" size={20} />
+          <h2>Sign in to view activity</h2>
+          <p>Your work records and payment actions are private to your Hive account.</p>
+          <button type="button" onClick={signInWithBnbWallet} disabled={authBusy || privyModalOpen} aria-busy={authBusy || privyModalOpen} className="bnb-button bnb-focus">
             {authBusy || privyModalOpen ? <BnbButtonLoader /> : null}
             {authBusy || privyModalOpen ? "Opening wallet..." : "Sign in"}
           </button>
-        </BnbPanel>
-      </BnbContainer>
+        </section>
+      </ActivityFrame>
     );
   }
 
   return (
     <ActivityFrame embedded={embedded}>
       {error ? (
-        <div className="bnb-error mb-4 flex flex-wrap items-center justify-between gap-3 p-4 text-sm">
+        <div className={styles.errorBand} role="alert">
           <span>{error}</span>
-          <button type="button" className="bnb-link-button bnb-focus" onClick={() => setReloadKey((current) => current + 1)}>
-            Retry
-          </button>
+          <button type="button" className="bnb-link-button bnb-focus" onClick={() => setReloadKey((current) => current + 1)}>Retry</button>
         </div>
       ) : null}
 
-      <section className="bnb-list-panel">
-        <div className="bnb-list-head">
+      <section className={styles.records} aria-labelledby="activity-records-title">
+        <div className={styles.recordsHeader}>
           <div>
-            <h2>Activity</h2>
-            <p>Hires, wallet alerts, comparisons, and payment updates.</p>
+            <span>Records</span>
+            <h2 id="activity-records-title">Your work</h2>
           </div>
-          <Link href="/bnb/agents" className="bnb-text-action bnb-focus">Browse agents</Link>
+          <Link href="/bnb/agents" className="bnb-button-dark bnb-focus">Browse agents</Link>
         </div>
 
-        <BnbPanel className="overflow-hidden">
-          {loading ? (
-            <div className="grid gap-0">
-              {Array.from({ length: 4 }).map((_, index) => (
-                <div key={index} className="bnb-receipt-row">
-                  <div className="h-4 w-40 rounded bg-zinc-800" />
-                  <div className="mt-3 h-3 w-64 rounded bg-zinc-900" />
-                </div>
-              ))}
-            </div>
-          ) : rows.length > 0 ? (
-            <div>
-              {records?.activations.map((record) => {
-                const paymentNotRequired = record.limits.walletConfirmationRequired === false;
-                const funded = paymentNotRequired || record.payment?.transactionStatus === "success";
-                const completed = record.delivery?.status === "delivered" || record.work?.status === "completed" || record.status === "delivered" || record.status === "work_completed";
-                const closed = record.status === "paid" || record.status === "released" || record.status === "refunded";
-                const running = record.delivery?.status === "running" || record.work?.status === "running" || record.status === "running";
-                const failed = record.delivery?.status === "failed" || record.work?.status === "failed" || record.status === "failed";
-                const output = record.delivery?.rawOutput || record.work?.output;
-                const dataSources = record.delivery?.dataSources || record.work?.dataSources;
-                const refundBlocker = bnbRefundUnavailableReason(record);
-                const showSettlementActions = record.payment?.mode === "escrow" && completed && !closed;
-                return (
-                  <article key={record.recordId} className="bnb-receipt-row">
-                    <span>
-                      <Link href={`/bnb/jobs/${encodeURIComponent(record.recordId)}`} className="flex items-center gap-2 text-sm font-semibold text-white bnb-focus">
-                        <FileText aria-hidden="true" size={15} />
-                        {record.agent.name}
-                      </Link>
-                      <span className="mt-1 block break-all text-sm leading-6 text-zinc-500">{record.limits.task}</span>
-                      {output ? (
-                        <BnbDeliveryView output={output} jobSpec={record.jobSpec} dataSources={dataSources} compact className="mt-3" />
-                      ) : null}
-                    </span>
-                    <span className="grid gap-2 justify-items-start sm:justify-items-end">
-                      <span className="bnb-chip">{jobStatusLabel(record)}</span>
-                      <Link href={`/bnb/jobs/${encodeURIComponent(record.recordId)}`} className="bnb-button-dark bnb-focus">
-                        View
-                      </Link>
-                      {funded && !completed && !closed && !failed ? (
-                        <button
-                          type="button"
-                          onClick={() => runHire(record)}
-                          disabled={Boolean(actionId) || running}
-                          aria-busy={actionId === `${record.recordId}:run` || running}
-                          className="bnb-button bnb-focus disabled:cursor-not-allowed disabled:opacity-60"
-                        >
-                          {actionId === `${record.recordId}:run` ? <BnbButtonLoader /> : null}
-                          {actionId === `${record.recordId}:run` || running ? "Running" : "Run agent"}
-                        </button>
-                      ) : null}
-                      {showSettlementActions ? (
-                        <span className="grid gap-2 sm:grid-cols-2">
-                          <button
-                            type="button"
-                            onClick={() => settleHire(record, "release")}
-                            disabled={Boolean(actionId) || walletBusy}
-                            aria-busy={actionId === `${record.recordId}:release` || walletBusy}
-                            className="bnb-button bnb-focus disabled:cursor-not-allowed disabled:opacity-60"
-                          >
-                            {actionId === `${record.recordId}:release` || walletBusy ? <BnbButtonLoader /> : null}
-                            {walletBusy ? "Opening wallet..." : actionId === `${record.recordId}:release` ? "Confirming..." : "Release"}
-                          </button>
-                          {!refundBlocker ? (
-                            <button
-                              type="button"
-                              onClick={() => settleHire(record, "refund")}
-                              disabled={Boolean(actionId) || walletBusy}
-                              aria-busy={actionId === `${record.recordId}:refund` || walletBusy}
-                              className="bnb-button bnb-button-secondary bnb-focus disabled:cursor-not-allowed disabled:opacity-60"
-                            >
-                              {actionId === `${record.recordId}:refund` || walletBusy ? <BnbButtonLoader /> : null}
-                              {walletBusy ? "Opening wallet..." : actionId === `${record.recordId}:refund` ? "Confirming..." : "Refund"}
-                            </button>
-                          ) : (
-                            <p className="bnb-field-hint bnb-action-hint">{refundBlocker}</p>
-                          )}
-                        </span>
-                      ) : null}
-                    </span>
-                  </article>
-                );
-              })}
-              {records?.accessRequests.map((record) => (
-                <article key={record.recordId} className="bnb-receipt-row">
-                  <span>
-                    <Link href={`/bnb/agents/${record.agent.chainId}/${encodeURIComponent(record.agent.tokenId)}`} className="flex items-center gap-2 text-sm font-semibold text-white bnb-focus">
-                      <FileText aria-hidden="true" size={15} />
-                      {record.agent.name}
-                    </Link>
-                    <span className="mt-1 block break-all text-sm leading-6 text-zinc-500">{record.task}</span>
-                    {(record.budget || record.deadline) ? (
-                      <span className="mt-2 block text-xs leading-5 text-zinc-500">
-                        {[record.budget, record.deadline].filter(Boolean).join(" / ")}
-                      </span>
-                    ) : null}
-                  </span>
-                  <span className="grid gap-2 justify-items-start sm:justify-items-end">
-                    <span className="bnb-chip">{accessRequestStatus(record)}</span>
-                    {record.status === "requested" ? (
-                      <button
-                        type="button"
-                        onClick={() => cancelAccessRequest(record)}
-                        disabled={Boolean(actionId)}
-                        aria-busy={actionId === `${record.recordId}:cancel`}
-                        className="bnb-link-button bnb-focus disabled:cursor-not-allowed disabled:opacity-60"
-                      >
-                        {actionId === `${record.recordId}:cancel` ? <BnbButtonLoader /> : null}
-                        {actionId === `${record.recordId}:cancel` ? "Cancelling..." : "Cancel request"}
-                      </button>
-                    ) : null}
-                  </span>
-                </article>
-              ))}
-              {rows.filter((row) => {
-                const isHire = records?.activations.some((record) => record.recordId === row.id);
-                const isAccessRequest = records?.accessRequests.some((record) => record.recordId === row.id);
-                return !isHire && !isAccessRequest;
-              }).map((row) => (
-                <Link key={row.id} href={row.href || "/bnb/account#activity"} className="bnb-receipt-row bnb-focus">
-                  <span>
-                    <span className="flex items-center gap-2 text-sm font-semibold text-white">
-                      <FileText aria-hidden="true" size={15} />
-                      {row.title}
-                    </span>
-                    <span className="mt-1 block break-all text-sm leading-6 text-zinc-500">{row.detail}</span>
-                  </span>
-                  <span className="bnb-chip">{row.meta}</span>
-                </Link>
-              ))}
-            </div>
-          ) : (
-            <div className="p-6">
-              <h2 className="text-xl font-semibold text-white">No activity yet</h2>
-              <p className="mt-2 text-sm leading-6 text-zinc-400">Hire an agent or save a wallet alert to create your first record.</p>
-              <Link href="/bnb/agents" className="bnb-button bnb-focus mt-5">
-                Browse agents
-              </Link>
-            </div>
-          )}
-        </BnbPanel>
+        <div className={styles.filterBar} role="tablist" aria-label="Filter activity">
+          {filters.map((item) => (
+            <button
+              key={item.value}
+              type="button"
+              role="tab"
+              aria-selected={filter === item.value}
+              className="bnb-focus"
+              onClick={() => setFilter(item.value)}
+            >
+              {item.label}{records ? <span>{counts[item.value]}</span> : null}
+            </button>
+          ))}
+        </div>
+
+        <div className={styles.columnHead} aria-hidden="true">
+          <span>Record</span><span>Updated</span><span>Status</span><span>Amount</span><span>Action</span>
+        </div>
+
+        {loading ? (
+          <div className={styles.recordsLoading} role="status" aria-label="Loading activity">
+            <BnbButtonLoader size={20} />
+          </div>
+        ) : visibleEntries.length > 0 ? (
+          <div className={styles.rows}>
+            {visibleEntries.map((entry) => (
+              <ActivityEntryRow
+                key={`${entry.type}:${entry.record.recordId}`}
+                entry={entry}
+                actionId={actionId}
+                walletBusy={walletBusy}
+                runHire={runHire}
+                settleHire={settleHire}
+                cancelAccessRequest={cancelAccessRequest}
+              />
+            ))}
+          </div>
+        ) : (
+          <div className={styles.emptyState}>
+            <FileSearch aria-hidden="true" size={20} />
+            <strong>{entries.length > 0 ? "No records in this view" : "No activity yet"}</strong>
+            <p>{entries.length > 0 ? "Choose another activity type." : "Hire an agent or create a wallet alert to add the first record."}</p>
+            {entries.length === 0 ? <Link href="/bnb/agents" className="bnb-button bnb-focus">Browse agents</Link> : null}
+          </div>
+        )}
       </section>
     </ActivityFrame>
   );
 }
 
-function ActivityFrame({ embedded, children }: { embedded?: boolean; children: ReactNode }) {
-  if (embedded) {
+function ActivityEntryRow({
+  entry,
+  actionId,
+  walletBusy,
+  runHire,
+  settleHire,
+  cancelAccessRequest,
+}: {
+  entry: ActivityEntry;
+  actionId: string;
+  walletBusy: boolean;
+  runHire: (record: BnbActivationRecord) => void;
+  settleHire: (record: BnbActivationRecord, action: "release" | "refund") => void;
+  cancelAccessRequest: (record: BnbAccessRequestRecord) => void;
+}) {
+  if (entry.type === "jobs") {
+    const record = entry.record;
+    const paymentNotRequired = record.limits.walletConfirmationRequired === false;
+    const funded = paymentNotRequired || record.payment?.transactionStatus === "success";
+    const completed = record.delivery?.status === "delivered" || record.work?.status === "completed" || record.status === "delivered" || record.status === "work_completed";
+    const closed = record.status === "paid" || record.status === "released" || record.status === "refunded";
+    const running = record.delivery?.status === "running" || record.work?.status === "running" || record.status === "running";
+    const failed = record.delivery?.status === "failed" || record.work?.status === "failed" || record.status === "failed";
+    const showSettlementActions = record.payment?.mode === "escrow" && completed && !closed;
+    const refundBlocker = bnbRefundUnavailableReason(record);
+    const href = `/bnb/jobs/${encodeURIComponent(record.recordId)}`;
     return (
-      <div id="activity" className="bnb-container bnb-account-activity">
-        {children}
-      </div>
+      <article className={styles.activityRow}>
+        <RecordIdentity icon={<BriefcaseBusiness size={16} />} type="Job" title={record.agent.name} detail={record.limits.task} href={href} />
+        <time dateTime={record.updatedAt}>{formatActivityDate(record.updatedAt)}</time>
+        <StatusCell label={jobStatusLabel(record)} />
+        <span className={styles.amount}>{paymentNotRequired ? "Free" : record.limits.budget || "-"}</span>
+        <div className={styles.rowActions}>
+          {funded && !completed && !closed && !failed ? (
+            <button type="button" onClick={() => runHire(record)} disabled={Boolean(actionId) || running} aria-busy={actionId === `${record.recordId}:run` || running} className="bnb-button bnb-focus">
+              {actionId === `${record.recordId}:run` || running ? <BnbButtonLoader /> : null}
+              {actionId === `${record.recordId}:run` || running ? "Running" : "Run agent"}
+            </button>
+          ) : showSettlementActions ? (
+            <>
+              <button type="button" onClick={() => settleHire(record, "release")} disabled={Boolean(actionId) || walletBusy} aria-busy={actionId === `${record.recordId}:release` || walletBusy} className="bnb-button bnb-focus">
+                {actionId === `${record.recordId}:release` || walletBusy ? <BnbButtonLoader /> : null}
+                {walletBusy ? "Opening wallet..." : actionId === `${record.recordId}:release` ? "Confirming..." : "Release"}
+              </button>
+              {!refundBlocker ? <button type="button" onClick={() => settleHire(record, "refund")} disabled={Boolean(actionId) || walletBusy} className={styles.textAction}>Refund</button> : null}
+            </>
+          ) : <Link href={href} className="bnb-button-dark bnb-focus">View job</Link>}
+        </div>
+      </article>
     );
   }
 
-  return <BnbContainer className="bnb-section">{children}</BnbContainer>;
+  if (entry.type === "requests") {
+    const record = entry.record;
+    const href = `/bnb/agents/${record.agent.chainId}/${encodeURIComponent(record.agent.tokenId)}`;
+    return (
+      <article className={styles.activityRow}>
+        <RecordIdentity icon={<KeyRound size={16} />} type="Access request" title={record.agent.name} detail={record.task} href={href} />
+        <time dateTime={record.updatedAt}>{formatActivityDate(record.updatedAt)}</time>
+        <StatusCell label={accessRequestStatus(record)} />
+        <span className={styles.amount}>{record.budget || "-"}</span>
+        <div className={styles.rowActions}>
+          {record.status === "requested" ? (
+            <button type="button" onClick={() => cancelAccessRequest(record)} disabled={Boolean(actionId)} aria-busy={actionId === `${record.recordId}:cancel`} className={styles.textAction}>
+              {actionId === `${record.recordId}:cancel` ? <BnbButtonLoader /> : null}
+              {actionId === `${record.recordId}:cancel` ? "Cancelling..." : "Cancel request"}
+            </button>
+          ) : <Link href={href} className="bnb-button-dark bnb-focus">View profile</Link>}
+        </div>
+      </article>
+    );
+  }
+
+  if (entry.type === "alerts") {
+    const record = entry.record;
+    return (
+      <article className={styles.activityRow}>
+        <RecordIdentity icon={<BellRing size={16} />} type="Wallet alert" title={record.title} detail={record.walletLabel} href="/bnb/altana" />
+        <time dateTime={record.updatedAt}>{formatActivityDate(record.updatedAt)}</time>
+        <StatusCell label={record.status === "stopped" ? "Stopped" : record.status === "active" ? "Active" : "Saved"} />
+        <span className={styles.amount}>{record.budget || "-"}</span>
+        <div className={styles.rowActions}><Link href="/bnb/altana" className="bnb-button-dark bnb-focus">View alert</Link></div>
+      </article>
+    );
+  }
+
+  const record = entry.record;
+  const comparisonHref = record.comparisonType === "agents" ? "/bnb/agents" : "/bnb/termix";
+  return (
+    <article className={styles.activityRow}>
+      <RecordIdentity icon={<Scale size={16} />} type="Comparison" title={record.title} detail={record.target} href={comparisonHref} />
+      <time dateTime={record.updatedAt}>{formatActivityDate(record.updatedAt)}</time>
+      <StatusCell label={comparisonStatus(record)} />
+      <span className={styles.amount}>-</span>
+      <div className={styles.rowActions}><Link href={comparisonHref} className="bnb-button-dark bnb-focus">View comparison</Link></div>
+    </article>
+  );
+}
+
+function RecordIdentity({ icon, type, title, detail, href }: { icon: React.ReactNode; type: string; title: string; detail: string; href: string }) {
+  return (
+    <div className={styles.recordIdentity}>
+      <span aria-hidden="true">{icon}</span>
+      <div>
+        <small>{type}</small>
+        <strong><Link href={href} className="bnb-focus">{title}</Link></strong>
+        <p>{detail}</p>
+      </div>
+    </div>
+  );
+}
+
+function StatusCell({ label }: { label: string }) {
+  const state = /failed|cancelled|stopped/i.test(label) ? "failed" : /paid|delivered|active|refunded|converted/i.test(label) ? "complete" : /running|submitted|sent/i.test(label) ? "current" : "pending";
+  return <span className={styles.status} data-state={state}><i aria-hidden="true" />{label}</span>;
+}
+
+function ActivityFrame({ embedded, children }: { embedded?: boolean; children: React.ReactNode }) {
+  if (embedded) return <div id="activity" className={`${styles.frame} ${styles.embedded}`}>{children}</div>;
+  return <BnbContainer className={styles.frame}>{children}</BnbContainer>;
+}
+
+function activityEntries(records: BnbRecordsSnapshot | null): ActivityEntry[] {
+  if (!records) return [];
+  return [
+    ...records.activations.map((record): ActivityEntry => ({ type: "jobs", updatedAt: record.updatedAt, record })),
+    ...records.accessRequests.map((record): ActivityEntry => ({ type: "requests", updatedAt: record.updatedAt, record })),
+    ...records.altanaSessions.map((record): ActivityEntry => ({ type: "alerts", updatedAt: record.updatedAt, record })),
+    ...records.termixComparisons.map((record): ActivityEntry => ({ type: "comparisons", updatedAt: record.updatedAt, record })),
+  ].sort((left, right) => Date.parse(right.updatedAt) - Date.parse(left.updatedAt));
 }
 
 function accessRequestStatus(record: BnbAccessRequestRecord) {
@@ -457,23 +474,27 @@ function jobStatusLabel(record: BnbActivationRecord) {
   if (record.payment?.transactionStatus === "success" || record.status === "funded" || record.status === "payment_confirmed") return "Payment sent";
   if (record.status === "payment_submitted") return "Payment submitted";
   if (record.status === "failed") return "Failed";
-  if (record.limits.walletConfirmationRequired === false) return "Run";
+  if (record.limits.walletConfirmationRequired === false) return "Ready to run";
   return "Awaiting payment";
 }
 
-function ensureProtectedSession({
-  authenticated,
-  walletAddress,
-  login,
-}: {
-  authenticated: boolean;
-  walletAddress?: string;
-  login: () => void;
-}) {
+function comparisonStatus(record: BnbTermixComparisonRecord) {
+  if (record.verdict === "agent_better") return "Agent faster";
+  if (record.verdict === "manual_better") return "Manual faster";
+  if (record.verdict === "equal") return "Equal";
+  return "Pending";
+}
+
+function formatActivityDate(value: string) {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "Unknown";
+  return new Intl.DateTimeFormat("en", { month: "short", day: "numeric", year: date.getFullYear() === new Date().getFullYear() ? undefined : "numeric" }).format(date);
+}
+
+function ensureProtectedSession({ authenticated, walletAddress, login }: { authenticated: boolean; walletAddress?: string; login: () => void }) {
   if (!authenticated && !walletAddress) {
     login();
     return false;
   }
-
   return true;
 }

@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useSyncExternalStore } from "react";
-import { GitCompareArrows } from "lucide-react";
+import { Bookmark } from "lucide-react";
 import type { BnbAgentProfile } from "@/lib/bnb/types";
 import {
   bnbAgentDisplayName,
@@ -21,6 +21,7 @@ import {
   bnbStatusLabel,
   bnbUsableServices,
 } from "@/lib/bnb/display";
+import styles from "./profile.module.css";
 
 type StoredAgent = {
   key: string;
@@ -44,67 +45,77 @@ type StoredAgent = {
 const savedKey = "hive:bnb:saved-agents";
 const compareKey = "hive:bnb:compare-agents";
 
-export function ProfileCompareAction({ agent }: { agent: BnbAgentProfile }) {
+export function ProfileActions({ agent }: { agent: BnbAgentProfile }) {
   const key = bnbAgentKey(agent);
   const snapshot = useSyncExternalStore(
-    subscribeToCompareStore,
-    () => getCompareSnapshot(key),
-    () => JSON.stringify({ compared: false, count: 0 }),
+    subscribeToAgentStores,
+    () => getSnapshot(key),
+    () => JSON.stringify({ saved: false, compared: false, count: 0 }),
   );
-  const { compared, count } = JSON.parse(snapshot) as { compared: boolean; count: number };
+  const { saved, compared, count } = JSON.parse(snapshot) as { saved: boolean; compared: boolean; count: number };
+
+  function toggleSave() {
+    const savedAgents = readSavedAgents();
+    if (savedAgents[key]) delete savedAgents[key];
+    else savedAgents[key] = toStoredAgent(agent);
+    window.localStorage.setItem(savedKey, JSON.stringify(savedAgents));
+    window.dispatchEvent(new Event("hive:bnb:saved-changed"));
+  }
 
   function toggleCompare() {
-    const saved = toStoredAgent(agent);
     const comparedAgents = readComparedAgents();
-    const exists = comparedAgents.includes(saved.key);
+    const exists = comparedAgents.includes(key);
     const next = exists
-      ? comparedAgents.filter((item) => item !== saved.key)
+      ? comparedAgents.filter((item) => item !== key)
       : comparedAgents.length >= 3
         ? comparedAgents
-        : [...comparedAgents, saved.key];
+        : [...comparedAgents, key];
 
     const savedAgents = readSavedAgents();
-    savedAgents[saved.key] = saved;
+    savedAgents[key] = toStoredAgent(agent);
     window.localStorage.setItem(savedKey, JSON.stringify(savedAgents));
     window.localStorage.setItem(compareKey, JSON.stringify(next));
+    window.dispatchEvent(new Event("hive:bnb:saved-changed"));
     window.dispatchEvent(new Event("hive:bnb:compare-changed"));
   }
 
   return (
-    <div className="bnb-profile-compare">
+    <div className={styles.profileActions}>
       <button
         type="button"
-        className="bnb-button-dark bnb-focus"
-        onClick={toggleCompare}
-        disabled={!compared && count >= 3}
+        className={styles.saveButton}
+        aria-label={saved ? `Remove ${bnbAgentDisplayName(agent)} from saved agents` : `Save ${bnbAgentDisplayName(agent)}`}
+        title={saved ? "Remove from saved" : "Save agent"}
+        onClick={toggleSave}
       >
-        <GitCompareArrows aria-hidden="true" size={15} />
-        {compared ? "Remove from compare" : count >= 3 ? "Compare limit reached" : "Add to compare"}
+        <Bookmark aria-hidden="true" size={17} fill={saved ? "currentColor" : "none"} />
       </button>
-      {count >= 2 ? (
-        <Link href="/bnb/agents" className="bnb-text-action bnb-focus">
-          Compare agents
-        </Link>
-      ) : null}
+      <label className={styles.compareControl} data-disabled={!compared && count >= 3 ? "true" : undefined}>
+        <input type="checkbox" checked={compared} disabled={!compared && count >= 3} onChange={toggleCompare} />
+        <span>{!compared && count >= 3 ? "Compare limit reached" : "Compare"}</span>
+      </label>
+      {count >= 2 ? <Link href="/bnb/agents">Compare selected</Link> : null}
     </div>
   );
 }
 
-function subscribeToCompareStore(onStoreChange: () => void) {
+function subscribeToAgentStores(onStoreChange: () => void) {
   if (typeof window === "undefined") return () => {};
-
   window.addEventListener("storage", onStoreChange);
+  window.addEventListener("hive:bnb:saved-changed", onStoreChange);
   window.addEventListener("hive:bnb:compare-changed", onStoreChange);
-
   return () => {
     window.removeEventListener("storage", onStoreChange);
+    window.removeEventListener("hive:bnb:saved-changed", onStoreChange);
     window.removeEventListener("hive:bnb:compare-changed", onStoreChange);
   };
 }
 
-function getCompareSnapshot(key: string) {
+function getSnapshot(key: string) {
+  const savedAgents = readSavedAgents();
   const comparedAgents = readComparedAgents();
   return JSON.stringify({
+    saved: Boolean(savedAgents[key]),
     compared: comparedAgents.includes(key),
     count: comparedAgents.length,
   });

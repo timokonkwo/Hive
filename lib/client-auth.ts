@@ -1,5 +1,6 @@
 import { NextRequest } from 'next/server';
 import { createRemoteJWKSet, jwtVerify } from 'jose';
+import { getAddress, isAddress } from 'viem';
 import { logger } from '@/lib/logger';
 
 /**
@@ -41,6 +42,8 @@ export interface VerifiedClient {
   sessionId: string;
   /** When the token expires */
   expiresAt: number;
+  /** Wallet addresses cryptographically linked to this Privy identity. */
+  ownerIds?: string[];
 }
 
 export type ClientAuthFailureReason =
@@ -129,6 +132,8 @@ export async function authenticateClientDetailed(req: NextRequest): Promise<Clie
     // Verify the JWT against Privy's JWKS
     const jwks = getJWKS();
     let lastError: any = null;
+    let verifiedClient: VerifiedClient | null = null;
+    const verifiedOwnerIds = new Set<string>();
     for (const token of uniqueTokens) {
       try {
         const { payload } = await jwtVerify(token, jwks, {
@@ -141,19 +146,29 @@ export async function authenticateClientDetailed(req: NextRequest): Promise<Clie
           continue;
         }
 
-        return {
-          ok: true,
-          client: {
+        if (!verifiedClient) {
+          verifiedClient = {
             userId,
             // The userId (did:privy:...) is the canonical identity.
             address: userId,
             sessionId: (payload as any).sid || '',
             expiresAt: payload.exp || 0,
-          },
-        };
+          };
+          verifiedOwnerIds.add(userId);
+        }
+
+        if (verifiedClient.userId !== userId) continue;
+        for (const address of linkedEvmWallets(payload.linked_accounts)) {
+          verifiedOwnerIds.add(address);
+        }
       } catch (verificationError: any) {
         lastError = verificationError;
       }
+    }
+
+    if (verifiedClient) {
+      verifiedClient.ownerIds = Array.from(verifiedOwnerIds);
+      return { ok: true, client: verifiedClient };
     }
 
     if (lastError?.code === 'ERR_JWT_EXPIRED') {
@@ -199,6 +214,28 @@ export async function authenticateClientDetailed(req: NextRequest): Promise<Clie
         : 'Privy authentication token was rejected.',
     };
   }
+}
+
+function linkedEvmWallets(claim: unknown) {
+  let accounts: unknown = claim;
+  if (typeof claim === 'string') {
+    try {
+      accounts = JSON.parse(claim);
+    } catch {
+      return [];
+    }
+  }
+  if (!Array.isArray(accounts)) return [];
+
+  return accounts.flatMap((account) => {
+    if (!account || typeof account !== 'object') return [];
+    const value = account as Record<string, unknown>;
+    if (value.type !== 'wallet' && value.type !== 'smart_wallet') return [];
+    const chainType = typeof value.chain_type === 'string' ? value.chain_type : value.chainType;
+    if (chainType && chainType !== 'ethereum') return [];
+    const address = typeof value.address === 'string' ? value.address : '';
+    return isAddress(address) ? [getAddress(address)] : [];
+  });
 }
 
 function isJwksFailure(error: any) {
