@@ -45,9 +45,9 @@ export function BnbShell({
           <BnbContainer className="bnb-header-inner">
             <Brand />
             <nav className="bnb-nav" aria-label="Hive navigation">
-              <BnbNavLink href="/bnb/agents" active={active === "agents"}>Agents</BnbNavLink>
-              <BnbNavLink href="/bnb/activity" active={active === "activity"}>Activity</BnbNavLink>
-              <BnbNavLink href="/bnb/status" active={active === "verify"}>Verify</BnbNavLink>
+              <BnbNavLink href="/agents" active={active === "agents"}>Agents</BnbNavLink>
+              <BnbNavLink href="/activity" active={active === "activity"}>Activity</BnbNavLink>
+              <BnbNavLink href="/status" active={active === "verify"}>Verify</BnbNavLink>
             </nav>
             <div className="bnb-header-actions">
               <BnbAccountButton active={active === "account"} />
@@ -65,7 +65,7 @@ export function BnbShell({
 
 function Brand({ compact = false }: { compact?: boolean }) {
   return (
-    <Link href="/bnb" className="bnb-brand bnb-focus">
+    <Link href="/" className="bnb-brand bnb-focus">
       <span className="bnb-brand-mark">
         <Image src="/images/hive-icon.svg" width={22} height={22} alt="" priority />
       </span>
@@ -149,7 +149,7 @@ function BnbFooter() {
     <footer className="bnb-footer">
       <BnbContainer className="bnb-footer-inner">
         <div className="bnb-footer-brand">
-          <Link href="/bnb" className="bnb-brand bnb-focus">
+          <Link href="/" className="bnb-brand bnb-focus">
             <span className="bnb-brand-mark">
               <Image src="/images/hive-icon.svg" width={22} height={22} alt="" />
             </span>
@@ -164,9 +164,9 @@ function BnbFooter() {
         <nav className="bnb-footer-links" aria-label="BNB footer navigation">
           <div>
             <h2>Marketplace</h2>
-            <Link href="/bnb/agents" className="bnb-focus">Agents</Link>
-            <Link href="/bnb/activity" className="bnb-focus">Activity</Link>
-            <Link href="/bnb/status" className="bnb-focus">Verify</Link>
+            <Link href="/agents" className="bnb-focus">Agents</Link>
+            <Link href="/activity" className="bnb-focus">Activity</Link>
+            <Link href="/status" className="bnb-focus">Verify</Link>
           </div>
           <div>
             <h2>Hive</h2>

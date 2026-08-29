@@ -187,7 +187,7 @@ export const bnbPartnerTracks: BnbPartnerTrackSummary[] = [
   {
     id: "pancakeswap",
     name: "PancakeSwap",
-    href: "/bnb/pancakeswap",
+    href: "/pancakeswap",
     productFit: "Find yield and LP agents.",
     userProblem: "Rank farms, review LP ranges, and save the result.",
     hiveSurface: "Yield and LP jobs.",
@@ -195,7 +195,7 @@ export const bnbPartnerTracks: BnbPartnerTrackSummary[] = [
   {
     id: "termix",
     name: "TermiX",
-    href: "/bnb/termix",
+    href: "/termix",
     productFit: "Compare manual work with agent work.",
     userProblem: "Save the target, result, time spent, and final decision.",
     hiveSurface: "Comparison records.",
@@ -203,7 +203,7 @@ export const bnbPartnerTracks: BnbPartnerTrackSummary[] = [
   {
     id: "altana",
     name: "Altana",
-    href: "/bnb/altana",
+    href: "/altana",
     productFit: "Set wallet alerts.",
     userProblem: "Let an agent watch a wallet or position and save the alert.",
     hiveSurface: "Wallet alerts.",
@@ -219,7 +219,7 @@ export const bnbPancakeSwapUtilities: BnbPancakeSwapUtility[] = [
     userInput: "Stablecoin amount, minimum liquidity, risk tolerance, lockup preference.",
     agentOutput: "Ranked PancakeSwap farms and pools with net APR, liquidity depth, volatility notes, and risk flags.",
     decisionMetric: "Best route must include a risk-adjusted APR and a reason to reject at least one tempting pool.",
-    activationHref: "/bnb/agents?category=Yield%20Optimisation&q=PancakeSwap%20yield",
+    activationHref: "/agents?category=Yield%20Optimisation&q=PancakeSwap%20yield",
     scoring: [
       { label: "Target time", value: "Under 60 sec" },
       { label: "Target cost", value: "User budget" },
@@ -234,7 +234,7 @@ export const bnbPancakeSwapUtilities: BnbPancakeSwapUtility[] = [
     userInput: "Pool address, current range, position size, preferred rebalance threshold.",
     agentOutput: "Hold, widen, narrow, or reset recommendation with impermanent-loss and fee capture notes.",
     decisionMetric: "Recommendation must state the current price distance from range edge and the action threshold.",
-    activationHref: "/bnb/agents?category=Rebalancing&q=PancakeSwap%20liquidity%20range",
+    activationHref: "/agents?category=Rebalancing&q=PancakeSwap%20liquidity%20range",
     scoring: [
       { label: "Target time", value: "Under 2 min" },
       { label: "Target cost", value: "User budget" },
@@ -249,7 +249,7 @@ export const bnbPancakeSwapUtilities: BnbPancakeSwapUtility[] = [
     userInput: "Wallet or position label, farm route, minimum APR delta, alert destination.",
     agentOutput: "Route watch plan with alert trigger, expected review cadence, and safe-stop condition.",
     decisionMetric: "Watch plan must include a trigger that avoids noisy alerts and stale APR reactions.",
-    activationHref: "/bnb/agents?category=Yield%20Optimisation&q=PancakeSwap%20farm%20alert",
+    activationHref: "/agents?category=Yield%20Optimisation&q=PancakeSwap%20farm%20alert",
     scoring: [
       { label: "Target time", value: "Under 90 sec" },
       { label: "Target cost", value: "User budget" },

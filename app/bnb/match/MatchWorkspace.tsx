@@ -61,7 +61,7 @@ export function MatchWorkspace({ intent, category, categories, matches }: MatchW
             <span>Work brief</span>
             <h2 id="match-brief-title">What needs to be done?</h2>
           </div>
-          <form action="/bnb/match" className={styles.matchForm}>
+          <form action="/match" className={styles.matchForm}>
             <label className={styles.taskField}>
               <span>Task</span>
               <textarea
@@ -97,7 +97,7 @@ export function MatchWorkspace({ intent, category, categories, matches }: MatchW
               <ul>
                 {taskExamples.map((example) => (
                   <li key={example}>
-                    <Link href={`/bnb/match?intent=${encodeURIComponent(example)}`} className="bnb-focus">
+                    <Link href={`/match?intent=${encodeURIComponent(example)}`} className="bnb-focus">
                       {example}
                       <ArrowRight aria-hidden="true" size={15} />
                     </Link>

@@ -236,7 +236,7 @@ export function AltanaSessionForm({ templates }: { templates: BnbAltanaSessionTe
           ) : result.grantRequest ? (
             <p className="mt-3 text-sm leading-6 text-zinc-300">{result.grantRequest.reason}</p>
           ) : null}
-          <Link href="/bnb/account#activity" className="bnb-text-action bnb-focus mt-3">
+          <Link href="/account#activity" className="bnb-text-action bnb-focus mt-3">
             Open activity
           </Link>
         </div>

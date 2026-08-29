@@ -1293,7 +1293,7 @@ function JobStatusPanel({
   const output = result?.record?.delivery?.rawOutput || result?.record?.work?.output;
   const dataSources = result?.record?.delivery?.dataSources || result?.record?.work?.dataSources;
   const refundBlocker = result?.record ? bnbRefundUnavailableReason(result.record) : "";
-  const jobHref = result?.recordId ? `/bnb/jobs/${encodeURIComponent(result.recordId)}` : `/bnb/agents/${agent.chainId}/${agent.tokenId}`;
+  const jobHref = result?.recordId ? `/jobs/${encodeURIComponent(result.recordId)}` : `/agents/${agent.chainId}/${agent.tokenId}`;
   const record = result?.record;
   const recordChainId = record?.payment?.chainId || getClientBnbChainId();
   const fundedExplorerUrl = record?.payment?.explorerUrl || (record?.payment?.transactionHash ? getClientBnbExplorerTxUrl(record.payment.transactionHash, recordChainId) : "");

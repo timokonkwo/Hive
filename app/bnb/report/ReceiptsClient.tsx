@@ -275,7 +275,7 @@ export function ReceiptsClient({ embedded = false, initialFilter = "all" }: { em
             <span>Records</span>
             <h2 id="activity-records-title">Your work</h2>
           </div>
-          <Link href="/bnb/agents" className="bnb-button-dark bnb-focus">Browse agents</Link>
+          <Link href="/agents" className="bnb-button-dark bnb-focus">Browse agents</Link>
         </div>
 
         <div className={styles.filterBar} role="tablist" aria-label="Filter activity">
@@ -320,7 +320,7 @@ export function ReceiptsClient({ embedded = false, initialFilter = "all" }: { em
             <FileSearch aria-hidden="true" size={20} />
             <strong>{entries.length > 0 ? "No records in this view" : "No activity yet"}</strong>
             <p>{entries.length > 0 ? "Choose another activity type." : "Hire an agent or create a wallet alert to add the first record."}</p>
-            {entries.length === 0 ? <Link href="/bnb/agents" className="bnb-button bnb-focus">Browse agents</Link> : null}
+            {entries.length === 0 ? <Link href="/agents" className="bnb-button bnb-focus">Browse agents</Link> : null}
           </div>
         )}
       </section>
@@ -353,7 +353,7 @@ function ActivityEntryRow({
     const failed = record.delivery?.status === "failed" || record.work?.status === "failed" || record.status === "failed";
     const showSettlementActions = record.payment?.mode === "escrow" && completed && !closed;
     const refundBlocker = bnbRefundUnavailableReason(record);
-    const href = `/bnb/jobs/${encodeURIComponent(record.recordId)}`;
+    const href = `/jobs/${encodeURIComponent(record.recordId)}`;
     return (
       <article className={styles.activityRow}>
         <RecordIdentity icon={<BriefcaseBusiness size={16} />} type="Job" title={record.agent.name} detail={record.limits.task} href={href} />
@@ -382,7 +382,7 @@ function ActivityEntryRow({
 
   if (entry.type === "requests") {
     const record = entry.record;
-    const href = `/bnb/agents/${record.agent.chainId}/${encodeURIComponent(record.agent.tokenId)}`;
+    const href = `/agents/${record.agent.chainId}/${encodeURIComponent(record.agent.tokenId)}`;
     return (
       <article className={styles.activityRow}>
         <RecordIdentity icon={<KeyRound size={16} />} type="Access request" title={record.agent.name} detail={record.task} href={href} />
@@ -405,17 +405,17 @@ function ActivityEntryRow({
     const record = entry.record;
     return (
       <article className={styles.activityRow}>
-        <RecordIdentity icon={<BellRing size={16} />} type="Wallet alert" title={record.title} detail={record.walletLabel} href="/bnb/altana" />
+        <RecordIdentity icon={<BellRing size={16} />} type="Wallet alert" title={record.title} detail={record.walletLabel} href="/altana" />
         <time dateTime={record.updatedAt}>{formatActivityDate(record.updatedAt)}</time>
         <StatusCell label={record.status === "stopped" ? "Stopped" : record.status === "active" ? "Active" : "Saved"} />
         <span className={styles.amount}>{record.budget || "-"}</span>
-        <div className={styles.rowActions}><Link href="/bnb/altana" className="bnb-button-dark bnb-focus">View alert</Link></div>
+        <div className={styles.rowActions}><Link href="/altana" className="bnb-button-dark bnb-focus">View alert</Link></div>
       </article>
     );
   }
 
   const record = entry.record;
-  const comparisonHref = record.comparisonType === "agents" ? "/bnb/agents" : "/bnb/termix";
+  const comparisonHref = record.comparisonType === "agents" ? "/agents" : "/termix";
   return (
     <article className={styles.activityRow}>
       <RecordIdentity icon={<Scale size={16} />} type="Comparison" title={record.title} detail={record.target} href={comparisonHref} />

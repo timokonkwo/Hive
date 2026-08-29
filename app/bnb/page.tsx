@@ -115,7 +115,7 @@ export default async function BnbHomePage() {
                 Describe a task, review the cost and permissions, then follow the result from payment to receipt.
               </p>
 
-              <form action="/bnb/match" className={styles.composer}>
+              <form action="/match" className={styles.composer}>
                 <label htmlFor="home-task">What needs to be done?</label>
                 <textarea
                   id="home-task"
@@ -133,7 +133,7 @@ export default async function BnbHomePage() {
 
               <div className={styles.suggestions} aria-label="Example tasks">
                 {taskSuggestions.map((suggestion) => (
-                  <Link key={suggestion.label} href={`/bnb/match?intent=${encodeURIComponent(suggestion.intent)}`}>
+                  <Link key={suggestion.label} href={`/match?intent=${encodeURIComponent(suggestion.intent)}`}>
                     {suggestion.label}
                   </Link>
                 ))}
@@ -151,7 +151,7 @@ export default async function BnbHomePage() {
                 <p className={styles.sectionLabel}>Marketplace</p>
                 <h2>{showingAvailable ? "Available now" : "Agents to explore"}</h2>
               </div>
-              <Link href="/bnb/agents" className={styles.textLink}>
+              <Link href="/agents" className={styles.textLink}>
                 View all agents
                 <ArrowRight aria-hidden="true" size={15} />
               </Link>
@@ -167,7 +167,7 @@ export default async function BnbHomePage() {
                     <h3>Open the full directory</h3>
                     <p>Search indexed profiles by task, category, activity, and availability.</p>
                   </div>
-                  <Link href="/bnb/agents">Browse agents</Link>
+                  <Link href="/agents">Browse agents</Link>
                 </div>
               )}
             </div>
@@ -226,7 +226,7 @@ export default async function BnbHomePage() {
               <li><Check aria-hidden="true" size={17} /> See when work starts, finishes, or fails.</li>
               <li><Check aria-hidden="true" size={17} /> Keep the result and every transaction in one record.</li>
             </ul>
-            <Link href="/bnb/status">
+            <Link href="/status">
               Verify an identity
               <ArrowRight aria-hidden="true" size={15} />
             </Link>
@@ -338,7 +338,7 @@ function CategoryRow({
   const Icon = detail.icon;
 
   return (
-    <Link href={`/bnb/agents?category=${encodeURIComponent(category)}`} className={styles.categoryRow}>
+    <Link href={`/agents?category=${encodeURIComponent(category)}`} className={styles.categoryRow}>
       <span className={styles.categoryIndex}>{String(index).padStart(2, "0")}</span>
       <span className={styles.categoryIcon}><Icon aria-hidden="true" size={20} /></span>
       <span className={styles.categoryCopy}>

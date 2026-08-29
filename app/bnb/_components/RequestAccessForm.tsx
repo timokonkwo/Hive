@@ -97,7 +97,7 @@ export function RequestAccessForm({ agent, showHeading = true }: RequestAccessFo
             <dd>{saved.recordId}</dd>
           </div>
         </dl>
-        <Link href="/bnb/account#activity" className="bnb-button bnb-focus">
+        <Link href="/account#activity" className="bnb-button bnb-focus">
           View activity
         </Link>
       </div>

@@ -293,7 +293,7 @@ export function BnbJobClient({ recordId }: { recordId: string }) {
           <section className={styles.emptyState}>
           <h2>Job unavailable</h2>
           <p>{error || "This job could not be loaded."}</p>
-          <Link href="/bnb/account" className="bnb-button-dark bnb-focus">Back to account</Link>
+          <Link href="/account" className="bnb-button-dark bnb-focus">Back to account</Link>
           </section>
         </BnbContainer>
       </div>
@@ -323,9 +323,9 @@ export function BnbJobClient({ recordId }: { recordId: string }) {
   return (
     <div className={styles.page}>
       <BnbContainer className={styles.container}>
-        <Link href="/bnb/account#activity" className={styles.backLink}>
+        <Link href="/account#activity" className={styles.backLink}>
           <ArrowLeft aria-hidden="true" size={16} />
-          My hires
+          Account activity
         </Link>
 
         <header className={styles.jobHeader}>
@@ -444,7 +444,7 @@ export function BnbJobClient({ recordId }: { recordId: string }) {
         </details>
 
         <footer className={styles.footerActions}>
-          <Link href={`/bnb/agents/${record.agent.chainId}/${encodeURIComponent(record.agent.tokenId)}`} className="bnb-button-dark bnb-focus">View agent</Link>
+          <Link href={`/agents/${record.agent.chainId}/${encodeURIComponent(record.agent.tokenId)}`} className="bnb-button-dark bnb-focus">View agent</Link>
         </footer>
       </BnbContainer>
     </div>

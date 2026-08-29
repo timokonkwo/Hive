@@ -1,1 +1,1 @@
-export { default } from "@/app/bnb/page";
+export { default, dynamic, metadata } from "@/app/bnb/page";

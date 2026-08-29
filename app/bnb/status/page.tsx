@@ -6,6 +6,7 @@ import { BnbContainer, BnbShell, freshnessLabel, shortAddress } from "@/app/bnb/
 import { get8004scanAgentUrl, getBscAddressSummary } from "@/lib/bnb/chain";
 import { listBnbAgents } from "@/lib/bnb/catalog";
 import { bnbAgentDisplayName, bnbListingDescription } from "@/lib/bnb/display";
+import { bnbAgentHirePath, bnbAgentProfilePath } from "@/lib/bnb/routes";
 import { canHireBnbAgent } from "@/lib/bnb/runtime";
 import type { BnbAgentProfile } from "@/lib/bnb/types";
 import styles from "./status.module.css";
@@ -41,7 +42,7 @@ export default async function BnbStatusPage({ searchParams }: { searchParams: Se
         </header>
 
         <BnbContainer className={styles.body}>
-          <form action="/bnb/status" className={styles.searchForm}>
+          <form action="/status" className={styles.searchForm}>
             <label htmlFor="verify-query">Agent name, token ID, or BNB address</label>
             <div className={styles.searchControl}>
               <Search aria-hidden="true" size={18} />
@@ -74,7 +75,7 @@ export default async function BnbStatusPage({ searchParams }: { searchParams: Se
 function AgentEvidence({ agent }: { agent: BnbAgentProfile }) {
   const hireable = canHireBnbAgent(agent);
   const sourceUrl = externalAgentUrl(agent);
-  const profileHref = `/bnb/agents/${agent.chainId}/${encodeURIComponent(agent.tokenId)}`;
+  const profileHref = bnbAgentProfilePath(agent);
 
   return (
     <article className={styles.result} aria-labelledby="agent-evidence-title">
@@ -106,7 +107,7 @@ function AgentEvidence({ agent }: { agent: BnbAgentProfile }) {
 
       <footer className={styles.resultActions}>
         <Link href={profileHref} className="bnb-button-dark bnb-focus">View profile</Link>
-        {hireable ? <Link href={`/bnb/activate?chainId=${agent.chainId}&tokenId=${encodeURIComponent(agent.tokenId)}`} className="bnb-button bnb-focus">Hire agent</Link> : null}
+        {hireable ? <Link href={bnbAgentHirePath(agent)} className="bnb-button bnb-focus">Hire agent</Link> : null}
         {sourceUrl ? <a href={sourceUrl} target="_blank" rel="noreferrer" className={styles.sourceLink}>View source <ExternalLink aria-hidden="true" size={14} /></a> : null}
       </footer>
     </article>
@@ -165,14 +166,14 @@ function CandidateResults({ agents, query }: { agents: BnbAgentProfile[]; query:
                 <p>{agent.category} · ID {agent.tokenId}</p>
               </div>
               <span className={styles.availability} data-available={hireable}>{hireable ? "Available" : "Profile only"}</span>
-              <Link href={`/bnb/status?q=${encodeURIComponent(agent.tokenId)}`} className="bnb-focus" aria-label={`Verify ${bnbAgentDisplayName(agent)}`}>
+              <Link href={`/status?q=${encodeURIComponent(agent.tokenId)}`} className="bnb-focus" aria-label={`Verify ${bnbAgentDisplayName(agent)}`}>
                 Verify <ArrowRight aria-hidden="true" size={15} />
               </Link>
             </article>
           );
         })}
       </div>
-      <Link href={`/bnb/agents?q=${encodeURIComponent(query)}`} className={styles.allResults}>View all marketplace results <ArrowRight aria-hidden="true" size={15} /></Link>
+      <Link href={`/agents?q=${encodeURIComponent(query)}`} className={styles.allResults}>View all marketplace results <ArrowRight aria-hidden="true" size={15} /></Link>
     </section>
   );
 }
@@ -182,7 +183,7 @@ function NoResult({ query }: { query: string }) {
     <section className={styles.noResult}>
       <h2>No exact match</h2>
       <p>No marketplace agent matched “{query}”. Check the spelling or browse the directory.</p>
-      <Link href="/bnb/agents" className="bnb-button-dark bnb-focus">Browse agents</Link>
+      <Link href="/agents" className="bnb-button-dark bnb-focus">Browse agents</Link>
     </section>
   );
 }

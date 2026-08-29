@@ -45,7 +45,7 @@ export function BnbAccountButton({ active = false }: { active?: boolean }) {
   }
 
   return (
-    <Link href="/bnb/account" className="bnb-account-button bnb-focus" data-active={active ? "true" : undefined}>
+    <Link href="/account" className="bnb-account-button bnb-focus" data-active={active ? "true" : undefined}>
       <UserRound aria-hidden="true" size={15} />
       <span className="bnb-account-desktop-label">{address ? shortAddress(address) : "Account"}</span>
       <span className="bnb-account-mobile-label">Account</span>
