@@ -9,6 +9,7 @@ import type { Hex } from "viem";
 import { BellRing, BriefcaseBusiness, FileSearch, KeyRound, Scale } from "lucide-react";
 import { BnbButtonLoader } from "@/app/bnb/_components/BnbButtonLoader";
 import { BnbContainer } from "@/app/bnb/_components/BnbUi";
+import { BnbPendingLink } from "@/app/bnb/_components/BnbPendingLink";
 import { useAuth } from "@/hooks/useAuth";
 import { useBnbAuthFetch } from "@/hooks/useBnbAuthFetch";
 import { getClientBnbChainId, getClientBnbNativeSymbol } from "@/lib/bnb/client-chain";
@@ -275,7 +276,7 @@ export function ReceiptsClient({ embedded = false, initialFilter = "all" }: { em
             <span>Records</span>
             <h2 id="activity-records-title">Your work</h2>
           </div>
-          <Link href="/agents" className="bnb-button-dark bnb-focus">Browse agents</Link>
+          <BnbPendingLink href="/agents" className="bnb-button-dark bnb-focus" pendingLabel="Opening directory">Browse agents</BnbPendingLink>
         </div>
 
         <div className={styles.filterBar} role="tablist" aria-label="Filter activity">
@@ -320,7 +321,7 @@ export function ReceiptsClient({ embedded = false, initialFilter = "all" }: { em
             <FileSearch aria-hidden="true" size={20} />
             <strong>{entries.length > 0 ? "No records in this view" : "No activity yet"}</strong>
             <p>{entries.length > 0 ? "Choose another activity type." : "Hire an agent or create a wallet alert to add the first record."}</p>
-            {entries.length === 0 ? <Link href="/agents" className="bnb-button bnb-focus">Browse agents</Link> : null}
+            {entries.length === 0 ? <BnbPendingLink href="/agents" className="bnb-button bnb-focus" pendingLabel="Opening directory">Browse agents</BnbPendingLink> : null}
           </div>
         )}
       </section>
@@ -372,9 +373,20 @@ function ActivityEntryRow({
                 {actionId === `${record.recordId}:release` || walletBusy ? <BnbButtonLoader /> : null}
                 {walletBusy ? "Opening wallet..." : actionId === `${record.recordId}:release` ? "Confirming..." : "Release"}
               </button>
-              {!refundBlocker ? <button type="button" onClick={() => settleHire(record, "refund")} disabled={Boolean(actionId) || walletBusy} className={styles.textAction}>Refund</button> : null}
+              {!refundBlocker ? (
+                <button
+                  type="button"
+                  onClick={() => settleHire(record, "refund")}
+                  disabled={Boolean(actionId) || walletBusy}
+                  aria-busy={actionId === `${record.recordId}:refund` || walletBusy}
+                  className={styles.textAction}
+                >
+                  {actionId === `${record.recordId}:refund` || walletBusy ? <BnbButtonLoader /> : null}
+                  {walletBusy ? "Opening wallet..." : actionId === `${record.recordId}:refund` ? "Confirming..." : "Refund"}
+                </button>
+              ) : null}
             </>
-          ) : <Link href={href} className="bnb-button-dark bnb-focus">View job</Link>}
+          ) : <BnbPendingLink href={href} className="bnb-button-dark bnb-focus" pendingLabel="Opening job">View job</BnbPendingLink>}
         </div>
       </article>
     );
@@ -395,7 +407,7 @@ function ActivityEntryRow({
               {actionId === `${record.recordId}:cancel` ? <BnbButtonLoader /> : null}
               {actionId === `${record.recordId}:cancel` ? "Cancelling..." : "Cancel request"}
             </button>
-          ) : <Link href={href} className="bnb-button-dark bnb-focus">View profile</Link>}
+          ) : <BnbPendingLink href={href} className="bnb-button-dark bnb-focus" pendingLabel="Opening profile">View profile</BnbPendingLink>}
         </div>
       </article>
     );
@@ -409,7 +421,7 @@ function ActivityEntryRow({
         <time dateTime={record.updatedAt}>{formatActivityDate(record.updatedAt)}</time>
         <StatusCell label={record.status === "stopped" ? "Stopped" : record.status === "active" ? "Active" : "Saved"} />
         <span className={styles.amount}>{record.budget || "-"}</span>
-        <div className={styles.rowActions}><Link href="/altana" className="bnb-button-dark bnb-focus">View alert</Link></div>
+        <div className={styles.rowActions}><BnbPendingLink href="/altana" className="bnb-button-dark bnb-focus" pendingLabel="Opening alert">View alert</BnbPendingLink></div>
       </article>
     );
   }
@@ -422,7 +434,7 @@ function ActivityEntryRow({
       <time dateTime={record.updatedAt}>{formatActivityDate(record.updatedAt)}</time>
       <StatusCell label={comparisonStatus(record)} />
       <span className={styles.amount}>-</span>
-      <div className={styles.rowActions}><Link href={comparisonHref} className="bnb-button-dark bnb-focus">View comparison</Link></div>
+      <div className={styles.rowActions}><BnbPendingLink href={comparisonHref} className="bnb-button-dark bnb-focus" pendingLabel="Opening comparison">View comparison</BnbPendingLink></div>
     </article>
   );
 }

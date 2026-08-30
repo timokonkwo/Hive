@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { Search } from "lucide-react";
+import { BnbButtonLoader } from "@/app/bnb/_components/BnbButtonLoader";
 import type { PancakeSwapPairAnalysis } from "@/lib/bnb/pancakeswap";
 
 export function PancakePairAnalyzer() {
@@ -67,6 +68,7 @@ export function PancakePairAnalyzer() {
       </div>
 
       <button type="submit" disabled={loading} className="bnb-button bnb-focus mt-4 disabled:cursor-not-allowed disabled:opacity-60">
+        {loading ? <BnbButtonLoader /> : null}
         {loading ? "Checking..." : "Check pair"}
       </button>
 

@@ -1,7 +1,7 @@
-import Link from "next/link";
 import { ArrowRight, LineChart } from "lucide-react";
 import { getBnbPancakeSwapUtilities } from "@/lib/bnb/catalog";
 import { BnbContainer, BnbHero, BnbPanel, BnbShell } from "@/app/bnb/_components/BnbUi";
+import { BnbPendingLink } from "@/app/bnb/_components/BnbPendingLink";
 import { PancakePairAnalyzer } from "@/app/bnb/pancakeswap/PancakePairAnalyzer";
 
 export default function BnbPancakeSwapPage() {
@@ -25,9 +25,9 @@ export default function BnbPancakeSwapPage() {
             <h2>Available jobs</h2>
             <p>Pick the work you need. You can edit the task and budget before hiring.</p>
           </div>
-          <Link href="/match?intent=Rank%20PancakeSwap%20yield%20routes%20and%20explain%20risk" className="bnb-button bnb-focus">
+          <BnbPendingLink href="/match?intent=Rank%20PancakeSwap%20yield%20routes%20and%20explain%20risk" className="bnb-button bnb-focus" pendingLabel="Finding agents">
             Match an agent
-          </Link>
+          </BnbPendingLink>
         </div>
 
         <BnbPanel className="overflow-hidden">
@@ -46,9 +46,9 @@ export default function BnbPancakeSwapPage() {
                   <span>Starting price</span>
                   <strong>{job.scoring.find((item) => item.label === "Target cost")?.value || "Set"}</strong>
                 </div>
-                <Link href={job.activationHref} className="bnb-button-dark bnb-focus">
+                <BnbPendingLink href={job.activationHref} className="bnb-button-dark bnb-focus" pendingLabel="Finding agents">
                   Find agents <ArrowRight aria-hidden="true" size={15} />
-                </Link>
+                </BnbPendingLink>
               </div>
             </article>
           ))}

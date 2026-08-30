@@ -1,6 +1,6 @@
-import Link from "next/link";
 import { getBnbAgentNetworkStats, getBnbCategories, listBnbAgentsPage } from "@/lib/bnb/catalog";
 import { BnbContainer, BnbShell } from "@/app/bnb/_components/BnbUi";
+import { BnbPendingLink } from "@/app/bnb/_components/BnbPendingLink";
 import type { BnbAgentCategory } from "@/lib/bnb/types";
 import { bnbCategoryLabel } from "@/lib/bnb/display";
 import { AgentsDirectory } from "./AgentsDirectory";
@@ -101,7 +101,7 @@ export default async function BnbAgentsPage({ searchParams }: { searchParams: Se
               <h1>Agents</h1>
               <p>Search the BNB Chain directory and see which agents can accept work now.</p>
             </div>
-            <Link href="/match" className={styles.matchLink}>Describe a task instead</Link>
+            <BnbPendingLink href="/match" className={styles.matchLink} pendingLabel="Opening task matcher">Describe a task instead</BnbPendingLink>
           </BnbContainer>
         </section>
 

@@ -1,12 +1,12 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import Link from "next/link";
 import { useModalStatus } from "@privy-io/react-auth";
 import { useAccount, useSendTransaction, useSwitchChain } from "wagmi";
 import type { Hex } from "viem";
 import { Bell } from "lucide-react";
 import { BnbButtonLoader } from "@/app/bnb/_components/BnbButtonLoader";
+import { BnbPendingLink } from "@/app/bnb/_components/BnbPendingLink";
 import { useAuth } from "@/hooks/useAuth";
 import { useBnbAuthFetch } from "@/hooks/useBnbAuthFetch";
 import { getClientBnbChainId, getClientBnbNativeSymbol } from "@/lib/bnb/client-chain";
@@ -236,9 +236,9 @@ export function AltanaSessionForm({ templates }: { templates: BnbAltanaSessionTe
           ) : result.grantRequest ? (
             <p className="mt-3 text-sm leading-6 text-zinc-300">{result.grantRequest.reason}</p>
           ) : null}
-          <Link href="/account#activity" className="bnb-text-action bnb-focus mt-3">
+          <BnbPendingLink href="/activity?filter=alerts" className="bnb-text-action bnb-focus mt-3" pendingLabel="Opening activity">
             Open activity
-          </Link>
+          </BnbPendingLink>
         </div>
       ) : null}
     </form>

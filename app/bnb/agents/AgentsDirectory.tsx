@@ -8,6 +8,7 @@ import { useAccount } from "wagmi";
 import { BadgeCheck, Bookmark, Check, Save, Search, SlidersHorizontal, Star, X } from "lucide-react";
 import { BnbButtonLoader } from "@/app/bnb/_components/BnbButtonLoader";
 import { BnbAgentAvatar } from "@/app/bnb/_components/BnbAgentAvatar";
+import { BnbPendingLink } from "@/app/bnb/_components/BnbPendingLink";
 import type { BnbAgentCategory, BnbAgentProfile } from "@/lib/bnb/types";
 import { BnbSelect } from "@/app/bnb/_components/BnbSelect";
 import { useAuth } from "@/hooks/useAuth";
@@ -391,9 +392,9 @@ export function AgentsDirectory({
                   </button>
                 ) : null}
                 {q.trim() ? (
-                  <Link href={`/match?intent=${encodeURIComponent(q.trim())}`} className="bnb-empty-state-match bnb-focus">
+                  <BnbPendingLink href={`/match?intent=${encodeURIComponent(q.trim())}`} className="bnb-empty-state-match bnb-focus" pendingLabel="Opening task matcher">
                     Match this task
-                  </Link>
+                  </BnbPendingLink>
                 ) : null}
               </div>
             </div>
@@ -611,11 +612,11 @@ function DirectoryAgentRow({
           <input type="checkbox" checked={compared} disabled={compareDisabled} onChange={onCompare} />
           <span>Compare</span>
         </label>
-        <Link href={profileHref(agent)} className="bnb-button-dark bnb-focus">View profile</Link>
+        <BnbPendingLink href={profileHref(agent)} className="bnb-button-dark bnb-focus" pendingLabel="Opening profile">View profile</BnbPendingLink>
         {canHire ? (
-          <Link href={hireHref(agent)} className="bnb-button bnb-focus">
+          <BnbPendingLink href={hireHref(agent)} className="bnb-button bnb-focus" pendingLabel="Opening hire flow">
             Hire
-          </Link>
+          </BnbPendingLink>
         ) : null}
       </div>
     </article>
@@ -637,11 +638,11 @@ function SavedAgents({ agents, remove }: { agents: SavedAgent[]; remove: (key: s
               <span>{[agent.category, agent.status, agent.price].filter(Boolean).join(" · ")}</span>
             </div>
             <div>
-              <Link href={agent.profileHref} className="bnb-text-action bnb-focus">View</Link>
+              <BnbPendingLink href={agent.profileHref} className="bnb-text-action bnb-focus" pendingLabel="Opening profile">View</BnbPendingLink>
               {agent.canHire ? (
-                <Link href={agent.hireHref} className="bnb-text-action bnb-focus">Hire</Link>
+                <BnbPendingLink href={agent.hireHref} className="bnb-text-action bnb-focus" pendingLabel="Opening hire flow">Hire</BnbPendingLink>
               ) : (
-                <Link href={agent.profileHref} className="bnb-text-action bnb-focus">Profile</Link>
+                <BnbPendingLink href={agent.profileHref} className="bnb-text-action bnb-focus" pendingLabel="Opening profile">Profile</BnbPendingLink>
               )}
               <button type="button" className="bnb-link-button bnb-focus" onClick={() => remove(agent.key)}>Remove</button>
             </div>
@@ -721,10 +722,10 @@ function ComparisonPanel({ agents, close }: { agents: SavedAgent[]; close: () =>
         <strong>Compare agents</strong>
         <div className="bnb-compare-head-actions">
           {saved ? (
-            <Link href="/activity?filter=comparisons" className="bnb-compare-saved bnb-focus">
+            <BnbPendingLink href="/activity?filter=comparisons" className="bnb-compare-saved bnb-focus" pendingLabel="Opening activity">
               <Check aria-hidden="true" size={16} />
               View saved
-            </Link>
+            </BnbPendingLink>
           ) : (
             <button
               type="button"

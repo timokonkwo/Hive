@@ -1,11 +1,11 @@
 "use client";
 
-import Link from "next/link";
 import type { FormEvent } from "react";
 import { useEffect, useState } from "react";
 import { useModalStatus } from "@privy-io/react-auth";
 import { useAccount } from "wagmi";
 import { BnbButtonLoader } from "@/app/bnb/_components/BnbButtonLoader";
+import { BnbPendingLink } from "@/app/bnb/_components/BnbPendingLink";
 import { useAuth } from "@/hooks/useAuth";
 import { useBnbAuthFetch } from "@/hooks/useBnbAuthFetch";
 import type { BnbAgentProfile } from "@/lib/bnb/types";
@@ -97,9 +97,9 @@ export function RequestAccessForm({ agent, showHeading = true }: RequestAccessFo
             <dd>{saved.recordId}</dd>
           </div>
         </dl>
-        <Link href="/account#activity" className="bnb-button bnb-focus">
+        <BnbPendingLink href="/activity?filter=requests" className="bnb-button bnb-focus" pendingLabel="Opening activity">
           View activity
-        </Link>
+        </BnbPendingLink>
       </div>
     );
   }

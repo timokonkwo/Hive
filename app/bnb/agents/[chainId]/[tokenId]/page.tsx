@@ -1,4 +1,3 @@
-import Link from "next/link";
 import { notFound } from "next/navigation";
 import {
   ArrowRight,
@@ -10,6 +9,7 @@ import {
 import { isAddress } from "viem";
 import { CopyValueButton } from "@/app/bnb/_components/CopyValueButton";
 import { BnbAgentAvatar } from "@/app/bnb/_components/BnbAgentAvatar";
+import { BnbPendingLink } from "@/app/bnb/_components/BnbPendingLink";
 import { BnbContainer, BnbShell, freshnessLabel, hasPrice, priceLabel, shortAddress } from "@/app/bnb/_components/BnbUi";
 import { recordBnbAnalyticsEvent } from "@/lib/bnb/analytics";
 import { getBnbAgent } from "@/lib/bnb/catalog";
@@ -106,9 +106,9 @@ export default async function BnbAgentDetailPage({
                 </div>
                 <div className={styles.primaryAction}>
                   {canHire ? (
-                    <Link href={bnbAgentHirePath(agent)}>
+                    <BnbPendingLink href={bnbAgentHirePath(agent)} pendingLabel="Opening hire flow">
                       Hire agent <ArrowRight aria-hidden="true" size={16} />
-                    </Link>
+                    </BnbPendingLink>
                   ) : (
                     <RequestAccessDialog agent={agent} className={styles.requestButton} />
                   )}

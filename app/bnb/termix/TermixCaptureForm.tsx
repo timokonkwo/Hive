@@ -1,11 +1,11 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import Link from "next/link";
 import { useModalStatus } from "@privy-io/react-auth";
 import { useAccount } from "wagmi";
 import { ClipboardCheck } from "lucide-react";
 import { BnbButtonLoader } from "@/app/bnb/_components/BnbButtonLoader";
+import { BnbPendingLink } from "@/app/bnb/_components/BnbPendingLink";
 import { useAuth } from "@/hooks/useAuth";
 import { useBnbAuthFetch } from "@/hooks/useBnbAuthFetch";
 import type { BnbTermixCapture } from "@/lib/bnb/types";
@@ -239,9 +239,9 @@ export function TermixCaptureForm({ captures }: { captures: BnbTermixCapture[] }
           <div className="text-sm font-semibold text-emerald-300">Comparison saved</div>
           <div className="mt-1 break-all font-mono text-xs text-zinc-200">Record {result.recordId}</div>
           <p className="mt-2 text-sm leading-6 text-zinc-300">{result.message}</p>
-          <Link href="/bnb/account#activity" className="bnb-text-action bnb-focus mt-3">
+          <BnbPendingLink href="/activity?filter=comparisons" className="bnb-text-action bnb-focus mt-3" pendingLabel="Opening activity">
             Open activity
-          </Link>
+          </BnbPendingLink>
         </div>
       ) : null}
     </form>

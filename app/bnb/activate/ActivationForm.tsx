@@ -6,8 +6,8 @@ import { useSetActiveWallet } from "@privy-io/wagmi";
 import { useAccount, usePublicClient, useSendTransaction, useSwitchChain, useWalletClient } from "wagmi";
 import type { Hex } from "viem";
 import { AlertTriangle, ArrowLeft, CheckCircle2, CreditCard, ExternalLink, Play, ShieldCheck } from "lucide-react";
-import Link from "next/link";
 import { BnbButtonLoader } from "@/app/bnb/_components/BnbButtonLoader";
+import { BnbPendingLink } from "@/app/bnb/_components/BnbPendingLink";
 import { BnbAgentAvatar } from "@/app/bnb/_components/BnbAgentAvatar";
 import { CopyValueButton } from "@/app/bnb/_components/CopyValueButton";
 import { BnbDeliveryView } from "@/app/bnb/_components/BnbDeliveryView";
@@ -1419,9 +1419,10 @@ function JobStatusPanel({
       ) : null}
 
       <footer className={styles.jobActions}>
-        {funded && !delivered && !closed && !jobRunning && !failed ? (
-          <button type="button" onClick={onRun} className="bnb-button bnb-focus">
-            Run agent
+        {funded && !delivered && !closed && !failed ? (
+          <button type="button" onClick={onRun} disabled={jobRunning} className="bnb-button bnb-focus" aria-busy={jobRunning}>
+            {jobRunning ? <BnbButtonLoader /> : <Play aria-hidden="true" size={16} />}
+            {jobRunning ? "Running..." : "Run agent"}
           </button>
         ) : null}
         {showSettlementActions ? (
@@ -1441,10 +1442,10 @@ function JobStatusPanel({
           </>
         ) : null}
         {closed ? <span className="bnb-chip bnb-chip-active">{result?.status === "refunded" ? "Refunded" : "Paid"}</span> : null}
-        <Link href={jobHref} className="bnb-button-dark bnb-focus">
+        <BnbPendingLink href={jobHref} className="bnb-button-dark bnb-focus" pendingLabel="Opening job">
           <ExternalLink aria-hidden="true" size={15} />
           View job
-        </Link>
+        </BnbPendingLink>
       </footer>
     </div>
   );

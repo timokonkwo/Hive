@@ -77,12 +77,15 @@ describe('BNB marketplace product flows', () => {
   const agentDirectoryFeed = read('app/bnb/agents/useAgentDirectoryFeed.ts');
   const agentsCss = read('app/bnb/agents/agents.module.css');
   const bnbUi = read('app/bnb/_components/BnbUi.tsx');
+  const pendingLink = read('app/bnb/_components/BnbPendingLink.tsx');
+  const submitButton = read('app/bnb/_components/BnbSubmitButton.tsx');
   const copyButton = read('app/bnb/_components/CopyValueButton.tsx');
   const altanaPage = read('app/bnb/altana/page.tsx');
   const altanaSessionForm = read('app/bnb/altana/AltanaSessionForm.tsx');
   const altanaRevokeForm = read('app/bnb/altana/AltanaRevokeForm.tsx');
   const termixPage = read('app/bnb/termix/page.tsx');
   const pancakeswapPage = read('app/bnb/pancakeswap/page.tsx');
+  const pancakeswapAnalyzer = read('app/bnb/pancakeswap/PancakePairAnalyzer.tsx');
   const bnbAuthFetch = read('hooks/useBnbAuthFetch.ts');
   const bnbAuth = read('lib/bnb/auth.ts');
   const walletAuth = read('lib/bnb/wallet-auth.ts');
@@ -825,7 +828,7 @@ describe('BNB marketplace product flows', () => {
   it('gives every non-home BNB page stable contextual back navigation', () => {
     assert.match(bnbUi, /back\?: \{[\s\S]*href: string;[\s\S]*label: string;/);
     assert.match(bnbUi, /aria-label="Back navigation"/);
-    assert.match(bnbUi, /<Link href=\{back\.href\} className="bnb-back-link bnb-focus">/);
+    assert.match(bnbUi, /<BnbPendingLink href=\{back\.href\} className="bnb-back-link bnb-focus" pendingLabel=\{back\.label\}>/);
     assert.match(bnbUi, /<main className="bnb-main" id="main-content">/);
     assert.match(bnbCss, /\.bnb-back-nav-inner\s*\{[\s\S]*min-height:\s*48px/);
     assert.match(bnbCss, /\.bnb-back-link\s*\{[\s\S]*min-height:\s*40px/);
@@ -842,6 +845,26 @@ describe('BNB marketplace product flows', () => {
     assert.match(termixPage, /back=\{\{ href: "\/activity\?filter=comparisons", label: "Back to activity" \}\}/);
     assert.doesNotMatch(read('app/bnb/page.tsx'), /back=\{\{/);
     assert.doesNotMatch([profilePage, activatePage, jobClient].join('\n'), /styles\.backLink/);
+  });
+
+  it('shows pending feedback for BNB navigation and URL-driven forms', () => {
+    assert.match(pendingLink, /useLinkStatus/);
+    assert.match(pendingLink, /data-pending=\{pending \? "true" : "false"\}/);
+    assert.match(pendingLink, /pending \? <BnbButtonLoader \/> : null/);
+    assert.match(submitButton, /useFormStatus/);
+    assert.match(submitButton, /disabled=\{disabled \|\| pending\}/);
+    assert.match(submitButton, /pending \? <BnbButtonLoader \/> : children/);
+    assert.match(bnbCss, /\.bnb-link-pending-indicator\s*\{[\s\S]*position:\s*absolute;[\s\S]*place-items:\s*center/);
+    assert.match(bnbCss, /\.bnb-pending-link:has\(\.bnb-link-pending-indicator\[data-pending="true"\]\) \.bnb-pending-link-content/);
+    assert.match(bnbUi, /<BnbPendingLink href=\{href\} className="bnb-nav-link bnb-focus"/);
+    assert.match(statusPage, /<Form action="\/status"/);
+    assert.match(statusPage, /pendingLabel="Verifying\.\.\."/);
+    assert.match(matchWorkspace, /<Form action="\/match"/);
+    assert.match(matchWorkspace, /pendingLabel="Finding agents\.\.\."/);
+    assert.match(directory, /<BnbPendingLink href=\{hireHref\(agent\)\}[^>]*pendingLabel="Opening hire flow"/);
+    assert.match(profilePage, /<BnbPendingLink href=\{bnbAgentHirePath\(agent\)\} pendingLabel="Opening hire flow">/);
+    assert.match(pancakeswapAnalyzer, /loading \? <BnbButtonLoader \/> : null/);
+    assert.match(activateForm, /disabled=\{jobRunning\}[\s\S]*aria-busy=\{jobRunning\}[\s\S]*jobRunning \? <BnbButtonLoader \/>/);
   });
 
   it('shows and manages access requests from account activity', () => {
@@ -903,7 +926,7 @@ describe('BNB marketplace product flows', () => {
     assert.match(statusPage, /listBnbAgents\(\{ q: query, limit: 20, sort: "recommended" \}\)/);
     assert.match(statusPage, /findExactAgent\(agents, query\)/);
     assert.match(statusPage, /const hireable = canHireBnbAgent\(agent\)/);
-    assert.match(statusPage, /hireable \? <Link href=\{bnbAgentHirePath\(agent\)\}/);
+    assert.match(statusPage, /hireable \? <BnbPendingLink href=\{bnbAgentHirePath\(agent\)\}/);
     assert.match(statusPage, /Can accept work/);
     assert.match(statusPage, /BNB Chain data could not be loaded\. Try again\./);
     assert.doesNotMatch(statusPage, /BnbPageHeader|BnbPanel|StatusBadge|CategoryChip/);
@@ -2014,9 +2037,10 @@ describe('BNB marketplace product flows', () => {
     assert.match(jobClient, /\/api\/bnb\/activate\/settlement/);
     assert.match(activateForm, /if \(!response\.ok\) \{[\s\S]*payload\.record[\s\S]*setResult/);
     assert.match(activateForm, /const runBlocked = Boolean\(error && funded && !delivered && !closed && !jobRunning\)/);
-    assert.match(activateForm, /funded && !delivered && !closed && !jobRunning && !failed/);
+    assert.match(activateForm, /funded && !delivered && !closed && !failed/);
     assert.match(activateForm, /Waiting for the agent result/);
-    assert.doesNotMatch(activateForm, /The agent is working|Running\.\.\./);
+    assert.doesNotMatch(activateForm, /The agent is working/);
+    assert.match(activateForm, /jobRunning \? "Running\.\.\." : "Run agent"/);
     assert.match(activateForm, /styles\.runningState/);
     assert.match(jobClient, /styles\.runningState/);
     assert.match(jobClient, /if \(!response\.ok\) \{[\s\S]*payload\.record[\s\S]*setJob/);

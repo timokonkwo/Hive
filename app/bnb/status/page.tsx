@@ -1,7 +1,9 @@
-import Link from "next/link";
+import Form from "next/form";
 import { ArrowRight, ExternalLink, Search, WalletCards } from "lucide-react";
 import { isAddress } from "viem";
 import { CopyValueButton } from "@/app/bnb/_components/CopyValueButton";
+import { BnbPendingLink } from "@/app/bnb/_components/BnbPendingLink";
+import { BnbSubmitButton } from "@/app/bnb/_components/BnbSubmitButton";
 import { BnbContainer, BnbShell, freshnessLabel, shortAddress } from "@/app/bnb/_components/BnbUi";
 import { get8004scanAgentUrl, getBscAddressSummary } from "@/lib/bnb/chain";
 import { listBnbAgents } from "@/lib/bnb/catalog";
@@ -42,7 +44,7 @@ export default async function BnbStatusPage({ searchParams }: { searchParams: Se
         </header>
 
         <BnbContainer className={styles.body}>
-          <form action="/status" className={styles.searchForm}>
+          <Form action="/status" className={styles.searchForm}>
             <label htmlFor="verify-query">Agent name, token ID, or BNB address</label>
             <div className={styles.searchControl}>
               <Search aria-hidden="true" size={18} />
@@ -55,9 +57,9 @@ export default async function BnbStatusPage({ searchParams }: { searchParams: Se
                 spellCheck={false}
                 placeholder="Search agents or paste 0x..."
               />
-              <button type="submit" className="bnb-button bnb-focus">Verify</button>
+              <BnbSubmitButton className="bnb-button bnb-focus" pendingLabel="Verifying...">Verify</BnbSubmitButton>
             </div>
-          </form>
+          </Form>
 
           {exactAgent ? <AgentEvidence agent={exactAgent} /> : null}
 
@@ -106,8 +108,8 @@ function AgentEvidence({ agent }: { agent: BnbAgentProfile }) {
       </div>
 
       <footer className={styles.resultActions}>
-        <Link href={profileHref} className="bnb-button-dark bnb-focus">View profile</Link>
-        {hireable ? <Link href={bnbAgentHirePath(agent)} className="bnb-button bnb-focus">Hire agent</Link> : null}
+        <BnbPendingLink href={profileHref} className="bnb-button-dark bnb-focus" pendingLabel="Opening profile">View profile</BnbPendingLink>
+        {hireable ? <BnbPendingLink href={bnbAgentHirePath(agent)} className="bnb-button bnb-focus" pendingLabel="Opening hire flow">Hire agent</BnbPendingLink> : null}
         {sourceUrl ? <a href={sourceUrl} target="_blank" rel="noreferrer" className={styles.sourceLink}>View source <ExternalLink aria-hidden="true" size={14} /></a> : null}
       </footer>
     </article>
@@ -166,14 +168,14 @@ function CandidateResults({ agents, query }: { agents: BnbAgentProfile[]; query:
                 <p>{agent.category} · ID {agent.tokenId}</p>
               </div>
               <span className={styles.availability} data-available={hireable}>{hireable ? "Available" : "Profile only"}</span>
-              <Link href={`/status?q=${encodeURIComponent(agent.tokenId)}`} className="bnb-focus" aria-label={`Verify ${bnbAgentDisplayName(agent)}`}>
+              <BnbPendingLink href={`/status?q=${encodeURIComponent(agent.tokenId)}`} className="bnb-focus" aria-label={`Verify ${bnbAgentDisplayName(agent)}`} pendingLabel={`Verifying ${bnbAgentDisplayName(agent)}`}>
                 Verify <ArrowRight aria-hidden="true" size={15} />
-              </Link>
+              </BnbPendingLink>
             </article>
           );
         })}
       </div>
-      <Link href={`/agents?q=${encodeURIComponent(query)}`} className={styles.allResults}>View all marketplace results <ArrowRight aria-hidden="true" size={15} /></Link>
+      <BnbPendingLink href={`/agents?q=${encodeURIComponent(query)}`} className={styles.allResults} pendingLabel="Opening directory">View all marketplace results <ArrowRight aria-hidden="true" size={15} /></BnbPendingLink>
     </section>
   );
 }
@@ -183,7 +185,7 @@ function NoResult({ query }: { query: string }) {
     <section className={styles.noResult}>
       <h2>No exact match</h2>
       <p>No marketplace agent matched “{query}”. Check the spelling or browse the directory.</p>
-      <Link href="/agents" className="bnb-button-dark bnb-focus">Browse agents</Link>
+      <BnbPendingLink href="/agents" className="bnb-button-dark bnb-focus" pendingLabel="Opening directory">Browse agents</BnbPendingLink>
     </section>
   );
 }

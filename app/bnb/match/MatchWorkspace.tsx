@@ -1,7 +1,10 @@
 import Link from "next/link";
+import Form from "next/form";
 import { ArrowRight, BadgeCheck, CheckCircle2, Search } from "lucide-react";
 import { BnbSelect } from "@/app/bnb/_components/BnbSelect";
 import { BnbAgentAvatar } from "@/app/bnb/_components/BnbAgentAvatar";
+import { BnbPendingLink } from "@/app/bnb/_components/BnbPendingLink";
+import { BnbSubmitButton } from "@/app/bnb/_components/BnbSubmitButton";
 import {
   bnbAgentDisplayName,
   bnbCanHireAgent,
@@ -61,7 +64,7 @@ export function MatchWorkspace({ intent, category, categories, matches }: MatchW
             <span>Work brief</span>
             <h2 id="match-brief-title">What needs to be done?</h2>
           </div>
-          <form action="/match" className={styles.matchForm}>
+          <Form action="/match" className={styles.matchForm}>
             <label className={styles.taskField}>
               <span>Task</span>
               <textarea
@@ -84,12 +87,12 @@ export function MatchWorkspace({ intent, category, categories, matches }: MatchW
                   ariaLabel="Work type"
                 />
               </label>
-              <button type="submit" className="bnb-button bnb-focus">
+              <BnbSubmitButton className="bnb-button bnb-focus" pendingLabel="Finding agents...">
                 <Search aria-hidden="true" size={16} />
                 Find agents
-              </button>
+              </BnbSubmitButton>
             </div>
-          </form>
+          </Form>
 
           {!intent ? (
             <div className={styles.examples}>
@@ -146,7 +149,7 @@ export function MatchWorkspace({ intent, category, categories, matches }: MatchW
                         <strong>{bnbAgentDisplayName(agent)}</strong>
                         <span>{bnbCategoryLabel(agent.category)} · {bnbStatusLabel(agent)}</span>
                       </div>
-                      <Link href={bnbAgentProfilePath(agent)} className="bnb-button-dark bnb-focus">View profile</Link>
+                      <BnbPendingLink href={bnbAgentProfilePath(agent)} className="bnb-button-dark bnb-focus" pendingLabel="Opening profile">View profile</BnbPendingLink>
                     </article>
                   ))}
                 </div>
@@ -189,8 +192,8 @@ function MatchResult({ agent, rank }: { agent: BnbAgentProfile; rank: number }) 
         {price ? <div><dt>Price</dt><dd>{price}</dd></div> : null}
       </dl>
       <div className={styles.resultActions}>
-        <Link href={bnbAgentProfilePath(agent)} className="bnb-button-dark bnb-focus">View profile</Link>
-        <Link href={bnbAgentHirePath(agent)} className="bnb-button bnb-focus">Hire agent</Link>
+        <BnbPendingLink href={bnbAgentProfilePath(agent)} className="bnb-button-dark bnb-focus" pendingLabel="Opening profile">View profile</BnbPendingLink>
+        <BnbPendingLink href={bnbAgentHirePath(agent)} className="bnb-button bnb-focus" pendingLabel="Opening hire flow">Hire agent</BnbPendingLink>
       </div>
     </article>
   );

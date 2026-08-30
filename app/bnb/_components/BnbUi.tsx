@@ -11,6 +11,7 @@ import {
   Twitter,
 } from "lucide-react";
 import { BnbAccountButton } from "@/app/bnb/_components/BnbAccountButton";
+import { BnbPendingLink } from "@/app/bnb/_components/BnbPendingLink";
 import type { BnbAgentCategory, BnbAgentProfile, BnbPartnerTrackSummary } from "@/lib/bnb/types";
 import {
   bnbAgentDisplayName,
@@ -63,10 +64,10 @@ export function BnbShell({
         {back ? (
           <nav className="bnb-back-nav" aria-label="Back navigation">
             <BnbContainer className="bnb-back-nav-inner">
-              <Link href={back.href} className="bnb-back-link bnb-focus">
+              <BnbPendingLink href={back.href} className="bnb-back-link bnb-focus" pendingLabel={back.label}>
                 <ArrowLeft aria-hidden="true" size={16} strokeWidth={1.8} />
                 {back.label}
-              </Link>
+              </BnbPendingLink>
             </BnbContainer>
           </nav>
         ) : null}
@@ -95,9 +96,9 @@ function Brand({ compact = false }: { compact?: boolean }) {
 
 function BnbNavLink({ href, active, children }: { href: string; active?: boolean; children: ReactNode }) {
   return (
-    <Link href={href} className="bnb-nav-link bnb-focus" data-active={active ? "true" : undefined}>
+    <BnbPendingLink href={href} className="bnb-nav-link bnb-focus" data-active={active ? "true" : undefined}>
       {children}
-    </Link>
+    </BnbPendingLink>
   );
 }
 
@@ -266,13 +267,13 @@ export function AgentCard({ agent }: { agent: BnbAgentProfile }) {
         </div>
       </div>
       <div className="bnb-agent-side">
-        <Link href={bnbAgentProfilePath(agent)} className="bnb-button-dark bnb-focus">
+        <BnbPendingLink href={bnbAgentProfilePath(agent)} className="bnb-button-dark bnb-focus" pendingLabel="Opening profile">
           View profile
-        </Link>
+        </BnbPendingLink>
         {canHire ? (
-          <Link href={bnbAgentHirePath(agent)} className="bnb-button bnb-focus">
+          <BnbPendingLink href={bnbAgentHirePath(agent)} className="bnb-button bnb-focus" pendingLabel="Opening hire flow">
             Hire
-          </Link>
+          </BnbPendingLink>
         ) : null}
       </div>
     </article>

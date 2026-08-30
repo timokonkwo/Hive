@@ -1,11 +1,11 @@
 "use client";
 
-import Link from "next/link";
 import { useState } from "react";
 import { useModalStatus } from "@privy-io/react-auth";
 import { useAccount } from "wagmi";
 import { UserRound } from "lucide-react";
 import { BnbButtonLoader } from "@/app/bnb/_components/BnbButtonLoader";
+import { BnbPendingLink } from "@/app/bnb/_components/BnbPendingLink";
 import { useAuth } from "@/hooks/useAuth";
 
 export function BnbAccountButton({ active = false }: { active?: boolean }) {
@@ -45,11 +45,11 @@ export function BnbAccountButton({ active = false }: { active?: boolean }) {
   }
 
   return (
-    <Link href="/account" className="bnb-account-button bnb-focus" data-active={active ? "true" : undefined}>
+    <BnbPendingLink href="/account" className="bnb-account-button bnb-focus" data-active={active ? "true" : undefined} pendingLabel="Opening account">
       <UserRound aria-hidden="true" size={15} />
       <span className="bnb-account-desktop-label">{address ? shortAddress(address) : "Account"}</span>
       <span className="bnb-account-mobile-label">Account</span>
-    </Link>
+    </BnbPendingLink>
   );
 }
 

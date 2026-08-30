@@ -612,6 +612,53 @@ body:has(.bnb-shell) {
   animation: bnb-spin 720ms linear infinite;
 }
 
+.bnb-pending-link {
+  position: relative;
+}
+
+.bnb-pending-link-content {
+  display: inline-flex;
+  min-width: 0;
+  align-items: center;
+  justify-content: center;
+  gap: inherit;
+}
+
+.bnb-link-pending-indicator {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  border-radius: inherit;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.bnb-link-pending-indicator[data-pending="true"] {
+  opacity: 1;
+}
+
+.bnb-pending-link:has(.bnb-link-pending-indicator[data-pending="true"]) {
+  cursor: wait;
+  pointer-events: none;
+}
+
+.bnb-pending-link:has(.bnb-link-pending-indicator[data-pending="true"]) .bnb-pending-link-content {
+  opacity: 0;
+}
+
+.bnb-sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
 @keyframes bnb-spin {
   to {
     transform: rotate(360deg);

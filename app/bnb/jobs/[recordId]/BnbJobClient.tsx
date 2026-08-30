@@ -1,6 +1,5 @@
 "use client";
 
-import Link from "next/link";
 import { useEffect, useState } from "react";
 import { useModalStatus } from "@privy-io/react-auth";
 import { useAccount, usePublicClient, useSendTransaction, useSwitchChain, useWalletClient } from "wagmi";
@@ -8,6 +7,7 @@ import type { Hex } from "viem";
 import { CheckCircle2, CreditCard, Play } from "lucide-react";
 import { BnbButtonLoader } from "@/app/bnb/_components/BnbButtonLoader";
 import { BnbContainer } from "@/app/bnb/_components/BnbUi";
+import { BnbPendingLink } from "@/app/bnb/_components/BnbPendingLink";
 import { CopyValueButton } from "@/app/bnb/_components/CopyValueButton";
 import { BnbDeliveryView } from "@/app/bnb/_components/BnbDeliveryView";
 import { useAuth } from "@/hooks/useAuth";
@@ -293,7 +293,7 @@ export function BnbJobClient({ recordId }: { recordId: string }) {
           <section className={styles.emptyState}>
           <h2>Job unavailable</h2>
           <p>{error || "This job could not be loaded."}</p>
-          <Link href="/account" className="bnb-button-dark bnb-focus">Back to account</Link>
+          <BnbPendingLink href="/account" className="bnb-button-dark bnb-focus" pendingLabel="Opening account">Back to account</BnbPendingLink>
           </section>
         </BnbContainer>
       </div>
@@ -439,7 +439,7 @@ export function BnbJobClient({ recordId }: { recordId: string }) {
         </details>
 
         <footer className={styles.footerActions}>
-          <Link href={`/agents/${record.agent.chainId}/${encodeURIComponent(record.agent.tokenId)}`} className="bnb-button-dark bnb-focus">View agent</Link>
+          <BnbPendingLink href={`/agents/${record.agent.chainId}/${encodeURIComponent(record.agent.tokenId)}`} className="bnb-button-dark bnb-focus" pendingLabel="Opening profile">View agent</BnbPendingLink>
         </footer>
       </BnbContainer>
     </div>

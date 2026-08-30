@@ -17,6 +17,7 @@ import {
 } from "lucide-react";
 import { BnbContainer, BnbShell } from "@/app/bnb/_components/BnbUi";
 import { BnbAgentAvatar } from "@/app/bnb/_components/BnbAgentAvatar";
+import { BnbPendingLink } from "@/app/bnb/_components/BnbPendingLink";
 import { getBnbCategories, listBnbAgentsPage } from "@/lib/bnb/catalog";
 import {
   bnbAgentDisplayName,
@@ -116,10 +117,10 @@ export default async function BnbHomePage() {
               </p>
 
               <div className={styles.heroActions}>
-                <Link href="/agents" className={styles.heroPrimary}>
+                <BnbPendingLink href="/agents" className={styles.heroPrimary} pendingLabel="Opening directory">
                   Browse agents
                   <ArrowRight aria-hidden="true" size={17} />
-                </Link>
+                </BnbPendingLink>
                 <a href="#how-hiring-works" className={styles.heroSecondary}>How hiring works</a>
               </div>
 
@@ -146,10 +147,10 @@ export default async function BnbHomePage() {
                 <p className={styles.sectionLabel}>Marketplace</p>
                 <h2>{showingAvailable ? "Available now" : "Agents to explore"}</h2>
               </div>
-              <Link href="/agents" className={styles.textLink}>
+              <BnbPendingLink href="/agents" className={styles.textLink} pendingLabel="Opening directory">
                 View all agents
                 <ArrowRight aria-hidden="true" size={15} />
-              </Link>
+              </BnbPendingLink>
             </div>
 
             <div className={styles.agentList}>
@@ -162,7 +163,7 @@ export default async function BnbHomePage() {
                     <h3>Open the full directory</h3>
                     <p>Search indexed profiles by task, category, activity, and availability.</p>
                   </div>
-                  <Link href="/agents">Browse agents</Link>
+                  <BnbPendingLink href="/agents" pendingLabel="Opening directory">Browse agents</BnbPendingLink>
                 </div>
               )}
             </div>
@@ -221,10 +222,10 @@ export default async function BnbHomePage() {
               <li><Check aria-hidden="true" size={17} /> See when work starts, finishes, or fails.</li>
               <li><Check aria-hidden="true" size={17} /> Keep the result and every transaction in one record.</li>
             </ul>
-            <Link href="/status">
+            <BnbPendingLink href="/status" pendingLabel="Opening verification">
               Verify an identity
               <ArrowRight aria-hidden="true" size={15} />
-            </Link>
+            </BnbPendingLink>
           </BnbContainer>
         </section>
       </div>
@@ -282,10 +283,10 @@ function WorkflowPreview({ agent }: { agent?: BnbAgentProfile }) {
       </ol>
 
       {agent ? (
-        <Link href={bnbAgentProfilePath(agent)} className={styles.previewLink}>
+        <BnbPendingLink href={bnbAgentProfilePath(agent)} className={styles.previewLink} pendingLabel="Opening profile">
           View agent details
           <ArrowRight aria-hidden="true" size={14} />
-        </Link>
+        </BnbPendingLink>
       ) : null}
     </aside>
   );
@@ -315,8 +316,8 @@ function LandingAgentRow({ agent }: { agent: BnbAgentProfile }) {
         {facts.map((fact) => <small key={fact}>{fact}</small>)}
       </div>
       <div className={styles.agentActions}>
-        <Link href={bnbAgentProfilePath(agent)} className={styles.secondaryAction}>View profile</Link>
-        {canHire ? <Link href={bnbAgentHirePath(agent)} className={styles.primaryAction}>Hire</Link> : null}
+        <BnbPendingLink href={bnbAgentProfilePath(agent)} className={styles.secondaryAction} pendingLabel="Opening profile">View profile</BnbPendingLink>
+        {canHire ? <BnbPendingLink href={bnbAgentHirePath(agent)} className={styles.primaryAction} pendingLabel="Opening hire flow">Hire</BnbPendingLink> : null}
       </div>
     </article>
   );
