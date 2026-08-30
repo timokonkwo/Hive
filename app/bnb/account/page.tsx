@@ -4,7 +4,7 @@ import styles from "./account.module.css";
 
 export default function BnbAccountPage() {
   return (
-    <BnbShell active="account" variant="landing">
+    <BnbShell active="account" variant="landing" back={{ href: "/", label: "Back to home" }}>
       <div className={styles.page}>
         <header className={styles.pageHeader}>
           <BnbContainer>

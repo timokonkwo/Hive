@@ -55,7 +55,7 @@ export function MatchWorkspace({ intent, category, categories, matches }: MatchW
         </ol>
       </aside>
 
-      <main className={styles.mainColumn}>
+      <div className={styles.mainColumn}>
         <section className={styles.brief} aria-labelledby="match-brief-title">
           <div className={styles.sectionHeading}>
             <span>Work brief</span>
@@ -162,7 +162,7 @@ export function MatchWorkspace({ intent, category, categories, matches }: MatchW
             ) : null}
           </section>
         ) : null}
-      </main>
+      </div>
     </div>
   );
 }

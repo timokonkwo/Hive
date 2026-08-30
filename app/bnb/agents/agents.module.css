@@ -27,6 +27,39 @@
   line-height: 1.55;
 }
 
+.pageHeaderInner {
+  display: flex;
+  align-items: end;
+  justify-content: space-between;
+  gap: 24px;
+}
+
+.pageHeaderInner > div {
+  min-width: 0;
+}
+
+.matchLink {
+  display: inline-flex;
+  min-height: 44px;
+  flex: 0 0 auto;
+  align-items: center;
+  border-bottom: 1px solid #b9bdb4;
+  color: #4f534d;
+  font-size: 13px;
+  font-weight: 650;
+  text-decoration: none;
+}
+
+.matchLink:hover {
+  border-color: #171815;
+  color: #171815;
+}
+
+.matchLink:focus-visible {
+  outline: 3px solid rgba(47, 111, 237, 0.35);
+  outline-offset: 2px;
+}
+
 .directoryPage {
   padding-top: 20px;
   padding-bottom: 80px;
@@ -571,6 +604,30 @@
   background: #fcfcf8;
 }
 
+.directoryPage :global(.bnb-empty-state-actions) {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 10px 16px;
+}
+
+.directoryPage :global(.bnb-empty-state-match) {
+  display: inline-flex;
+  min-height: 44px;
+  align-items: center;
+  border-bottom: 1px solid #b9bdb4;
+  color: #4f534d;
+  font-size: 13px;
+  font-weight: 650;
+  text-decoration: none;
+}
+
+.directoryPage :global(.bnb-empty-state-match:hover) {
+  border-color: #171815;
+  color: #171815;
+}
+
 .directoryPage :global(.bnb-compare-tray) {
   border-color: #343731;
   border-radius: 8px;
@@ -697,6 +754,12 @@
 
   .pageHeader h1 {
     font-size: 30px;
+  }
+
+  .pageHeaderInner {
+    align-items: start;
+    flex-direction: column;
+    gap: 10px;
   }
 
   .directoryPage {

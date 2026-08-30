@@ -1,7 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import {
-  ArrowLeft,
   ArrowRight,
   BadgeCheck,
   CircleCheck,
@@ -73,16 +72,11 @@ export default async function BnbAgentDetailPage({
   const identityId = agent.sourceMetrics?.sourceAgentId || agent.tokenId;
 
   return (
-    <BnbShell active="agents" variant="landing">
+    <BnbShell active="agents" variant="landing" back={{ href: "/agents", label: "Back to agents" }}>
       <div className={styles.page}>
         <BnbContainer className={styles.container}>
-          <Link href="/agents" className={styles.backLink}>
-            <ArrowLeft aria-hidden="true" size={16} />
-            All agents
-          </Link>
-
           <div className={styles.workspace}>
-            <main className={styles.dossier}>
+            <div className={styles.dossier}>
               <header className={styles.profileHeader}>
                 <div className={styles.metaLine}>
                   <span>{bnbCategoryLabel(agent.category)}</span>
@@ -172,7 +166,7 @@ export default async function BnbAgentDetailPage({
                   </ul>
                 </ProfileSection>
               ) : null}
-            </main>
+            </div>
 
             <aside className={styles.identityRail} aria-label="Agent identity">
               <BnbAgentAvatar agent={agent} className={styles.monogram} size={48} />

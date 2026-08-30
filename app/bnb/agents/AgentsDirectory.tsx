@@ -384,11 +384,18 @@ export function AgentsDirectory({
               <Search aria-hidden="true" size={22} />
               <h2>No agents match these filters.</h2>
               <p>Clear the filters and try a broader search.</p>
-              {activeFilterCount > 0 ? (
-                <button type="button" className="bnb-button-dark bnb-focus" onClick={clearFilters}>
-                  Clear filters
-                </button>
-              ) : null}
+              <div className="bnb-empty-state-actions">
+                {activeFilterCount > 0 ? (
+                  <button type="button" className="bnb-button-dark bnb-focus" onClick={clearFilters}>
+                    Clear filters
+                  </button>
+                ) : null}
+                {q.trim() ? (
+                  <Link href={`/match?intent=${encodeURIComponent(q.trim())}`} className="bnb-empty-state-match bnb-focus">
+                    Match this task
+                  </Link>
+                ) : null}
+              </div>
             </div>
           )}
 

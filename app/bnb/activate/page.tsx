@@ -1,6 +1,4 @@
-import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
-import { ArrowLeft } from "lucide-react";
 import { BnbContainer, BnbShell } from "@/app/bnb/_components/BnbUi";
 import { getBnbAgent } from "@/lib/bnb/catalog";
 import { bnbAgentDisplayName } from "@/lib/bnb/display";
@@ -30,13 +28,13 @@ export default async function BnbActivatePage({ searchParams }: { searchParams: 
   const agentName = bnbAgentDisplayName(agent);
 
   return (
-    <BnbShell active="agents" variant="landing">
+    <BnbShell
+      active="agents"
+      variant="landing"
+      back={{ href: bnbAgentProfilePath(agent), label: "Back to agent profile" }}
+    >
       <div className={styles.page}>
         <BnbContainer className={styles.container}>
-          <Link href={bnbAgentProfilePath(agent)} className={styles.backLink}>
-            <ArrowLeft aria-hidden="true" size={16} />
-            Agent profile
-          </Link>
           <header className={styles.pageHeader}>
             <span>Hire agent</span>
             <h1>{agentName}</h1>

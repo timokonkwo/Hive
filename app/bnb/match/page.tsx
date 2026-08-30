@@ -18,7 +18,7 @@ export default async function BnbMatchPage({ searchParams }: { searchParams: Sea
   const matches = intent ? await matchBnbAgents(intent, category || null, 10) : [];
 
   return (
-    <BnbShell active="agents" variant="landing">
+    <BnbShell active="agents" variant="landing" back={{ href: "/agents", label: "Back to agents" }}>
       <div className={styles.page}>
         <header className={styles.pageHeader}>
           <BnbContainer>

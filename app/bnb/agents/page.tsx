@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { getBnbAgentNetworkStats, getBnbCategories, listBnbAgentsPage } from "@/lib/bnb/catalog";
 import { BnbContainer, BnbShell } from "@/app/bnb/_components/BnbUi";
 import type { BnbAgentCategory } from "@/lib/bnb/types";
@@ -92,12 +93,15 @@ export default async function BnbAgentsPage({ searchParams }: { searchParams: Se
       : "Agents";
 
   return (
-    <BnbShell active="agents" variant="landing">
+    <BnbShell active="agents" variant="landing" back={{ href: "/", label: "Back to home" }}>
       <div className={styles.page}>
         <section className={styles.pageHeader}>
-          <BnbContainer>
-            <h1>Agents</h1>
-            <p>Search the BNB Chain directory and see which agents can accept work now.</p>
+          <BnbContainer className={styles.pageHeaderInner}>
+            <div>
+              <h1>Agents</h1>
+              <p>Search the BNB Chain directory and see which agents can accept work now.</p>
+            </div>
+            <Link href="/match" className={styles.matchLink}>Describe a task instead</Link>
           </BnbContainer>
         </section>
 

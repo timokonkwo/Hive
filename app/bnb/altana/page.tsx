@@ -8,7 +8,7 @@ export default function BnbAltanaPage() {
   const alerts = getBnbAltanaSessionTemplates();
 
   return (
-    <BnbShell>
+    <BnbShell active="activity" back={{ href: "/activity?filter=alerts", label: "Back to activity" }}>
       <BnbHero
         kicker="Wallet permissions"
         title="Wallet alerts"

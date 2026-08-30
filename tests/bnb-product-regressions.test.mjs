@@ -78,8 +78,11 @@ describe('BNB marketplace product flows', () => {
   const agentsCss = read('app/bnb/agents/agents.module.css');
   const bnbUi = read('app/bnb/_components/BnbUi.tsx');
   const copyButton = read('app/bnb/_components/CopyValueButton.tsx');
+  const altanaPage = read('app/bnb/altana/page.tsx');
   const altanaSessionForm = read('app/bnb/altana/AltanaSessionForm.tsx');
   const altanaRevokeForm = read('app/bnb/altana/AltanaRevokeForm.tsx');
+  const termixPage = read('app/bnb/termix/page.tsx');
+  const pancakeswapPage = read('app/bnb/pancakeswap/page.tsx');
   const bnbAuthFetch = read('hooks/useBnbAuthFetch.ts');
   const bnbAuth = read('lib/bnb/auth.ts');
   const walletAuth = read('lib/bnb/wallet-auth.ts');
@@ -795,7 +798,7 @@ describe('BNB marketplace product flows', () => {
     assert.match(accountButton, /bnb-account-desktop-label/);
     assert.match(accountButton, /bnb-account-mobile-label/);
     assert.match(bnbCss, /\.bnb-account-desktop-label \{[\s\S]*display:\s*none/);
-    assert.match(accountPage, /<BnbShell active="account" variant="landing">/);
+    assert.match(accountPage, /<BnbShell active="account" variant="landing"/);
     assert.doesNotMatch(accountPage, /ReceiptsClient|BnbPageHeader|BnbPanel/);
     assert.match(accountPage, /View the wallet Hive uses for BNB Chain jobs and payments/);
     assert.match(accountClient, /Verify wallet/);
@@ -814,9 +817,31 @@ describe('BNB marketplace product flows', () => {
     assert.match(accountCss, /\.readiness\s*\{[\s\S]*grid-template-columns:/);
     assert.match(reportPage, /redirect\("\/activity"\)/);
     assert.match(bnbUi, /href="\/activity"[\s\S]*>Activity</);
-    assert.match(activityPage, /<BnbShell active="activity" variant="landing">/);
+    assert.match(activityPage, /<BnbShell active="activity" variant="landing"/);
     assert.doesNotMatch(bnbUi, />Receipts</);
     assert.doesNotMatch(bnbUi, /\/bnb\/report/);
+  });
+
+  it('gives every non-home BNB page stable contextual back navigation', () => {
+    assert.match(bnbUi, /back\?: \{[\s\S]*href: string;[\s\S]*label: string;/);
+    assert.match(bnbUi, /aria-label="Back navigation"/);
+    assert.match(bnbUi, /<Link href=\{back\.href\} className="bnb-back-link bnb-focus">/);
+    assert.match(bnbUi, /<main className="bnb-main" id="main-content">/);
+    assert.match(bnbCss, /\.bnb-back-nav-inner\s*\{[\s\S]*min-height:\s*48px/);
+    assert.match(bnbCss, /\.bnb-back-link\s*\{[\s\S]*min-height:\s*40px/);
+
+    for (const page of [agentsPage, activityPage, accountPage, statusPage]) {
+      assert.match(page, /back=\{\{ href: "\/", label: "Back to home" \}\}/);
+    }
+    for (const page of [profilePage, matchPage, pancakeswapPage]) {
+      assert.match(page, /back=\{\{ href: "\/agents", label: "Back to agents" \}\}/);
+    }
+    assert.match(activatePage, /back=\{\{ href: bnbAgentProfilePath\(agent\), label: "Back to agent profile" \}\}/);
+    assert.match(jobPage, /back=\{\{ href: "\/activity\?filter=jobs", label: "Back to activity" \}\}/);
+    assert.match(altanaPage, /back=\{\{ href: "\/activity\?filter=alerts", label: "Back to activity" \}\}/);
+    assert.match(termixPage, /back=\{\{ href: "\/activity\?filter=comparisons", label: "Back to activity" \}\}/);
+    assert.doesNotMatch(read('app/bnb/page.tsx'), /back=\{\{/);
+    assert.doesNotMatch([profilePage, activatePage, jobClient].join('\n'), /styles\.backLink/);
   });
 
   it('shows and manages access requests from account activity', () => {
@@ -873,7 +898,7 @@ describe('BNB marketplace product flows', () => {
   });
 
   it('verifies agents and wallets without exposing unsupported actions', () => {
-    assert.match(statusPage, /<BnbShell active="verify" variant="landing">/);
+    assert.match(statusPage, /<BnbShell active="verify" variant="landing"/);
     assert.match(statusPage, /Verify an agent or wallet/);
     assert.match(statusPage, /listBnbAgents\(\{ q: query, limit: 20, sort: "recommended" \}\)/);
     assert.match(statusPage, /findExactAgent\(agents, query\)/);
@@ -892,15 +917,23 @@ describe('BNB marketplace product flows', () => {
   it('keeps the redesigned marketplace copy and display rules', () => {
     const home = read('app/bnb/page.tsx');
     assert.match(home, /Hire agents that can do the work\./);
-    assert.match(home, /What needs to be done\?/);
-    assert.match(home, /Find an agent/);
+    assert.match(home, /Browse agents/);
+    assert.match(home, /Explore by task/);
+    assert.doesNotMatch(home, /Find an agent/);
+    assert.doesNotMatch(home, /action="\/match"|\/match\?intent=/);
+    assert.match(home, /href=\{bnbAgentProfilePath\(agent\)\}/);
+    assert.match(home, /href=\{bnbAgentHirePath\(agent\)\}/);
     assert.match(home, /variant="landing"/);
     assert.match(home, /filter\(bnbCanHireAgent\)/);
     assert.doesNotMatch(home, /registered on BSC|Connected to the BNB ecosystem|What do you need an agent to do\?/);
-    assert.match(agentsPage, /<BnbShell active="agents" variant="landing">/);
+    assert.match(agentsPage, /<BnbShell active="agents" variant="landing"/);
     assert.match(agentsPage, /<h1>Agents<\/h1>/);
+    assert.match(agentsPage, /href="\/match"/);
+    assert.match(agentsPage, /Describe a task instead/);
     assert.match(directory, /<strong>\{resultLabel\}<\/strong>/);
     assert.match(directory, /agentCountSummary\(agents\.length, total\)/);
+    assert.match(directory, /\/match\?intent=\$\{encodeURIComponent\(q\.trim\(\)\)\}/);
+    assert.match(directory, /Match this task/);
     assert.doesNotMatch(directory, /Showing \{start\}-\{end\}/);
     assert.doesNotMatch(agentsPage, /registered on BSC|agents shown/);
     assert.match(bnbUi, /function BnbFooter/);

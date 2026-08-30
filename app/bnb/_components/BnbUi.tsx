@@ -2,6 +2,7 @@ import Image from "next/image";
 import Link from "next/link";
 import type { ReactNode } from "react";
 import {
+  ArrowLeft,
   ArrowRight,
   BadgeCheck,
   BarChart3,
@@ -33,13 +34,18 @@ export function BnbShell({
   children,
   active = "home",
   variant = "default",
+  back,
 }: {
   children: ReactNode;
   active?: BnbNavItem;
   variant?: "default" | "landing";
+  back?: {
+    href: string;
+    label: string;
+  };
 }) {
   return (
-    <main className={`bnb-shell ${variant === "landing" ? "bnb-shell-home" : ""}`}>
+    <div className={`bnb-shell ${variant === "landing" ? "bnb-shell-home" : ""}`}>
       <div className="bnb-frame">
         <header className="bnb-header">
           <BnbContainer className="bnb-header-inner">
@@ -54,12 +60,22 @@ export function BnbShell({
             </div>
           </BnbContainer>
         </header>
-        <div className="bnb-main">
+        {back ? (
+          <nav className="bnb-back-nav" aria-label="Back navigation">
+            <BnbContainer className="bnb-back-nav-inner">
+              <Link href={back.href} className="bnb-back-link bnb-focus">
+                <ArrowLeft aria-hidden="true" size={16} strokeWidth={1.8} />
+                {back.label}
+              </Link>
+            </BnbContainer>
+          </nav>
+        ) : null}
+        <main className="bnb-main" id="main-content">
           {children}
-        </div>
+        </main>
         <BnbFooter />
       </div>
-    </main>
+    </div>
   );
 }
 

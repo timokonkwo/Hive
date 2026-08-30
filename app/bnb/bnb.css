@@ -257,6 +257,44 @@ body:has(.bnb-shell) {
   box-shadow: 0 0 0 2px var(--bnb-bg), 0 0 0 4px var(--bnb-hive);
 }
 
+.bnb-back-nav {
+  border-bottom: 1px solid var(--bnb-line);
+  background: var(--bnb-bg);
+}
+
+.bnb-back-nav-inner {
+  display: flex;
+  min-height: 48px;
+  align-items: center;
+}
+
+.bnb-back-link {
+  display: inline-flex;
+  min-height: 40px;
+  align-items: center;
+  gap: 7px;
+  margin-left: -8px;
+  padding: 0 8px;
+  border-radius: 6px;
+  color: var(--bnb-text-muted);
+  font-size: 13px;
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.bnb-back-link:hover {
+  color: var(--bnb-text);
+}
+
+.bnb-back-link svg {
+  flex: 0 0 auto;
+  transition: transform 160ms ease;
+}
+
+.bnb-back-link:hover svg {
+  transform: translateX(-2px);
+}
+
 .bnb-container {
   width: 100%;
   max-width: 1200px;

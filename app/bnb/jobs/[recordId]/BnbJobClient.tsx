@@ -5,7 +5,7 @@ import { useEffect, useState } from "react";
 import { useModalStatus } from "@privy-io/react-auth";
 import { useAccount, usePublicClient, useSendTransaction, useSwitchChain, useWalletClient } from "wagmi";
 import type { Hex } from "viem";
-import { ArrowLeft, CheckCircle2, CreditCard, Play } from "lucide-react";
+import { CheckCircle2, CreditCard, Play } from "lucide-react";
 import { BnbButtonLoader } from "@/app/bnb/_components/BnbButtonLoader";
 import { BnbContainer } from "@/app/bnb/_components/BnbUi";
 import { CopyValueButton } from "@/app/bnb/_components/CopyValueButton";
@@ -323,11 +323,6 @@ export function BnbJobClient({ recordId }: { recordId: string }) {
   return (
     <div className={styles.page}>
       <BnbContainer className={styles.container}>
-        <Link href="/account#activity" className={styles.backLink}>
-          <ArrowLeft aria-hidden="true" size={16} />
-          Account activity
-        </Link>
-
         <header className={styles.jobHeader}>
           <div className={styles.statusLine} data-state={failed ? "failed" : running ? "running" : delivered || closed ? "complete" : "pending"}>
             {running ? <BnbButtonLoader /> : <span aria-hidden="true" />}
@@ -400,7 +395,7 @@ export function BnbJobClient({ recordId }: { recordId: string }) {
             </ol>
           </aside>
 
-          <main className={styles.resultArea}>
+          <div className={styles.resultArea}>
             <div className={styles.resultHeading}>
               <span>Result</span>
               <h2>{output ? "Delivered work" : failed ? "Work stopped" : running ? "Agent is working" : "No result yet"}</h2>
@@ -423,7 +418,7 @@ export function BnbJobClient({ recordId }: { recordId: string }) {
                 <div><strong>{funded ? "Ready to start" : "Waiting for payment"}</strong><p>{funded ? "Run the agent to begin work." : "Confirm payment before work begins."}</p></div>
               </div>
             )}
-          </main>
+          </div>
         </div>
 
         <details className={styles.recordDetails}>

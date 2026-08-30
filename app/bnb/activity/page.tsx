@@ -10,7 +10,7 @@ export default async function BnbActivityPage({ searchParams }: { searchParams: 
   const initialFilter = activityFilter(value);
 
   return (
-    <BnbShell active="activity" variant="landing">
+    <BnbShell active="activity" variant="landing" back={{ href: "/", label: "Back to home" }}>
       <div className={styles.page}>
         <header className={styles.pageHeader}>
           <BnbContainer>

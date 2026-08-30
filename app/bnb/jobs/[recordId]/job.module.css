@@ -9,20 +9,6 @@
   padding-bottom: 72px;
 }
 
-.backLink {
-  display: inline-flex;
-  align-items: center;
-  gap: 7px;
-  color: #60645d;
-  font-size: 12px;
-  font-weight: 650;
-  text-decoration: none;
-}
-
-.backLink:hover {
-  color: #171815;
-}
-
 .stateSurface,
 .emptyState {
   display: flex;

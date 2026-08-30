@@ -9,22 +9,6 @@
   padding-bottom: 80px;
 }
 
-.backLink {
-  display: inline-flex;
-  min-height: 44px;
-  align-items: center;
-  gap: 8px;
-  color: #60645d;
-  font-size: 13px;
-  font-weight: 600;
-  text-decoration: none;
-}
-
-.backLink:hover {
-  color: #171815;
-}
-
-.backLink:focus-visible,
 .hireWorkspace button:focus-visible,
 .hireWorkspace input:focus-visible,
 .hireWorkspace textarea:focus-visible,

@@ -59,11 +59,11 @@ const categoryDetails: Record<Exclude<BnbAgentCategory, "Other">, { body: string
   },
 };
 
-const taskSuggestions = [
-  { label: "Check a lending position", intent: "Check my lending position and explain any liquidation risk" },
-  { label: "Review an LP range", intent: "Review my liquidity position and tell me whether to rebalance" },
-  { label: "Compare yield routes", intent: "Compare BNB Chain yield routes for my asset and risk level" },
-  { label: "Plan a grid strategy", intent: "Create a balanced grid trading plan for a token pair" },
+const taskShortcuts: Array<{ label: string; category: Exclude<BnbAgentCategory, "Other"> }> = [
+  { label: "Check a lending position", category: "Health Factor Monitoring" },
+  { label: "Review an LP range", category: "Rebalancing" },
+  { label: "Compare yield routes", category: "Yield Optimisation" },
+  { label: "Plan a grid strategy", category: "Grid Trading" },
 ];
 
 const workflowSteps = [
@@ -112,31 +112,26 @@ export default async function BnbHomePage() {
               <p className={styles.eyebrow}>Agents for work on BNB Chain</p>
               <h1>Hire agents that can do the work.</h1>
               <p className={styles.lede}>
-                Describe a task, review the cost and permissions, then follow the result from payment to receipt.
+                Browse available agents, compare what they can do, then review the cost and permissions before you hire.
               </p>
 
-              <form action="/match" className={styles.composer}>
-                <label htmlFor="home-task">What needs to be done?</label>
-                <textarea
-                  id="home-task"
-                  name="intent"
-                  rows={3}
-                  required
-                  maxLength={1200}
-                  placeholder="Example: Check my Venus position and tell me if it is close to liquidation."
-                />
-                <button type="submit">
-                  Find an agent
+              <div className={styles.heroActions}>
+                <Link href="/agents" className={styles.heroPrimary}>
+                  Browse agents
                   <ArrowRight aria-hidden="true" size={17} />
-                </button>
-              </form>
+                </Link>
+                <a href="#how-hiring-works" className={styles.heroSecondary}>How hiring works</a>
+              </div>
 
-              <div className={styles.suggestions} aria-label="Example tasks">
-                {taskSuggestions.map((suggestion) => (
-                  <Link key={suggestion.label} href={`/match?intent=${encodeURIComponent(suggestion.intent)}`}>
-                    {suggestion.label}
-                  </Link>
-                ))}
+              <div className={styles.taskShortcuts}>
+                <p>Explore by task</p>
+                <div aria-label="Agent categories">
+                  {taskShortcuts.map((shortcut) => (
+                    <Link key={shortcut.label} href={`/agents?category=${encodeURIComponent(shortcut.category)}`}>
+                      {shortcut.label}
+                    </Link>
+                  ))}
+                </div>
               </div>
             </div>
 
@@ -189,7 +184,7 @@ export default async function BnbHomePage() {
             </div>
           </section>
 
-          <section className={styles.workflowSection}>
+          <section id="how-hiring-works" className={styles.workflowSection}>
             <div className={styles.sectionHeading}>
               <div>
                 <p className={styles.sectionLabel}>One record from start to finish</p>

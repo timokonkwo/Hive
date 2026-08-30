@@ -8,7 +8,7 @@ export default function BnbPancakeSwapPage() {
   const jobs = getBnbPancakeSwapUtilities();
 
   return (
-    <BnbShell>
+    <BnbShell active="agents" back={{ href: "/agents", label: "Back to agents" }}>
       <BnbHero
         kicker="PancakeSwap"
         title="PancakeSwap agents"

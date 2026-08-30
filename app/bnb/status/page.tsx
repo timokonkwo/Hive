@@ -31,7 +31,7 @@ export default async function BnbStatusPage({ searchParams }: { searchParams: Se
   const candidates = exactAgent ? [] : agents.slice(0, 6);
 
   return (
-    <BnbShell active="verify" variant="landing">
+    <BnbShell active="verify" variant="landing" back={{ href: "/", label: "Back to home" }}>
       <div className={styles.page}>
         <header className={styles.pageHeader}>
           <BnbContainer>

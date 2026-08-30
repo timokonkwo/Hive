@@ -9,22 +9,6 @@
   padding-bottom: 80px;
 }
 
-.backLink {
-  display: inline-flex;
-  min-height: 44px;
-  align-items: center;
-  gap: 8px;
-  color: #60645d;
-  font-size: 13px;
-  font-weight: 600;
-  text-decoration: none;
-}
-
-.backLink:hover {
-  color: #171815;
-}
-
-.backLink:focus-visible,
 .profileActions button:focus-visible,
 .profileActions a:focus-visible,
 .compareControl:has(input:focus-visible),

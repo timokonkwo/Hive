@@ -7,7 +7,7 @@ export default function BnbTermixPage() {
   const comparisons = getBnbTermixCaptures();
 
   return (
-    <BnbShell>
+    <BnbShell active="activity" back={{ href: "/activity?filter=comparisons", label: "Back to activity" }}>
       <BnbHero
         kicker="TermiX"
         title="Work comparisons"
