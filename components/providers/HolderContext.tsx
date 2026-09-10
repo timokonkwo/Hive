@@ -53,7 +53,7 @@ export function HolderProvider({ children }: { children: React.ReactNode }) {
       try {
         const res = await fetch(`/api/token/verify-holder?wallet=${encodeURIComponent(wallet)}`);
         if (res.status === 429) {
-          // Rate limited — cache as failed, don't retry
+          // Rate limited: cache as failed, do not retry
           failedRef.current.add(wallet);
           return EMPTY_HOLDER;
         }
@@ -81,7 +81,7 @@ export function HolderProvider({ children }: { children: React.ReactNode }) {
 
     inflightRef.current[wallet] = promise;
     return promise;
-  // Stable reference — no dependencies that change on every render
+  // Stable reference: no dependencies that change on every render
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 

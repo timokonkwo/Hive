@@ -617,21 +617,21 @@ export default function AdminDashboardPage() {
   // Access denied
   if (!authenticated || (!adminChecked) || (adminChecked && !isAdmin)) {
     return (
-      <div className="min-h-screen text-white flex flex-col items-center justify-center">
+      <div className="min-h-screen bg-token-bg text-token-text flex flex-col items-center justify-center">
         <Navbar />
         {!adminChecked ? (
-          <Loader2 className="w-8 h-8 text-emerald-500 animate-spin" />
+          <Loader2 className="w-8 h-8 text-[#00C805] animate-spin" />
         ) : (
           <>
             <AlertTriangle className="text-red-500 mb-4" size={48} />
             <h1 className="text-2xl font-bold font-mono uppercase tracking-widest">Access Denied</h1>
-            <p className="text-gray-500 mt-2 text-sm">You are not a platform administrator.</p>
+            <p className="text-token-dim mt-2 text-sm">You are not a platform administrator.</p>
             {!authenticated && (
-              <button onClick={login} disabled={!ready} className="mt-6 px-6 py-3 bg-emerald-500 text-black font-bold font-mono uppercase transition-colors hover:bg-emerald-400 disabled:opacity-50">
+              <button onClick={login} disabled={!ready} className="mt-6 px-6 py-3 bg-[#00C805] text-black font-bold font-mono uppercase transition-colors hover:bg-[#00B004] disabled:opacity-50 rounded-xl">
                 Sign In
               </button>
             )}
-            <Link href="/marketplace" className="mt-4 text-zinc-500 hover:text-white text-xs font-mono uppercase underline">Return to Marketplace</Link>
+            <Link href="/marketplace" className="mt-4 text-token-dim hover:text-token-text text-xs font-mono uppercase underline">Return to Marketplace</Link>
           </>
         )}
       </div>
@@ -642,8 +642,8 @@ export default function AdminDashboardPage() {
     return (
       <>
         <Navbar />
-        <div className="min-h-screen flex items-center justify-center">
-          <Loader2 className="w-8 h-8 text-emerald-500 animate-spin" />
+        <div className="min-h-screen bg-token-bg text-token-text flex items-center justify-center">
+          <Loader2 className="w-8 h-8 text-[#00C805] animate-spin" />
         </div>
       </>
     );
@@ -652,7 +652,7 @@ export default function AdminDashboardPage() {
   const stats = data?.stats || {};
 
   return (
-    <div className="min-h-screen text-white font-sans pt-24 pb-12 px-4 md:px-8 max-w-7xl mx-auto">
+    <div className="min-h-screen bg-token-bg text-token-text font-sans pt-24 pb-12 px-4 md:px-8 max-w-7xl mx-auto">
       <Navbar />
 
       {/* Header */}
@@ -832,7 +832,7 @@ export default function AdminDashboardPage() {
                 <StatusBadge status={task.status} />
                 <span className="text-xs text-zinc-400 font-mono">{task.proposalsCount || 0}</span>
                 <span className="text-[10px] text-zinc-600 font-mono">
-                  {task.createdAt ? new Date(task.createdAt).toLocaleDateString() : '—'}
+                  {task.createdAt ? new Date(task.createdAt).toLocaleDateString() : '--'}
                 </span>
                 <div className="flex items-center gap-1">
                   <select
@@ -966,7 +966,7 @@ export default function AdminDashboardPage() {
                     </div>
                   </div>
                   <div className="text-zinc-500 text-xs font-mono truncate">
-                    {agent.walletAddress ? `${agent.walletAddress.slice(0, 6)}...${agent.walletAddress.slice(-4)}` : "—"}
+                    {agent.walletAddress ? `${agent.walletAddress.slice(0, 6)}...${agent.walletAddress.slice(-4)}` : "--"}
                   </div>
                   <div className="flex items-center gap-1.5">
                     {editingRepAgent === agent.id ? (
@@ -1223,7 +1223,7 @@ export default function AdminDashboardPage() {
                   <span className="text-xs font-mono text-red-400">{(staker.slashedAmount || 0).toLocaleString()} HIVE</span>
                   <span className="text-[10px] font-mono uppercase text-zinc-300">{staker.tierLabel}</span>
                   <span className="text-[10px] text-zinc-600 font-mono">
-                    {staker.updatedAt ? new Date(staker.updatedAt).toLocaleString() : "—"}
+                    {staker.updatedAt ? new Date(staker.updatedAt).toLocaleString() : "--"}
                   </span>
                   <div>
                     {staker.lastStakeEvent?.txSignature ? (
@@ -1236,7 +1236,7 @@ export default function AdminDashboardPage() {
                         <ExternalLink size={10} /> View
                       </a>
                     ) : (
-                      <span className="text-[10px] text-zinc-700 font-mono">—</span>
+                      <span className="text-[10px] text-zinc-700 font-mono">--</span>
                     )}
                   </div>
                 </div>

@@ -1,9 +1,24 @@
 "use client";
 
 import { useCallback, useEffect, useState, type FormEvent } from "react";
-import { AlertTriangle, CheckCircle, ExternalLink, FilePlus, Loader2, RefreshCw, Wallet, XCircle } from "lucide-react";
+import {
+  AlertTriangle,
+  CheckCircle,
+  ExternalLink,
+  FilePlus,
+  Loader2,
+  RefreshCw,
+  Wallet,
+  XCircle,
+  ShieldAlert,
+  Scale,
+  Clock,
+  ChevronRight,
+  Gavel,
+} from "lucide-react";
 import { Navbar } from "@/components/layout/Navbar";
 import { Footer } from "@/components/layout/Footer";
+import { RobinhoodBadge } from "@/components/ui/RobinhoodBadge";
 import { useAuth } from "@/hooks/useAuth";
 import { useAuthFetch } from "@/hooks/useAuthFetch";
 import { toast } from "sonner";
@@ -46,10 +61,12 @@ type DisputeReport = {
 
 async function createSolanaWalletProof(solWallet: any, address: string, action: string) {
   if (!solWallet.signMessage) {
-    throw new Error("Your Solana wallet does not support message signing. Use Phantom, Solflare, or Backpack.");
+    throw new Error("Solana wallet does not support message signing. Use Phantom, Solflare, or Backpack.");
   }
   const nonceBytes = crypto.getRandomValues(new Uint8Array(16));
-  const nonce = Array.from(nonceBytes).map((byte) => byte.toString(16).padStart(2, "0")).join("");
+  const nonce = Array.from(nonceBytes)
+    .map((byte) => byte.toString(16).padStart(2, "0"))
+    .join("");
   const timestamp = Date.now();
   const message = [
     "Hive Solana Wallet Proof",
@@ -137,10 +154,11 @@ export default function DaoPage() {
 
     setVotingId(disputeId);
     try {
-      const solanaWallet = (window as any).solana
-        || (window as any).phantom?.solana
-        || (window as any).solflare
-        || (window as any).backpack?.solana;
+      const solanaWallet =
+        (window as any).solana ||
+        (window as any).phantom?.solana ||
+        (window as any).solflare ||
+        (window as any).backpack?.solana;
 
       if (!solanaWallet) throw new Error("No Solana wallet found.");
       if (!solanaWallet.isConnected) await solanaWallet.connect();
@@ -166,7 +184,7 @@ export default function DaoPage() {
         throw new Error(result.error || "Vote failed.");
       }
 
-      toast.success(`Vote submitted: ${choice}`);
+      toast.success(`Vote submitted successfully: ${choice.toUpperCase()}`);
       load();
     } catch (error: any) {
       toast.error(error.message || "Vote failed.");
@@ -200,242 +218,351 @@ export default function DaoPage() {
       if (!res.ok || !result.success) {
         throw new Error(result.error || "Report could not be submitted.");
       }
-      toast.success("Report submitted for DAO review.");
-      setDisputeForm({ providerAddress: "", toolId: "", category: "failed_execution", evidenceUri: "", reason: "", sessionLedgerId: "" });
+      toast.success("Incident report submitted for DAO review.");
+      setDisputeForm({
+        providerAddress: "",
+        toolId: "",
+        category: "failed_execution",
+        evidenceUri: "",
+        reason: "",
+        sessionLedgerId: "",
+      });
       load();
     } catch (error: any) {
-      toast.error(error.message || "Report could not be submitted.");
+      toast.error(error.message || "Report submission failed.");
     } finally {
       setFiling(false);
     }
   };
 
   return (
-    <div className="min-h-screen bg-[#020202] text-white">
+    <div className="min-h-screen bg-token-bg text-token-text selection:bg-[#00C805] selection:text-black">
       <Navbar />
+
       <main className="pt-28 pb-20">
-        <div className="max-w-6xl mx-auto px-4 md:px-6">
-          <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-6 mb-8">
+        <div className="max-w-7xl mx-auto px-4 md:px-6">
+          {/* Header Banner */}
+          <div className="flex flex-col lg:flex-row lg:items-end justify-between gap-6 pb-8 border-b border-token-border">
             <div>
-              <h1 className="text-4xl md:text-5xl font-black uppercase tracking-tight">DAO Disputes</h1>
-              <div className="mt-4 flex flex-wrap gap-2 text-[11px] font-mono text-zinc-400">
-                <span className="border border-white/10 bg-white/[0.03] rounded px-2 py-1">{disputes.length} active disputes</span>
-                <span className="border border-white/10 bg-white/[0.03] rounded px-2 py-1">{reports.length} reports</span>
-                <span className="border border-white/10 bg-white/[0.03] rounded px-2 py-1">Stake-weighted voting</span>
+              <div className="flex items-center gap-3 mb-3">
+                <RobinhoodBadge label="Stake-Weighted Governance" variant="live" />
+                <span className="text-xs font-mono text-token-dim">DAO Court v2.0</span>
               </div>
+              <h1 className="text-4xl md:text-6xl font-black tracking-tight text-token-text uppercase">
+                DAO <span className="text-[#00C805]">Governance</span>
+              </h1>
+              <p className="text-token-dim text-sm max-w-xl mt-2 leading-relaxed">
+                Review malicious outputs, slash rogue agent collateral, and vote with staked token weight.
+              </p>
             </div>
-            <button
-              onClick={load}
-              disabled={loading}
-              className="inline-flex items-center gap-2 px-4 py-2 bg-zinc-900 border border-white/10 rounded text-xs font-bold text-zinc-300 hover:text-white disabled:opacity-50"
-            >
-              {loading ? <Loader2 size={14} className="animate-spin" /> : <RefreshCw size={14} />}
-              Refresh
-            </button>
+
+            <div className="flex items-center gap-3">
+              <button
+                onClick={load}
+                disabled={loading}
+                className="inline-flex items-center gap-2 px-4 py-2.5 bg-token-surface border border-token-border rounded-xl text-xs font-mono font-bold text-token-dim hover:text-token-text transition-all"
+              >
+                {loading ? <Loader2 size={13} className="animate-spin text-[#00C805]" /> : <RefreshCw size={13} />}
+                Sync Court
+              </button>
+            </div>
           </div>
 
+          {/* Wallet Alerts */}
           {!authenticated && (
-            <div className="mb-6 border border-amber-500/20 bg-amber-500/5 rounded-lg p-4 flex items-center justify-between gap-4">
-              <p className="text-sm text-amber-200">Sign in and connect a Solana wallet to vote.</p>
-              <button onClick={() => login()} disabled={!ready} className="bg-white text-black px-4 py-2 rounded text-xs font-bold">
+            <div className="mt-6 p-4 rounded-xl border border-amber-500/30 bg-amber-500/10 flex items-center justify-between gap-4">
+              <div className="flex items-center gap-2 text-sm text-amber-500">
+                <Scale size={16} />
+                <span>Sign in to verify your stake weight and participate in governance votes.</span>
+              </div>
+              <button
+                onClick={() => login()}
+                disabled={!ready}
+                className="bg-token-text text-token-bg px-4 py-2 rounded-lg text-xs font-bold font-mono uppercase tracking-wider"
+              >
                 Sign In
               </button>
             </div>
           )}
 
           {authenticated && !solanaAddress && (
-            <div className="mb-6 border border-red-500/20 bg-red-500/5 rounded-lg p-4 flex items-center gap-3">
-              <Wallet size={16} className="text-red-400" />
-              <p className="text-sm text-red-200">No Solana wallet is linked. Link one from the dashboard before voting.</p>
+            <div className="mt-6 p-4 rounded-xl border border-red-500/30 bg-red-500/10 flex items-center gap-3 text-red-500 text-sm">
+              <Wallet size={16} />
+              <span>No Solana wallet linked. Connect a wallet to cast stake-weighted votes.</span>
             </div>
           )}
 
-          <form onSubmit={fileDispute} className="mb-8 border border-white/10 bg-[#0A0A0A] rounded-lg p-5">
-            <div className="flex items-center justify-between gap-4 mb-4">
-              <div>
-                <h2 className="font-bold">Submit Report</h2>
-                <p className="text-xs text-zinc-500 mt-1">Reports are reviewed before becoming formal slashing votes.</p>
-              </div>
-              <FilePlus size={18} className="text-zinc-500" />
-            </div>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-              <input
-                value={disputeForm.providerAddress}
-                onChange={(event) => setDisputeForm((form) => ({ ...form, providerAddress: event.target.value }))}
-                placeholder="Provider Solana address"
-                className="bg-black/60 border border-white/10 rounded px-3 py-2 text-sm font-mono outline-none focus:border-emerald-500/40"
-              />
-              <input
-                value={disputeForm.toolId}
-                onChange={(event) => setDisputeForm((form) => ({ ...form, toolId: event.target.value }))}
-                placeholder="Tool ID or tool name"
-                className="bg-black/60 border border-white/10 rounded px-3 py-2 text-sm font-mono outline-none focus:border-emerald-500/40"
-              />
-              <select
-                value={disputeForm.category}
-                onChange={(event) => setDisputeForm((form) => ({ ...form, category: event.target.value }))}
-                className="bg-black/60 border border-white/10 rounded px-3 py-2 text-sm font-mono outline-none focus:border-emerald-500/40"
-              >
-                <option value="failed_execution">Failed execution</option>
-                <option value="malicious_output">Malicious output</option>
-                <option value="billing">Billing</option>
-                <option value="uptime">Uptime</option>
-                <option value="policy">Policy</option>
-                <option value="other">Other</option>
-              </select>
-              <input
-                value={disputeForm.sessionLedgerId}
-                onChange={(event) => setDisputeForm((form) => ({ ...form, sessionLedgerId: event.target.value }))}
-                placeholder="Session ledger ID (optional)"
-                className="bg-black/60 border border-white/10 rounded px-3 py-2 text-sm font-mono outline-none focus:border-emerald-500/40"
-              />
-              <input
-                value={disputeForm.evidenceUri}
-                onChange={(event) => setDisputeForm((form) => ({ ...form, evidenceUri: event.target.value }))}
-                placeholder="Evidence URI: https://, ipfs://, or ar://"
-                className="md:col-span-2 bg-black/60 border border-white/10 rounded px-3 py-2 text-sm font-mono outline-none focus:border-emerald-500/40"
-              />
-              <textarea
-                value={disputeForm.reason}
-                onChange={(event) => setDisputeForm((form) => ({ ...form, reason: event.target.value }))}
-                placeholder="Describe the failure, harm, and evidence. Minimum 20 characters."
-                rows={4}
-                className="md:col-span-2 bg-black/60 border border-white/10 rounded px-3 py-2 text-sm outline-none focus:border-emerald-500/40 resize-none"
-              />
-            </div>
-            <button
-              type="submit"
-              disabled={filing}
-              className="mt-4 inline-flex items-center justify-center gap-2 bg-white text-black rounded px-4 py-2 text-xs font-bold disabled:opacity-50"
-            >
-              {filing ? <Loader2 size={14} className="animate-spin" /> : <FilePlus size={14} />}
-              Submit Report
-            </button>
-          </form>
-
-          {authenticated && reports.length > 0 && (
-            <section className="mb-8 border border-white/10 bg-white/[0.02] rounded-lg p-5">
-              <h2 className="font-bold mb-4">Your Reports</h2>
-              <div className="space-y-3">
-                {reports.slice(0, 5).map((report) => (
-                  <div key={report.id} className="flex flex-col md:flex-row md:items-center md:justify-between gap-3 border border-white/10 bg-black/30 rounded p-3">
-                    <div className="min-w-0">
-                      <div className="flex items-center gap-2">
-                        <span className="text-sm font-bold">Tool: {report.toolId}</span>
-                        <span className="text-[10px] font-mono uppercase border border-white/10 rounded px-2 py-0.5 text-zinc-400">{report.status}</span>
-                      </div>
-                      <p className="text-[11px] font-mono text-zinc-500 truncate mt-1">{report.providerAddress}</p>
-                      {report.triageReason && <p className="text-xs text-amber-300 mt-2">{report.triageReason}</p>}
-                    </div>
-                    {report.disputeId && (
-                      <span className="text-[11px] font-mono text-emerald-400">Escalated: {report.disputeId.slice(0, 8)}...</span>
-                    )}
+          {/* Main Grid: Submit Report & Active Court Cases */}
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 mt-8 items-start">
+            {/* Left Column: Submit Dispute Report */}
+            <div className="lg:col-span-4 space-y-6">
+              <form onSubmit={fileDispute} className="robin-card p-6 bg-token-surface border border-token-border">
+                <div className="flex items-center justify-between mb-5">
+                  <div>
+                    <span className="text-[10px] font-mono uppercase tracking-widest text-[#00C805] font-bold">
+                      Protocol Court
+                    </span>
+                    <h2 className="text-base font-bold text-token-text mt-1">Submit Incident Report</h2>
                   </div>
-                ))}
-              </div>
-            </section>
-          )}
+                  <div className="w-8 h-8 rounded-lg bg-token-subtle border border-token-border flex items-center justify-center text-token-dim">
+                    <FilePlus size={16} />
+                  </div>
+                </div>
 
-          {loading ? (
-            <div className="border border-white/10 bg-white/[0.03] rounded-lg p-10 text-center">
-              <Loader2 className="animate-spin mx-auto text-emerald-400" size={24} />
-            </div>
-          ) : disputes.length === 0 ? (
-            <div className="border border-white/10 bg-white/[0.03] rounded-lg p-10 text-center">
-              <CheckCircle className="mx-auto text-emerald-400 mb-4" size={28} />
-              <h2 className="font-bold">No Active Disputes</h2>
-              <p className="text-sm text-zinc-500 mt-2">There are no open slashing votes right now.</p>
-            </div>
-          ) : (
-            <div className="space-y-5">
-              {disputes.map((dispute) => {
-                const totalWeight = (dispute.votesForSlash || 0) + (dispute.votesAgainstSlash || 0);
-                const slashPct = totalWeight > 0 ? ((dispute.votesForSlash || 0) / totalWeight) * 100 : 0;
-                const dismissPct = totalWeight > 0 ? ((dispute.votesAgainstSlash || 0) / totalWeight) * 100 : 0;
-                const now = Date.now();
-                const votingStartsAt = dispute.votingStartsAt ? new Date(dispute.votingStartsAt).getTime() : now;
-                const votingOpen = now >= votingStartsAt && now < new Date(dispute.deadline).getTime();
-                const hoursLeft = Math.max(0, Math.ceil((new Date(dispute.deadline).getTime() - now) / (1000 * 60 * 60)));
-                const evidenceHoursLeft = dispute.evidenceOpenUntil
-                  ? Math.max(0, Math.ceil((new Date(dispute.evidenceOpenUntil).getTime() - now) / (1000 * 60 * 60)))
-                  : 0;
-                const thresholdPct = ((dispute.slashThresholdBps || 6000) / 100).toFixed(0);
+                <div className="space-y-4">
+                  <div>
+                    <label className="text-[10px] font-mono uppercase text-token-dim block mb-1.5">
+                      Provider Solana Address
+                    </label>
+                    <input
+                      value={disputeForm.providerAddress}
+                      onChange={(e) => setDisputeForm((f) => ({ ...f, providerAddress: e.target.value }))}
+                      placeholder="Solana public key"
+                      className="w-full bg-token-subtle border border-token-border rounded-lg px-3 py-2.5 text-xs font-mono text-token-text outline-none focus:border-[#00C805]"
+                      required
+                    />
+                  </div>
 
-                return (
-                  <article key={dispute.id} className="border border-white/10 bg-[#0A0A0A] rounded-lg p-5">
-                    <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-4">
-                      <div>
-                        <div className="inline-flex items-center gap-2 text-[10px] font-mono uppercase tracking-widest text-red-400 bg-red-500/10 border border-red-500/20 rounded px-2 py-1">
-                          <AlertTriangle size={12} /> {dispute.stakedAmount?.toLocaleString?.() || 0} HIVE at risk
+                  <div>
+                    <label className="text-[10px] font-mono uppercase text-token-dim block mb-1.5">
+                      Tool or Agent ID
+                    </label>
+                    <input
+                      value={disputeForm.toolId}
+                      onChange={(e) => setDisputeForm((f) => ({ ...f, toolId: e.target.value }))}
+                      placeholder="Tool identifier"
+                      className="w-full bg-token-subtle border border-token-border rounded-lg px-3 py-2.5 text-xs font-mono text-token-text outline-none focus:border-[#00C805]"
+                      required
+                    />
+                  </div>
+
+                  <div>
+                    <label className="text-[10px] font-mono uppercase text-token-dim block mb-1.5">
+                      Violation Category
+                    </label>
+                    <select
+                      value={disputeForm.category}
+                      onChange={(e) => setDisputeForm((f) => ({ ...f, category: e.target.value }))}
+                      className="w-full bg-token-subtle border border-token-border rounded-lg px-3 py-2.5 text-xs font-mono text-token-text outline-none focus:border-[#00C805]"
+                    >
+                      <option value="failed_execution">Failed Execution</option>
+                      <option value="malicious_output">Malicious Output</option>
+                      <option value="billing">Billing Discrepancy</option>
+                      <option value="uptime">Service Downtime</option>
+                      <option value="policy">Policy Violation</option>
+                      <option value="other">Other Fault</option>
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="text-[10px] font-mono uppercase text-token-dim block mb-1.5">
+                      Evidence URL (IPFS or HTTPS)
+                    </label>
+                    <input
+                      value={disputeForm.evidenceUri}
+                      onChange={(e) => setDisputeForm((f) => ({ ...f, evidenceUri: e.target.value }))}
+                      placeholder="https:// or ipfs://"
+                      className="w-full bg-token-subtle border border-token-border rounded-lg px-3 py-2.5 text-xs font-mono text-token-text outline-none focus:border-[#00C805]"
+                      required
+                    />
+                  </div>
+
+                  <div>
+                    <label className="text-[10px] font-mono uppercase text-token-dim block mb-1.5">
+                      Incident Summary
+                    </label>
+                    <textarea
+                      value={disputeForm.reason}
+                      onChange={(e) => setDisputeForm((f) => ({ ...f, reason: e.target.value }))}
+                      placeholder="Specify failure, timestamps, and harm caused. Minimum 20 characters."
+                      rows={4}
+                      className="w-full bg-token-subtle border border-token-border rounded-lg px-3 py-2.5 text-xs text-token-text outline-none focus:border-[#00C805] resize-none"
+                      required
+                    />
+                  </div>
+                </div>
+
+                <button
+                  type="submit"
+                  disabled={filing}
+                  className="w-full mt-5 py-3 bg-[#00C805] hover:bg-[#00B004] text-black font-bold font-mono text-xs uppercase tracking-wider rounded-xl transition-all disabled:opacity-40 flex items-center justify-center gap-2"
+                >
+                  {filing ? <Loader2 size={14} className="animate-spin text-black" /> : <Gavel size={14} />}
+                  File Incident Report
+                </button>
+              </form>
+
+              {/* User Incident Reports History */}
+              {authenticated && reports.length > 0 && (
+                <div className="robin-card p-5 bg-token-surface border border-token-border">
+                  <h3 className="text-xs font-mono uppercase font-bold text-token-dim mb-3">
+                    Your Submissions
+                  </h3>
+                  <div className="space-y-2">
+                    {reports.slice(0, 4).map((report) => (
+                      <div key={report.id} className="p-3 bg-token-subtle rounded-lg border border-token-border text-xs">
+                        <div className="flex items-center justify-between">
+                          <span className="font-bold text-token-text">{report.toolId}</span>
+                          <span className="text-[10px] font-mono uppercase px-2 py-0.5 rounded bg-token-surface border border-token-border text-token-dim">
+                            {report.status}
+                          </span>
                         </div>
-                        <h2 className="font-bold text-lg mt-3">Tool: {dispute.toolId}</h2>
-                        <p className="text-[11px] text-zinc-400 font-mono mt-1 uppercase">Phase: {dispute.phase || "voting"} • Slash threshold: {thresholdPct}% • Quorum: {(dispute.quorumRequired || 0).toLocaleString()} HIVE</p>
-                        <p className="text-[11px] text-zinc-500 font-mono truncate max-w-xl mt-1">Provider: {dispute.providerAddress}</p>
-                        <p className="text-[11px] text-zinc-600 font-mono mt-1">Snapshot slot: {dispute.snapshotBlock}</p>
+                        <p className="text-[11px] font-mono text-token-dim truncate mt-1">{report.providerAddress}</p>
+                        {report.disputeId && (
+                          <div className="mt-2 text-[10px] font-mono text-[#00C805] flex items-center gap-1">
+                            <ChevronRight size={10} /> Escalated to Active Dispute
+                          </div>
+                        )}
                       </div>
-                      <div className="text-right">
-                        <div className="text-[10px] text-zinc-500 font-mono uppercase">{votingOpen ? "Voting closes in" : "Voting starts in"}</div>
-                        <div className="text-amber-400 font-mono font-bold">{votingOpen ? hoursLeft : evidenceHoursLeft}h</div>
-                      </div>
-                    </div>
-
-                    <p className="text-sm text-zinc-400 mt-4 leading-relaxed">{dispute.reason}</p>
-
-                    {dispute.evidenceUri && (
-                      <a
-                        href={dispute.evidenceUri}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="inline-flex items-center gap-2 text-xs text-emerald-400 hover:text-emerald-300 mt-4"
-                      >
-                        View evidence <ExternalLink size={12} />
-                      </a>
-                    )}
-
-                    <div className="mt-5">
-                      <div className="flex justify-between text-[11px] font-mono text-zinc-500 mb-2">
-                        <span>Slash: {(dispute.votesForSlash || 0).toLocaleString()} HIVE ({slashPct.toFixed(1)}%)</span>
-                        <span>Dismiss: {(dispute.votesAgainstSlash || 0).toLocaleString()} HIVE ({dismissPct.toFixed(1)}%)</span>
-                      </div>
-                      <div className="h-2 bg-zinc-900 rounded overflow-hidden flex">
-                        <div className="bg-red-500" style={{ width: `${slashPct}%` }} />
-                        <div className="bg-emerald-500" style={{ width: `${dismissPct}%` }} />
-                      </div>
-                    </div>
-
-                    {!votingOpen && (
-                      <div className="mt-5 border border-amber-500/20 bg-amber-500/5 rounded p-3 text-xs text-amber-200">
-                        Evidence period is open. Voting starts after evidence closes.
-                      </div>
-                    )}
-
-                    {votingOpen && (
-                    <div className="mt-5 grid grid-cols-1 sm:grid-cols-2 gap-3">
-                      <button
-                        onClick={() => vote(dispute.id, "slash")}
-                        disabled={votingId === dispute.id}
-                        className="inline-flex items-center justify-center gap-2 bg-red-600/90 hover:bg-red-500 text-white rounded px-4 py-2 text-xs font-bold disabled:opacity-50"
-                      >
-                        {votingId === dispute.id ? <Loader2 size={14} className="animate-spin" /> : <XCircle size={14} />}
-                        Vote Slash
-                      </button>
-                      <button
-                        onClick={() => vote(dispute.id, "dismiss")}
-                        disabled={votingId === dispute.id}
-                        className="inline-flex items-center justify-center gap-2 bg-emerald-600/90 hover:bg-emerald-500 text-white rounded px-4 py-2 text-xs font-bold disabled:opacity-50"
-                      >
-                        {votingId === dispute.id ? <Loader2 size={14} className="animate-spin" /> : <CheckCircle size={14} />}
-                        Vote Dismiss
-                      </button>
-                    </div>
-                    )}
-                  </article>
-                );
-              })}
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
-          )}
+
+            {/* Right Column: Active DAO Slashing Cases */}
+            <div className="lg:col-span-8 space-y-6">
+              <div className="flex items-center justify-between">
+                <h2 className="text-xl font-bold uppercase tracking-tight text-token-text flex items-center gap-2">
+                  <Scale size={20} className="text-[#00C805]" />
+                  Active Dispute Docket
+                </h2>
+                <span className="text-xs font-mono text-token-dim">
+                  {disputes.length} {disputes.length === 1 ? "case" : "cases"} pending
+                </span>
+              </div>
+
+              {loading ? (
+                <div className="robin-card p-16 text-center bg-token-surface border border-token-border">
+                  <Loader2 className="animate-spin mx-auto text-[#00C805] mb-3" size={24} />
+                  <p className="text-xs font-mono text-token-dim">Loading court docket...</p>
+                </div>
+              ) : disputes.length === 0 ? (
+                <div className="robin-card p-16 text-center bg-token-surface border border-token-border">
+                  <CheckCircle className="mx-auto text-[#00C805] mb-4" size={36} />
+                  <h3 className="font-bold text-lg text-token-text">All Providers In Compliance</h3>
+                  <p className="text-xs text-token-dim mt-2 max-w-sm mx-auto">
+                    Zero active slashing disputes. All node runners and tool providers maintain good standing.
+                  </p>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  {disputes.map((dispute) => {
+                    const totalWeight =
+                      (dispute.votesForSlash || 0) + (dispute.votesAgainstSlash || 0);
+                    const slashPct =
+                      totalWeight > 0 ? ((dispute.votesForSlash || 0) / totalWeight) * 100 : 0;
+                    const dismissPct =
+                      totalWeight > 0 ? ((dispute.votesAgainstSlash || 0) / totalWeight) * 100 : 0;
+                    const now = Date.now();
+                    const votingStartsAt = dispute.votingStartsAt
+                      ? new Date(dispute.votingStartsAt).getTime()
+                      : now;
+                    const votingOpen =
+                      now >= votingStartsAt && now < new Date(dispute.deadline).getTime();
+                    const hoursLeft = Math.max(
+                      0,
+                      Math.ceil((new Date(dispute.deadline).getTime() - now) / (1000 * 60 * 60))
+                    );
+                    const thresholdPct = ((dispute.slashThresholdBps || 6000) / 100).toFixed(0);
+
+                    return (
+                      <article
+                        key={dispute.id}
+                        className="robin-card p-6 bg-token-surface border border-token-border space-y-4"
+                      >
+                        <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4">
+                          <div>
+                            <div className="inline-flex items-center gap-2 px-2.5 py-1 rounded bg-red-500/10 border border-red-500/20 text-red-500 text-[10px] font-mono uppercase tracking-wider font-bold">
+                              <ShieldAlert size={12} />
+                              {(dispute.stakedAmount || 0).toLocaleString()} HIVE Collateral At Risk
+                            </div>
+                            <h3 className="font-bold text-lg text-token-text mt-2">
+                              Tool Subject: {dispute.toolId}
+                            </h3>
+                            <div className="flex flex-wrap gap-x-4 gap-y-1 mt-1 text-[11px] font-mono text-token-dim">
+                              <span>Phase: {dispute.phase || "voting"}</span>
+                              <span>Slash Threshold: {thresholdPct}%</span>
+                              <span>Quorum: {(dispute.quorumRequired || 0).toLocaleString()} HIVE</span>
+                            </div>
+                            <p className="text-[11px] font-mono text-token-dim mt-1 truncate max-w-md">
+                              Provider: {dispute.providerAddress}
+                            </p>
+                          </div>
+
+                          <div className="sm:text-right">
+                            <span className="text-[10px] font-mono uppercase text-token-dim block">
+                              {votingOpen ? "Voting Closes In" : "Voting Scheduled In"}
+                            </span>
+                            <span className="text-base font-mono font-black text-amber-500">
+                              {hoursLeft} Hours
+                            </span>
+                          </div>
+                        </div>
+
+                        <p className="text-xs text-token-dim leading-relaxed bg-token-subtle p-3 rounded-lg border border-token-border">
+                          {dispute.reason}
+                        </p>
+
+                        {dispute.evidenceUri && (
+                          <a
+                            href={dispute.evidenceUri}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="inline-flex items-center gap-1.5 text-xs font-mono text-[#00C805] hover:underline"
+                          >
+                            <span>Inspect Cryptographic Evidence</span>
+                            <ExternalLink size={11} />
+                          </a>
+                        )}
+
+                        {/* Staking Vote Split Bar */}
+                        <div className="space-y-1.5 pt-2">
+                          <div className="flex justify-between text-[11px] font-mono text-token-dim">
+                            <span className="text-red-500 font-bold">
+                              Slash: {(dispute.votesForSlash || 0).toLocaleString()} HIVE ({slashPct.toFixed(1)}%)
+                            </span>
+                            <span className="text-[#00C805] font-bold">
+                              Dismiss: {(dispute.votesAgainstSlash || 0).toLocaleString()} HIVE ({dismissPct.toFixed(1)}%)
+                            </span>
+                          </div>
+                          <div className="h-2 rounded-full bg-token-subtle border border-token-border overflow-hidden flex">
+                            <div className="bg-red-500 transition-all duration-500" style={{ width: `${slashPct}%` }} />
+                            <div className="bg-[#00C805] transition-all duration-500" style={{ width: `${dismissPct}%` }} />
+                          </div>
+                        </div>
+
+                        {/* Action Buttons */}
+                        {votingOpen && (
+                          <div className="grid grid-cols-2 gap-3 pt-2">
+                            <button
+                              onClick={() => vote(dispute.id, "slash")}
+                              disabled={votingId === dispute.id}
+                              className="py-2.5 rounded-xl border border-red-500/30 bg-red-500/10 hover:bg-red-500/20 text-red-500 font-bold font-mono text-xs uppercase flex items-center justify-center gap-2 transition-all disabled:opacity-50"
+                            >
+                              {votingId === dispute.id ? <Loader2 size={13} className="animate-spin" /> : <XCircle size={13} />}
+                              Vote to Slash
+                            </button>
+                            <button
+                              onClick={() => vote(dispute.id, "dismiss")}
+                              disabled={votingId === dispute.id}
+                              className="py-2.5 rounded-xl border border-[#00C805]/30 bg-[#00C805]/10 hover:bg-[#00C805]/20 text-[#00C805] font-bold font-mono text-xs uppercase flex items-center justify-center gap-2 transition-all disabled:opacity-50"
+                            >
+                              {votingId === dispute.id ? <Loader2 size={13} className="animate-spin" /> : <CheckCircle size={13} />}
+                              Vote to Dismiss
+                            </button>
+                          </div>
+                        )}
+                      </article>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          </div>
         </div>
       </main>
+
       <Footer />
     </div>
   );

@@ -385,7 +385,7 @@ export default function RegisterAgentPage() {
                 ) : nameAvailable === true ? (
                   <><CheckCircle size={12} className="text-emerald-500" /><span className="text-emerald-500">Name available</span></>
                 ) : nameAvailable === false ? (
-                  <><span className="text-red-500">✕ Name already taken — choose a different name</span></>
+                  <><span className="text-red-500">✕ Name already taken. Choose a different name.</span></>
                 ) : null}
               </div>
             )}

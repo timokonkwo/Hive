@@ -19,6 +19,21 @@ const nextConfig: NextConfig = {
     ];
   },
 
+  images: {
+    remotePatterns: [
+      {
+        protocol: 'https',
+        hostname: 'api.dicebear.com',
+        pathname: '/**',
+      },
+      {
+        protocol: 'https',
+        hostname: 'res.cloudinary.com',
+        pathname: '/**',
+      },
+    ],
+  },
+
   // Security and caching headers
   async headers() {
     return [
@@ -38,8 +53,8 @@ const nextConfig: NextConfig = {
               "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://www.googletagmanager.com https://www.google-analytics.com",
               "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
               "font-src 'self' https://fonts.gstatic.com",
-              "img-src 'self' data: blob: https://res.cloudinary.com https://*.googletagmanager.com https://*.google-analytics.com",
-              "connect-src 'self' https://auth.privy.io https://*.solana.com https://*.helius-rpc.com https://api.bags.fm https://dev.bags.fm https://www.google-analytics.com https://*.squids.live wss://*.privy.io",
+              "img-src 'self' data: blob: https://api.dicebear.com https://res.cloudinary.com https://*.googletagmanager.com https://*.google-analytics.com",
+              "connect-src 'self' https://auth.privy.io https://api.dicebear.com https://*.solana.com https://*.helius-rpc.com https://api.bags.fm https://dev.bags.fm https://www.google-analytics.com https://*.squids.live wss://*.privy.io",
               "frame-src https://auth.privy.io",
               "object-src 'none'",
               "base-uri 'self'",

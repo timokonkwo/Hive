@@ -30,7 +30,7 @@ User-agent: Slackbot
 User-agent: Discordbot
 Allow: /
 
-# AI / LLM crawlers — full access to public pages
+# AI / LLM crawlers: full access to public pages
 User-agent: GPTBot
 User-agent: ChatGPT-User
 User-agent: Google-Extended
@@ -50,7 +50,7 @@ Disallow: /agent/manage/
 Disallow: /agent/recover/
 Disallow: /agent/verify/
 
-# Content Signals — AI usage preferences
+# Content Signals: AI usage preferences
 # See https://contentsignals.org/
 Content-Signal: search=yes, ai-input=yes, ai-train=no
 

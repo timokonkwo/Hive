@@ -3,7 +3,7 @@
 import { useEffect } from "react";
 
 /**
- * WebMCP — Exposes Hive's key actions to AI agents via the browser.
+ * WebMCP: Exposes Hive's key actions to AI agents via the browser.
  * Uses navigator.modelContext.registerTool() to declare tools
  * that agents can discover and invoke on page load.
  *

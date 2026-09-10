@@ -1,64 +1,41 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
+import React from "react";
+import { ThreeCanvas } from "@/components/ui/ThreeCanvas";
 import { useTheme } from "@/components/providers/ThemeProvider";
 
 export function HeroBackground() {
-  const [mousePosition, setMousePosition] = useState({ x: 0, y: 0 });
-  const { theme } = useTheme();
-
-  useEffect(() => {
-    const handleMouseMove = (e: MouseEvent) => {
-      setMousePosition({ x: e.clientX, y: e.clientY });
-    };
-
-    window.addEventListener("mousemove", handleMouseMove);
-    return () => window.removeEventListener("mousemove", handleMouseMove);
-  }, []);
-
-  const isDark = theme === "dark";
+  const { isDark } = useTheme();
 
   return (
-    <div className="fixed inset-0 pointer-events-none overflow-hidden z-0 transition-colors duration-300" style={{ background: isDark ? '#020202' : '#FAFAFA' }}>
-      {/* Hexagonal Grid Overlay */}
-      <div 
-        className="absolute inset-0 transition-opacity duration-300"
+    <div 
+      className="fixed inset-0 pointer-events-none overflow-hidden z-0 transition-colors duration-300"
+      style={{ background: isDark ? "#000000" : "#FFFFFF" }}
+      aria-hidden="true"
+    >
+      {/* ThreeUI WebGL Neural Constellation */}
+      <ThreeCanvas density={95} interactive={true} />
+
+      {/* Subtle radial ambient vignette */}
+      <div
+        className="absolute inset-0 transition-opacity duration-500"
         style={{
-          backgroundImage: `url('/images/hex-grid.svg')`,
-          backgroundSize: '40px 40px',
-          opacity: isDark ? 0.15 : 0.06,
-          filter: isDark ? 'none' : 'invert(1)',
+          background: isDark
+            ? "radial-gradient(ellipse 80% 50% at 50% -20%, rgba(0, 200, 5, 0.12), transparent 70%)"
+            : "radial-gradient(ellipse 80% 50% at 50% -20%, rgba(0, 168, 4, 0.08), transparent 70%)",
         }}
-      ></div>
+      />
 
-      {/* Cursor Spotlight */}
-      <div 
-        className="absolute inset-0 transition-opacity duration-300"
+      {/* Micro-grid overlay for texture */}
+      <div
+        className="absolute inset-0 opacity-[0.03] transition-opacity duration-300"
         style={{
-          opacity: isDark ? 0.2 : 0.08,
-          background: `radial-gradient(300px circle at ${mousePosition.x}px ${mousePosition.y}px, ${isDark ? 'rgba(16, 185, 129, 0.4)' : 'rgba(5, 150, 105, 0.15)'}, transparent 80%)`,
-          maskImage: `radial-gradient(300px circle at ${mousePosition.x}px ${mousePosition.y}px, black, transparent)`,
-          WebkitMaskImage: `radial-gradient(300px circle at ${mousePosition.x}px ${mousePosition.y}px, black, transparent)`
+          backgroundImage: isDark
+            ? "linear-gradient(rgba(255, 255, 255, 0.1) 1px, transparent 1px), linear-gradient(90deg, rgba(255, 255, 255, 0.1) 1px, transparent 1px)"
+            : "linear-gradient(rgba(0, 0, 0, 0.1) 1px, transparent 1px), linear-gradient(90deg, rgba(0, 0, 0, 0.1) 1px, transparent 1px)",
+          backgroundSize: "32px 32px",
         }}
-      >
-         <div 
-            className="absolute inset-0"
-            style={{
-              backgroundImage: `url('/images/hex-grid.svg')`,
-              backgroundSize: '40px 40px',
-              filter: isDark ? 'none' : 'invert(1)',
-            }}
-          ></div>
-      </div>
-
-      {/* Radial Gradient Mesh - Breathing */}
-      <div 
-        className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[800px] h-[800px] rounded-full blur-[120px] animate-breathe mix-blend-screen transition-colors duration-300"
-        style={{ background: isDark ? 'rgba(4, 120, 87, 0.1)' : 'rgba(5, 150, 105, 0.04)' }}
-      ></div>
-
-      {/* Noise Overlay */}
-      <div className="bg-noise"></div>
+      />
     </div>
   );
 }

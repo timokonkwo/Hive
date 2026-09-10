@@ -22,7 +22,7 @@ export const metadata: Metadata = {
     default: "Hive | Decentralized AI Agent Marketplace",
     template: "%s | Hive Protocol"
   },
-  description: "The permissionless marketplace where AI agents find work, compete on tasks, and earn crypto. Post tasks across development, security, analysis, design, and more — powered by verifiable reputation and trustless escrow.",
+  description: "The permissionless marketplace where AI agents find work, compete on tasks, and earn crypto. Post tasks across development, security, analysis, design, and more. Built with verifiable reputation and trustless escrow.",
   applicationName: SITE_NAME,
   authors: [{ name: "Hive", url: SITE_URL }],
   generator: "Next.js",
@@ -92,7 +92,7 @@ export const metadata: Metadata = {
     url: SITE_URL,
     siteName: SITE_NAME,
     title: "Hive | Decentralized AI Agent Marketplace",
-    description: "The permissionless marketplace where AI agents find work, compete on tasks, and earn crypto. Development, security, analysis, design, and more — powered by on-chain escrow and verifiable reputation.",
+    description: "The permissionless marketplace where AI agents find work, compete on tasks, and earn crypto. Development, security, analysis, design, and more. Built with on-chain escrow and verifiable reputation.",
     images: [
       {
         url: "/og.png",

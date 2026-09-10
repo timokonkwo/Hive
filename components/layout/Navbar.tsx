@@ -1,263 +1,245 @@
 "use client";
 
-import React from "react";
+import React, { useState, useEffect } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { usePathname } from "next/navigation";
-import { X, Book, Activity, Trophy, LogOut, Briefcase, Plus, Bot, Map, Lock, Scale } from "lucide-react";
+import { 
+  Plus, LogOut, Sun, Moon, Menu, X, Shield, ChevronRight
+} from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { useAuthFetch } from "@/hooks/useAuthFetch";
+import { useTheme } from "@/components/providers/ThemeProvider";
+import { getUserAvatarUrl } from "@/lib/avatar";
 
-export const Navbar = () => {
-  const [isMenuOpen, setIsMenuOpen] = React.useState(false);
-  const [isAdmin, setIsAdmin] = React.useState(false);
-  const [clientName, setClientName] = React.useState<string | null>(null);
+export function Navbar() {
+  const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const [isAdmin, setIsAdmin] = useState(false);
+  const [clientName, setClientName] = useState<string | null>(null);
+
   const pathname = usePathname();
   const { user, login, logout, ready, authenticated } = useAuth();
   const authFetch = useAuthFetch();
+  const { isDark, toggleTheme } = useTheme();
 
-  // Display: wallet address for wallet users, email for email/Google users
   const rawAddress = user?.wallet?.address || "";
   const isPrivyId = rawAddress.startsWith("did:privy:");
   const userEmail = (user as any)?.email?.address || (user as any)?.google?.email || null;
   const displayAddress = isPrivyId
     ? (userEmail || "Account")
-    : rawAddress ? `${rawAddress.slice(0, 6)}...${rawAddress.slice(-4)}` : "";
+    : rawAddress ? `${rawAddress.slice(0, 4)}...${rawAddress.slice(-4)}` : "";
   const displayName = clientName || displayAddress;
-  const isDark = true; // Forced to dark mode for now
 
-  // Server-side admin check
-  React.useEffect(() => {
+  // Avatar URL for connected user
+  const userAvatar = getUserAvatarUrl(rawAddress || user?.id || "anonymous");
+
+  // Admin verification
+  useEffect(() => {
     if (!user?.wallet?.address) {
       setIsAdmin(false);
       return;
     }
     authFetch(`/api/admin/verify?address=${user.wallet.address}`)
-      .then(res => res.json())
-      .then(data => setIsAdmin(!!data.isAdmin))
+      .then((res) => res.json())
+      .then((data) => setIsAdmin(!!data.isAdmin))
       .catch(() => setIsAdmin(false));
-  }, [user?.wallet?.address]);
+  }, [user?.wallet?.address, authFetch]);
 
-  // Fetch client profile for display name
-  React.useEffect(() => {
+  // Client profile
+  useEffect(() => {
     if (!user?.wallet?.address) {
       setClientName(null);
       return;
     }
     fetch(`/api/clients/profile?address=${user.wallet.address}`)
-      .then(res => res.json())
-      .then(data => setClientName(data.profile?.name || null))
+      .then((res) => res.json())
+      .then((data) => setClientName(data.profile?.name || null))
       .catch(() => setClientName(null));
   }, [user?.wallet?.address]);
 
+  const navLinks = [
+    { href: "/marketplace", label: "Marketplace" },
+    { href: "/agents", label: "Agents" },
+    { href: "/registry", label: "Registry" },
+    { href: "/agent/dashboard", label: "Agent Hub" },
+    { href: "/stake", label: "$HIVE" },
+    { href: "/docs", label: "Docs" },
+  ];
+
   return (
-    <nav className="fixed top-0 left-0 right-0 z-50 backdrop-blur-xl transition-colors duration-300" style={{ background: isDark ? 'rgba(0, 0, 0, 0.65)' : 'rgba(255, 255, 255, 0.8)', borderBottom: `1px solid ${isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.08)'}` }}>
-      
-      <div className="max-w-7xl mx-auto px-4 md:px-6 h-16 flex items-center justify-between">
+    <header className="fixed top-0 left-0 right-0 z-50 px-4 pt-3 pointer-events-none">
+      <div className="max-w-7xl mx-auto flex items-center justify-between h-14 px-4 sm:px-6 rounded-full robin-glass pointer-events-auto shadow-sm">
         
-        {/* Left: Brand */}
-        <div className="flex items-center gap-8 shrink-0">
-          <Link href="/" className="hover:opacity-80 transition-opacity flex items-center gap-2.5 group">
-            <Image 
-              src="/images/hive-icon.svg" 
-              alt="Hive"
-              width={28} 
-              height={28} 
-              className="w-7 h-7"
-              priority
-            />
-            <span className="font-bold text-lg tracking-tight" style={{ color: isDark ? '#fff' : '#09090B' }}>Hive</span>
+        {/* Left: Brand + Chain Indicator */}
+        <div className="flex items-center gap-3.5">
+          <Link href="/" className="flex items-center gap-2 group transition-opacity hover:opacity-90">
+            <div className="w-8 h-8 rounded-full bg-[var(--accent-green-tint)] border border-[var(--border-accent)] flex items-center justify-center transition-transform group-hover:scale-105">
+              <Image 
+                src="/images/hive-icon.svg" 
+                alt="Hive"
+                width={20} 
+                height={20} 
+                className="w-5 h-5"
+                priority
+              />
+            </div>
+            <span className="font-bold text-base tracking-tight text-[var(--text-primary)]">
+              Hive
+            </span>
           </Link>
+
+          {/* Robinhood Chain Live Badge */}
+          <div className="hidden sm:flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-mono-num font-medium bg-[var(--bg-pill)] border border-[var(--border-subtle)] text-[var(--text-secondary)]">
+            <span className="relative flex h-1.5 w-1.5">
+              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[var(--accent-green)] opacity-75" />
+              <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-[var(--accent-green)]" />
+            </span>
+            <span>Robinhood Chain</span>
+          </div>
         </div>
 
-        {/* Desktop Nav (Flex-centered to prevent collisions) */}
-        <div className="hidden lg:flex flex-1 items-center justify-center gap-4 xl:gap-6 text-[13px] font-medium px-4">
-          <NavLink href="/marketplace" label="Marketplace" pathname={pathname} isDark={isDark} />
-          <NavLink href="/agents" label="Agents" pathname={pathname} isDark={isDark} />
-          <NavLink href="/registry" label="Registry" pathname={pathname} isDark={isDark} />
-          <NavLink href="/agent/dashboard" label="Agent Hub" pathname={pathname} isDark={isDark} />
-          <NavLink href="/docs" label="Docs" pathname={pathname} isDark={isDark} />
-          <NavLink href="/stake" label="$HIVE" pathname={pathname} isDark={isDark} />
-          <NavLink href="/dao" label="DAO" pathname={pathname} isDark={isDark} />
-
-          {authenticated && (
-            <NavLink href="/dashboard" label="Dashboard" pathname={pathname} isDark={isDark} />
-          )}
+        {/* Center: Desktop Navigation Links */}
+        <nav className="hidden md:flex items-center gap-1 text-[13px] font-medium text-[var(--text-secondary)]">
+          {navLinks.map((link) => {
+            const isActive = pathname === link.href || pathname?.startsWith(`${link.href}/`);
+            return (
+              <Link
+                key={link.href}
+                href={link.href}
+                className={`px-3 py-1.5 rounded-full transition-all duration-150 ${
+                  isActive
+                    ? "text-[var(--text-primary)] font-semibold bg-[var(--bg-pill)] border border-[var(--border-subtle)]"
+                    : "hover:text-[var(--text-primary)] hover:bg-[var(--bg-pill)]"
+                }`}
+              >
+                {link.label}
+              </Link>
+            );
+          })}
 
           {isAdmin && (
-            <Link href="/admin" className="text-[12px] font-medium text-emerald-400 hover:text-emerald-300 transition-colors px-3 py-1 bg-emerald-500/10 rounded-full">
-              Admin
+            <Link
+              href="/admin"
+              className="flex items-center gap-1 px-3 py-1.5 rounded-full text-[12px] font-medium text-[var(--accent-green)] bg-[var(--accent-green-tint)] border border-[var(--border-accent)] ml-1"
+            >
+              <Shield size={12} /> Admin
             </Link>
           )}
-        </div>
+        </nav>
 
-        {/* Right Actions */}
-        <div className="hidden md:flex items-center gap-3 xl:gap-4 shrink-0 z-10">
+        {/* Right: Actions (Theme Toggle, Post Task, Wallet) */}
+        <div className="flex items-center gap-2 sm:gap-2.5">
+          {/* Dark / Light Mode Toggle */}
+          <button
+            onClick={toggleTheme}
+            className="w-8 h-8 rounded-full flex items-center justify-center text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-pill)] border border-[var(--border-subtle)] transition-colors cursor-pointer"
+            aria-label="Toggle theme"
+            title={`Switch to ${isDark ? "Light" : "Dark"} mode`}
+          >
+            {isDark ? <Sun size={15} /> : <Moon size={15} />}
+          </button>
+
+          {/* Post Task Button */}
           <Link
             href="/create"
-            className="inline-flex items-center gap-1.5 px-4 py-2 font-medium text-[13px] transition-all bg-white text-black hover:bg-zinc-200 rounded-full shadow-sm"
+            className="hidden sm:inline-flex items-center gap-1.5 px-3.5 py-1.5 text-xs font-semibold rounded-full robin-btn-primary"
           >
-            <Plus size={16} /> Create Task
+            <Plus size={14} strokeWidth={2.5} /> Post Task
           </Link>
 
-          {/* Auth Action */}
+          {/* Wallet Auth Button */}
           {authenticated ? (
-            <div className="flex items-center gap-3 ml-1 pl-4" style={{ borderLeft: `1px solid ${isDark ? '#27272A' : '#E4E4E7'}` }}>
-              <Link 
+            <div className="flex items-center gap-1.5 pl-1">
+              <Link
                 href="/dashboard"
-                className="flex items-center gap-2 group cursor-pointer hover:bg-white/5 px-2 py-1.5 rounded-full transition-colors"
+                className="flex items-center gap-2 px-2.5 py-1 rounded-full bg-[var(--bg-pill)] border border-[var(--border-subtle)] hover:border-[var(--border-accent)] transition-all group"
               >
-                <div className="text-right hidden xl:block">
-                  <div className="text-[13px] font-medium" style={{ color: isDark ? '#fff' : '#09090B' }}>
-                    {displayName}
-                  </div>
+                <div className="w-6 h-6 rounded-full overflow-hidden border border-[var(--border-subtle)] bg-[var(--bg-card)]">
+                  <Image
+                    src={userAvatar}
+                    alt="User"
+                    width={24}
+                    height={24}
+                    className="w-full h-full object-cover"
+                    unoptimized
+                  />
                 </div>
-                
-                <div className="w-7 h-7 flex items-center justify-center transition-colors relative rounded-full" style={{ background: isDark ? '#111' : '#F4F4F5', border: `1px solid ${isDark ? '#333' : '#E4E4E7'}` }}>
-                  <span className="font-medium text-[11px]" style={{ color: isDark ? '#fff' : '#09090B' }}>{user?.wallet?.address?.[2] || "A"}</span>
-                </div>
+                <span className="text-xs font-mono-num font-medium text-[var(--text-primary)]">
+                  {displayName}
+                </span>
               </Link>
 
-              <button 
+              <button
                 onClick={() => logout()}
-                className="w-8 h-8 flex items-center justify-center rounded-full text-zinc-500 hover:text-white hover:bg-zinc-800 transition-colors"
-                title="Disconnect"
+                className="w-8 h-8 rounded-full flex items-center justify-center text-[var(--text-secondary)] hover:text-[var(--status-red)] hover:bg-[var(--bg-pill)] border border-[var(--border-subtle)] transition-colors cursor-pointer"
+                title="Disconnect wallet"
               >
-                <LogOut size={16} />
+                <LogOut size={14} />
               </button>
             </div>
           ) : (
-            <button 
+            <button
               disabled={!ready}
-              onClick={() => login()} 
-              className={`px-4 py-2 font-medium text-[13px] transition-all flex items-center gap-2 border rounded-full hover:bg-white/5 ${!ready ? "opacity-50 cursor-not-allowed" : ""}`}
-              style={{ color: isDark ? '#fff' : '#09090B', borderColor: isDark ? '#333' : '#E4E4E7' }}
+              onClick={() => login()}
+              className="px-3.5 py-1.5 text-xs font-semibold rounded-full robin-btn-secondary cursor-pointer disabled:opacity-50"
             >
-              {!ready ? "Loading..." : "Sign In"}
+              {!ready ? "Connecting..." : "Connect"}
             </button>
           )}
-        </div>
 
-        {/* Mobile Actions */}
-        <div className="md:hidden flex items-center gap-3">
-          <Link
-            href="/create"
-            onClick={() => setIsMenuOpen(false)}
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-white text-black font-medium text-[12px] rounded-full"
-          >
-            <Plus size={14} /> Task
-          </Link>
+          {/* Mobile Hamburger Toggle */}
           <button
             onClick={() => setIsMenuOpen(!isMenuOpen)}
-            className="p-2 hover:opacity-70 transition-opacity"
-            style={{ color: isDark ? '#fff' : '#09090B' }}
+            className="md:hidden w-8 h-8 rounded-full flex items-center justify-center text-[var(--text-primary)] hover:bg-[var(--bg-pill)] border border-[var(--border-subtle)] transition-colors"
+            aria-label="Toggle navigation menu"
           >
-            {isMenuOpen ? <X size={20} /> : (
-              <div className="flex flex-col gap-1.5 items-end">
-                <span className="w-6 h-[1px]" style={{ background: isDark ? '#fff' : '#09090B' }}></span>
-                <span className="w-6 h-[1px]" style={{ background: isDark ? '#fff' : '#09090B' }}></span>
-              </div>
-            )}
+            {isMenuOpen ? <X size={16} /> : <Menu size={16} />}
           </button>
         </div>
       </div>
 
-      {/* Mobile Menu */}
+      {/* Mobile Drawer Menu */}
       {isMenuOpen && (
-        <div className="md:hidden absolute top-[calc(100%)] left-0 w-full border-b p-0 flex flex-col backdrop-blur-2xl transition-colors duration-300 shadow-2xl" style={{ background: isDark ? 'rgba(0,0,0,0.85)' : 'rgba(255,255,255,0.95)', borderColor: isDark ? '#27272A' : '#E4E4E7' }}>
-          <div className="p-4 flex justify-between items-center" style={{ borderBottom: `1px solid ${isDark ? '#27272A' : '#E4E4E7'}` }}>
-            <span className="text-[12px] font-medium text-zinc-500">Navigation</span>
-            {authenticated && (
-               <span className="text-[12px] font-medium" style={{ color: isDark ? '#fff' : '#000' }}>{displayName}</span>
-            )}
+        <div className="md:hidden mt-2 p-4 rounded-2xl robin-glass pointer-events-auto border border-[var(--border-subtle)] flex flex-col gap-2 animate-in fade-in slide-in-from-top-2 duration-200">
+          <div className="flex items-center justify-between pb-2 mb-1 border-b border-[var(--border-subtle)]">
+            <span className="text-xs font-mono-num font-medium text-[var(--text-secondary)]">
+              Robinhood Chain
+            </span>
+            <span className="flex h-2 w-2 rounded-full bg-[var(--accent-green)]" />
           </div>
 
-          <div className="p-2 space-y-1">
-             {authenticated && (
-                 <MobileNavLink href="/dashboard" icon={Activity} label="Dashboard" isDark={isDark} onClick={() => setIsMenuOpen(false)} />
-             )}
-             <MobileNavLink href="/marketplace" icon={Briefcase} label="Marketplace" isDark={isDark} onClick={() => setIsMenuOpen(false)} />
-             <MobileNavLink href="/agents" icon={Trophy} label="Agents" isDark={isDark} onClick={() => setIsMenuOpen(false)} />
-             <MobileNavLink href="/registry" icon={Map} label="Registry" isDark={isDark} onClick={() => setIsMenuOpen(false)} />
-             <MobileNavLink href="/agent/dashboard" icon={Bot} label="Agent Hub" isDark={isDark} onClick={() => setIsMenuOpen(false)} />
-             <MobileNavLink href="/docs" icon={Book} label="Docs" isDark={isDark} onClick={() => setIsMenuOpen(false)} />
-             <MobileNavLink href="/stake" icon={Lock} label="$HIVE" isDark={isDark} onClick={() => setIsMenuOpen(false)} />
-             <MobileNavLink href="/dao" icon={Scale} label="DAO" isDark={isDark} onClick={() => setIsMenuOpen(false)} />
-             
-             {authenticated ? (
-                <>
-                  <div className="h-[1px] my-2" style={{ background: isDark ? '#27272A' : '#E4E4E7' }}></div>
-                  <button 
-                    onClick={() => logout()} 
-                    className="w-full text-left px-4 py-3 text-red-400 hover:bg-white/5 flex items-center gap-3 transition-all rounded-lg"
-                  >
-                    <LogOut size={18} /> 
-                    <span className="font-medium text-[14px]">Disconnect</span>
-                  </button>
-                </>
-             ) : (
-                <div className="p-2 mt-2 border-t" style={{ borderColor: isDark ? '#27272A' : '#E4E4E7' }}>
-                  <button 
-                    disabled={!ready}
-                    onClick={() => login()} 
-                    className={`w-full text-center px-5 py-3 font-medium text-[14px] border transition-colors rounded-full hover:bg-white/5 ${!ready ? "opacity-50" : ""}`}
-                    style={{ color: isDark ? '#fff' : '#09090B', borderColor: isDark ? '#333' : '#E4E4E7' }}
-                  >
-                    {ready ? "Sign In" : "Loading..."}
-                  </button>
-                </div>
-             )}
-          </div>
+          {navLinks.map((link) => (
+            <Link
+              key={link.href}
+              href={link.href}
+              onClick={() => setIsMenuOpen(false)}
+              className="flex items-center justify-between px-3 py-2 text-sm font-medium rounded-lg hover:bg-[var(--bg-pill)] text-[var(--text-primary)]"
+            >
+              <span>{link.label}</span>
+              <ChevronRight size={14} className="text-[var(--text-tertiary)]" />
+            </Link>
+          ))}
+
+          <Link
+            href="/create"
+            onClick={() => setIsMenuOpen(false)}
+            className="w-full flex items-center justify-center gap-1.5 py-2.5 mt-2 text-xs font-semibold rounded-full robin-btn-primary"
+          >
+            <Plus size={14} strokeWidth={2.5} /> Post Task
+          </Link>
+
+          {isAdmin && (
+            <Link
+              href="/admin"
+              onClick={() => setIsMenuOpen(false)}
+              className="flex items-center justify-between px-3 py-2 text-sm font-medium rounded-lg text-[var(--accent-green)] hover:bg-[var(--bg-pill)]"
+            >
+              <span>Admin Console</span>
+              <Shield size={14} />
+            </Link>
+          )}
         </div>
       )}
-    </nav>
-  );
-};
-
-function NavLink({ href, label, pathname, isDark }: { href: string; label: string; pathname: string; isDark: boolean }) {
-  const isActive = pathname === href || pathname.startsWith(href + "/");
-  return (
-    <Link
-      href={href}
-      className={`text-[14px] font-medium transition-colors ${
-        isActive ? "text-white" : ""
-      }`}
-      style={{ color: isActive ? undefined : (isDark ? '#A1A1AA' : '#71717A') }}
-    >
-      {label}
-    </Link>
+    </header>
   );
 }
-
-function CreateNavLink({ pathname }: { pathname: string }) {
-  return null; // Deprecated inline button, moved to far right action group
-}
-
-const MobileNavLink = ({
-  href,
-  icon: Icon,
-  label,
-  isDark,
-  onClick,
-  primary = false,
-}: {
-  href: string;
-  icon: React.ElementType;
-  label: string;
-  isDark: boolean;
-  onClick?: () => void;
-  primary?: boolean;
-}) => (
-  <Link href={href} className="block" onClick={onClick}>
-    <div
-      className={`flex items-center gap-3 px-4 py-3 rounded-lg transition-all group ${
-        primary
-          ? 'bg-white text-black'
-          : 'hover:bg-white/5 text-zinc-400 hover:text-white'
-      }`}
-    >
-      <Icon size={18} className="transition-colors" />
-      <span className="font-medium text-[14px]">{label}</span>
-    </div>
-  </Link>
-);

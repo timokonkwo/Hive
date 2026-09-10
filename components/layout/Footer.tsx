@@ -3,15 +3,14 @@
 import React, { useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
-import { Twitter, Github, Copy, Check } from "lucide-react";
+import { Twitter, Github, Copy, Check, ExternalLink } from "lucide-react";
 import { useTheme } from "@/components/providers/ThemeProvider";
 
-export const Footer = () => {
-  const { theme } = useTheme();
-  const isDark = true;
+export function Footer() {
+  const { isDark } = useTheme();
   const [caCopied, setCaCopied] = useState(false);
 
-  const HIVE_CA = '6JfonM6a24xngXh5yJ1imZzbMhpfvEsiafkb4syHBAGS';
+  const HIVE_CA = "6JfonM6a24xngXh5yJ1imZzbMhpfvEsiafkb4syHBAGS";
 
   const handleCopyCA = () => {
     navigator.clipboard.writeText(HIVE_CA);
@@ -20,92 +19,184 @@ export const Footer = () => {
   };
 
   return (
-    <footer className="pt-24 pb-12 px-6 font-sans border-t transition-colors duration-300 relative overflow-hidden" style={{ background: isDark ? '#020202' : '#FAFAFA', borderColor: isDark ? 'rgba(255,255,255,0.05)' : '#E4E4E7' }}>
-      
-      {/* Subtle Glow Backdrop */}
-      <div className="absolute top-0 left-1/2 -translate-x-1/2 w-full max-w-[800px] h-[300px] opacity-[0.03] pointer-events-none blur-[120px] rounded-full mix-blend-screen" style={{ background: 'radial-gradient(circle, rgba(16,185,129,1) 0%, rgba(59,130,246,1) 100%)' }}></div>
-
-      <div className="max-w-7xl mx-auto relative z-10">
-        <div className="grid md:grid-cols-4 gap-12 lg:gap-20 mb-16">
-          {/* Brand Column */}
+    <footer className="pt-20 pb-12 px-4 md:px-6 border-t border-[var(--border-subtle)] bg-[var(--bg-surface)] text-[var(--text-secondary)] transition-colors duration-200">
+      <div className="max-w-7xl mx-auto">
+        <div className="grid grid-cols-1 md:grid-cols-5 gap-10 lg:gap-16 mb-16">
+          
+          {/* Brand and Network Telemetry */}
           <div className="md:col-span-2">
-            <div className="mb-6">
-              <Link href="/" className="flex items-center gap-2.5 transition-opacity hover:opacity-80 inline-flex">
+            <Link href="/" className="inline-flex items-center gap-2 mb-4 group">
+              <div className="w-7 h-7 rounded-full bg-[var(--accent-green-tint)] border border-[var(--border-accent)] flex items-center justify-center">
                 <Image 
                   src="/images/hive-icon.svg" 
                   alt="Hive" 
-                  width={28} 
-                  height={28} 
-                  className="w-7 h-7"
+                  width={18} 
+                  height={18} 
+                  className="w-4 h-4"
                 />
-                <span className="font-bold text-xl tracking-tight" style={{ color: isDark ? '#fff' : '#09090B' }}>Hive</span>
-              </Link>
-            </div>
-            <p className="mb-8 max-w-md leading-[1.6] text-[15px] font-medium" style={{ color: isDark ? '#A1A1AA' : '#71717A' }}>
-              The permissionless marketplace for autonomous agents. Hire verifiable talent for development, research, design, and analysis on the Hive network.
+              </div>
+              <span className="font-bold text-lg tracking-tight text-[var(--text-primary)]">
+                Hive
+              </span>
+            </Link>
+
+            <p className="text-sm leading-relaxed max-w-sm mb-6 text-[var(--text-secondary)]">
+              The autonomous settlement network for AI agents. Post specifications, coordinate work, and settle on Robinhood Chain.
             </p>
-            <div className="flex items-center gap-3">
-              <a href="https://x.com/uphivexyz" target="_blank" rel="noopener noreferrer" className="w-10 h-10 flex items-center justify-center transition-all rounded-full hover:-translate-y-0.5" style={{ background: isDark ? 'rgba(255,255,255,0.03)' : '#F4F4F5', color: isDark ? '#D4D4D8' : '#A1A1AA', border: `1px solid ${isDark ? 'rgba(255,255,255,0.05)' : '#E4E4E7'}` }}>
-                <Twitter size={16} />
+
+            {/* Network Health Indicator */}
+            <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full border border-[var(--border-subtle)] bg-[var(--bg-pill)] text-xs font-mono-num mb-6">
+              <span className="relative flex h-2 w-2">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[var(--accent-green)] opacity-75" />
+                <span className="relative inline-flex rounded-full h-2 w-2 bg-[var(--accent-green)]" />
+              </span>
+              <span className="text-[var(--text-primary)] font-medium">Robinhood Chain:</span>
+              <span className="text-[var(--accent-green)]">Operational</span>
+            </div>
+
+            {/* Social Channels */}
+            <div className="flex items-center gap-2">
+              <a
+                href="https://x.com/uphivexyz"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="w-9 h-9 flex items-center justify-center rounded-full border border-[var(--border-subtle)] bg-[var(--bg-pill)] hover:border-[var(--border-accent)] hover:text-[var(--accent-green)] transition-all cursor-pointer"
+                aria-label="X (Twitter)"
+              >
+                <Twitter size={15} />
               </a>
-              <a href="https://github.com/timokonkwo/Hive" target="_blank" rel="noopener noreferrer" className="w-10 h-10 flex items-center justify-center transition-all rounded-full hover:-translate-y-0.5" style={{ background: isDark ? 'rgba(255,255,255,0.03)' : '#F4F4F5', color: isDark ? '#D4D4D8' : '#A1A1AA', border: `1px solid ${isDark ? 'rgba(255,255,255,0.05)' : '#E4E4E7'}` }}>
-                <Github size={16} />
+              <a
+                href="https://github.com/timokonkwo/Hive"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="w-9 h-9 flex items-center justify-center rounded-full border border-[var(--border-subtle)] bg-[var(--bg-pill)] hover:border-[var(--border-accent)] hover:text-[var(--accent-green)] transition-all cursor-pointer"
+                aria-label="GitHub"
+              >
+                <Github size={15} />
               </a>
             </div>
           </div>
-          
-          {/* Links Column 1 */}
-          <div className="pt-2">
-            <h4 className="font-semibold mb-6 text-[14px]" style={{ color: isDark ? '#fff' : '#111827' }}>Marketplace</h4>
-            <ul className="space-y-3.5 text-[14px] font-medium">
-              <li><Link href="/marketplace" className="transition-colors hover:text-white" style={{ color: isDark ? '#A1A1AA' : '#71717A' }}>Browse Tasks</Link></li>
-              <li><Link href="/create" className="transition-colors hover:text-white" style={{ color: isDark ? '#A1A1AA' : '#71717A' }}>Post a Task</Link></li>
-              <li><Link href="/agent/register" className="transition-colors hover:text-white" style={{ color: isDark ? '#A1A1AA' : '#71717A' }}>Register Agent</Link></li>
-              <li><Link href="/agent/dashboard" className="transition-colors hover:text-white" style={{ color: isDark ? '#A1A1AA' : '#71717A' }}>Agent Hub</Link></li>
-              <li><Link href="/agents" className="transition-colors hover:text-white" style={{ color: isDark ? '#A1A1AA' : '#71717A' }}>Directory</Link></li>
+
+          {/* Market Navigation */}
+          <div>
+            <h4 className="text-xs font-mono-num uppercase tracking-wider text-[var(--text-primary)] font-semibold mb-4">
+              Marketplace
+            </h4>
+            <ul className="space-y-2.5 text-sm">
+              <li>
+                <Link href="/marketplace" className="hover:text-[var(--text-primary)] transition-colors">
+                  Explore Tasks
+                </Link>
+              </li>
+              <li>
+                <Link href="/create" className="hover:text-[var(--text-primary)] transition-colors">
+                  Post New Task
+                </Link>
+              </li>
+              <li>
+                <Link href="/agents" className="hover:text-[var(--text-primary)] transition-colors">
+                  Agent Directory
+                </Link>
+              </li>
+              <li>
+                <Link href="/leaderboard" className="hover:text-[var(--text-primary)] transition-colors">
+                  Leaderboard
+                </Link>
+              </li>
+              <li>
+                <Link href="/feed" className="hover:text-[var(--text-primary)] transition-colors">
+                  Live Feed
+                </Link>
+              </li>
             </ul>
           </div>
 
-          {/* Links Column 2 */}
-          <div className="pt-2">
-            <h4 className="font-semibold mb-6 text-[14px]" style={{ color: isDark ? '#fff' : '#111827' }}>Ecosystem</h4>
-            <ul className="space-y-3.5 text-[14px] font-medium">
-              <li><Link href="/docs" className="transition-colors hover:text-white" style={{ color: isDark ? '#A1A1AA' : '#71717A' }}>Documentation</Link></li>
-              <li><Link href="/analytics" className="transition-colors hover:text-white" style={{ color: isDark ? '#A1A1AA' : '#71717A' }}>Analytics</Link></li>
-              <li><Link href="/roadmap" className="transition-colors hover:text-white" style={{ color: isDark ? '#A1A1AA' : '#71717A' }}>Roadmap</Link></li>
-              <li><Link href="/stake" className="transition-colors hover:text-white" style={{ color: isDark ? '#A1A1AA' : '#71717A' }}>$HIVE</Link></li>
-              <li><Link href="/feedback" className="transition-colors hover:text-white" style={{ color: isDark ? '#A1A1AA' : '#71717A' }}>Feedback</Link></li>
+          {/* Agent Developer Portal */}
+          <div>
+            <h4 className="text-xs font-mono-num uppercase tracking-wider text-[var(--text-primary)] font-semibold mb-4">
+              Agent Portal
+            </h4>
+            <ul className="space-y-2.5 text-sm">
+              <li>
+                <Link href="/agent/register" className="hover:text-[var(--text-primary)] transition-colors">
+                  Register Agent
+                </Link>
+              </li>
+              <li>
+                <Link href="/agent/dashboard" className="hover:text-[var(--text-primary)] transition-colors">
+                  Agent Hub
+                </Link>
+              </li>
+              <li>
+                <Link href="/registry" className="hover:text-[var(--text-primary)] transition-colors">
+                  Protocol Registry
+                </Link>
+              </li>
+              <li>
+                <Link href="/docs" className="hover:text-[var(--text-primary)] transition-colors">
+                  WebMCP & SDK
+                </Link>
+              </li>
+            </ul>
+          </div>
+
+          {/* Network and Token */}
+          <div>
+            <h4 className="text-xs font-mono-num uppercase tracking-wider text-[var(--text-primary)] font-semibold mb-4">
+              Protocol
+            </h4>
+            <ul className="space-y-2.5 text-sm">
+              <li>
+                <Link href="/stake" className="hover:text-[var(--text-primary)] transition-colors">
+                  $HIVE Staking
+                </Link>
+              </li>
+              <li>
+                <Link href="/token" className="hover:text-[var(--text-primary)] transition-colors">
+                  Tokenomics
+                </Link>
+              </li>
+              <li>
+                <Link href="/dao" className="hover:text-[var(--text-primary)] transition-colors">
+                  DAO Governance
+                </Link>
+              </li>
+              <li>
+                <Link href="/analytics" className="hover:text-[var(--text-primary)] transition-colors">
+                  Telemetry
+                </Link>
+              </li>
+              <li>
+                <Link href="/roadmap" className="hover:text-[var(--text-primary)] transition-colors">
+                  Roadmap
+                </Link>
+              </li>
             </ul>
           </div>
         </div>
 
-        {/* Bottom Bar */}
-        <div className="pt-8 flex flex-col md:flex-row items-center justify-between gap-6" style={{ borderTop: `1px solid ${isDark ? 'rgba(255,255,255,0.05)' : '#E4E4E7'}` }}>
-          <div className="text-[13px] font-medium" style={{ color: isDark ? '#71717A' : '#A1A1AA' }}>
-            &copy; {new Date().getFullYear()} Hive Protocol. All rights reserved.
-          </div>
-          
+        {/* Bottom Bar with Token Address */}
+        <div className="pt-8 border-t border-[var(--border-subtle)] flex flex-col sm:flex-row items-center justify-between gap-4 text-xs">
+          <p className="text-[var(--text-tertiary)]">
+            &copy; {new Date().getFullYear()} Hive Protocol. Settling on Robinhood Chain.
+          </p>
+
           <button
             onClick={handleCopyCA}
-            className="flex items-center gap-2 px-4 py-2 rounded-full transition-all group cursor-pointer hover:bg-white/[0.03]"
-            style={{ border: '1px solid rgba(255,255,255,0.08)' }}
+            className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full border border-[var(--border-subtle)] bg-[var(--bg-pill)] hover:border-[var(--border-accent)] transition-all cursor-pointer font-mono-num"
           >
-            <span className="text-[12px] font-semibold text-zinc-500">CA:</span>
-            <span className="text-[12px] font-medium text-zinc-300 group-hover:text-white transition-colors tracking-wide">
-              {HIVE_CA.slice(0, 6)}...{HIVE_CA.slice(-4)}
+            <span className="text-[var(--text-tertiary)]">Contract:</span>
+            <span className="text-[var(--text-primary)]">
+              {HIVE_CA.slice(0, 4)}...{HIVE_CA.slice(-4)}
             </span>
             {caCopied ? (
-              <Check size={12} className="text-emerald-400" />
+              <Check size={12} className="text-[var(--accent-green)]" />
             ) : (
-              <Copy size={12} className="text-zinc-500 group-hover:text-emerald-400 transition-colors" />
+              <Copy size={12} className="text-[var(--text-tertiary)] hover:text-[var(--accent-green)]" />
             )}
           </button>
-
-          <div className="flex items-center gap-3 text-[12px] font-semibold" style={{ color: isDark ? '#71717A' : '#A1A1AA' }}>
-            <span>v2.0</span>
-          </div>
         </div>
       </div>
     </footer>
   );
-};
+}

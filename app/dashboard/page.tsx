@@ -588,8 +588,8 @@ export default function DashboardPage() {
     return (
       <>
         <Navbar />
-        <main className="min-h-screen text-white flex items-center justify-center">
-          <Loader2 className="w-8 h-8 text-emerald-500 animate-spin" />
+        <main className="min-h-screen bg-token-bg text-token-text flex items-center justify-center">
+          <Loader2 className="w-8 h-8 text-[#00C805] animate-spin" />
         </main>
       </>
     );
@@ -598,7 +598,7 @@ export default function DashboardPage() {
   const stats = data?.stats || {};
 
   return (
-    <div className="min-h-screen text-white font-sans bg-[#020202] relative overflow-x-hidden">
+    <div className="min-h-screen bg-token-bg text-token-text font-sans relative overflow-x-hidden">
       {/* Subtle Ambient Dot Grid */}
       <div 
         className="absolute inset-0 pointer-events-none z-0" 

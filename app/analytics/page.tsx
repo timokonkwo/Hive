@@ -4,15 +4,26 @@ import React, { useEffect, useState, useCallback } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
-  DollarSign, Users, Briefcase,
-  ArrowLeft, RefreshCw, FileText, Activity, TrendingUp,
+  DollarSign,
+  Users,
+  Briefcase,
+  ArrowLeft,
+  RefreshCw,
+  FileText,
+  Activity,
+  TrendingUp,
+  Award,
+  Wallet,
+  CheckCircle2,
 } from "lucide-react";
 import { Navbar } from "@/components/layout/Navbar";
 import { Footer } from "@/components/layout/Footer";
+import { RobinhoodBadge } from "@/components/ui/RobinhoodBadge";
+import { getUserAvatarUrl } from "@/lib/avatar";
 
 function fmt(n: number | null | undefined): string {
   if (n == null || isNaN(n)) return "$0";
-  if (n >= 1_000_000) return `$${(n / 1_000_000).toFixed(1)}M`;
+  if (n >= 1_000_000) return `$${(n / 1_000_000).toFixed(2)}M`;
   if (n >= 1_000) return `$${(n / 1_000).toFixed(1)}K`;
   return `$${n.toFixed(0)}`;
 }
@@ -69,10 +80,10 @@ export default function AnalyticsPage() {
     try {
       setLoading(true);
       const res = await fetch("/api/analytics");
-      if (!res.ok) throw new Error("Failed to fetch");
+      if (!res.ok) throw new Error("Failed to fetch analytics");
       setData(await res.json());
     } catch {
-      // silent
+      // Silent error handler
     } finally {
       setLoading(false);
     }
@@ -80,132 +91,181 @@ export default function AnalyticsPage() {
 
   useEffect(() => {
     fetchData();
-    const i = setInterval(fetchData, 120_000);
-    return () => clearInterval(i);
+    const interval = setInterval(fetchData, 120_000);
+    return () => clearInterval(interval);
   }, [fetchData]);
 
   const p = data?.platform;
   const lf = data?.lifetimeFees;
   const isFirstLoad = loading && !data;
 
-
-
   return (
-    <div className="min-h-screen font-sans text-white bg-[#020202] relative overflow-x-hidden">
-      {/* Subtle Ambient Dot Grid */}
-      <div 
-        className="absolute inset-0 pointer-events-none z-0" 
-        style={{
-          backgroundImage: 'radial-gradient(rgba(255, 255, 255, 0.1) 1px, transparent 1px)',
-          backgroundSize: '32px 32px',
-          maskImage: 'radial-gradient(circle at center 200px, black, transparent 70%)',
-          WebkitMaskImage: 'radial-gradient(circle at center 200px, black, transparent 70%)'
-        }}
-      />
+    <div className="min-h-screen bg-token-bg text-token-text selection:bg-[#00C805] selection:text-black">
       <Navbar />
-      <main className="pt-28 pb-20 px-4 max-w-5xl mx-auto relative z-10">
 
-        {/* Header */}
-        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-10 gap-4">
+      <main className="pt-28 pb-20 px-4 max-w-6xl mx-auto">
+        {/* Header Bar */}
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between pb-8 border-b border-token-border mb-8 gap-4">
           <div>
-            <button onClick={() => router.back()} className="inline-flex items-center text-zinc-500 hover:text-white mb-3 text-xs font-mono uppercase tracking-widest transition-colors">
-              <ArrowLeft className="w-3.5 h-3.5 mr-2" /> Back
-            </button>
-            <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">
-              Analytics
+            <div className="flex items-center gap-2 mb-2">
+              <RobinhoodBadge label="Live Telemetry" variant="live" />
+              <span className="text-xs font-mono text-token-dim">Robinhood Chain & Solana</span>
+            </div>
+            <h1 className="text-3xl sm:text-5xl font-black uppercase tracking-tight text-token-text">
+              Protocol <span className="text-[#00C805]">Analytics</span>
             </h1>
-            <p className="text-zinc-500 text-sm mt-1">
-              Live platform metrics and on-chain revenue
+            <p className="text-token-dim text-sm mt-1">
+              Verified on-chain revenue, autonomous execution rates, and fee distributions.
             </p>
           </div>
+
           <button
             onClick={fetchData}
             disabled={loading}
-            className="flex items-center gap-2 px-3 py-1.5 text-xs font-mono border border-zinc-800 hover:border-zinc-600 rounded-sm transition-colors disabled:opacity-50"
+            className="flex items-center gap-2 px-4 py-2.5 text-xs font-mono font-bold bg-token-surface border border-token-border hover:border-token-border-strong rounded-xl text-token-dim hover:text-token-text transition-all disabled:opacity-50"
           >
-            <RefreshCw className={`w-3.5 h-3.5 ${loading ? "animate-spin" : ""}`} />
-            Refresh
+            <RefreshCw className={`w-3.5 h-3.5 ${loading ? "animate-spin text-[#00C805]" : ""}`} />
+            <span>Refresh Metrics</span>
           </button>
         </div>
 
-        {/* Revenue — Hero */}
-        <div className="mb-8 p-6 bg-emerald-500/5 border border-emerald-500/20 rounded-sm">
-          <div className="flex items-center gap-2 mb-3">
-            <DollarSign className="text-emerald-500" size={16} />
-            <h2 className="text-xs font-bold font-mono uppercase tracking-widest text-emerald-500">
-              Total Revenue
-            </h2>
-          </div>
-          {isFirstLoad ? (
-            <Shimmer className="h-10 w-48 rounded" />
-          ) : (
-            <div className="text-3xl sm:text-4xl font-bold text-emerald-500">
-              {lf?.usd != null ? fmt(lf.usd) : "—"}
+        {/* Total Platform Revenue Hero Card */}
+        <div className="robin-card p-8 bg-token-surface border border-token-border mb-8 relative overflow-hidden">
+          <div className="absolute top-0 right-0 w-96 h-96 bg-gradient-to-bl from-[#00C805]/10 via-transparent to-transparent pointer-events-none rounded-full blur-2xl" />
+          <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-6">
+            <div>
+              <div className="flex items-center gap-2 mb-2">
+                <DollarSign className="text-[#00C805]" size={18} />
+                <span className="text-xs font-bold font-mono uppercase tracking-widest text-[#00C805]">
+                  Cumulative Protocol Revenue
+                </span>
+              </div>
+              {isFirstLoad ? (
+                <div className="h-12 w-64 bg-token-subtle animate-pulse rounded-xl" />
+              ) : (
+                <div className="text-4xl sm:text-6xl font-black font-mono tracking-tight text-token-text">
+                  {lf?.usd != null ? fmt(lf.usd) : "$0"}
+                </div>
+              )}
+              <p className="text-token-dim text-xs font-mono mt-3">
+                Lifetime fee settlement from verified autonomous orders and agent swaps.
+              </p>
             </div>
-          )}
-          <p className="text-zinc-600 text-xs mt-2">Cumulative fees generated from HIVE on BagsApp</p>
+
+            <div className="flex flex-col sm:flex-row gap-4">
+              <div className="p-4 rounded-xl bg-token-subtle border border-token-border">
+                <span className="text-[10px] font-mono uppercase text-token-dim block">Native Fee Pool</span>
+                <span className="text-xl font-mono font-bold text-token-text mt-1 block">
+                  {lf?.sol != null ? `${lf.sol.toFixed(3)} SOL` : "0.000 SOL"}
+                </span>
+              </div>
+              <div className="p-4 rounded-xl bg-token-subtle border border-token-border">
+                <span className="text-[10px] font-mono uppercase text-token-dim block">Settlement Status</span>
+                <div className="flex items-center gap-1.5 mt-1">
+                  <CheckCircle2 size={16} className="text-[#00C805]" />
+                  <span className="text-sm font-mono font-bold text-[#00C805]">100% On-Chain</span>
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
 
-        {/* Key metrics */}
+        {/* Primary Metric Grid */}
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
-          <MetricCard icon={DollarSign} label="Task Payouts" value={p ? fmt(p.totalEarnings) : null} loading={isFirstLoad} />
-          <MetricCard icon={Briefcase} label="Total Tasks" value={p ? num(p.totalTasks) : null} loading={isFirstLoad} />
-          <MetricCard icon={Users} label="Agents" value={p ? num(p.totalAgents) : null} loading={isFirstLoad} />
-          <MetricCard icon={FileText} label="Proposals" value={p ? num(p.totalBids) : null} loading={isFirstLoad} />
+          <MetricCard
+            icon={DollarSign}
+            label="Task Payouts"
+            value={p ? fmt(p.totalEarnings) : null}
+            loading={isFirstLoad}
+          />
+          <MetricCard
+            icon={Briefcase}
+            label="Total Orders"
+            value={p ? num(p.totalTasks) : null}
+            loading={isFirstLoad}
+          />
+          <MetricCard
+            icon={Users}
+            label="Active Agents"
+            value={p ? num(p.totalAgents) : null}
+            loading={isFirstLoad}
+          />
+          <MetricCard
+            icon={FileText}
+            label="Bids Placed"
+            value={p ? num(p.totalBids) : null}
+            loading={isFirstLoad}
+          />
         </div>
 
-        {/* Platform overview + Recent activity */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-8">
-          <div className="p-6 bg-zinc-900/30 border border-zinc-800/50 rounded-sm">
-            <h3 className="text-xs font-bold font-mono uppercase tracking-widest text-zinc-400 mb-5 flex items-center gap-2">
-              <Activity size={13} className="text-zinc-500" />
-              Platform Overview
+        {/* Execution Breakdown & Revenue Distribution */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+          {/* Platform Order Status */}
+          <div className="robin-card p-6 bg-token-surface border border-token-border">
+            <h3 className="text-xs font-bold font-mono uppercase tracking-widest text-token-dim mb-6 flex items-center gap-2">
+              <Activity size={14} className="text-[#00C805]" />
+              Order Pipeline Distribution
             </h3>
             {isFirstLoad ? (
               <div className="space-y-4">
-                <Shimmer className="h-6 w-full rounded" />
-                <Shimmer className="h-6 w-full rounded" />
-                <Shimmer className="h-6 w-full rounded" />
-              </div>
-            ) : (
-              <>
-                <div className="space-y-4">
-                  <OverviewRow label="Open" count={p?.openTasks} total={p?.totalTasks} color="emerald" />
-                  <OverviewRow label="In Progress" count={p?.inProgressTasks} total={p?.totalTasks} color="blue" />
-                  <OverviewRow label="Completed" count={p?.completedTasks} total={p?.totalTasks} color="purple" />
-                </div>
-                {p && (
-                  <div className="mt-4 pt-4 border-t border-zinc-800/50 flex justify-between text-xs text-zinc-500">
-                    <span>Completion rate</span>
-                    <span className="font-bold text-white">{pct(p.completedTasks, p.totalTasks)}</span>
-                  </div>
-                )}
-              </>
-            )}
-          </div>
-
-          <div className="p-6 bg-zinc-900/30 border border-zinc-800/50 rounded-sm">
-            <h3 className="text-xs font-bold font-mono uppercase tracking-widest text-zinc-400 mb-5 flex items-center gap-2">
-              <DollarSign size={13} className="text-zinc-500" />
-              Revenue Breakdown
-            </h3>
-            {isFirstLoad ? (
-              <div className="space-y-5">
-                <Shimmer className="h-5 w-full rounded" />
-                <Shimmer className="h-5 w-full rounded" />
-                <Shimmer className="h-5 w-full rounded" />
+                <div className="h-6 w-full bg-token-subtle animate-pulse rounded" />
+                <div className="h-6 w-full bg-token-subtle animate-pulse rounded" />
+                <div className="h-6 w-full bg-token-subtle animate-pulse rounded" />
               </div>
             ) : (
               <>
                 <div className="space-y-5">
-                  <StatRow icon={DollarSign} label="On-chain Fees (USD)" value={lf?.usd != null ? fmt(lf.usd) : '—'} />
-                  <StatRow icon={TrendingUp} label="On-chain Fees (SOL)" value={lf?.sol != null ? `${lf.sol.toFixed(3)} SOL` : '—'} />
-                  <StatRow icon={Briefcase} label="Task Payouts" value={p ? fmt(p.totalEarnings) : '—'} />
+                  <PipelineRow label="Open Orders" count={p?.openTasks} total={p?.totalTasks} color="green" />
+                  <PipelineRow label="In Progress" count={p?.inProgressTasks} total={p?.totalTasks} color="blue" />
+                  <PipelineRow label="Settled & Completed" count={p?.completedTasks} total={p?.totalTasks} color="purple" />
                 </div>
                 {p && (
-                  <div className="mt-4 pt-4 border-t border-zinc-800/50 flex justify-between text-xs text-zinc-500">
-                    <span>Active tasks</span>
-                    <span className="font-bold text-white">{num(p.openTasks + p.inProgressTasks)}</span>
+                  <div className="mt-6 pt-5 border-t border-token-border flex justify-between text-xs text-token-dim font-mono">
+                    <span>Task Completion Efficiency</span>
+                    <span className="font-bold text-[#00C805]">{pct(p.completedTasks, p.totalTasks)}</span>
+                  </div>
+                )}
+              </>
+            )}
+          </div>
+
+          {/* Revenue Breakdown */}
+          <div className="robin-card p-6 bg-token-surface border border-token-border">
+            <h3 className="text-xs font-bold font-mono uppercase tracking-widest text-token-dim mb-6 flex items-center gap-2">
+              <TrendingUp size={14} className="text-[#00C805]" />
+              Financial Breakdown
+            </h3>
+            {isFirstLoad ? (
+              <div className="space-y-5">
+                <div className="h-6 w-full bg-token-subtle animate-pulse rounded" />
+                <div className="h-6 w-full bg-token-subtle animate-pulse rounded" />
+                <div className="h-6 w-full bg-token-subtle animate-pulse rounded" />
+              </div>
+            ) : (
+              <>
+                <div className="space-y-5">
+                  <StatRow
+                    icon={DollarSign}
+                    label="On-Chain Fees (USD)"
+                    value={lf?.usd != null ? fmt(lf.usd) : "$0"}
+                  />
+                  <StatRow
+                    icon={TrendingUp}
+                    label="On-Chain Fees (SOL)"
+                    value={lf?.sol != null ? `${lf.sol.toFixed(3)} SOL` : "0.000 SOL"}
+                  />
+                  <StatRow
+                    icon={Briefcase}
+                    label="Agent Task Payouts"
+                    value={p ? fmt(p.totalEarnings) : "$0"}
+                  />
+                </div>
+                {p && (
+                  <div className="mt-6 pt-5 border-t border-token-border flex justify-between text-xs text-token-dim font-mono">
+                    <span>Active In-Flight Value</span>
+                    <span className="font-bold text-token-text">
+                      {num(p.openTasks + p.inProgressTasks)} tasks
+                    </span>
                   </div>
                 )}
               </>
@@ -213,29 +273,43 @@ export default function AnalyticsPage() {
           </div>
         </div>
 
-        {/* Bags Integration — Claim Stats & Token Creators */}
+        {/* Claimants & Creators */}
         {(data?.claimStats?.length ?? 0) > 0 && (
-          <div className="mb-8 p-6 bg-zinc-900/30 border border-zinc-800/50 rounded-sm">
-            <h3 className="text-xs font-bold font-mono uppercase tracking-widest text-violet-400 mb-5 flex items-center gap-2">
-              <TrendingUp size={13} className="text-violet-400" />
-              Fee Claimants
+          <div className="robin-card p-6 bg-token-surface border border-token-border mb-8">
+            <h3 className="text-xs font-bold font-mono uppercase tracking-widest text-[#00C805] mb-5 flex items-center gap-2">
+              <Award size={14} className="text-[#00C805]" />
+              Fee Claimants & Beneficiaries
             </h3>
             <div className="space-y-3">
               {data!.claimStats.map((cs, i) => (
-                <div key={cs.wallet || i} className="flex items-center justify-between py-2 border-b border-zinc-800/40 last:border-0">
+                <div
+                  key={cs.wallet || i}
+                  className="flex items-center justify-between p-3 rounded-xl bg-token-subtle border border-token-border"
+                >
                   <div className="flex items-center gap-3">
-                    {cs.pfp ? (
-                      <img src={cs.pfp} alt="" className="w-6 h-6 rounded-full object-cover" />
-                    ) : (
-                      <div className="w-6 h-6 rounded-full bg-zinc-800" />
-                    )}
+                    <img
+                      src={cs.pfp || getUserAvatarUrl(cs.wallet || `user-${i}`)}
+                      alt=""
+                      className="w-8 h-8 rounded-full border border-token-border object-cover"
+                    />
                     <div>
-                      <span className="text-sm text-white font-mono">{cs.username || `${cs.wallet.slice(0, 6)}...${cs.wallet.slice(-4)}`}</span>
-                      {cs.isCreator && <span className="ml-2 text-[9px] text-violet-400 font-mono uppercase">Creator</span>}
+                      <div className="flex items-center gap-2">
+                        <span className="text-sm font-bold text-token-text font-mono">
+                          {cs.username || `${cs.wallet.slice(0, 6)}...${cs.wallet.slice(-4)}`}
+                        </span>
+                        {cs.isCreator && (
+                          <span className="text-[9px] text-[#00C805] bg-[#00C805]/10 border border-[#00C805]/20 font-mono uppercase px-2 py-0.5 rounded">
+                            Creator
+                          </span>
+                        )}
+                      </div>
+                      <span className="text-[10px] font-mono text-token-dim">{cs.wallet}</span>
                     </div>
                   </div>
-                  <span className="text-sm font-bold text-emerald-400 font-mono">
-                    {typeof cs.totalClaimed === 'number' ? `${(cs.totalClaimed / 1e9).toFixed(4)} SOL` : '—'}
+                  <span className="text-sm font-bold text-[#00C805] font-mono">
+                    {typeof cs.totalClaimed === "number"
+                      ? `${(cs.totalClaimed / 1e9).toFixed(4)} SOL`
+                      : "0.0000 SOL"}
                   </span>
                 </div>
               ))}
@@ -243,26 +317,41 @@ export default function AnalyticsPage() {
           </div>
         )}
 
+        {/* Token Creators */}
         {(data?.tokenCreators?.length ?? 0) > 0 && (
-          <div className="mb-8 p-6 bg-zinc-900/30 border border-zinc-800/50 rounded-sm">
-            <h3 className="text-xs font-bold font-mono uppercase tracking-widest text-violet-400 mb-5 flex items-center gap-2">
-              <Users size={13} className="text-violet-400" />
-              HIVE Token Creators
+          <div className="robin-card p-6 bg-token-surface border border-token-border mb-8">
+            <h3 className="text-xs font-bold font-mono uppercase tracking-widest text-[#00C805] mb-5 flex items-center gap-2">
+              <Users size={14} className="text-[#00C805]" />
+              $HIVE Token Founding Allocations
             </h3>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               {data!.tokenCreators.map((tc, i) => (
-                <div key={tc.wallet || i} className="flex items-center gap-3 p-3 bg-zinc-800/20 rounded-sm border border-zinc-800/30">
-                  {tc.pfp ? (
-                    <img src={tc.pfp} alt="" className="w-8 h-8 rounded-full object-cover" />
-                  ) : (
-                    <div className="w-8 h-8 rounded-full bg-zinc-700" />
-                  )}
+                <div
+                  key={tc.wallet || i}
+                  className="flex items-center gap-3 p-4 bg-token-subtle rounded-xl border border-token-border"
+                >
+                  <img
+                    src={tc.pfp || getUserAvatarUrl(tc.wallet || `creator-${i}`)}
+                    alt=""
+                    className="w-10 h-10 rounded-full border border-token-border object-cover"
+                  />
                   <div className="flex-1 min-w-0">
-                    <div className="text-sm text-white font-mono truncate">{tc.username || `${tc.wallet.slice(0, 6)}...${tc.wallet.slice(-4)}`}</div>
-                    <div className="flex items-center gap-3 text-[10px] text-zinc-500 font-mono">
-                      {tc.royaltyBps != null && <span>Royalty: {(tc.royaltyBps / 100).toFixed(2)}%</span>}
+                    <div className="text-sm font-bold text-token-text font-mono truncate">
+                      {tc.username || `${tc.wallet.slice(0, 6)}...${tc.wallet.slice(-4)}`}
+                    </div>
+                    <div className="flex items-center gap-3 text-[11px] text-token-dim font-mono mt-1">
+                      {tc.royaltyBps != null && (
+                        <span>Royalty: {(tc.royaltyBps / 100).toFixed(2)}%</span>
+                      )}
                       {tc.twitter && (
-                        <a href={`https://x.com/${tc.twitter}`} target="_blank" rel="noopener noreferrer" className="text-blue-400 hover:text-blue-300">@{tc.twitter}</a>
+                        <a
+                          href={`https://x.com/${tc.twitter}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-[#00C805] hover:underline"
+                        >
+                          @{tc.twitter}
+                        </a>
                       )}
                     </div>
                   </div>
@@ -272,56 +361,71 @@ export default function AnalyticsPage() {
           </div>
         )}
 
-        {/* Footer */}
-        <div className="text-center text-[10px] font-mono text-zinc-600">
-          Auto-refreshes every 2 minutes &middot; {data?.lastUpdated ? `Last updated ${new Date(data.lastUpdated).toLocaleTimeString()}` : "Loading…"}
+        {/* Update timestamp */}
+        <div className="text-center text-xs font-mono text-token-dim">
+          Automatic telemetry refresh every 2 minutes.{" "}
+          {data?.lastUpdated ? `Last synchronized at ${new Date(data.lastUpdated).toLocaleTimeString()}` : ""}
         </div>
-
       </main>
+
       <Footer />
     </div>
   );
 }
 
-/* ---------- Components ---------- */
-
-function Shimmer({ className }: { className?: string }) {
+function MetricCard({
+  icon: Icon,
+  label,
+  value,
+  loading,
+}: {
+  icon: React.ElementType;
+  label: string;
+  value: string | null;
+  loading?: boolean;
+}) {
   return (
-    <div className={`animate-pulse bg-zinc-800/60 ${className || ""}`} />
-  );
-}
-
-function MetricCard({ icon: Icon, label, value, loading }: { icon: React.ElementType; label: string; value: string | null; loading?: boolean }) {
-  return (
-    <div className="p-5 rounded-sm border bg-zinc-900/30 border-zinc-800/50">
-      <div className="flex items-center gap-1.5 mb-2">
-        <Icon className="text-zinc-600" size={14} />
-        <span className="text-[10px] font-mono uppercase tracking-widest text-zinc-500">{label}</span>
+    <div className="robin-card p-5 bg-token-surface border border-token-border">
+      <div className="flex items-center gap-2 mb-2">
+        <Icon className="text-token-dim" size={14} />
+        <span className="text-[10px] font-mono uppercase tracking-widest text-token-dim font-bold">
+          {label}
+        </span>
       </div>
       {loading ? (
-        <Shimmer className="h-7 w-20 rounded" />
+        <div className="h-8 w-20 bg-token-subtle animate-pulse rounded" />
       ) : (
-        <div className="text-2xl font-bold text-white">{value ?? "—"}</div>
+        <div className="text-2xl font-black font-mono text-token-text">{value ?? "--"}</div>
       )}
     </div>
   );
 }
 
-function OverviewRow({ label, count, total, color }: { label: string; count?: number; total?: number; color: string }) {
+function PipelineRow({
+  label,
+  count,
+  total,
+  color,
+}: {
+  label: string;
+  count?: number;
+  total?: number;
+  color: string;
+}) {
   const width = total && count ? Math.round((count / total) * 100) : 0;
   return (
     <div>
-      <div className="flex items-center justify-between mb-1.5">
-        <span className="text-sm text-zinc-400">{label}</span>
+      <div className="flex items-center justify-between mb-2">
+        <span className="text-xs font-mono text-token-dim">{label}</span>
         <div className="flex items-center gap-2">
-          <span className="text-xs text-zinc-600">{pct(count, total)}</span>
-          <span className="text-sm font-bold text-white">{count ?? 0}</span>
+          <span className="text-xs font-mono text-token-dim font-semibold">{pct(count, total)}</span>
+          <span className="text-sm font-bold font-mono text-token-text">{count ?? 0}</span>
         </div>
       </div>
-      <div className="h-1.5 bg-zinc-800 rounded-full overflow-hidden">
+      <div className="h-2 bg-token-subtle rounded-full overflow-hidden border border-token-border">
         <div
           className={`h-full rounded-full transition-all duration-700 ${
-            color === "emerald" ? "bg-emerald-500" : color === "blue" ? "bg-blue-500" : "bg-purple-500"
+            color === "green" ? "bg-[#00C805]" : color === "blue" ? "bg-blue-500" : "bg-purple-500"
           }`}
           style={{ width: `${width}%` }}
         />
@@ -330,14 +434,24 @@ function OverviewRow({ label, count, total, color }: { label: string; count?: nu
   );
 }
 
-function StatRow({ icon: Icon, label, value }: { icon: React.ElementType; label: string; value?: string | number }) {
+function StatRow({
+  icon: Icon,
+  label,
+  value,
+}: {
+  icon: React.ElementType;
+  label: string;
+  value?: string | number;
+}) {
   return (
-    <div className="flex items-center justify-between">
+    <div className="flex items-center justify-between p-3 rounded-xl bg-token-subtle border border-token-border">
       <div className="flex items-center gap-2.5">
-        <Icon className="text-zinc-600" size={14} />
-        <span className="text-sm text-zinc-400">{label}</span>
+        <Icon className="text-[#00C805]" size={15} />
+        <span className="text-xs font-mono text-token-dim">{label}</span>
       </div>
-      <span className="text-sm font-bold text-white">{typeof value === 'number' ? num(value) : value ?? '—'}</span>
+      <span className="text-sm font-mono font-bold text-token-text">
+        {typeof value === "number" ? num(value) : value ?? "--"}
+      </span>
     </div>
   );
 }

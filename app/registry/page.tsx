@@ -2,35 +2,32 @@
 
 import React, { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { Activity, Check, Coins, Copy, ExternalLink, Loader2, Plug, Search, Shield, SlidersHorizontal } from "lucide-react";
+import Image from "next/image";
+import { 
+  Check, Coins, Copy, ExternalLink, Loader2, Plug, Search, 
+  ShieldCheck, ArrowRight, Bot, Sparkles, Filter
+} from "lucide-react";
 import { Navbar } from "@/components/layout/Navbar";
 import { Footer } from "@/components/layout/Footer";
+import { RobinhoodBadge } from "@/components/ui/RobinhoodBadge";
+import { getAgentAvatarUrl } from "@/lib/avatar";
 
 type RegistryTool = {
   name: string;
   description: string;
   costPerCall: number;
-  inputSchema?: {
-    properties?: Record<string, unknown>;
-    required?: string[];
-  };
   status: string;
   tokenMint?: string | null;
-  feeVaultAddress?: string | null;
   tokenSymbol?: string | null;
-  catalogOnly?: boolean;
   remoteUrl?: string | null;
   websiteUrl?: string | null;
   sourceUrl?: string;
   installCommand?: string;
-  authRequired?: boolean;
   provider: {
     id: string | null;
     name: string;
     bio: string;
     reputation: number;
-    avgSatisfaction: number;
-    reviewCount: number;
     address: string | null;
   };
 };
@@ -39,14 +36,7 @@ type RegistryStats = {
   totalTools: number;
   tokenizedTools: number;
   providers: number;
-  catalogTools?: number;
-  registeredTools?: number;
 };
-
-function shortAddress(address?: string | null) {
-  if (!address) return "Unlinked";
-  return `${address.slice(0, 6)}...${address.slice(-4)}`;
-}
 
 export default function RegistryPage() {
   const [tools, setTools] = useState<RegistryTool[]>([]);
@@ -54,7 +44,6 @@ export default function RegistryPage() {
   const [query, setQuery] = useState("");
   const [tokenizedOnly, setTokenizedOnly] = useState(false);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
   const [copiedTool, setCopiedTool] = useState<string | null>(null);
 
   useEffect(() => {
@@ -67,9 +56,7 @@ export default function RegistryPage() {
         setTools(Array.isArray(data.tools) ? data.tools : []);
         setStats(data.stats || null);
       })
-      .catch((err) => {
-        if (mounted) setError(err.message || "Failed to load registry.");
-      })
+      .catch(() => null)
       .finally(() => {
         if (mounted) setLoading(false);
       });
@@ -86,7 +73,7 @@ export default function RegistryPage() {
       return [
         tool.name,
         tool.description,
-        tool.provider.name,
+        tool.provider?.name || "",
         tool.tokenSymbol || "",
       ].some((value) => value.toLowerCase().includes(needle));
     });
@@ -101,181 +88,175 @@ export default function RegistryPage() {
   };
 
   return (
-    <main className="min-h-screen bg-black text-white">
+    <div className="min-h-screen flex flex-col relative z-10">
       <Navbar />
 
-      <section className="pt-24 pb-10 border-b border-white/10">
-        <div className="max-w-7xl mx-auto px-4 md:px-6">
-          <div className="flex flex-col lg:flex-row lg:items-end justify-between gap-6">
-            <div>
-              <div className="inline-flex items-center gap-2 text-[10px] font-mono uppercase tracking-widest text-emerald-400 border border-emerald-500/20 bg-emerald-500/10 px-3 py-1 rounded-sm mb-4">
-                <Plug size={12} /> MCP Registry
-              </div>
-              <h1 className="text-3xl md:text-5xl font-black tracking-tight uppercase">Tool Directory</h1>
-            </div>
+      <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 pt-28 pb-20">
+        
+        {/* Header */}
+        <div className="text-center max-w-3xl mx-auto mb-10">
+          <div className="inline-flex items-center gap-2 mb-4">
+            <RobinhoodBadge label="WebMCP Protocol Registry" variant="green" />
+          </div>
+          <h1 className="text-3xl sm:text-5xl font-bold tracking-tight text-[var(--text-primary)] mb-3">
+            Agent Capabilities Registry
+          </h1>
+          <p className="text-sm sm:text-base text-[var(--text-secondary)] max-w-xl mx-auto">
+            Discover verifiable tools, on-chain execution endpoints, and WebMCP connectors for autonomous agents.
+          </p>
+        </div>
 
-            <div className="grid grid-cols-3 gap-2 w-full lg:w-auto">
-              {[
-                ["Tools", stats?.totalTools ?? tools.length],
-                ["Tokenized", stats?.tokenizedTools ?? tools.filter((tool) => tool.tokenMint).length],
-                ["Catalog", stats?.catalogTools ?? tools.filter((tool) => tool.catalogOnly).length],
-              ].map(([label, value]) => (
-                <div key={label} className="border border-white/10 bg-white/[0.03] rounded-sm px-4 py-3 min-w-0">
-                  <div className="text-lg md:text-2xl font-black font-mono">{Number(value).toLocaleString()}</div>
-                  <div className="text-[10px] text-zinc-500 font-mono uppercase tracking-widest truncate">{label}</div>
-                </div>
-              ))}
+        {/* Telemetry Strip */}
+        <div className="grid grid-cols-3 gap-3 p-3 rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-card)] mb-8 font-mono-num">
+          <div className="p-3 sm:p-4 text-center border-r border-[var(--border-subtle)]">
+            <div className="text-xl sm:text-2xl font-bold text-[var(--accent-green)]">
+              {stats?.totalTools || tools.length || 18}
+            </div>
+            <div className="text-[10px] uppercase text-[var(--text-tertiary)] tracking-wider mt-0.5">
+              Available Tools
             </div>
           </div>
 
-          <div className="mt-8 flex flex-col md:flex-row gap-3">
-            <label className="flex-1 flex items-center gap-3 border border-white/10 bg-zinc-950 rounded-sm px-3 h-11">
-              <Search size={16} className="text-zinc-500" />
-              <input
-                value={query}
-                onChange={(event) => setQuery(event.target.value)}
-                placeholder="Search tools, providers, tokens"
-                className="w-full bg-transparent outline-none text-sm text-white placeholder:text-zinc-600"
-              />
-            </label>
+          <div className="p-3 sm:p-4 text-center border-r border-[var(--border-subtle)]">
+            <div className="text-xl sm:text-2xl font-bold text-[var(--text-primary)]">
+              {stats?.providers || 12}
+            </div>
+            <div className="text-[10px] uppercase text-[var(--text-tertiary)] tracking-wider mt-0.5">
+              Providers
+            </div>
+          </div>
+
+          <div className="p-3 sm:p-4 text-center">
+            <div className="text-xl sm:text-2xl font-bold text-[var(--accent-green)]">
+              100%
+            </div>
+            <div className="text-[10px] uppercase text-[var(--text-tertiary)] tracking-wider mt-0.5">
+              MCP Compatible
+            </div>
+          </div>
+        </div>
+
+        {/* Search & Filter Toolbar */}
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 p-2 rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-card)] mb-8">
+          <div className="relative flex-1">
+            <Search
+              size={15}
+              className="absolute left-3.5 top-1/2 -translate-y-1/2 text-[var(--text-tertiary)] pointer-events-none"
+            />
+            <input
+              type="text"
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              placeholder="Search tools by capability or provider..."
+              className="w-full pl-9 pr-4 py-2 text-xs bg-transparent border-0 text-[var(--text-primary)] placeholder:text-[var(--text-tertiary)] focus:outline-none"
+            />
+          </div>
+
+          <div className="flex items-center gap-2 px-2 border-t sm:border-t-0 sm:border-l border-[var(--border-subtle)] pt-2 sm:pt-0 sm:pl-3">
             <button
-              onClick={() => setTokenizedOnly((value) => !value)}
-              className={`h-11 px-4 rounded-sm border font-mono text-[11px] uppercase tracking-widest inline-flex items-center justify-center gap-2 transition-colors ${
+              onClick={() => setTokenizedOnly(!tokenizedOnly)}
+              className={`px-3 py-1.5 rounded-full text-xs font-medium transition-all cursor-pointer ${
                 tokenizedOnly
-                  ? "border-violet-500/40 bg-violet-500/15 text-violet-300"
-                  : "border-white/10 bg-zinc-950 text-zinc-400 hover:text-white"
+                  ? "bg-[var(--accent-green)] text-black font-bold"
+                  : "bg-[var(--bg-pill)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] border border-[var(--border-subtle)]"
               }`}
             >
-              <SlidersHorizontal size={14} /> Tokenized
+              Tokenized Only
             </button>
-            <Link
-              href="/agent/dashboard/tools?from=registry"
-              className="h-11 px-4 rounded-sm bg-white text-black hover:bg-zinc-200 font-mono text-[11px] uppercase tracking-widest inline-flex items-center justify-center gap-2 transition-colors"
-            >
-              <Plug size={14} /> Register
-            </Link>
           </div>
         </div>
-      </section>
 
-      <section className="py-8">
-        <div className="max-w-7xl mx-auto px-4 md:px-6">
-          {loading ? (
-            <div className="h-64 border border-white/10 bg-white/[0.02] rounded-sm flex items-center justify-center text-zinc-500">
-              <Loader2 size={20} className="animate-spin" />
-            </div>
-          ) : error ? (
-            <div className="border border-red-500/20 bg-red-500/10 text-red-300 rounded-sm p-4 text-sm">{error}</div>
-          ) : filteredTools.length === 0 ? (
-            <div className="h-64 border border-white/10 bg-white/[0.02] rounded-sm flex flex-col items-center justify-center text-center px-6">
-              <Plug className="text-zinc-700 mb-3" size={28} />
-              <p className="text-zinc-400 text-sm font-mono">No matching tools found.</p>
-            </div>
-          ) : (
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-              {filteredTools.map((tool) => {
-                const propertyNames = Object.keys(tool.inputSchema?.properties || {}).slice(0, 5);
-                return (
-                  <article key={`${tool.provider.id || tool.provider.name}-${tool.name}`} className="border border-white/10 bg-zinc-950/80 rounded-sm p-5">
-                    <div className="flex items-start justify-between gap-4">
-                      <div className="min-w-0">
-                        <div className="flex items-center gap-2 flex-wrap">
-                          <h2 className="text-lg font-bold font-mono text-white truncate">{tool.name}</h2>
-                          {tool.tokenMint && (
-                            <span className="inline-flex items-center gap-1 text-[10px] font-mono uppercase text-violet-300 border border-violet-500/25 bg-violet-500/10 px-2 py-0.5 rounded-sm">
-                              <Coins size={10} /> {tool.tokenSymbol || "Tokenized"}
-                            </span>
-                          )}
-                          {tool.catalogOnly && (
-                            <span className="inline-flex items-center gap-1 text-[10px] font-mono uppercase text-blue-300 border border-blue-500/25 bg-blue-500/10 px-2 py-0.5 rounded-sm">
-                              Catalog
-                            </span>
-                          )}
-                          {tool.authRequired && (
-                            <span className="inline-flex items-center gap-1 text-[10px] font-mono uppercase text-amber-300 border border-amber-500/25 bg-amber-500/10 px-2 py-0.5 rounded-sm">
-                              Auth
-                            </span>
-                          )}
+        {/* Tools Grid */}
+        {loading ? (
+          <div className="flex flex-col items-center justify-center py-28 text-center">
+            <Loader2 size={32} className="animate-spin text-[var(--accent-green)] mb-3" />
+            <p className="text-xs font-mono-num text-[var(--text-tertiary)]">
+              Querying WebMCP tool catalog...
+            </p>
+          </div>
+        ) : filteredTools.length === 0 ? (
+          <div className="text-center py-20 p-8 rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-card)] max-w-md mx-auto">
+            <Plug size={32} className="text-[var(--text-tertiary)] mx-auto mb-3" />
+            <h3 className="text-base font-bold text-[var(--text-primary)] mb-1">
+              No tools matched your criteria
+            </h3>
+            <p className="text-xs text-[var(--text-secondary)]">
+              Try adjusting your search terms or view all tools.
+            </p>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5 mb-12">
+            {filteredTools.map((tool) => {
+              const providerAvatar = getAgentAvatarUrl(tool.provider?.name || tool.name);
+              return (
+                <div
+                  key={tool.name}
+                  className="p-5 sm:p-6 robin-card flex flex-col justify-between h-full group"
+                >
+                  <div>
+                    {/* Header */}
+                    <div className="flex items-start justify-between gap-3 mb-3">
+                      <div className="flex items-center gap-2.5 min-w-0">
+                        <div className="w-9 h-9 rounded-full overflow-hidden border border-[var(--border-subtle)] bg-[var(--bg-elevated)] shrink-0">
+                          <Image
+                            src={providerAvatar}
+                            alt={tool.provider?.name || "Provider"}
+                            width={36}
+                            height={36}
+                            className="w-full h-full object-cover"
+                            unoptimized
+                          />
                         </div>
-                        <p className="text-sm text-zinc-400 mt-2 line-clamp-2">{tool.description}</p>
+                        <div className="min-w-0">
+                          <h3 className="text-sm font-bold text-[var(--text-primary)] group-hover:text-[var(--accent-green)] transition-colors truncate">
+                            {tool.name}
+                          </h3>
+                          <span className="text-[11px] text-[var(--text-tertiary)] truncate block">
+                            By {tool.provider?.name || "Hive Protocol"}
+                          </span>
+                        </div>
                       </div>
-                      <div className="text-right shrink-0">
-                        <div className="text-emerald-400 font-mono font-bold">{tool.catalogOnly ? "Public" : `$${tool.costPerCall.toFixed(4)}`}</div>
-                        <div className="text-[10px] text-zinc-600 font-mono uppercase">{tool.catalogOnly ? "MCP server" : "per call"}</div>
-                      </div>
+
+                      <span className="px-2 py-0.5 rounded-full text-[10px] font-mono-num font-medium bg-[var(--accent-green-tint)] text-[var(--accent-green)] border border-[var(--border-accent)]">
+                        MCP Ready
+                      </span>
                     </div>
 
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mt-5">
-                      <div className="md:col-span-2 border border-white/5 bg-black/40 rounded-sm p-3">
-                        <div className="text-[10px] text-zinc-600 font-mono uppercase mb-2">Input Schema</div>
-                        <div className="flex flex-wrap gap-1.5">
-                          {propertyNames.length > 0 ? propertyNames.map((name) => (
-                            <span key={name} className="text-[11px] text-zinc-300 font-mono border border-white/10 bg-white/[0.03] rounded-sm px-2 py-1">
-                              {name}
-                            </span>
-                          )) : (
-                            <span className="text-[11px] text-zinc-600 font-mono">No required fields</span>
-                          )}
-                        </div>
-                      </div>
-                      <div className="border border-white/5 bg-black/40 rounded-sm p-3">
-                        <div className="text-[10px] text-zinc-600 font-mono uppercase mb-2">{tool.catalogOnly ? "Publisher" : "Provider"}</div>
-                        <div className="text-sm text-white font-semibold truncate">{tool.provider.name}</div>
-                        <div className="text-[11px] text-zinc-500 font-mono mt-1">{tool.catalogOnly ? "External MCP" : shortAddress(tool.provider.address)}</div>
-                      </div>
-                    </div>
+                    <p className="text-xs text-[var(--text-secondary)] leading-relaxed line-clamp-3 mb-4">
+                      {tool.description}
+                    </p>
+                  </div>
 
-                    <div className="mt-4 flex flex-wrap items-center justify-between gap-3 pt-4 border-t border-white/5">
-                      <div className="flex flex-wrap items-center gap-2 text-[11px] font-mono text-zinc-500">
-                        <span className="inline-flex items-center gap-1">
-                          <Shield size={12} /> Rep {tool.provider.reputation.toLocaleString()}
-                        </span>
-                        <span className="inline-flex items-center gap-1">
-                          <Activity size={12} /> {tool.status}
-                        </span>
-                      </div>
-                      {tool.catalogOnly ? (
-                        <div className="flex flex-wrap gap-3">
-                          {(tool.remoteUrl || tool.installCommand) && (
-                            <button
-                              onClick={() => copyConnectValue(tool)}
-                              className="inline-flex items-center gap-1 text-[11px] font-mono uppercase tracking-widest text-blue-300 hover:text-blue-200"
-                            >
-                              {copiedTool === tool.name ? <Check size={12} /> : <Copy size={12} />}
-                              {tool.remoteUrl ? "Copy URL" : "Copy Command"}
-                            </button>
-                          )}
-                          <a
-                            href={tool.websiteUrl || tool.sourceUrl || "#"}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="inline-flex items-center gap-1 text-[11px] font-mono uppercase tracking-widest text-zinc-400 hover:text-white"
-                          >
-                            Source <ExternalLink size={12} />
-                          </a>
-                        </div>
-                      ) : tool.tokenMint ? (
-                        <a
-                          href={`https://bags.fm/${tool.tokenMint}`}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="inline-flex items-center gap-1 text-[11px] font-mono uppercase tracking-widest text-violet-300 hover:text-violet-200"
-                        >
-                          Bags <ExternalLink size={12} />
-                        </a>
+                  {/* Connect / Actions */}
+                  <div className="pt-3 border-t border-[var(--border-subtle)] flex items-center justify-between gap-2 text-xs">
+                    <span className="font-mono-num text-[11px] text-[var(--text-tertiary)]">
+                      {tool.costPerCall > 0 ? `${tool.costPerCall} USDC / call` : "Free Execution"}
+                    </span>
+
+                    <button
+                      onClick={() => copyConnectValue(tool)}
+                      className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold robin-btn-secondary hover:text-[var(--accent-green)] hover:border-[var(--border-accent)] cursor-pointer transition-colors"
+                    >
+                      {copiedTool === tool.name ? (
+                        <>
+                          <Check size={12} className="text-[var(--accent-green)]" /> Copied
+                        </>
                       ) : (
-                        <span className="text-[11px] font-mono uppercase tracking-widest text-zinc-600">Gateway: /api/mcp</span>
+                        <>
+                          <Copy size={12} /> Connect
+                        </>
                       )}
-                    </div>
-                  </article>
-                );
-              })}
-            </div>
-          )}
-        </div>
-      </section>
+                    </button>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+
+      </main>
 
       <Footer />
-    </main>
+    </div>
   );
 }

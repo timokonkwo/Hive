@@ -271,7 +271,7 @@ export default function AgentDashboardPage() {
             }
             fetchPoints(savedKey);
           } else {
-            // Key expired or invalid — clear it
+            // Key expired or invalid: clear it
             sessionStorage.removeItem('hive_agent_key');
           }
         } catch {
@@ -966,7 +966,7 @@ export default function AgentDashboardPage() {
           ) : (
             <div className="space-y-6">
 
-              {/* Onboarding Checklist — show if not fully set up */}
+              {/* Onboarding Checklist: show if not fully set up */}
               {(!agent.isVerified || !agent.solanaAddress) && (
                 <div className="bg-[#0A0A0A] border border-amber-500/20 rounded-sm p-5">
                   <h3 className="font-bold font-mono text-xs uppercase mb-4 text-amber-400 flex items-center gap-2">
@@ -1068,7 +1068,7 @@ export default function AgentDashboardPage() {
               )}
 
               <div className="grid md:grid-cols-5 gap-6">
-              {/* Left Column — Profile & Wallet */}
+              {/* Left Column: Profile and Wallet */}
               <div className="md:col-span-2 space-y-6">
                 {/* Agent Profile */}
                 <div className="bg-zinc-900/30 border border-zinc-800 rounded-lg p-6">
@@ -1128,11 +1128,11 @@ export default function AgentDashboardPage() {
                         <div className="grid grid-cols-2 gap-3">
                           <div className="bg-zinc-900/50 rounded p-2">
                             <div className="text-[10px] text-zinc-600 font-mono uppercase">SOL</div>
-                            <div className="text-white font-mono font-bold">{solBalance ?? "—"}</div>
+                            <div className="text-white font-mono font-bold">{solBalance ?? "--"}</div>
                           </div>
                           <div className="bg-zinc-900/50 rounded p-2">
                             <div className="text-[10px] text-zinc-600 font-mono uppercase">USDC</div>
-                            <div className="text-white font-mono font-bold">{usdcBalance ?? "—"}</div>
+                            <div className="text-white font-mono font-bold">{usdcBalance ?? "--"}</div>
                           </div>
                         </div>
                       </div>
@@ -1563,7 +1563,7 @@ export default function AgentDashboardPage() {
                 </div>
               </div>
 
-              {/* Right Column — Earnings & Payment History */}
+              {/* Right Column: Earnings and Payment History */}
               <div className="md:col-span-3 space-y-6">
                 {/* Stats */}
                 <div className="grid grid-cols-3 gap-4">
@@ -2058,7 +2058,7 @@ export default function AgentDashboardPage() {
                           <div className="flex-1 min-w-0">
                             <div className="text-xs font-mono text-white truncate">{payment.title}</div>
                             <div className="text-[10px] text-zinc-600 font-mono">
-                              {payment.completedAt ? new Date(payment.completedAt).toLocaleDateString() : "—"}
+                              {payment.completedAt ? new Date(payment.completedAt).toLocaleDateString() : "--"}
                             </div>
                           </div>
                           <div className="flex items-center gap-3">

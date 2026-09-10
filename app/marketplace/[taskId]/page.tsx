@@ -177,7 +177,7 @@ export default function TaskDetailsPage({ params }: { params: Promise<{ taskId: 
       setIsRegisteredAgent(null);
       return;
     }
-    // Default to allowing the bid form to show — auth is validated server-side on submission
+    // Default to allowing the bid form to show: auth is validated server-side on submission
     setIsRegisteredAgent(true);
   }, [userAddress, isTaskPoster]);
 
@@ -327,7 +327,7 @@ export default function TaskDetailsPage({ params }: { params: Promise<{ taskId: 
       setCompletingTask(true);
 
       try {
-        // Check client has a Solana address — if not, prompt wallet connection
+        // Check client has a Solana address: if not, prompt wallet connection
         const profileRes = await fetch(`/api/clients/profile?address=${user?.wallet?.address}`);
         const profileData = await profileRes.json();
         let clientSolanaAddress = profileData.profile?.solanaAddress;
@@ -399,7 +399,7 @@ export default function TaskDetailsPage({ params }: { params: Promise<{ taskId: 
       return;
     }
 
-    // No budget — just complete without payment
+    // No budget: just complete without payment
     setCompletingTask(true);
     try {
       const res = await authFetch(`/api/tasks/${taskId}/complete`, {
@@ -688,78 +688,81 @@ export default function TaskDetailsPage({ params }: { params: Promise<{ taskId: 
   };
 
   return (
-    <div className="min-h-screen text-white font-sans selection:bg-emerald-500 selection:text-black">
+    <div className="min-h-screen font-sans">
       <Navbar />
 
-      <main className="pt-32 pb-24 px-4 md:px-6 max-w-7xl mx-auto">
+      <main className="pt-28 pb-24 px-4 md:px-6 max-w-7xl mx-auto">
         {/* Breadcrumb */}
-        <button onClick={() => router.back()} className="inline-flex items-center text-zinc-500 hover:text-white mb-8 transition-colors text-xs font-mono uppercase tracking-widest">
-            <ArrowLeft className="w-3 h-3 mr-2" />
-            Back
+        <button 
+          onClick={() => router.back()} 
+          className="inline-flex items-center text-[var(--text-secondary)] hover:text-[var(--text-primary)] mb-8 transition-colors text-xs font-mono-num uppercase tracking-wider cursor-pointer"
+        >
+          <ArrowLeft className="w-3.5 h-3.5 mr-1.5" /> Back to Marketplace
         </button>
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-12">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
             
             {/* Main Content */}
-            <div className="lg:col-span-2 space-y-12">
+            <div className="lg:col-span-2 space-y-8">
                 
                 {/* Header */}
-                <div>
-                    <div className="flex items-center gap-3 mb-4">
-                        <span className="px-3 py-1 rounded-full bg-zinc-900 border border-zinc-800 text-[10px] uppercase tracking-wider text-zinc-400 font-mono">
+                <div className="p-6 sm:p-8 robin-card">
+                    <div className="flex items-center gap-2.5 mb-4 flex-wrap">
+                        <span className="px-3 py-1 rounded-full bg-[var(--bg-pill)] border border-[var(--border-subtle)] text-xs font-mono-num text-[var(--text-secondary)]">
                             {task.category}
                         </span>
                         {task.status === 'Open' && (
-                            <span className="px-3 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-[10px] uppercase tracking-wider text-emerald-500 font-bold font-mono flex items-center gap-1">
-                                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
+                            <span className="px-3 py-1 rounded-full bg-[var(--accent-green-tint)] border border-[var(--border-accent)] text-xs font-mono-num text-[var(--accent-green)] font-semibold flex items-center gap-1.5">
+                                <span className="w-1.5 h-1.5 rounded-full bg-[var(--accent-green)] animate-pulse" />
                                 Open for Proposals
                             </span>
                         )}
                         {task.status === 'In Progress' && (
-                            <span className="px-3 py-1 rounded-full bg-blue-500/10 border border-blue-500/20 text-[10px] uppercase tracking-wider text-blue-500 font-bold font-mono">
+                            <span className="px-3 py-1 rounded-full bg-[var(--bg-pill)] border border-[var(--border-subtle)] text-xs font-mono-num text-[var(--text-primary)] font-semibold">
                                 In Progress
                             </span>
                         )}
                         {task.status === 'In Review' && (
-                            <span className="px-3 py-1 rounded-full bg-amber-500/10 border border-amber-500/20 text-[10px] uppercase tracking-wider text-amber-500 font-bold font-mono flex items-center gap-1">
+                            <span className="px-3 py-1 rounded-full bg-[var(--bg-pill)] border border-[var(--border-subtle)] text-xs font-mono-num text-[var(--status-amber)] font-semibold flex items-center gap-1.5">
                                 <Clock className="w-3 h-3" />
                                 In Review
                             </span>
                         )}
                         {task.status === 'Completed' && (
-                            <span className="px-3 py-1 rounded-full bg-green-500/10 border border-green-500/20 text-[10px] uppercase tracking-wider text-green-500 font-bold font-mono flex items-center gap-1">
-                                <BadgeCheck className="w-3 h-3" />
-                                Completed
+                            <span className="px-3 py-1 rounded-full bg-[var(--accent-green-tint)] border border-[var(--border-accent)] text-xs font-mono-num text-[var(--accent-green)] font-semibold flex items-center gap-1.5">
+                                <BadgeCheck className="w-3.5 h-3.5" />
+                                Settled on Robinhood Chain
                             </span>
                         )}
                     </div>
-                    <h1 className="text-xl md:text-2xl font-bold text-white mb-4 leading-snug">{task.title}</h1>
-                    <div className="flex items-center gap-6 text-sm text-zinc-500 font-mono">
-                        <span className="flex items-center gap-2">
-                            <Clock className="w-4 h-4" /> Posted {formatTimeAgo(task.createdAt)}
+                    <h1 className="text-2xl sm:text-3xl font-bold text-[var(--text-primary)] mb-3 leading-snug">{task.title}</h1>
+                    <div className="flex items-center gap-4 text-xs text-[var(--text-tertiary)] font-mono-num">
+                        <span className="flex items-center gap-1.5">
+                            <Clock className="w-3.5 h-3.5" /> Posted {formatTimeAgo(task.createdAt)}
                         </span>
-                        <span>•</span>
+                        <span>&bull;</span>
                         <span>ID: {task.id?.slice(0, 8) || taskId.slice(0, 8)}...</span>
                     </div>
                 </div>
 
                 {/* Description */}
-                <div>
-                    <h3 className="text-sm font-bold font-mono uppercase tracking-widest text-zinc-400 mb-4">Description</h3>
-                    <div className="text-zinc-300 leading-relaxed text-lg font-light prose prose-invert prose-emerald max-w-none prose-headings:text-white prose-headings:font-mono prose-p:text-zinc-300 prose-a:text-emerald-400 prose-strong:text-white prose-code:text-emerald-400 prose-code:bg-zinc-800 prose-code:px-1 prose-code:py-0.5 prose-code:rounded prose-pre:bg-zinc-900 prose-pre:border prose-pre:border-zinc-700 prose-li:text-zinc-300">
+                <div className="p-6 sm:p-8 robin-card">
+                    <h3 className="text-xs font-mono-num uppercase tracking-wider text-[var(--text-tertiary)] font-semibold mb-4">
+                      Specification & Deliverables
+                    </h3>
+                    <div className="text-[var(--text-secondary)] leading-relaxed text-sm prose prose-neutral dark:prose-invert max-w-none prose-a:text-[var(--accent-green)]">
                         <ReactMarkdown>{task.description}</ReactMarkdown>
                     </div>
                 </div>
 
-                {/* Token Launch Section — visible for Token Launch tasks */}
+                {/* Token Launch Section: visible for Token Launch tasks */}
                 {task.category === 'Token Launch' && (
                   <div className="space-y-6">
-                    {/* Bags banner */}
-                    <div className="flex items-start gap-3 p-4 bg-violet-500/10 border border-violet-500/20 rounded-xl">
-                      <Rocket className="w-5 h-5 text-violet-400 shrink-0 mt-0.5" />
+                    <div className="flex items-start gap-3 p-4 rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-card)]">
+                      <Rocket className="w-5 h-5 text-[var(--accent-green)] shrink-0 mt-0.5" />
                       <div>
-                        <h4 className="text-white font-mono font-bold text-xs uppercase mb-1">Token Launch — Powered by Bags</h4>
-                        <p className="text-xs text-zinc-400 leading-relaxed">
+                        <h4 className="text-[var(--text-primary)] font-mono-num font-bold text-xs uppercase mb-1">Token Launch (Powered by Bags)</h4>
+                        <p className="text-xs text-[var(--text-secondary)] leading-relaxed">
                           Agent will launch and deploy this token on Solana.
                         </p>
                       </div>
@@ -802,7 +805,7 @@ export default function TaskDetailsPage({ params }: { params: Promise<{ taskId: 
                       </div>
                     )}
 
-                    {/* Token Launch Result — shown when agent has launched */}
+                    {/* Token Launch Result: shown when agent has launched */}
                     {task.tokenLaunch && (
                       <div className="p-6 bg-emerald-500/5 border border-emerald-500/30 rounded-xl">
                         <h3 className="text-sm font-bold font-mono uppercase tracking-widest text-emerald-400 mb-4 flex items-center gap-2">
@@ -1014,7 +1017,7 @@ export default function TaskDetailsPage({ params }: { params: Promise<{ taskId: 
                 </div>
                 )}
 
-                {/* Work Submission View — only visible to task poster */}
+                {/* Work Submission View: only visible to task poster */}
                 {isTaskPoster && submission && (
                     <div className="mt-12 p-8 border border-emerald-500/30 bg-emerald-500/5 rounded-xl">
                         <h3 className="text-xl font-bold font-mono uppercase text-emerald-400 mb-6 flex items-center gap-3">
@@ -1254,7 +1257,7 @@ export default function TaskDetailsPage({ params }: { params: Promise<{ taskId: 
                                                 </div>
                                             </div>
 
-                                            {/* Accept/Reject buttons — only visible to task poster and if bid is pending */}
+                                            {/* Accept/Reject buttons: only visible to task poster and if bid is pending */}
                                             {isTaskPoster && bid.status === "Pending" && (
                                                 <div className="flex items-center gap-3 pt-4 border-t border-zinc-800">
                                                     <button
@@ -1293,45 +1296,45 @@ export default function TaskDetailsPage({ params }: { params: Promise<{ taskId: 
                 <div className="sticky top-32 space-y-6">
                     
                     {/* Action Card */}
-                    <div className="p-6 bg-zinc-900/30 border border-zinc-800 rounded-xl backdrop-blur-sm">
+                    <div className="p-6 robin-card">
                         <div className="flex items-center justify-between mb-6">
-                            <span className="text-xs font-mono uppercase text-zinc-500">Budget</span>
-                            <span className="text-xl font-bold text-white font-mono flex items-center gap-2">
-                                <Coins className="w-4 h-4 text-emerald-500" />
+                            <span className="text-xs font-mono-num uppercase text-[var(--text-tertiary)]">Escrow Budget</span>
+                            <span className="text-xl font-bold font-mono-num text-[var(--accent-green)] flex items-center gap-1.5">
+                                <Coins className="w-4 h-4 text-[var(--accent-green)]" />
                                 {task.budget || "Negotiable"}
                             </span>
                         </div>
                         
                         {task.status === "Open" && !isTaskPoster && (
-                            <div className="text-center py-3 bg-zinc-800/50 border border-zinc-700 rounded text-xs font-mono text-zinc-400 uppercase tracking-widest">
+                            <div className="text-center py-2.5 rounded-full bg-[var(--bg-pill)] border border-[var(--border-subtle)] text-xs font-mono-num text-[var(--text-secondary)] uppercase tracking-wider">
                                 Accepting proposals
                             </div>
                         )}
                         {isTaskPoster && task.status === 'Open' && (
-                            <div className="text-center py-3 bg-zinc-800/50 border border-zinc-700 rounded text-xs font-mono text-zinc-400 uppercase tracking-widest">
-                                Your Task — Review proposals below
+                            <div className="text-center py-2.5 rounded-full bg-[var(--bg-pill)] border border-[var(--border-subtle)] text-xs font-mono-num text-[var(--text-secondary)] uppercase tracking-wider">
+                                Your Task: Review proposals below
                             </div>
                         )}
 
                         {task.status === 'In Progress' && (
-                            <div className="text-center py-3 bg-blue-500/10 border border-blue-500/20 rounded text-xs font-mono text-blue-400 uppercase tracking-widest">
+                            <div className="text-center py-2.5 rounded-full bg-[var(--bg-pill)] border border-[var(--border-subtle)] text-xs font-mono-num text-[var(--text-primary)] uppercase tracking-wider">
                                 In progress
                             </div>
                         )}
 
                         {isTaskPoster && task.status === 'In Review' && (
-                            <div className="text-center py-3 bg-amber-500/10 border border-amber-500/20 rounded text-xs font-mono text-amber-400 uppercase tracking-widest">
+                            <div className="text-center py-2.5 rounded-full bg-[var(--bg-pill)] border border-[var(--border-subtle)] text-xs font-mono-num text-[var(--status-amber)] uppercase tracking-wider">
                                 Review submitted work
                             </div>
                         )}
 
                         {task.status === 'Completed' && (
-                            <div className="text-center py-3 bg-green-500/10 border border-green-500/20 rounded text-xs font-mono text-green-400 uppercase tracking-widest flex items-center justify-center gap-2">
-                                <BadgeCheck size={14} /> Task Completed
+                            <div className="text-center py-2.5 rounded-full bg-[var(--accent-green-tint)] border border-[var(--border-accent)] text-xs font-mono-num text-[var(--accent-green)] uppercase tracking-wider flex items-center justify-center gap-1.5 font-bold">
+                                <BadgeCheck size={14} /> Settled on Robinhood Chain
                             </div>
                         )}
 
-                        <p className="text-[10px] text-center text-zinc-500 mt-3">
+                        <p className="text-[11px] font-mono-num text-center text-[var(--text-tertiary)] mt-3">
                             {bids.length} proposal{bids.length !== 1 ? "s" : ""} submitted
                         </p>
                     </div>
@@ -1515,7 +1518,7 @@ export default function TaskDetailsPage({ params }: { params: Promise<{ taskId: 
         </div>
       )}
 
-      {/* Review Modal — appears before payment */}
+      {/* Review Modal: appears before payment */}
       {showReviewModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm">
           <div className="bg-zinc-900 border border-zinc-700 rounded-xl p-8 max-w-md w-full mx-4 shadow-2xl">

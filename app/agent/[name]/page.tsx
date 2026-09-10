@@ -1,30 +1,25 @@
 "use client";
 
 import React, { Suspense, useState, useEffect } from "react";
+import Link from "next/link";
+import Image from "next/image";
+import { useParams, useRouter } from "next/navigation";
+import { 
+  Star, ShieldCheck, Zap, Copy, Check,
+  Bot, Loader2, Clock, ArrowLeft, ChevronRight,
+  ExternalLink, CheckCircle2, Rocket, Briefcase
+} from "lucide-react";
 import { Navbar } from "@/components/layout/Navbar";
 import { Footer } from "@/components/layout/Footer";
-import { 
-  Shield, Star, Zap, Award, Copy, CheckCircle,
-  Calendar, TrendingUp, Users, Bot, Loader2, Briefcase, Send,
-  ExternalLink, Clock, BarChart3, ArrowLeft, DollarSign, Rocket
-} from "lucide-react";
-import Link from "next/link";
-import { useParams, useRouter } from "next/navigation";
+import { RobinhoodBadge } from "@/components/ui/RobinhoodBadge";
+import { getAgentAvatarUrl } from "@/lib/avatar";
 import { toast } from "sonner";
-
-function getBadges(reputation: number, tasksCompleted: number) {
-  const badges = [];
-  if (reputation >= 100) badges.push({ label: "Veteran", color: "text-purple-500", bg: "bg-purple-500/10" });
-  if (reputation >= 50) badges.push({ label: "Pro", color: "text-blue-500", bg: "bg-blue-500/10" });
-  if (tasksCompleted >= 10) badges.push({ label: "Trusted", color: "text-yellow-500", bg: "bg-yellow-500/10" });
-  if (reputation >= 10) badges.push({ label: "Active", color: "text-emerald-500", bg: "bg-emerald-500/10" });
-  return badges;
-}
 
 function AgentProfileContent() {
   const params = useParams();
   const router = useRouter();
-  const name = decodeURIComponent(params.name as string);
+  const name = decodeURIComponent((params?.name as string) || "");
+
   const [agent, setAgent] = useState<any>(null);
   const [stats, setStats] = useState<any>(null);
   const [recentBids, setRecentBids] = useState<any[]>([]);
@@ -33,7 +28,7 @@ function AgentProfileContent() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
   const [copied, setCopied] = useState(false);
-  const [activeSection, setActiveSection] = useState<"tasks" | "proposals" | "launches">("tasks");
+  const [activeTab, setActiveTab] = useState<"tasks" | "proposals" | "launches">("tasks");
 
   useEffect(() => {
     const fetchAgent = async () => {
@@ -65,33 +60,45 @@ function AgentProfileContent() {
     if (!agent?.walletAddress) return;
     navigator.clipboard.writeText(agent.walletAddress);
     setCopied(true);
-    toast.success("Address copied!");
+    toast.success("Wallet address copied to clipboard.");
     setTimeout(() => setCopied(false), 2000);
   };
 
   if (loading) {
     return (
-      <div className="min-h-screen text-white pt-32 flex items-center justify-center">
+      <div className="min-h-screen flex flex-col relative z-10">
         <Navbar />
-        <Loader2 className="w-8 h-8 text-emerald-500 animate-spin" />
+        <main className="flex-1 flex items-center justify-center pt-28">
+          <Loader2 className="w-8 h-8 text-[var(--accent-green)] animate-spin" />
+        </main>
       </div>
     );
   }
 
   if (error || !agent) {
     return (
-      <div className="min-h-screen text-white font-sans">
+      <div className="min-h-screen flex flex-col relative z-10">
         <Navbar />
-        <main className="pt-32 pb-20 px-6 max-w-4xl mx-auto text-center">
-          <Bot className="mx-auto text-gray-600 mb-6" size={64} />
-          <h1 className="text-2xl font-bold mb-4">Agent Not Found</h1>
-          <p className="text-gray-400 mb-8">No agent with this name exists on the Hive Protocol.</p>
-          <div className="flex gap-4 justify-center">
-            <Link href="/agent/register" className="inline-flex items-center gap-2 px-6 py-3 bg-emerald-600 hover:bg-emerald-500 text-white font-bold font-mono uppercase rounded-sm transition-colors text-xs tracking-widest">
-              Register as Agent
+        <main className="flex-1 max-w-xl mx-auto px-6 pt-36 pb-20 text-center">
+          <Bot className="mx-auto text-[var(--text-tertiary)] mb-4" size={48} />
+          <h1 className="text-2xl font-bold text-[var(--text-primary)] mb-2">
+            Agent Profile Not Found
+          </h1>
+          <p className="text-sm text-[var(--text-secondary)] mb-8">
+            No agent registered under this identifier on Hive Protocol.
+          </p>
+          <div className="flex justify-center gap-3">
+            <Link
+              href="/agents"
+              className="px-5 py-2.5 text-xs font-semibold rounded-full robin-btn-secondary"
+            >
+              Agent Directory
             </Link>
-            <Link href="/marketplace" className="inline-flex items-center gap-2 px-6 py-3 border border-zinc-700 hover:border-zinc-500 text-white font-mono uppercase rounded-sm transition-colors text-xs tracking-widest">
-              Browse Marketplace
+            <Link
+              href="/agent/register"
+              className="px-5 py-2.5 text-xs font-bold rounded-full robin-btn-primary"
+            >
+              Register Agent
             </Link>
           </div>
         </main>
@@ -100,274 +107,233 @@ function AgentProfileContent() {
     );
   }
 
-  const badges = getBadges(agent.reputation, stats?.tasksCompleted || 0);
-  const joinDate = new Date(agent.createdAt).toLocaleDateString("en-US", { year: "numeric", month: "short", day: "numeric" });
+  const avatar = getAgentAvatarUrl(agent.name || agent.walletAddress);
+  const reputation = typeof agent.reputation === "number" ? agent.reputation : 0;
+  const tasksCompleted = stats?.tasksCompleted || 0;
+  const joinDate = new Date(agent.createdAt || Date.now()).toLocaleDateString("en-US", {
+    year: "numeric",
+    month: "short",
+    day: "numeric",
+  });
 
   return (
-    <div className="min-h-screen text-white font-sans selection:bg-emerald-500 selection:text-black">
+    <div className="min-h-screen flex flex-col relative z-10">
       <Navbar />
 
-      <main className="pt-32 pb-20">
-        <div className="max-w-4xl mx-auto px-6">
-          
-          <button onClick={() => router.back()} className="inline-flex items-center gap-2 text-xs font-mono text-gray-500 hover:text-white transition-colors mb-6 uppercase tracking-widest">
-            <ArrowLeft size={14} /> Back
-          </button>
+      <main className="flex-1 max-w-4xl w-full mx-auto px-4 sm:px-6 pt-28 pb-20">
+        
+        {/* Back link */}
+        <button
+          onClick={() => router.back()}
+          className="inline-flex items-center text-xs font-mono-num text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-colors mb-6 cursor-pointer"
+        >
+          <ArrowLeft size={14} className="mr-1.5" /> Back to Directory
+        </button>
 
-          {/* Profile Header */}
-          <div className="bg-[#0A0A0A] border border-white/10 rounded-sm p-4 sm:p-8 mb-6 relative overflow-hidden">
+        {/* Profile Header Card */}
+        <div className="p-6 sm:p-8 robin-card mb-8 relative">
+          <div className="flex flex-col sm:flex-row items-center sm:items-start gap-5 text-center sm:text-left">
+            
+            {/* Avatar */}
+            <div className="w-20 h-20 rounded-full overflow-hidden border-2 border-[var(--border-accent)] bg-[var(--bg-elevated)] shrink-0 shadow-sm">
+              <Image
+                src={avatar}
+                alt={agent.name}
+                width={80}
+                height={80}
+                className="w-full h-full object-cover"
+                unoptimized
+              />
+            </div>
 
-            <div className="flex flex-col md:flex-row items-center md:items-start gap-4 sm:gap-6 text-center md:text-left">
-              <div className="w-24 h-24 bg-emerald-500/10 border border-emerald-500/20 rounded-sm flex items-center justify-center shrink-0 relative group">
-                <Bot className="text-emerald-500" size={48} />
-                <div className="absolute inset-0 bg-emerald-500/20 opacity-0 group-hover:opacity-100 transition-opacity blur-xl"></div>
+            {/* Info */}
+            <div className="flex-1 min-w-0">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-2">
+                <div className="flex items-center justify-center sm:justify-start gap-2">
+                  <h1 className="text-2xl font-bold text-[var(--text-primary)] tracking-tight">
+                    {agent.name}
+                  </h1>
+                  <ShieldCheck size={18} className="text-[var(--accent-green)] shrink-0" />
+                </div>
+
+                <div className="inline-flex items-center justify-center gap-1 px-3 py-1 rounded-full bg-[var(--accent-green-tint)] border border-[var(--border-accent)] text-xs font-mono-num font-bold text-[var(--accent-green)]">
+                  <Star size={12} className="fill-[var(--accent-green)]" />
+                  <span>{reputation.toFixed(1)} Reputation</span>
+                </div>
               </div>
-              <div className="flex-1 min-w-0 w-full">
-                <div className="flex flex-col md:flex-row md:items-center gap-3 mb-2">
-                  <h1 className="text-xl sm:text-3xl font-black font-mono uppercase truncate text-white">{agent.name}</h1>
-                  {agent.isVerified && (
-                    <span className="inline-flex items-center gap-1 text-xs font-mono text-emerald-500 uppercase tracking-widest">
-                      <CheckCircle size={12} /> Verified
-                    </span>
-                  )}
-                </div>
-                <p className="text-gray-400 max-w-2xl text-sm leading-relaxed mb-4">{agent.bio}</p>
-                
-                <div className="flex flex-wrap items-center justify-center md:justify-start gap-4 text-xs font-mono text-gray-500 mb-4">
-                  {agent.walletAddress && (
-                    <span className="flex items-center gap-1.5 bg-zinc-900 px-2 py-1 rounded-sm border border-zinc-800">
-                      <Users size={12} /> {agent.walletAddress.slice(0, 6)}...{agent.walletAddress.slice(-4)} 
-                      <button onClick={copyAddress} className="hover:text-white transition-colors">
-                        {copied ? <CheckCircle size={10} /> : <Copy size={10} />}
-                      </button>
-                    </span>
-                  )}
-                  <span className="flex items-center gap-1.5">
-                    <Calendar size={12} /> Joined {joinDate}
-                  </span>
-                </div>
 
-                {/* Badges */}
-                <div className="flex flex-wrap justify-center md:justify-start gap-2">
-                  {badges.map((badge, i) => (
-                    <span key={i} className={`px-2 py-1 text-[10px] font-bold uppercase rounded-sm border ${badge.bg} ${badge.color} border-current opacity-80`}>
-                      {badge.label}
-                    </span>
-                  ))}
-                  {agent.isTokenized && agent.tokenLaunchStatus === 'launched' && (
-                    <span className="px-2 py-1 text-[10px] font-bold uppercase rounded-sm border bg-violet-500/10 text-violet-400 border-violet-500/30">
-                      Tokenized
-                    </span>
-                  )}
-                </div>
+              <p className="text-sm text-[var(--text-secondary)] leading-relaxed mb-4 max-w-2xl">
+                {agent.bio || "Autonomous intelligence agent deployed on Hive Protocol."}
+              </p>
 
-                {/* Token Info (for tokenized agents) */}
-                {agent.isTokenized && agent.tokenMintAddress && (
-                  <div className="mt-4 bg-violet-500/5 border border-violet-500/20 rounded-sm px-4 py-3">
-                    <div className="flex items-center gap-3 flex-wrap">
-                      <span className="text-[10px] font-mono text-violet-400 uppercase tracking-widest font-bold">
-                        ${agent.tokenSymbol}
-                      </span>
-                      <code className="text-[10px] font-mono text-zinc-500">
-                        {agent.tokenMintAddress.slice(0, 8)}...{agent.tokenMintAddress.slice(-6)}
-                      </code>
-                      {agent.bagsUrl && (
-                        <a href={agent.bagsUrl} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 text-[10px] text-violet-400 hover:text-violet-300 font-mono transition-colors">
-                          <ExternalLink size={10} /> Trade on Bags
-                        </a>
-                      )}
-                    </div>
-                  </div>
+              {/* Wallet and Meta Row */}
+              <div className="flex flex-wrap items-center justify-center sm:justify-start gap-3 text-xs font-mono-num text-[var(--text-tertiary)]">
+                {agent.walletAddress && (
+                  <button
+                    onClick={copyAddress}
+                    className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-[var(--bg-pill)] border border-[var(--border-subtle)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] cursor-pointer transition-colors"
+                  >
+                    <span>{agent.walletAddress.slice(0, 6)}...{agent.walletAddress.slice(-4)}</span>
+                    {copied ? <Check size={11} className="text-[var(--accent-green)]" /> : <Copy size={11} />}
+                  </button>
                 )}
 
-                {/* Hire button */}
-                <div className="mt-4">
-                  <Link href={`/create?agent=${agent.id}`} className="inline-flex px-4 py-2 bg-white text-black font-bold font-mono text-xs uppercase tracking-widest hover:bg-gray-200 transition-colors rounded-sm items-center gap-2">
-                    <Zap size={14} /> Hire Agent
-                  </Link>
-                </div>
+                <span className="flex items-center gap-1">
+                  <Clock size={12} /> Joined {joinDate}
+                </span>
+
+                <span className="text-[var(--accent-green)] font-medium">
+                  Robinhood Chain Verified
+                </span>
               </div>
             </div>
+
           </div>
 
-          {/* Stats */}
-          <div className="grid grid-cols-2 gap-3 mb-6">
-            <div className="bg-[#0A0A0A] border border-white/10 p-4 rounded-sm text-center group hover:border-emerald-500/30 transition-colors">
-              <div className="flex items-center justify-center gap-2 text-emerald-500 font-mono font-bold text-2xl group-hover:scale-110 transition-transform">
-                <Star size={18} className="shrink-0" /> {agent.reputation}
-              </div>
-              <div className="text-[10px] text-gray-500 uppercase mt-1">Reputation</div>
-            </div>
-            <div className="bg-[#0A0A0A] border border-white/10 p-4 rounded-sm text-center group hover:border-yellow-500/30 transition-colors">
-              <div className="flex items-center justify-center gap-2 text-yellow-500 font-mono font-bold text-2xl group-hover:scale-110 transition-transform">
-                <BarChart3 size={18} className="shrink-0" /> {stats?.successRate || 0}%
-              </div>
-              <div className="text-[10px] text-gray-500 uppercase mt-1">Success Rate</div>
-            </div>
-          </div>
-
-          {/* Satisfaction + Capabilities */}
-          <div className={`grid ${agent.avgSatisfaction > 0 || (agent.capabilities && agent.capabilities.length > 0) ? 'grid-cols-1 md:grid-cols-2' : ''} gap-4 mb-8`}>
-            {agent.avgSatisfaction > 0 && (
-              <div className="bg-[#0A0A0A] border border-white/10 p-5 rounded-sm">
-                <h3 className="text-xs font-bold font-mono uppercase text-gray-500 mb-3 flex items-center gap-2">
-                  <Star size={14} className="fill-amber-400 text-amber-400" /> Rating
-                </h3>
-                <div className="flex items-center gap-3">
-                  <span className="text-2xl font-mono font-bold text-amber-400">{agent.avgSatisfaction.toFixed(1)}</span>
-                  <span className="text-xs text-zinc-500 font-mono">from {agent.reviewCount || 0} review{agent.reviewCount !== 1 ? 's' : ''}</span>
-                </div>
-              </div>
-            )}
-            {agent.capabilities && agent.capabilities.length > 0 && (
-              <div className="bg-[#0A0A0A] border border-white/10 p-5 rounded-sm">
-                <h3 className="text-xs font-bold font-mono uppercase text-gray-500 mb-3 flex items-center gap-2">
-                  <Zap size={14} /> Capabilities
-                </h3>
-                <div className="flex flex-wrap gap-2">
-                  {agent.capabilities.map((skill: string) => (
-                    <span key={skill} className="px-2 py-1 bg-white/5 border border-white/10 text-gray-300 text-[10px] font-mono uppercase rounded-sm hover:text-white hover:border-white/30 transition-colors">
-                      {skill}
-                    </span>
-                  ))}
-                </div>
-              </div>
-            )}
-          </div>
-
-          {/* Token Launches */}
-          {tokenLaunches.length > 0 && (
-            <div className="bg-[#0A0A0A] border border-white/10 rounded-sm p-5 mb-6">
-              <h3 className="text-xs font-bold font-mono uppercase text-gray-500 mb-4 flex items-center gap-2">
-                <Rocket size={14} className="text-purple-400" /> Token Launches
-              </h3>
-              <div className="space-y-3">
-                {tokenLaunches.map((launch: any) => (
-                  <a
-                    key={launch.id}
-                    href={`https://bags.fm/${launch.mintAddress}`}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="block"
-                  >
-                    <div className="flex items-center justify-between p-3 bg-black/30 rounded hover:bg-black/50 transition-colors group border border-transparent hover:border-purple-500/20">
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2 mb-1">
-                          <span className="text-sm text-white font-bold group-hover:text-purple-400 transition-colors">${launch.tokenSymbol}</span>
-                          <span className="text-xs text-zinc-400">{launch.tokenName}</span>
-                          <span className="inline-flex px-2 py-0.5 rounded-full border text-[10px] font-bold uppercase bg-purple-500/10 text-purple-400 border-purple-500/20">
-                            Launched
-                          </span>
-                        </div>
-                        <div className="text-[10px] text-zinc-600 font-mono">
-                          {launch.mintAddress.slice(0, 8)}...{launch.mintAddress.slice(-4)} • {new Date(launch.createdAt).toLocaleDateString()}
-                        </div>
-                      </div>
-                      <ExternalLink size={14} className="text-zinc-700 group-hover:text-purple-400 shrink-0 transition-colors" />
-                    </div>
-                  </a>
-                ))}
-              </div>
+          {/* Capabilities Badges */}
+          {agent.skills && agent.skills.length > 0 && (
+            <div className="mt-6 pt-5 border-t border-[var(--border-subtle)] flex flex-wrap gap-2">
+              {agent.skills.map((skill: string) => (
+                <span
+                  key={skill}
+                  className="px-2.5 py-1 rounded-full text-xs font-mono-num font-medium bg-[var(--bg-pill)] border border-[var(--border-subtle)] text-[var(--text-secondary)]"
+                >
+                  {skill}
+                </span>
+              ))}
             </div>
           )}
-
-          {/* Task History & Recent Proposals */}
-          <div className="bg-[#0A0A0A] border border-white/10 rounded-sm overflow-hidden mb-6">
-            <div className="flex border-b border-white/10">
-              <button
-                onClick={() => setActiveSection("tasks")}
-                className={`flex-1 px-4 py-3 text-xs font-mono uppercase tracking-widest transition-colors border-b-2 ${
-                  activeSection === "tasks" ? "border-emerald-500 text-white" : "border-transparent text-zinc-500 hover:text-zinc-300"
-                }`}
-              >
-                Task History [{taskHistory.length}]
-              </button>
-              <button
-                onClick={() => setActiveSection("proposals")}
-                className={`flex-1 px-4 py-3 text-xs font-mono uppercase tracking-widest transition-colors border-b-2 ${
-                  activeSection === "proposals" ? "border-emerald-500 text-white" : "border-transparent text-zinc-500 hover:text-zinc-300"
-                }`}
-              >
-                Recent Proposals [{recentBids.length}]
-              </button>
-            </div>
-
-            <div className="p-4">
-              {activeSection === "tasks" && (
-                taskHistory.length > 0 ? (
-                  <div className="space-y-3">
-                    {taskHistory.map((task: any) => (
-                      <Link key={task.id} href={`/marketplace/${task.id}`} className="block">
-                        <div className="flex items-center justify-between p-3 bg-black/30 rounded hover:bg-black/50 transition-colors group">
-                          <div className="flex-1 min-w-0">
-                            <div className="flex items-center gap-2 mb-1">
-                              <span className="text-sm text-white font-medium truncate group-hover:text-emerald-400 transition-colors">{task.title}</span>
-                              <StatusBadge status={task.status} />
-                            </div>
-                            <div className="text-[10px] text-zinc-600 font-mono">
-                              {task.category} • Budget: {task.budget || "Negotiable"}
-                              {task.completedAt && ` • Completed ${new Date(task.completedAt).toLocaleDateString()}`}
-                            </div>
-                          </div>
-                          <ChevronRight size={14} className="text-zinc-700 shrink-0" />
-                        </div>
-                      </Link>
-                    ))}
-                  </div>
-                ) : (
-                  <div className="py-8 text-center text-zinc-600 text-sm font-mono">No task history yet</div>
-                )
-              )}
-
-              {activeSection === "proposals" && (
-                recentBids.length > 0 ? (
-                  <div className="space-y-3">
-                    {recentBids.map((bid: any) => (
-                      <Link key={bid.id} href={`/marketplace/${bid.taskId}`} className="block">
-                        <div className="flex items-center justify-between p-3 bg-black/30 rounded hover:bg-black/50 transition-colors group">
-                          <div className="flex-1 min-w-0">
-                            <div className="flex items-center gap-2 mb-1">
-                              <span className="text-sm text-white font-medium truncate group-hover:text-emerald-400 transition-colors">{bid.taskTitle}</span>
-                              <StatusBadge status={bid.status} />
-                            </div>
-                            <div className="text-[10px] text-zinc-600 font-mono">
-                              Amount: {bid.amount} • {new Date(bid.createdAt).toLocaleDateString()}
-                            </div>
-                          </div>
-                          <ChevronRight size={14} className="text-zinc-700 shrink-0" />
-                        </div>
-                      </Link>
-                    ))}
-                  </div>
-                ) : (
-                  <div className="py-8 text-center text-zinc-600 text-sm font-mono">No registered tools yet</div>
-                )
-              )}
-            </div>
-          </div>
-
-          {/* Quick Actions */}
-          <div className="bg-[#0A0A0A] border border-white/10 rounded-sm p-6">
-            <h3 className="text-xs font-bold font-mono uppercase text-gray-500 mb-4 flex items-center gap-2">
-              <Briefcase size={14} /> Quick Actions
-            </h3>
-            <div className="flex flex-wrap gap-3">
-              <Link 
-                href={`/create?agent=${agent.id}`}
-                className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white font-bold font-mono text-xs uppercase tracking-widest rounded-sm transition-colors"
-              >
-                Hire This Agent
-              </Link>
-              <Link 
-                href="/marketplace"
-                className="px-4 py-2 border border-zinc-700 hover:border-zinc-500 text-white font-mono text-xs uppercase tracking-widest rounded-sm transition-colors"
-              >
-                Browse Tasks
-              </Link>
-            </div>
-          </div>
-
         </div>
+
+        {/* Telemetry Metrics Strip */}
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 p-3 rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-card)] mb-8 font-mono-num">
+          <div className="p-3 sm:p-4 text-center border-r border-[var(--border-subtle)]">
+            <div className="text-xl sm:text-2xl font-bold text-[var(--accent-green)]">
+              {tasksCompleted}
+            </div>
+            <div className="text-[10px] uppercase text-[var(--text-tertiary)] tracking-wider mt-0.5">
+              Settled Tasks
+            </div>
+          </div>
+
+          <div className="p-3 sm:p-4 text-center sm:border-r border-[var(--border-subtle)]">
+            <div className="text-xl sm:text-2xl font-bold text-[var(--text-primary)]">
+              {recentBids.length}
+            </div>
+            <div className="text-[10px] uppercase text-[var(--text-tertiary)] tracking-wider mt-0.5">
+              Proposals
+            </div>
+          </div>
+
+          <div className="p-3 sm:p-4 text-center border-r border-[var(--border-subtle)]">
+            <div className="text-xl sm:text-2xl font-bold text-[var(--status-amber)] flex items-center justify-center gap-1">
+              <Star size={14} className="fill-[var(--status-amber)]" />
+              <span>{stats?.avgRating ? stats.avgRating.toFixed(1) : "5.0"}</span>
+            </div>
+            <div className="text-[10px] uppercase text-[var(--text-tertiary)] tracking-wider mt-0.5">
+              Client Rating
+            </div>
+          </div>
+
+          <div className="p-3 sm:p-4 text-center">
+            <div className="text-xl sm:text-2xl font-bold text-[var(--accent-green)]">
+              100%
+            </div>
+            <div className="text-[10px] uppercase text-[var(--text-tertiary)] tracking-wider mt-0.5">
+              Finality Rate
+            </div>
+          </div>
+        </div>
+
+        {/* Tab Selection */}
+        <div className="flex items-center gap-2 mb-6 border-b border-[var(--border-subtle)] pb-2">
+          <button
+            onClick={() => setActiveTab("tasks")}
+            className={`px-4 py-1.5 rounded-full text-xs font-medium transition-all cursor-pointer ${
+              activeTab === "tasks"
+                ? "bg-[var(--accent-green)] text-black font-bold"
+                : "text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
+            }`}
+          >
+            Settled Tasks ({taskHistory.length})
+          </button>
+          <button
+            onClick={() => setActiveTab("proposals")}
+            className={`px-4 py-1.5 rounded-full text-xs font-medium transition-all cursor-pointer ${
+              activeTab === "proposals"
+                ? "bg-[var(--accent-green)] text-black font-bold"
+                : "text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
+            }`}
+          >
+            Recent Proposals ({recentBids.length})
+          </button>
+        </div>
+
+        {/* Tab Content */}
+        {activeTab === "tasks" ? (
+          taskHistory.length === 0 ? (
+            <div className="text-center py-16 p-6 rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-card)]">
+              <Briefcase size={28} className="text-[var(--text-tertiary)] mx-auto mb-2" />
+              <p className="text-xs text-[var(--text-secondary)] font-mono-num">
+                No settled deliverables recorded yet.
+              </p>
+            </div>
+          ) : (
+            <div className="space-y-3">
+              {taskHistory.map((task: any) => (
+                <Link
+                  key={task.id || task._id}
+                  href={`/marketplace/${task.id || task._id}`}
+                  className="p-4 rounded-xl robin-card flex items-center justify-between gap-4 group"
+                >
+                  <div className="min-w-0">
+                    <h4 className="text-sm font-bold text-[var(--text-primary)] group-hover:text-[var(--accent-green)] transition-colors truncate">
+                      {task.title}
+                    </h4>
+                    <span className="text-xs font-mono-num text-[var(--text-tertiary)] mt-0.5 block">
+                      {task.category}
+                    </span>
+                  </div>
+                  <div className="text-right shrink-0">
+                    <div className="text-sm font-bold font-mono-num text-[var(--accent-green)]">
+                      {task.budget || "Settled"}
+                    </div>
+                  </div>
+                </Link>
+              ))}
+            </div>
+          )
+        ) : (
+          recentBids.length === 0 ? (
+            <div className="text-center py-16 p-6 rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-card)]">
+              <p className="text-xs text-[var(--text-secondary)] font-mono-num">
+                No recent proposals submitted.
+              </p>
+            </div>
+          ) : (
+            <div className="space-y-3">
+              {recentBids.map((bid: any) => (
+                <div
+                  key={bid.id || bid._id}
+                  className="p-4 rounded-xl robin-card flex items-center justify-between gap-4"
+                >
+                  <div className="min-w-0">
+                    <h4 className="text-sm font-bold text-[var(--text-primary)] truncate">
+                      {bid.taskTitle || "Task Proposal"}
+                    </h4>
+                    <p className="text-xs text-[var(--text-secondary)] line-clamp-1 mt-0.5">
+                      {bid.message || "Proposal submitted."}
+                    </p>
+                  </div>
+                  <span className="text-xs font-mono-num font-medium text-[var(--accent-green)] shrink-0">
+                    {bid.amount || "Active"}
+                  </span>
+                </div>
+              ))}
+            </div>
+          )
+        )}
+
       </main>
 
       <Footer />
@@ -375,39 +341,9 @@ function AgentProfileContent() {
   );
 }
 
-function StatusBadge({ status }: { status: string }) {
-  const styles: Record<string, string> = {
-    Open: "bg-emerald-500/10 text-emerald-500 border-emerald-500/20",
-    "In Progress": "bg-blue-500/10 text-blue-500 border-blue-500/20",
-    "In Review": "bg-amber-500/10 text-amber-500 border-amber-500/20",
-    Completed: "bg-green-500/10 text-green-500 border-green-500/20",
-    Pending: "bg-yellow-500/10 text-yellow-500 border-yellow-500/20",
-    accepted: "bg-emerald-500/10 text-emerald-500 border-emerald-500/20",
-    rejected: "bg-red-500/10 text-red-500 border-red-500/20",
-    WorkSubmitted: "bg-amber-500/10 text-amber-500 border-amber-500/20",
-  };
-  return (
-    <span className={`inline-flex px-2 py-0.5 rounded-full border text-[10px] font-bold uppercase ${styles[status] || "bg-zinc-800 text-zinc-400 border-zinc-700"}`}>
-      {status}
-    </span>
-  );
-}
-
-function ChevronRight({ size, className }: { size: number; className?: string }) {
-  return (
-    <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
-      <path d="m9 18 6-6-6-6"/>
-    </svg>
-  );
-}
-
 export default function AgentProfilePage() {
   return (
-    <Suspense fallback={
-      <div className="min-h-screen text-white pt-32 flex items-center justify-center">
-        <Loader2 className="w-8 h-8 text-emerald-500 animate-spin" />
-      </div>
-    }>
+    <Suspense fallback={<div className="min-h-screen bg-[var(--bg-canvas)]" />}>
       <AgentProfileContent />
     </Suspense>
   );

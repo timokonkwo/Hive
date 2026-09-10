@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { ArrowDown, Loader2, ExternalLink, RefreshCw, AlertCircle } from "lucide-react";
+import { ArrowDown, Loader2, ExternalLink, RefreshCw, AlertCircle, CheckCircle2 } from "lucide-react";
 
 const HIVE_CA = "6JfonM6a24xngXh5yJ1imZzbMhpfvEsiafkb4syHBAGS";
 const LAMPORTS_PER_SOL = 1_000_000_000;
@@ -110,7 +110,6 @@ export function SwapWidget() {
     setSwapping(true);
 
     try {
-      // Detect Solana wallet provider
       const phantom = (window as any).phantom?.solana;
       const solflare = (window as any).solflare;
       const solana = phantom || solflare || (window as any).solana;
@@ -122,16 +121,14 @@ export function SwapWidget() {
         return;
       }
 
-      // Try silent connect first, then prompt
       let wallet: string | null = solana.publicKey?.toString() || null;
       
       if (!wallet) {
         try {
-          // Try silent connect (won't show popup if already trusted)
           const resp = await solana.connect({ onlyIfTrusted: true });
           wallet = resp?.publicKey?.toString() || null;
         } catch {
-          // Silent connect failed — do a full connect with popup
+          // Silent connect failed: do a full connect with popup
           try {
             const resp = await solana.connect();
             wallet = resp?.publicKey?.toString() || null;
@@ -149,10 +146,8 @@ export function SwapWidget() {
         return;
       }
 
-      // Mark as connected
       setWalletConnected(true);
 
-      // If no amount entered, this was just a connect action
       if (!solAmount || parseFloat(solAmount) <= 0) {
         setSwapping(false);
         return;
@@ -178,7 +173,6 @@ export function SwapWidget() {
         return;
       }
 
-      // Bags returns swapTransaction at response level or top level
       const swapTx = swapData.response?.swapTransaction || swapData.swapTransaction;
 
       if (swapTx) {
@@ -191,7 +185,6 @@ export function SwapWidget() {
         const serialized = signed.serialize();
         const serializedBase64 = bytesToBase64(serialized);
 
-        // Send via server-side proxy to keep RPC key private
         const sendRes = await fetch("/api/solana/rpc", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -217,7 +210,7 @@ export function SwapWidget() {
         setSolAmount("");
         setQuote(null);
       } else {
-        console.error("[SWAP] Response shape:", JSON.stringify(Object.keys(swapData)), swapData.response ? JSON.stringify(Object.keys(swapData.response)) : 'no response key');
+        console.error("[SWAP] Response shape:", JSON.stringify(Object.keys(swapData)));
         setError("No transaction returned from swap API");
       }
     } catch (err: any) {
@@ -239,31 +232,35 @@ export function SwapWidget() {
 
   return (
     <div className="relative">
-      {/* Glow effect */}
-      <div className="absolute -inset-px bg-gradient-to-b from-emerald-500/20 via-transparent to-transparent rounded-xl blur-sm opacity-60" />
+      <div className="absolute -inset-px bg-gradient-to-b from-[#00C805]/20 via-transparent to-transparent rounded-2xl blur-sm opacity-60 pointer-events-none" />
       
-      <div className="relative bg-[#0A0A0A] border border-white/10 rounded-xl overflow-hidden">
+      <div className="relative robin-card p-0 overflow-hidden bg-token-surface border border-token-border shadow-2xl">
         {/* Header */}
-        <div className="flex items-center justify-between px-5 pt-5 pb-3">
+        <div className="flex items-center justify-between px-6 pt-6 pb-4 border-b border-token-border bg-token-subtle/50">
           <div>
-            <h3 className="text-white font-bold text-base">Buy $HIVE</h3>
-            <p className="text-zinc-600 text-[10px] font-mono mt-0.5">Swap SOL → HIVE via Bags</p>
+            <div className="flex items-center gap-2">
+              <span className="w-2 h-2 rounded-full bg-[#00C805] animate-pulse" />
+              <h3 className="text-token-text font-bold text-base tracking-tight">Buy $HIVE</h3>
+            </div>
+            <p className="text-token-dim text-[11px] font-mono mt-0.5">Instant settlement via Bags router</p>
           </div>
           <button
             onClick={() => fetchQuote(solAmount)}
-            className="w-8 h-8 flex items-center justify-center rounded-lg bg-zinc-800/50 text-zinc-500 hover:text-white hover:bg-zinc-700/50 transition-all"
+            className="w-8 h-8 flex items-center justify-center rounded-lg border border-token-border bg-token-surface text-token-dim hover:text-token-text hover:border-token-border-strong transition-all"
             title="Refresh quote"
+            aria-label="Refresh quote"
           >
-            <RefreshCw size={13} className={loadingQuote ? 'animate-spin' : ''} />
+            <RefreshCw size={13} className={loadingQuote ? "animate-spin text-[#00C805]" : ""} />
           </button>
         </div>
 
         {/* Swap form */}
-        <div className="px-5 pb-5">
+        <div className="p-6 space-y-3">
           {/* Input: SOL */}
-          <div className="bg-black/60 border border-white/5 rounded-lg p-4 mb-1.5">
+          <div className="bg-token-subtle border border-token-border rounded-xl p-4">
             <div className="flex items-center justify-between mb-2">
-              <span className="text-[10px] font-mono text-zinc-600 uppercase tracking-widest">You pay</span>
+              <span className="text-[10px] font-mono text-token-dim uppercase tracking-widest">You Pay</span>
+              <span className="text-[10px] font-mono text-token-dim">Solana Network</span>
             </div>
             <div className="flex items-center gap-3">
               <input
@@ -273,10 +270,10 @@ export function SwapWidget() {
                 value={solAmount}
                 onChange={(e) => setSolAmount(e.target.value)}
                 placeholder="0.00"
-                className="flex-1 bg-transparent text-white font-mono text-2xl focus:outline-none placeholder:text-zinc-700 min-w-0"
+                className="flex-1 bg-transparent text-token-text font-mono text-2xl font-bold focus:outline-none placeholder:text-token-dim/40 min-w-0"
               />
-              <div className="flex items-center gap-2 px-3 py-1.5 bg-zinc-800/80 rounded-lg shrink-0">
-                <svg width="20" height="20" viewBox="0 0 128 128" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <div className="flex items-center gap-2 px-3 py-1.5 bg-token-surface border border-token-border rounded-lg shrink-0">
+                <svg width="18" height="18" viewBox="0 0 128 128" fill="none" xmlns="http://www.w3.org/2000/svg">
                   <circle cx="64" cy="64" r="64" fill="black"/>
                   <path d="M36.7 87.3a2.4 2.4 0 011.7-.7h56.9c1.1 0 1.6 1.3.8 2.1l-11.8 11.8a2.4 2.4 0 01-1.7.7H25.7c-1.1 0-1.6-1.3-.8-2.1L36.7 87.3z" fill="url(#sol_a)"/>
                   <path d="M36.7 27.5a2.5 2.5 0 011.7-.7h56.9c1.1 0 1.6 1.3.8 2.1L84.3 40.7a2.4 2.4 0 01-1.7.7H25.7c-1.1 0-1.6-1.3-.8-2.1l11.8-11.8z" fill="url(#sol_b)"/>
@@ -287,115 +284,123 @@ export function SwapWidget() {
                     <linearGradient id="sol_c" x1="89.5" y1="18.5" x2="29.5" y2="109.5" gradientUnits="userSpaceOnUse"><stop stopColor="#00FFA3"/><stop offset="1" stopColor="#DC1FFF"/></linearGradient>
                   </defs>
                 </svg>
-                <span className="text-white font-bold text-sm font-mono">SOL</span>
+                <span className="text-token-text font-bold text-xs font-mono">SOL</span>
               </div>
             </div>
           </div>
 
           {/* Arrow */}
           <div className="flex justify-center -my-2 relative z-10">
-            <div className="w-9 h-9 rounded-xl bg-zinc-800 border border-zinc-700/50 flex items-center justify-center shadow-lg">
-              <ArrowDown size={15} className="text-zinc-400" />
+            <div className="w-8 h-8 rounded-full bg-token-surface border border-token-border flex items-center justify-center shadow-md text-token-dim">
+              <ArrowDown size={14} />
             </div>
           </div>
 
           {/* Output: HIVE */}
-          <div className="bg-black/60 border border-white/5 rounded-lg p-4 mt-1.5">
+          <div className="bg-token-subtle border border-token-border rounded-xl p-4">
             <div className="flex items-center justify-between mb-2">
-              <span className="text-[10px] font-mono text-zinc-600 uppercase tracking-widest">You receive</span>
+              <span className="text-[10px] font-mono text-token-dim uppercase tracking-widest">You Receive</span>
+              <span className="text-[10px] font-mono text-[#00C805] font-semibold">Verified Token</span>
             </div>
             <div className="flex items-center gap-3">
               <div className="flex-1 min-h-[36px] flex items-center">
                 {loadingQuote ? (
-                  <Loader2 size={20} className="text-emerald-500 animate-spin" />
+                  <Loader2 size={20} className="text-[#00C805] animate-spin" />
                 ) : hasQuote ? (
-                  <span className="text-emerald-400 font-mono text-2xl font-bold">
+                  <span className="text-[#00C805] font-mono text-2xl font-black">
                     {formatHive(hiveOutput)}
                   </span>
                 ) : (
-                  <span className="text-zinc-700 font-mono text-2xl">0.00</span>
+                  <span className="text-token-dim/40 font-mono text-2xl font-bold">0.00</span>
                 )}
               </div>
-              <div className="flex items-center gap-2 px-3 py-1.5 bg-emerald-500/10 border border-emerald-500/20 rounded-lg shrink-0">
-                <div className="w-5 h-5 rounded-full bg-gradient-to-br from-emerald-400 to-emerald-600 flex items-center justify-center text-[8px] font-bold text-black">H</div>
-                <span className="text-emerald-400 font-bold text-sm font-mono">HIVE</span>
+              <div className="flex items-center gap-2 px-3 py-1.5 bg-[#00C805]/10 border border-[#00C805]/30 rounded-lg shrink-0">
+                <div className="w-5 h-5 rounded-full bg-[#00C805] flex items-center justify-center text-[9px] font-black text-black">
+                  H
+                </div>
+                <span className="text-token-text font-bold text-xs font-mono">HIVE</span>
               </div>
             </div>
           </div>
 
           {/* Quote details */}
           {hasQuote && (
-            <div className="mt-3 px-1 space-y-1.5">
-              <div className="flex justify-between text-[10px] font-mono">
-                <span className="text-zinc-600">Price Impact</span>
-                <span className={`${parseFloat(priceImpact || '0') > 1 ? 'text-amber-400' : 'text-zinc-400'}`}>
+            <div className="p-3 bg-token-surface rounded-xl border border-token-border space-y-1.5">
+              <div className="flex justify-between text-[11px] font-mono">
+                <span className="text-token-dim">Price Impact</span>
+                <span className={parseFloat(priceImpact || "0") > 1 ? "text-amber-500 font-semibold" : "text-token-text font-semibold"}>
                   {formatPriceImpact(priceImpact)}
                 </span>
               </div>
               {slippageBps !== undefined && (
-                <div className="flex justify-between text-[10px] font-mono">
-                  <span className="text-zinc-600">Max Slippage</span>
-                  <span className="text-zinc-400">{(slippageBps / 100).toFixed(1)}%</span>
+                <div className="flex justify-between text-[11px] font-mono">
+                  <span className="text-token-dim">Max Slippage</span>
+                  <span className="text-token-text font-semibold">{(slippageBps / 100).toFixed(1)}%</span>
                 </div>
               )}
               {quote?.response?.routePlan?.[0]?.venue && (
-                <div className="flex justify-between text-[10px] font-mono">
-                  <span className="text-zinc-600">Route</span>
-                  <span className="text-zinc-400">{quote.response.routePlan[0].venue}</span>
+                <div className="flex justify-between text-[11px] font-mono">
+                  <span className="text-token-dim">Route Venue</span>
+                  <span className="text-token-text font-semibold">{quote.response.routePlan[0].venue}</span>
                 </div>
               )}
             </div>
           )}
 
-          {/* Error */}
+          {/* Error notification */}
           {error && (
-            <div className="mt-3 p-3 bg-red-500/5 border border-red-500/15 rounded-lg flex items-start gap-2">
-              <AlertCircle size={13} className="text-red-400 shrink-0 mt-0.5" />
-              <span className="text-red-400 text-[11px] font-mono leading-tight">{error}</span>
+            <div className="p-3 bg-red-500/10 border border-red-500/20 rounded-xl flex items-start gap-2.5">
+              <AlertCircle size={14} className="text-red-500 shrink-0 mt-0.5" />
+              <span className="text-red-500 text-[11px] font-mono leading-tight">{error}</span>
             </div>
           )}
 
-          {/* Success */}
+          {/* Success confirmation */}
           {swapResult && (
-            <div className="mt-3 p-3 bg-emerald-500/5 border border-emerald-500/15 rounded-lg">
-              <p className="text-emerald-400 text-[11px] font-mono font-bold mb-1">Swap successful!</p>
+            <div className="p-3 bg-[#00C805]/10 border border-[#00C805]/30 rounded-xl">
+              <div className="flex items-center gap-1.5 text-[#00C805] text-[11px] font-mono font-bold mb-1">
+                <CheckCircle2 size={13} />
+                <span>Swap executed successfully</span>
+              </div>
               <a
                 href={`https://solscan.io/tx/${swapResult}`}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="text-[10px] font-mono text-zinc-500 hover:text-zinc-300 flex items-center gap-1 transition-colors"
+                className="text-[10px] font-mono text-token-dim hover:text-token-text flex items-center gap-1 transition-colors"
               >
-                View on Solscan <ExternalLink size={9} />
+                Inspect on Solscan <ExternalLink size={10} />
               </a>
             </div>
           )}
 
-          {/* Buy button */}
+          {/* Execution CTA button */}
           <button
             onClick={handleSwap}
             disabled={(walletConnected && (!solAmount || parseFloat(solAmount) <= 0)) || swapping || loadingQuote}
-            className="w-full mt-4 py-3.5 bg-emerald-600 hover:bg-emerald-500 disabled:opacity-30 disabled:cursor-not-allowed text-white font-bold font-mono text-xs uppercase tracking-widest rounded-lg transition-all flex items-center justify-center gap-2 shadow-[0_0_20px_rgba(16,185,129,0.15)] hover:shadow-[0_0_30px_rgba(16,185,129,0.3)]"
+            className="w-full mt-2 py-3.5 bg-[#00C805] hover:bg-[#00B004] active:scale-[0.99] disabled:opacity-30 disabled:cursor-not-allowed text-black font-bold font-mono text-xs uppercase tracking-wider rounded-xl transition-all flex items-center justify-center gap-2 shadow-[0_4px_16px_rgba(0,200,5,0.25)]"
           >
             {swapping ? (
               <>
-                <Loader2 size={14} className="animate-spin" /> Swapping...
+                <Loader2 size={14} className="animate-spin text-black" />
+                <span>Broadcasting Transaction...</span>
               </>
             ) : walletConnected ? (
-              "Buy $HIVE"
+              "Execute Swap"
             ) : (
-              "Connect Wallet"
+              "Connect Solana Wallet"
             )}
           </button>
 
-          {/* Fallback */}
-          <div className="mt-3 text-center">
+          {/* Fallback link */}
+          <div className="pt-2 text-center">
             <a
               href={`https://bags.fm/${HIVE_CA}`}
               target="_blank"
               rel="noopener noreferrer"
-              className="text-[10px] font-mono text-zinc-600 hover:text-zinc-400 transition-colors inline-flex items-center gap-1"
+              className="text-[11px] font-mono text-token-dim hover:text-token-text transition-colors inline-flex items-center gap-1.5"
             >
-              or trade on bags.fm <ExternalLink size={8} />
+              <span>Secondary liquidity pool on bags.fm</span>
+              <ExternalLink size={10} />
             </a>
           </div>
         </div>

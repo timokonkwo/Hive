@@ -1,10 +1,15 @@
 "use client";
 
-import { TaskCategory } from "@/lib/types/task";
-import { Shield, Code, Cpu, PenTool, Layout, Search, Megaphone, Scale, Languages, Briefcase, Clock, Coins, ArrowRight, CheckCircle, Rocket, BadgeCheck } from "lucide-react";
+import React from "react";
 import Link from "next/link";
-import { useTheme } from "@/components/providers/ThemeProvider";
-import { HolderBadge } from "@/components/ui/HolderBadge";
+import Image from "next/image";
+import { TaskCategory } from "@/lib/types/task";
+import { 
+  Shield, Code, Cpu, PenTool, Layout, Search, 
+  Megaphone, Scale, Languages, Briefcase, Rocket, 
+  Clock, CheckCircle2, ChevronRight
+} from "lucide-react";
+import { getUserAvatarUrl } from "@/lib/avatar";
 
 interface TaskCardProps {
   id: string | number;
@@ -18,83 +23,111 @@ interface TaskCardProps {
   clientAddress?: string;
 }
 
-const CATEGORY_CONFIG: Record<TaskCategory, { color: string; icon: any }> = {
-  Security: { color: "text-zinc-400", icon: Shield },
-  Development: { color: "text-zinc-400", icon: Code },
-  Analysis: { color: "text-zinc-400", icon: Cpu },
-  Content: { color: "text-zinc-400", icon: PenTool },
-  Design: { color: "text-zinc-400", icon: Layout },
-  Research: { color: "text-zinc-400", icon: Search },
-  Social: { color: "text-zinc-400", icon: Megaphone },
-  Legal: { color: "text-zinc-400", icon: Scale },
-  Translation: { color: "text-zinc-400", icon: Languages },
-  'Token Launch': { color: "text-zinc-400", icon: Rocket },
-  Other: { color: "text-zinc-400", icon: Briefcase },
+const CATEGORY_ICONS: Record<string, React.ElementType> = {
+  Security: Shield,
+  Development: Code,
+  Analysis: Cpu,
+  Content: PenTool,
+  Design: Layout,
+  Research: Search,
+  Social: Megaphone,
+  Legal: Scale,
+  Translation: Languages,
+  "Token Launch": Rocket,
+  Other: Briefcase,
 };
 
-const STATUS_CONFIG: Record<string, { label: string; color: string; bg: string; border: string; icon?: any }> = {
-  Open: { label: "Open", color: "text-emerald-400", bg: "bg-emerald-500/10", border: "border-emerald-500/20" },
-  "In Progress": { label: "In Progress", color: "text-zinc-300", bg: "bg-white/5", border: "border-white/10" },
-  "In Review": { label: "In Review", color: "text-zinc-400", bg: "bg-white/5", border: "border-white/10", icon: Clock },
-  Completed: { label: "Completed", color: "text-zinc-500", bg: "bg-transparent", border: "border-white/5", icon: BadgeCheck },
-};
-
-export function TaskCard({ id, title, description, category, budget, postedTime, status, proposalsCount, clientAddress }: TaskCardProps) {
-  const { theme } = useTheme();
-  const isDark = true;
-  const config = CATEGORY_CONFIG[category] || CATEGORY_CONFIG.Other;
-  const CategoryIcon = config.icon;
-  const statusConf = STATUS_CONFIG[status] || STATUS_CONFIG.Open;
-  const StatusIcon = statusConf.icon;
+export function TaskCard({
+  id,
+  title,
+  description,
+  category,
+  budget,
+  postedTime,
+  status,
+  proposalsCount,
+  clientAddress,
+}: TaskCardProps) {
+  const CategoryIcon = CATEGORY_ICONS[category] || Briefcase;
   const isCompleted = status === "Completed";
+  const isOpen = status === "Open";
+  const avatarUrl = getUserAvatarUrl(clientAddress || String(id));
 
   return (
-    <Link href={`/marketplace/${id}`} className="group transition-all p-6 md:p-8 flex flex-col h-full relative cursor-pointer block rounded-2xl shadow-sm hover:shadow-md hover:-translate-y-1" style={{
-      background: isDark ? 'rgba(255,255,255,0.02)' : '#FFFFFF',
-      border: `1px solid ${isCompleted ? (isDark ? 'rgba(34,197,94,0.1)' : 'rgba(34,197,94,0.15)') : (isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.08)')}`,
-      opacity: isCompleted ? 0.7 : 1,
-    }}>
-      
-      {/* Header: Category + Status */}
-      <div className="flex justify-between items-start mb-6">
-        <span className={`text-[12px] font-medium ${config.color} flex items-center gap-1.5`}>
-           <CategoryIcon size={14} /> {category}
-        </span>
-        <div className="flex items-center gap-2">
-          <span className={`px-2.5 py-1 rounded-full ${statusConf.bg} border ${statusConf.border} text-[11px] font-medium ${statusConf.color} flex items-center gap-1.5`}>
-            {StatusIcon && <StatusIcon size={12} />}
-            {statusConf.label}
-          </span>
-        </div>
-      </div>
+    <Link
+      href={`/marketplace/${id}`}
+      className={`group p-5 sm:p-6 robin-card flex flex-col justify-between h-full relative cursor-pointer block transition-all ${
+        isCompleted ? "opacity-75" : ""
+      }`}
+    >
+      <div>
+        {/* Top Header: Client Avatar + Category + Status Pill */}
+        <div className="flex items-center justify-between gap-3 mb-4">
+          <div className="flex items-center gap-2.5 min-w-0">
+            <div className="w-6 h-6 rounded-full overflow-hidden border border-[var(--border-subtle)] bg-[var(--bg-elevated)] shrink-0">
+              <Image
+                src={avatarUrl}
+                alt="Client"
+                width={24}
+                height={24}
+                className="w-full h-full object-cover"
+                unoptimized
+              />
+            </div>
+            <span className="text-xs font-medium text-[var(--text-secondary)] flex items-center gap-1 truncate">
+              <CategoryIcon size={12} className="text-[var(--text-tertiary)] shrink-0" />
+              {category}
+            </span>
+          </div>
 
-      {/* Content */}
-      <div className="mb-8 flex-1">
-        <h3 className="text-[18px] font-semibold mb-3 tracking-tight transition-colors group-hover:text-emerald-400" style={{
-          color: isCompleted ? (isDark ? '#71717A' : '#A1A1AA') : (isDark ? '#fff' : '#111827')
-        }}>
-             {title}
+          {/* Status Indicator */}
+          <div className="shrink-0">
+            {isOpen ? (
+              <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[10px] font-mono-num font-medium bg-[var(--accent-green-tint)] text-[var(--accent-green)] border border-[var(--border-accent)]">
+                <span className="w-1.5 h-1.5 rounded-full bg-[var(--accent-green)] animate-pulse" />
+                Open
+              </span>
+            ) : isCompleted ? (
+              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-mono-num font-medium bg-[var(--bg-pill)] text-[var(--text-tertiary)] border border-[var(--border-subtle)]">
+                <CheckCircle2 size={10} className="text-[var(--accent-green)]" />
+                Settled
+              </span>
+            ) : (
+              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-mono-num font-medium bg-[var(--bg-pill)] text-[var(--text-secondary)] border border-[var(--border-subtle)]">
+                <Clock size={10} />
+                {status}
+              </span>
+            )}
+          </div>
+        </div>
+
+        {/* Title */}
+        <h3 className="text-base font-bold text-[var(--text-primary)] mb-2 group-hover:text-[var(--accent-green)] transition-colors line-clamp-2 leading-snug">
+          {title}
         </h3>
-        <p className="text-[14px] leading-relaxed line-clamp-4" style={{ color: isDark ? '#A1A1AA' : '#60646c' }}>
+
+        {/* Description */}
+        <p className="text-xs sm:text-sm text-[var(--text-secondary)] line-clamp-3 leading-relaxed mb-6">
           {description}
         </p>
       </div>
 
-      {/* Footer Details */}
-      <div className="flex flex-wrap gap-4 items-center justify-between pt-5" style={{ borderTop: `1px solid ${isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.08)'}` }}>
-         <div className="flex items-center gap-2 bg-white/5 px-3 py-1.5 rounded-lg" style={{ background: isDark ? 'rgba(255,255,255,0.03)' : 'rgba(0,0,0,0.03)' }}>
-            <span className="text-[11px] font-medium" style={{ color: isDark ? '#71717A' : '#A1A1AA' }}>Budget</span>
-            <span className="text-[13px] font-semibold" style={{ color: isDark ? '#fff' : '#111827' }}>{budget}</span>
-            {clientAddress && <div className="ml-1"><HolderBadge wallet={clientAddress} compact /></div>}
-         </div>
+      {/* Card Footer: Budget + Proposals + Timestamp */}
+      <div className="pt-4 border-t border-[var(--border-subtle)] flex items-center justify-between gap-3 text-xs">
+        {/* Reward Pill */}
+        <div className="flex items-center gap-1.5">
+          <span className="text-[11px] font-mono-num text-[var(--text-tertiary)]">Reward:</span>
+          <span className="text-sm font-bold font-mono-num text-[var(--accent-green)]">
+            {budget}
+          </span>
+        </div>
 
-         <div className="flex items-center gap-4">
-            <div className="flex items-center gap-1.5">
-               <span className="text-[11px] font-medium" style={{ color: isDark ? '#71717A' : '#A1A1AA' }}>Bids</span>
-               <span className="text-[13px] font-medium" style={{ color: isDark ? '#fff' : '#111827' }}>{proposalsCount}</span>
-            </div>
-            <span className="text-[12px] font-medium" style={{ color: isDark ? '#71717A' : '#A1A1AA' }}>{postedTime}</span>
-         </div>
+        {/* Bids and Time */}
+        <div className="flex items-center gap-3 text-[var(--text-tertiary)] font-mono-num text-[11px]">
+          <span>{proposalsCount} {proposalsCount === 1 ? "bid" : "bids"}</span>
+          <span>&bull;</span>
+          <span>{postedTime}</span>
+        </div>
       </div>
     </Link>
   );
