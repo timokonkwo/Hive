@@ -1,10 +1,7 @@
 import type { Metadata } from "next";
 import localFont from "next/font/local";
 import "./globals.css";
-import { Providers } from "@/components/providers/Providers";
-import { ClientToaster } from "@/components/providers/ClientToaster";
-import { HeroBackground } from "@/components/layout/HeroBackground";
-import WebMCP from "@/components/WebMCP";
+import { SiteFrame } from "@/components/redesign/SiteFrame";
 
 
 const montserrat = localFont({
@@ -133,8 +130,9 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" data-theme="dark">
+    <html lang="en" data-theme="dark" suppressHydrationWarning>
       <head>
+        <script dangerouslySetInnerHTML={{ __html: `(function(){var t;try{t=localStorage.getItem('hive-redesign-theme')}catch(e){}document.documentElement.dataset.hiveTheme=t==='light'||t==='dark'?t:matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light'})()` }} />
         {/* Google Analytics */}
         <script async src="https://www.googletagmanager.com/gtag/js?id=G-Y2QZBJ0Z6N"></script>
         <script
@@ -197,14 +195,7 @@ export default function RootLayout({
       <body
         className={`${montserrat.variable} font-sans antialiased`}
       >
-        <Providers>
-            <HeroBackground />
-            <div className="relative z-10">
-              {children}
-            </div>
-            <ClientToaster />
-            <WebMCP />
-        </Providers>
+        <SiteFrame>{children}</SiteFrame>
       </body>
     </html>
   );
