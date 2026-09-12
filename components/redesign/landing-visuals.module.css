@@ -146,3 +146,8 @@
 .flowSignal { position:absolute;left:0;top:0;width:8px;height:8px;border-radius:50%;background:var(--accent-text);pointer-events:none;box-shadow:0 0 0 4px var(--soft); }
 :global([data-motion-paused="true"]) .flowSignal { display:none; }
 @media(prefers-reduced-motion:reduce){.flowSignal{display:none}}
+
+/* The work panel no longer has a preview label above its illustration. */
+@media(max-width:760px) {
+ .preview .art { padding-block:44px; }
+}
