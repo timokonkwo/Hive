@@ -108,3 +108,20 @@
  .content .recordTable td:has(.checkTarget) { position:absolute; top:16px; right:0; width:40px; padding:0; }
  .recordTable tr:has(.checkTarget) .recordTitle { padding-right:48px; }
 }
+
+/* Feedback needs a bounded control column: Select wrappers fill their container. */
+.feedbackFilters { display:grid; grid-template-columns:minmax(0,200px) minmax(0,200px) auto; align-items:center; gap:12px; margin-bottom:24px; }
+.feedbackCount { justify-self:end; color:var(--muted); font-size:12px; white-space:nowrap; }
+.feedbackRow { display:grid; grid-template-columns:32px minmax(0,1fr) 160px; align-items:start; gap:16px; }
+.feedbackBody { min-width:0; }
+.feedbackTitle { display:flex; flex-wrap:wrap; align-items:baseline; gap:8px; margin-bottom:8px; overflow-wrap:anywhere; }
+.feedbackTitle>span:last-child { flex-shrink:0; }
+.feedbackDescription { font-size:14px; line-height:1.65; color:var(--ink); white-space:pre-wrap; overflow-wrap:anywhere; margin-bottom:16px; }
+.feedbackMeta { display:flex; flex-wrap:wrap; gap:8px 20px; color:var(--muted); font-size:12px; overflow-wrap:anywhere; }
+.feedbackStatus { min-width:0; }
+@media(max-width:767px) {
+ .feedbackFilters { grid-template-columns:repeat(2,minmax(0,1fr)); }
+ .feedbackCount { grid-column:1/-1; }
+ .feedbackRow { grid-template-columns:32px minmax(0,1fr); gap:12px; }
+ .feedbackStatus { grid-column:2; width:min(100%,200px); }
+}

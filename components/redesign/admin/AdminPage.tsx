@@ -1061,7 +1061,7 @@ function AdminWorkspace() {
       {/* ── Feedback Tab ── */}
       {activeTab === "feedback" && (
         <div>
-          <div className="flex items-center gap-3 mb-6">
+          <div className={styles.feedbackFilters}>
             <Select aria-label="Feedback type filter"
               value={feedbackTypeFilter}
               onChange={(e) => setFeedbackTypeFilter(e.target.value)}
@@ -1082,7 +1082,7 @@ function AdminWorkspace() {
               <option value="resolved">Resolved</option>
               <option value="dismissed">Dismissed</option>
             </Select>
-            <span className="text-[var(--muted)] text-xs  ml-auto">{feedbackTotal} total</span>
+            <span className={styles.feedbackCount}>{feedbackTotal} total</span>
           </div>
 
           {feedbackLoading ? (
@@ -1093,15 +1093,15 @@ function AdminWorkspace() {
             <div className="space-y-3">
               {feedbackItems.map((item: any) => (
                 <div key={item.id} className="p-4 bg-[var(--surface)] border border-[var(--rule)] rounded-lg">
-                  <div className="flex items-start gap-3">
+                  <div className={styles.feedbackRow}>
                     <div className={`w-8 h-8 rounded-full flex items-center justify-center shrink-0 mt-0.5 ${
                       item.type === "bug" ? "bg-[var(--danger-soft)] text-[var(--danger)]" : "bg-[var(--soft)] text-[var(--accent-text)]"
                     }`}>
                       {item.type === "bug" ? <Bug size={14} /> : <Lightbulb size={14} />}
                     </div>
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2 mb-1">
-                        <span className="text-sm font-semibold text-[var(--ink)] truncate">{item.title}</span>
+                    <div className={styles.feedbackBody}>
+                      <div className={styles.feedbackTitle}>
+                        <span className="text-sm font-semibold text-[var(--ink)]">{item.title}</span>
                         <span className={`text-xs   px-1.5 py-0.5 rounded border ${
                           item.status === "open" ? "bg-[var(--soft)] text-[var(--accent-text)] border-[var(--rule)]" :
                           item.status === "reviewed" ? "bg-[var(--soft)] text-[var(--accent-text)] border-[var(--rule)]" :
@@ -1109,13 +1109,14 @@ function AdminWorkspace() {
                           "bg-[var(--surface)] text-[var(--muted)] border-[var(--rule)]"
                         }`}>{item.status}</span>
                       </div>
-                      <p className="text-[var(--muted)] text-xs  mb-2 whitespace-pre-wrap">{item.description}</p>
-                      <div className="flex items-center gap-4 text-xs text-[var(--muted)] ">
+                      <p className={styles.feedbackDescription}>{item.description}</p>
+                      <div className={styles.feedbackMeta}>
                         <span>{new Date(item.createdAt).toLocaleString()}</span>
                         {item.contactInfo && <span>Contact: {item.contactInfo}</span>}
                       </div>
                     </div>
-                    <Select
+                    <div className={styles.feedbackStatus}><Select
+                      aria-label={`Status for ${item.title}`}
                       value={item.status}
                       onChange={(e) => updateFeedbackStatus(item.id, e.target.value)}
                       className="bg-[var(--surface)] border border-[var(--rule)] text-[var(--muted)] text-xs  px-2 py-1 rounded-sm  shrink-0"
@@ -1124,7 +1125,7 @@ function AdminWorkspace() {
                       <option value="reviewed">Reviewed</option>
                       <option value="resolved">Resolved</option>
                       <option value="dismissed">Dismissed</option>
-                    </Select>
+                    </Select></div>
                   </div>
                 </div>
               ))}
