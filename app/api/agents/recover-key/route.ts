@@ -1,126 +1,42 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { createHash } from 'crypto';
 import { getDb, COLLECTIONS } from '@/lib/db';
 import { generateApiKey, hashApiKey } from '@/lib/api-key';
 import { checkRateLimit, getClientIp } from '@/lib/rate-limit';
-import { ObjectId } from 'mongodb';
 import { logger } from '@/lib/logger';
 
-/**
- * POST /api/agents/recover-key
- * Recover (regenerate) an agent's API key using agent name as the identifier.
- *
- * Methods:
- *   1. "recovery_code" — Use the recovery code given at registration
- *   2. "wallet" — Connect a wallet already linked to the agent
- *
- * Body: { method, agentName, recoveryCode?, walletAddress? }
- *
- * NOTE: This only regenerates the API key. Owner PIN is untouched and cannot be recovered.
- */
+const privateHeaders = { 'Cache-Control': 'no-store, private', 'Referrer-Policy': 'no-referrer' };
+const reply = (body: unknown, status = 200, headers = {}) => NextResponse.json(body, { status, headers: { ...privateHeaders, ...headers } });
+/** Recovery replaces only the API key. The offline recovery code and owner PIN remain unchanged. */
 export async function POST(req: NextRequest) {
-  const ip = getClientIp(req);
-
-  try {
-    const body = await req.json();
-    const { method, agentName } = body;
-
-    if (!method) {
-      return NextResponse.json({ error: 'method is required.' }, { status: 400 });
-    }
-
-    if (!agentName || typeof agentName !== 'string' || agentName.trim().length < 2) {
-      return NextResponse.json({ error: 'agentName is required (at least 2 characters).' }, { status: 400 });
-    }
-
-    if (!['recovery_code'].includes(method)) {
-      return NextResponse.json(
-        { error: 'Invalid method. Use "recovery_code".' },
-        { status: 400 }
-      );
-    }
-
-    // Find agent by name (case-insensitive, exact match)
-    const db = await getDb();
-    const escapedName = agentName.trim().replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-    const agent = await db.collection(COLLECTIONS.AGENTS).findOne({
-      name: { $regex: new RegExp(`^${escapedName}$`, 'i') },
-      status: { $ne: 'pending' },
-    });
-
-    if (!agent) {
-      return NextResponse.json({ error: 'No active agent found with that name.' }, { status: 404 });
-    }
-
-    const agentId = agent._id.toString();
-
-    // ── Method 1: Recovery Code ──
-    if (method === 'recovery_code') {
-      const rl = checkRateLimit(`recover-code:${ip}`, { maxRequests: 5, windowSeconds: 3600 });
-      if (!rl.allowed) {
-        return NextResponse.json(
-          { error: `Too many attempts. Try again in ${rl.resetInSeconds}s.` },
-          { status: 429, headers: { 'Retry-After': String(rl.resetInSeconds) } }
-        );
-      }
-
-      const { recoveryCode } = body;
-      if (!recoveryCode || typeof recoveryCode !== 'string') {
-        return NextResponse.json({ error: 'recoveryCode is required.' }, { status: 400 });
-      }
-
-      if (!agent.recoveryCodeHash) {
-        return NextResponse.json(
-          { error: 'No recovery code set for this agent.' },
-          { status: 400 }
-        );
-      }
-
-      const { createHash } = await import('crypto');
-      const providedHash = createHash('sha256').update(recoveryCode).digest('hex');
-      if (providedHash !== agent.recoveryCodeHash) {
-        return NextResponse.json({ error: 'Invalid recovery code.' }, { status: 403 });
-      }
-
-      return await regenerateKey(db, agent, agentId, 'recovery_code');
-    }
-
-    // SECURITY: Wallet-based recovery was removed because it accepted
-    // a wallet address without cryptographic proof of ownership.
-    // Anyone who knew the public wallet could steal the API key.
-    // Only recovery_code method is supported.
-
-    return NextResponse.json({ error: 'Invalid method.' }, { status: 400 });
-  } catch (error: any) {
-    logger.error('[HIVE] Key recovery error:', error);
-    return NextResponse.json({ error: 'Recovery failed.' }, { status: 500 });
+  const limit = checkRateLimit(`recover-code:${getClientIp(req)}`, { maxRequests: 5, windowSeconds: 3600 });
+  if (!limit.allowed) return reply({ error: `Too many attempts. Try again in ${limit.resetInSeconds} seconds.` }, 429, { 'Retry-After': String(limit.resetInSeconds) });
+  let body;
+  try { body = await req.json(); } catch { return reply({ error: 'Enter an agent name and recovery code.' }, 400); }
+  if (!body || body.method !== 'recovery_code' || typeof body.agentName !== 'string' || body.agentName.trim().length < 2 || body.agentName.trim().length > 100 || typeof body.recoveryCode !== 'string' || !/^[a-f0-9]{32}$/.test(body.recoveryCode.trim())) {
+    return reply({ error: 'Enter an agent name and the 32-character recovery code.' }, 400);
   }
-}
-
-/**
- * Helper: generate a new API key, update the agent, log the event.
- * NOTE: This does NOT touch the owner PIN. PINs are set by humans and cannot be recovered.
- */
-async function regenerateKey(db: any, agent: any, agentId: string, method: string) {
-  const newRawApiKey = generateApiKey();
-  const newApiKeyHash = hashApiKey(newRawApiKey);
-
-  await db.collection(COLLECTIONS.AGENTS).updateOne(
-    { _id: new ObjectId(agentId) },
-    { $set: { apiKeyHash: newApiKeyHash, updatedAt: new Date() } }
-  );
-
-  await db.collection(COLLECTIONS.ACTIVITY).insertOne({
-    type: 'AgentKeyRecovered',
-    agentId,
-    actorName: agent.name,
-    metadata: { method },
-    createdAt: new Date(),
-  });
-
-  return NextResponse.json({
-    api_key: newRawApiKey,
-    agent_name: agent.name,
-    method,
-    message: `API key regenerated for "${agent.name}". Save it now — it will not be shown again. Your owner PIN is unchanged.`,
-  });
+  try {
+    const db = await getDb();
+    const name = body.agentName.trim().replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const recoveryCodeHash = createHash('sha256').update(body.recoveryCode.trim()).digest('hex');
+    // Proof is part of the lookup; reject ambiguous legacy records instead of choosing one.
+    const matches = await db.collection(COLLECTIONS.AGENTS).find({ name: { $regex: new RegExp(`^${name}$`, 'i') }, recoveryCodeHash, status: { $ne: 'pending' } }).limit(2).toArray();
+    if (matches.length !== 1) return reply({ error: 'The agent name and recovery code do not match.' }, 403);
+    const agent = matches[0];
+    const apiKey = generateApiKey();
+    const result = await db.collection(COLLECTIONS.AGENTS).updateOne(
+      { _id: agent._id, apiKeyHash: agent.apiKeyHash ?? null, recoveryCodeHash, name: agent.name, status: { $ne: 'pending' } },
+      { $set: { apiKeyHash: hashApiKey(apiKey), updatedAt: new Date() } }
+    );
+    if (result.matchedCount !== 1) return reply({ error: 'Agent access changed during this request. Check your access before trying again.' }, 409);
+    try {
+      await db.collection(COLLECTIONS.ACTIVITY).insertOne({ type: 'AgentKeyRecovered', agentId: agent._id.toString(), actorName: agent.name, metadata: { method: 'recovery_code' }, createdAt: new Date() });
+    } catch { logger.error('[HIVE] Recovery activity could not be recorded.'); }
+    return reply({ success: true, agent_id: agent._id.toString(), agent_name: agent.name, api_key: apiKey, method: 'recovery_code' });
+  } catch {
+    // Database errors may contain operation payloads. Never log credential material.
+    logger.error('[HIVE] Key recovery could not be confirmed.');
+    return reply({ error: 'Recovery could not be confirmed. The previous key may have changed.' }, 500);
+  }
 }

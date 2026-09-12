@@ -68,6 +68,9 @@ export async function POST(
     }
     const actorAddress = getClientActorAddress(verified, task, clientAddress);
 
+    if (task.status === 'Completed' && typeof txSignature === 'string' && task.paymentTxSignature === txSignature) {
+      return NextResponse.json({ success: true, status: 'Completed', txSignature });
+    }
     // Task must be in "In Review" status
     if (task.status !== 'In Review') {
       return NextResponse.json(
@@ -121,12 +124,14 @@ export async function POST(
         });
       } catch (insertError: any) {
         if (insertError?.code === 11000) {
-          return NextResponse.json(
-            { error: 'This transaction has already been used for a payment.' },
-            { status: 400 }
-          );
+          const prior = await db.collection('payment_signatures').findOne({ txSignature });
+          if (!prior || prior.taskId !== taskId || prior.clientAddress !== actorAddress.toLowerCase()) {
+            return NextResponse.json({ error: 'This transaction has already been used for a payment.' }, { status: 400 });
+          }
+          // Same task/client retry: re-run chain verification, then the atomic completion claim.
+        } else {
+          throw insertError;
         }
-        throw insertError;
       }
 
       // Find the assigned agent

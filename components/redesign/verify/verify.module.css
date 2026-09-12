@@ -1,0 +1,33 @@
+.main { padding-bottom: 80px; }
+.heading { composes: heading from '../tools/tools.module.css'; }
+.primary { composes: primary from '../owner/owner.module.css'; }
+.secondary { composes: secondary from '../owner/owner.module.css'; }
+.iconButton { composes: iconButton from '../owner/owner.module.css'; }
+.textLink { composes: textLink from '../owner/owner.module.css'; }
+.textButton { composes: textButton from '../tools/tools.module.css'; }
+.actions { composes: actions from '../owner/owner.module.css'; flex-wrap: wrap; margin-top: 20px; }
+.field { composes: field from '../owner/owner.module.css'; }
+.details { composes: details from '../owner/owner.module.css'; }
+.hint { composes: hint from '../owner/owner.module.css'; }
+.error { composes: error from '../owner/owner.module.css'; max-width: 780px; }
+.notice { composes: notice from '../tools/tools.module.css'; }
+.srOnly { composes: srOnly from '../marketplace/marketplace.module.css'; }
+.identity { composes: identity from '../tools/tools.module.css'; }
+.identityName { composes: identityName from '../tools/tools.module.css'; }
+.avatar { composes: avatar from '../tools/tools.module.css'; }
+.workspace { max-width: 780px; }
+.statusLine { display: flex; align-items: center; justify-content: space-between; margin: 12px 0 20px; color: var(--muted); font-size: 13px; }
+.postSection,.form { padding: 24px 0 32px; border-bottom: 1px solid var(--rule); }
+.workspace h2,.result h2 { font-weight: 500; font-size: 22px; letter-spacing: -.03em; line-height: 1.3; }
+.postSection>p,.unavailable>p,.result>p { margin: 12px 0 24px; color: var(--muted); font-size: 14px; line-height: 1.8; }
+.main .postText { width: 100%; min-width: 0; min-height: 150px; padding: 20px; resize: vertical; border: 1px solid var(--rule); border-radius: 6px; color: var(--ink); background: var(--surface); font: inherit; font-size: 16px; line-height: 1.8; }
+.form { border: 0; padding-top: 32px; }.form .field { margin: 24px 0; }
+.form .hint { margin-top: 10px; }
+.unavailable { padding: 24px 0; }.accessError { max-width: 620px; }.accessError button { margin-top: 20px; }
+.result { max-width: 780px; margin-top: 32px; padding: 32px 0; border-top: 1px solid var(--rule); }.result>svg { color: var(--accent-text); margin-bottom: 20px; }.result a { width: fit-content; margin-top: 24px; }
+.recovery { border-left: 2px solid var(--accent-text); margin: 24px 0; padding: 8px 0 8px 20px; }.recovery h2{font-size:18px}.recovery p{font-size:14px;line-height:1.8;margin-top:12px;color:var(--muted)}
+.main :is(a,button,input,textarea):focus-visible { outline: 2px solid var(--accent-text); outline-offset: 4px; }
+@media(max-width:760px) {
+  .identity { display: grid; grid-template-columns: 42px minmax(0,1fr); gap: 4px 14px; }.identity>.textLink { grid-column: 2; justify-self: start; }
+  .main .postText { padding: 16px; min-height: 200px; }.actions { gap: 12px; }.actions button { max-width: 100%; white-space: normal; }
+}

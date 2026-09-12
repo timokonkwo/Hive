@@ -1,0 +1,89 @@
+.root {
+  display: inline-block;
+  position: relative;
+  width: 100%;
+  min-width: 0;
+  vertical-align: middle;
+}
+.root .native {
+  position: absolute!important;
+  width: 1px!important;
+  height: 1px!important;
+  padding: 0!important;
+  margin: -1px!important;
+  border: 0!important;
+  clip-path: inset(50%);
+  overflow: hidden;
+  pointer-events: none;
+}
+.root .trigger {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  width: 100%;
+  min-width: 0;
+  min-height: 44px;
+  padding: 10px 12px;
+  border: 1px solid var(--rule, #424c37);
+  border-radius: 6px;
+  background: var(--canvas, #11140f);
+  color: var(--ink, #f1f3e9);
+  font: inherit;
+  font-size: 14px;
+  line-height: 1.5;
+  text-align: left;
+  cursor: pointer;
+}
+.root .trigger:hover:not(:disabled) { border-color: var(--muted, #b5bcad); }
+.root .trigger:focus-visible,.root .trigger[aria-expanded='true'] { outline: 2px solid var(--accent-text, #ccff00); outline-offset: 3px; }
+.root .trigger:disabled { opacity: .5; cursor: not-allowed; }
+.root .trigger[aria-invalid='true'] { border-color: #b94b37; }
+.value { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+.root .trigger > svg { flex-shrink: 0; position: static; transform: none; width: 16px; height: 16px; }
+/* Retire the old decorative arrows next to native selects. */
+.root + svg { display: none; }
+.menu {
+  position: fixed;
+  inset: auto;
+  margin: 0;
+  padding: 5px;
+  box-sizing: border-box;
+  border: 1px solid var(--rule, #424c37);
+  border-radius: 8px;
+  background: var(--surface, #191e16);
+  color: var(--ink, #f1f3e9);
+  box-shadow: 0 12px 36px #0003;
+  font: inherit;
+  font-size: 14px;
+  line-height: 1.5;
+  overflow: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
+  z-index: 10000;
+}
+.menu:popover-open { display: block; }
+.option {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  padding: 10px 12px;
+  min-height: 42px;
+  box-sizing: border-box;
+  border-radius: 4px;
+  cursor: pointer;
+}
+.option > span { min-width: 0; overflow-wrap: anywhere; }
+.option > svg { flex-shrink: 0; }
+.option[data-active='true'] { background: var(--soft, #252d1f); outline: 1px solid var(--rule, #424c37); outline-offset: -1px; }
+.option[aria-selected='true'] { color: var(--accent-text, #ccff00); font-weight: 600; }
+.option[aria-disabled='true'] { opacity: .45; cursor: not-allowed; }
+@media (prefers-reduced-motion: no-preference) {
+  .menu:popover-open { animation: appear .12s ease-out; }
+  @keyframes appear { from { opacity: 0; transform: translateY(3px); } to { opacity: 1; transform: translateY(0); } }
+}
+@media (forced-colors: active) {
+  .option[data-active='true'] { outline: 2px solid Highlight; }
+  .option[aria-selected='true'] { color: Highlight; }
+}

@@ -47,16 +47,20 @@ export async function POST(req: NextRequest) {
     }
 
     if (agent.status === 'active') {
-      return NextResponse.json({ message: 'Agent is already active.' });
+      return NextResponse.json({ message: 'Agent is already active.', status: 'active', agent_id });
     }
 
+    if (agent.status !== 'pending') return NextResponse.json({ error: 'This agent cannot be activated from registration.' }, { status: 409 });
+
     // Activate the agent
-    await db.collection(COLLECTIONS.AGENTS).updateOne(
-      { _id: objectId },
+    const updated = await db.collection(COLLECTIONS.AGENTS).updateOne(
+      { _id: objectId, apiKeyHash, status: 'pending' },
       { $set: { status: 'active', updatedAt: new Date() } }
     );
 
+    if (updated.modifiedCount !== 1) return NextResponse.json({ error: 'The agent changed. Try confirmation again.' }, { status: 409 });
     return NextResponse.json({
+      agent_id,
       message: `Agent "${agent.name}" is now active.`,
       status: 'active',
     });

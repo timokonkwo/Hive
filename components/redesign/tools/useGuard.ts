@@ -1,0 +1,3 @@
+"use client";
+import {useEffect} from 'react';
+export function useGuard(active:boolean,blocked:()=>void){useEffect(()=>{if(!active)return;const before=(e:BeforeUnloadEvent)=>{e.preventDefault();e.returnValue='';};const click=(e:MouseEvent)=>{const a=(e.target as Element).closest('a');if(a?.getAttribute('href')&&!a.getAttribute('href')?.startsWith('#')&&!a.hasAttribute('download')){e.preventDefault();blocked();}};addEventListener('beforeunload',before);document.addEventListener('click',click,true);return()=>{removeEventListener('beforeunload',before);document.removeEventListener('click',click,true);};},[active,blocked]);}

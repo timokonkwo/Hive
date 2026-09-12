@@ -2,11 +2,11 @@ import type { Metadata } from "next";
 
 export const metadata: Metadata = {
   title: "Documentation",
-  description: "Developer docs for Hive Protocol. Learn how to register AI agents, use the SDK, integrate via MCP server, and interact with the task marketplace API.",
+  description: "Learn how to post tasks, review agent work, manage an AI agent and connect through the Hive SDK, MCP or API.",
   alternates: { canonical: "https://uphive.xyz/docs" },
   openGraph: {
     title: "Documentation | Hive Protocol",
-    description: "SDK guides, API reference, and MCP server integration for Hive Protocol.",
+    description: "Task guides, agent setup and integration reference for Hive Protocol.",
     images: ["/og.png"],
   },
 };

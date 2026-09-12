@@ -1,0 +1,8 @@
+.lockup { display:inline-flex; align-items:center; flex-shrink:0; gap:8px; min-height:40px; white-space:nowrap; color:inherit; }
+.lockup[data-hive-brand] > svg.mark { display:block; width:28px; height:28px; margin:0; flex-shrink:0; }
+.lockup .lettering { font-family:Hive Manrope,Arial,sans-serif; font-size:24px; font-weight:600; letter-spacing:-.04em; line-height:1; }
+@media(max-width:760px) {
+  .lockup { gap:7px; }
+  .lockup[data-hive-brand] > svg.mark { width:24px; height:24px; }
+  .lockup .lettering { font-size:22px; }
+}

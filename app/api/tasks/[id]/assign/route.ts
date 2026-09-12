@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto';
 import { NextRequest, NextResponse } from 'next/server';
 import { getDb, COLLECTIONS } from '@/lib/db';
 import { ObjectId } from 'mongodb';
@@ -73,7 +74,8 @@ export async function POST(
     }
     const actorAddress = getClientActorAddress(verified, task, clientAddress);
 
-    if (task.status !== 'Open') {
+    const alreadyAssigned = task.status === 'In Progress' && task.isDirectHire === true && task.assignedAgent === agentId;
+    if (task.status !== 'Open' && !alreadyAssigned) {
       return NextResponse.json(
         { error: `Task is "${task.status}", not Open. Cannot assign.` },
         { status: 400 }
@@ -92,6 +94,12 @@ export async function POST(
       return NextResponse.json({ error: 'Agent not found.' }, { status: 404 });
     }
 
+    if (!alreadyAssigned && agent.status != null && agent.status !== 'active') {
+      return NextResponse.json({ error: 'This agent cannot be assigned.' }, { status: 409 });
+    }
+    if (!alreadyAssigned && task.assignmentMode === 'direct' && task.requestedAgentId !== agentId) {
+      return NextResponse.json({ error: 'This task was created for another agent.' }, { status: 409 });
+    }
     const now = new Date();
     const resolvedAgentId = agent._id.toString();
     const resolvedAgentName = agent.name || 'Unknown Agent';
@@ -111,25 +119,24 @@ export async function POST(
       updatedAt: now,
     };
 
-    await db.collection(COLLECTIONS.BIDS).insertOne(bid);
-
-    // Update the task
-    await db.collection(COLLECTIONS.TASKS).updateOne(
-      { _id: new ObjectId(taskId) },
-      {
-        $set: {
-          status: 'In Progress',
-          assignedAgent: resolvedAgentId,
-          assignedAgentName: resolvedAgentName,
-          assignedAgentAddress: agent.walletAddress || null,
-          updatedAt: now,
-        },
-        $inc: { proposalsCount: 1 },
-      }
+    // Claim before adding a bid. Concurrent requests cannot assign different agents.
+    if (!alreadyAssigned) {
+      const claim = await db.collection(COLLECTIONS.TASKS).updateOne(
+        { _id: new ObjectId(taskId), status: 'Open' },
+        { $set: { status: 'In Progress', isDirectHire: true, assignedAgent: resolvedAgentId,
+          assignedAgentId: resolvedAgentId, assignedAgentName: resolvedAgentName,
+          assignedAgentAddress: agent.walletAddress || null, updatedAt: now }, $inc: { proposalsCount: 1 } }
+      );
+      if (claim.modifiedCount !== 1) return NextResponse.json({ error: 'The task changed. Open it to check the assigned agent.' }, { status: 409 });
+    }
+    // Deterministic record IDs make a retry repair an interrupted assignment without duplicate records.
+    const recordId = (kind: string) => new ObjectId(createHash('sha256').update(`${kind}:${taskId}`).digest('hex').slice(0, 24));
+    await db.collection(COLLECTIONS.BIDS).updateOne(
+      { _id: recordId('direct-bid') }, { $setOnInsert: bid }, { upsert: true }
     );
 
     // Log activity
-    await db.collection(COLLECTIONS.ACTIVITY).insertOne({
+    await db.collection(COLLECTIONS.ACTIVITY).updateOne({ _id: recordId('direct-activity') }, { $setOnInsert: {
       type: 'AgentDirectHired',
       taskId,
       agentId: resolvedAgentId,
@@ -140,7 +147,7 @@ export async function POST(
         agentName: resolvedAgentName,
       },
       createdAt: now,
-    });
+    } }, { upsert: true });
 
     return NextResponse.json({
       success: true,

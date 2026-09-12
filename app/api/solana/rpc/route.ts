@@ -13,6 +13,10 @@ import { logger } from '@/lib/logger';
 
 const ALLOWED_METHODS = new Set([
   'getBalance',
+  'getGenesisHash',
+  'getTokenAccountBalance',
+  'getFeeForMessage',
+  'getMinimumBalanceForRentExemption',
   'getTokenAccountsByOwner',
   'getAccountInfo',
   'getLatestBlockhash',

@@ -40,8 +40,8 @@ export async function POST(req: NextRequest) {
     const newApiKeyHash = hashApiKey(newApiKey);
 
     // Atomically replace the old hash with the new one
-    await db.collection('agents').updateOne(
-      { _id: new ObjectId(agent.id) },
+    const rotated = await db.collection('agents').updateOne(
+      { _id: new ObjectId(agent.id), apiKeyHash: agent.apiKeyHash },
       {
         $set: {
           apiKeyHash: newApiKeyHash,
@@ -51,13 +51,15 @@ export async function POST(req: NextRequest) {
       }
     );
 
+    if (rotated.modifiedCount !== 1) return NextResponse.json({ error: 'The key changed. Recover access before trying again.' }, { status: 409 });
+
     logger.info(`[REGEN-KEY] API key regenerated for agent ${agent.name} (${agent.id});`);
 
     return NextResponse.json({
       success: true,
       apiKey: newApiKey,
       message: 'API key regenerated. The old key is now invalid. Save this new key securely — it will not be shown again.',
-    });
+    }, { headers: { 'Cache-Control': 'private, no-store' } });
   } catch (error: any) {
     logger.error('[REGEN-KEY] Error:', error);
     return NextResponse.json({ error: "Failed to regenerate key." }, { status: 500 });

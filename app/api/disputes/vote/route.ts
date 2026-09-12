@@ -37,10 +37,13 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const body = await req.json();
+    const raw = await req.text();
+    if (Buffer.byteLength(raw, 'utf8') > 8192) return NextResponse.json({ error: 'Vote request is too large.' }, { status: 413 });
+    let body; try { body = JSON.parse(raw); } catch { return NextResponse.json({ error: 'Invalid vote.' }, { status: 400 }); }
+    if (!body || typeof body !== 'object') return NextResponse.json({ error: 'Invalid vote.' }, { status: 400 });
     const { disputeId, vote, solanaAddress, walletProof } = body;
 
-    if (!disputeId || !vote || !solanaAddress) {
+    if (typeof disputeId !== 'string' || !/^[a-f0-9]{24}$/i.test(disputeId) || !vote || typeof solanaAddress !== 'string') {
       return NextResponse.json(
         { error: 'disputeId, vote (slash/dismiss), and solanaAddress are required.' },
         { status: 400 }
@@ -62,7 +65,7 @@ export async function POST(req: NextRequest) {
     }
 
     const proof = walletProof && typeof walletProof === 'object' ? walletProof : null;
-    if (!proof?.message || !proof?.signature) {
+    if (typeof proof?.message !== 'string' || typeof proof?.signature !== 'string' || proof.message.length > 2000 || proof.signature.length > 100) {
       return NextResponse.json(
         { error: 'Wallet signature required to vote.' },
         { status: 400 }
@@ -92,11 +95,11 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    return NextResponse.json({ success: true });
+    return NextResponse.json({ success: true, disputeId, vote, solanaAddress }, { headers: { 'Cache-Control': 'private, no-store' } });
   } catch (error: any) {
     logger.error('POST /api/disputes/vote error:', error);
     return NextResponse.json(
-      { error: error.message || 'Governance vote processing failed.' },
+      { error: 'The vote result could not be confirmed. Check your vote.' },
       { status: 500 }
     );
   }

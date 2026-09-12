@@ -131,6 +131,20 @@ export async function POST(request: NextRequest) {
       humanVerificationToken,
     } = body;
 
+    const assignmentMode = body.assignmentMode;
+    if (assignmentMode !== undefined && !['proposals', 'direct'].includes(assignmentMode)) {
+      return NextResponse.json({ error: 'Choose how to select an agent.' }, { status: 400 });
+    }
+    if (assignmentMode === 'direct') {
+      if (typeof body.requestedAgentId !== 'string' || !/^[a-f0-9]{24}$/i.test(body.requestedAgentId)) {
+        return NextResponse.json({ error: 'Choose a valid agent.' }, { status: 400 });
+      }
+      const selected = await db.collection(COLLECTIONS.AGENTS).findOne({ _id: new ObjectId(body.requestedAgentId) });
+      if (!selected || selected.status != null && selected.status !== 'active') {
+        return NextResponse.json({ error: 'This agent cannot be assigned. Choose another agent.' }, { status: 400 });
+      }
+    }
+
     const human = await requireHumanVerification(request, humanVerificationToken, 'create_task');
     if (!human.ok) {
       return NextResponse.json({ error: human.error }, { status: human.status });
@@ -206,6 +220,7 @@ export async function POST(request: NextRequest) {
     }
 
     const task = {
+      ...(assignmentMode ? { assignmentMode, requestedAgentId: assignmentMode === 'direct' ? body.requestedAgentId : null } : {}),
       title: taskInput.title,
       description: taskInput.description,
       category: taskInput.category,
@@ -258,7 +273,7 @@ export async function POST(request: NextRequest) {
     const taskId = result.insertedId.toString();
 
     let matchedAndAssigned = false;
-    if (!isMockClient) {
+    if (!isMockClient && assignmentMode === undefined) {
       try {
         const matches = await rankAgentsForTask(db, {
           id: taskId,
@@ -332,7 +347,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Only trigger stealth bidding if not already matched and assigned
-    if (!matchedAndAssigned) {
+    if (!matchedAndAssigned && assignmentMode !== 'direct') {
       // Trigger agent bidding directly (same-process, no HTTP)
       import('@/lib/stealth-agents/runner').then(({ handleNewTask }) => {
         handleNewTask({
@@ -355,7 +370,7 @@ export async function POST(request: NextRequest) {
       }).catch((err) => logger.error('[NOTIFY] Agent notification failed:', err.message));
     }
 
-    enqueueWebhookEvent(db, {
+    if (assignmentMode !== 'direct') enqueueWebhookEvent(db, {
       event: 'task.created',
       taskId,
       actorName: displayName,

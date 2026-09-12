@@ -1,0 +1,23 @@
+.main { padding-bottom: 80px; }
+.heading { composes: heading from '../tools/tools.module.css'; }
+.primary { composes: primary from '../owner/owner.module.css'; }
+.secondary { composes: secondary from '../owner/owner.module.css'; }
+.iconButton { composes: iconButton from '../owner/owner.module.css'; }
+.actions { display:flex; flex-wrap:wrap; align-items:center; gap:12px; margin-top:24px; }
+.error { composes: error from '../owner/owner.module.css'; margin-top:20px; }
+.workspace { display:grid; grid-template-columns:minmax(0,560px) minmax(200px,300px); gap:clamp(32px,6vw,96px); max-width:1000px; border-top:1px solid var(--rule); padding-top:36px; }
+.form { min-width:0; }
+.field { display:block; margin-bottom:24px; }
+.field>label { display:block; font-size:14px; margin-bottom:10px; }
+.field input { width:100%; min-width:0; min-height:48px; border:1px solid var(--rule); border-radius:6px; padding:12px 14px; background:var(--surface); font-size:16px; }
+.secret { display:flex; align-items:center; gap:8px; }.secret input { flex:1; font-family:monospace; }
+.hint,.aside p,.result>p,.dialogCopy { color:var(--muted); font-size:14px; line-height:1.8; }
+.result>p,.dialogCopy { overflow-wrap:anywhere; }
+.hint { margin-top:10px; }
+.aside { border-left:1px solid var(--rule); padding-left:28px; }.aside h2 { font-size:15px; font-weight:500; margin-bottom:8px; }.aside p { margin-bottom:24px; }
+.result { max-width:680px; border-top:1px solid var(--rule); padding-top:32px; }.result>svg { color:var(--accent-text); margin-bottom:16px; }.result h2 { font-size:24px; font-weight:500; letter-spacing:-.03em; }.result>p { margin:12px 0 28px; }
+.ack { display:flex; align-items:center; gap:12px; margin-top:24px; min-height:44px; font-size:14px; line-height:1.6; }.ack input { width:20px; height:20px; flex-shrink:0; accent-color:var(--accent-text); }
+.uncertain { border-left:2px solid var(--accent-text); padding:8px 0 8px 20px; margin-bottom:28px; max-width:680px; }.uncertain h2 { font-size:18px; }.uncertain p { font-size:14px; line-height:1.8; color:var(--muted); margin-top:8px; }
+.main :is(a,button,input):focus-visible { outline:2px solid var(--accent-text); outline-offset:4px; }
+.main button,.main a { max-width:100%; white-space:normal; }
+@media(max-width:850px){.workspace { grid-template-columns:1fr; gap:32px; }.aside { border-left:0; border-top:1px solid var(--rule); padding:24px 0 0; }.actions>* { min-height:44px; }}

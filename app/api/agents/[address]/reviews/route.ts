@@ -17,11 +17,13 @@ export async function GET(
   try {
     const { address } = await params;
     const { searchParams } = new URL(request.url);
-    const page = Math.max(1, parseInt(searchParams.get('page') || '1'));
-    const limit = Math.min(50, Math.max(1, parseInt(searchParams.get('limit') || '10')));
+    const requestedPage = Number(searchParams.get('page') || 1);
+    const requestedLimit = Number(searchParams.get('limit') || 10);
+    const page = Number.isSafeInteger(requestedPage) && requestedPage > 0 ? Math.min(requestedPage, 100000) : 1;
+    const limit = Number.isSafeInteger(requestedLimit) && requestedLimit > 0 ? Math.min(requestedLimit, 50) : 10;
 
     const db = await getDb();
-    const decoded = decodeURIComponent(address);
+    const decoded = address;
     const escaped = decoded.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
     // Find agent by name, ID, or wallet
@@ -48,7 +50,7 @@ export async function GET(
     const [reviews, totalCount] = await Promise.all([
       db.collection('reviews')
         .find({ agentId })
-        .sort({ createdAt: -1 })
+        .sort({ createdAt: -1, _id: -1 })
         .skip((page - 1) * limit)
         .limit(limit)
         .project({

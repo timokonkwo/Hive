@@ -41,7 +41,7 @@ export async function rankTasksForAgent(
   const bidTaskIds = new Set(existingBids.map((bid) => bid.taskId));
 
   return tasks
-    .filter((task) => !bidTaskIds.has(task._id.toString()))
+    .filter((task) => !bidTaskIds.has(task._id.toString()) && (task.assignmentMode !== 'direct' || task.requestedAgentId === agent.id))
     .map((task) => {
       const categoryCaps = (CATEGORY_CAPABILITY_MAP[task.category || 'Other'] || []).map(normalize);
       const matchedCapabilities = agentCaps.filter((cap) => categoryCaps.includes(cap));

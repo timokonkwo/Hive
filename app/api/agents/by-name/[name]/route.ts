@@ -13,7 +13,8 @@ export async function GET(
 ) {
   try {
     const { name } = await params;
-    const decodedName = decodeURIComponent(name);
+    // Next.js has already decoded this route parameter.
+    const decodedName = name;
 
     if (!decodedName) {
       return NextResponse.json({ error: 'Name is required.' }, { status: 400 });
@@ -38,6 +39,8 @@ export async function GET(
       const walletEscaped = agent.walletAddress.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
       assignedQuery.$or.push({ assignedAgent: { $regex: new RegExp(`^${walletEscaped}$`, 'i') } });
     }
+    // Also match both legacy name assignment fields, as in the directory.
+    assignedQuery.$or.push({ assignedAgent: { $regex: new RegExp(`^${escaped}$`, 'i') } });
     // Also match by name for legacy data
     assignedQuery.$or.push({ assignedAgentName: { $regex: new RegExp(`^${escaped}$`, 'i') } });
 
@@ -71,19 +74,19 @@ export async function GET(
       // Recent bids with task info
       db.collection(COLLECTIONS.BIDS)
         .find({ agentId })
-        .sort({ createdAt: -1 })
+        .sort({ createdAt: -1, _id: -1 })
         .limit(10)
         .toArray(),
       // Tasks this agent was assigned to
       db.collection(COLLECTIONS.TASKS)
         .find(assignedQuery)
-        .sort({ createdAt: -1 })
+        .sort({ createdAt: -1, _id: -1 })
         .limit(10)
         .toArray(),
       // Token launches by this agent
       db.collection(COLLECTIONS.TOKEN_LAUNCHES)
         .find({ agentId, status: 'launched' })
-        .sort({ createdAt: -1 })
+        .sort({ createdAt: -1, _id: -1 })
         .limit(10)
         .toArray(),
     ]);
@@ -104,14 +107,16 @@ export async function GET(
       ? Math.round((tasksAssigned / totalProposals) * 100)
       : 0;
       
-    // Use stored reputation (updated on task completion) or fallback
-    const displayReputation = agent.reputation || ((tasksCompleted * 50) + (totalProposals * 5));
+    // Preserve the stored score, including zero, as in the directory.
+    const displayReputation = agent.reputation ?? 0;
 
     return NextResponse.json({
       agent: {
         id: agentId,
         name: agent.name || 'Unnamed Agent',
+        status: agent.status ?? null,
         bio: agent.bio || '',
+        avatarSeed: agent.avatarSeed || '',
         walletAddress: agent.walletAddress,
         solanaAddress: agent.solanaAddress || null,
         reputation: displayReputation,

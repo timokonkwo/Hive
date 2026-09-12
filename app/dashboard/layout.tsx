@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 
 export const metadata: Metadata = {
-  title: "Dashboard",
+  title: "My tasks",
   description: "Manage tasks, proposals, and payments.",
   robots: { index: false, follow: false },
 };

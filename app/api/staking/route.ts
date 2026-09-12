@@ -27,6 +27,7 @@ import { isValidSolanaAddress } from '@/lib/solana-pay';
 import { checkRateLimit, getClientIp, RATE_LIMITS } from '@/lib/rate-limit';
 import { logger } from '@/lib/logger';
 import bs58 from 'bs58';
+import { positivePage } from '@/lib/dispute-view';
 
 const TX_SIGNATURE_REGEX = /^[1-9A-HJ-NP-Za-km-z]{64,100}$/;
 const MAX_STAKE_HIVE = 1_000_000_000;
@@ -142,7 +143,7 @@ async function findStakeExitBlocker(db: any, solanaAddress: string) {
   return null;
 }
 
-async function sendHiveFromTreasury(recipientAddress: string, amountHive: number) {
+async function sendHiveFromTreasury(recipientAddress: string, amountHive: number, beforeSend: (signature: string) => Promise<void>) {
   const treasuryKeypair = getTreasuryKeypair();
   if (!treasuryKeypair) {
     throw new Error('Treasury withdrawal keypair is not configured. Set HIVE_TREASURY_KEYPAIR on the server.');
@@ -217,6 +218,8 @@ async function sendHiveFromTreasury(recipientAddress: string, amountHive: number
   transaction.feePayer = treasuryKeypair.publicKey;
   transaction.sign(treasuryKeypair);
 
+  const signedReference = bs58.encode(transaction.signature!);
+  await beforeSend(signedReference);
   let txSignature = '';
   try {
     txSignature = await connection.sendRawTransaction(transaction.serialize(), {
@@ -279,17 +282,32 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ error: 'Authentication required.' }, { status: 401 });
     }
 
+    const query = req.nextUrl.searchParams;
+    const reference = query.get('reference');
+    if (reference) {
+      if (!TX_SIGNATURE_REGEX.test(reference) && !UNSTAKE_REQUEST_ID_REGEX.test(reference)) return NextResponse.json({ error: 'Invalid request reference.' }, { status: 400 });
+      const event = await db.collection(COLLECTIONS.STAKE_EVENTS).findOne({ stakerId: staker.stakerId, ...(TX_SIGNATURE_REGEX.test(reference) ? { txSignature: reference } : { requestId: reference }) }, { sort: { createdAt: -1, _id: -1 } });
+      const record = await db.collection(COLLECTIONS.STAKES).findOne({ stakerId: staker.stakerId });
+      const exit = record?.pendingUnstakes?.find((e: any) => e.id === reference);
+      return NextResponse.json({ event: event ? { type: event.type, status: event.status, amount: event.confirmedAmount ?? event.amount, solanaAddress: event.solanaAddress, txSignature: event.txSignature || null } : null, request: exit ? { id: exit.id, amount: exit.amount, status: exit.status, claimTxSignature: exit.claimTxSignature || null } : null }, { headers: { 'Cache-Control': 'private, no-store' } });
+    }
+    if (query.get('history') === '1') {
+      const page = positivePage(query.get('page')), limit = 20, filter = { stakerId: staker.stakerId };
+      const [rows, total] = await Promise.all([db.collection(COLLECTIONS.STAKE_EVENTS).find(filter).sort({ createdAt: -1, _id: -1 }).skip((page - 1) * limit).limit(limit).toArray(), db.collection(COLLECTIONS.STAKE_EVENTS).countDocuments(filter)]);
+      return NextResponse.json({ accountId: staker.stakerId, history: rows.map(e => ({ id: e._id.toString(), type: e.type, status: e.status, amount: e.confirmedAmount ?? e.amount, createdAt: e.createdAt, txSignature: e.txSignature || null })), total, page, limit }, { headers: { 'Cache-Control': 'private, no-store' } });
+    }
     const stake = await db.collection(COLLECTIONS.STAKES).findOne({ stakerId: staker.stakerId });
     const activeAmount = stake?.activeAmount || 0;
     const tier = getStakingTier(activeAmount);
     const tierInfo = getStakingTierInfo(activeAmount);
 
     return NextResponse.json({
+      chain: 'solana', mint: HIVE_MINT.toBase58(), decimals: HIVE_DECIMALS,
       stake: {
         stakerId: staker.stakerId,
         stakerType: staker.stakerType,
         solanaAddress: stake?.solanaAddress || staker.linkedSolanaAddress || null,
-        solanaAddressVerified: staker.linkedSolanaAddressVerified,
+        solanaAddressVerified: staker.linkedSolanaAddressVerified && (!stake?.solanaAddress || stake.solanaAddress === staker.linkedSolanaAddress),
         activeAmount,
         lockedAmount: stake?.lockedAmount || 0,
         slashedAmount: stake?.slashedAmount || 0,
@@ -306,10 +324,10 @@ export async function GET(req: NextRequest) {
         lockedStakeRemainsSlashable: true,
       },
       treasuryWallet: process.env.HIVE_TREASURY_WALLET || DEFAULT_HIVE_TREASURY_WALLET,
-    });
+    }, { headers: { 'Cache-Control': 'private, no-store' } });
   } catch (error: any) {
     logger.error('GET /api/staking error:', error);
-    return NextResponse.json({ error: error.message || 'Failed to load staking data.' }, { status: 500 });
+    return NextResponse.json({ error: 'Staking data could not be loaded.' }, { status: 500 });
   }
 }
 
@@ -328,6 +346,9 @@ async function handleRequestUnstake(db: any, staker: any, body: any) {
   }
 
   const stake = await db.collection(COLLECTIONS.STAKES).findOne({ stakerId: staker.stakerId });
+  if (body.requestId !== undefined && (typeof body.requestId !== 'string' || !UNSTAKE_REQUEST_ID_REGEX.test(body.requestId))) return NextResponse.json({ error: 'Invalid request reference.' }, { status: 400 });
+  const prior = body.requestId && stake?.pendingUnstakes?.find((r: any) => r.id === body.requestId);
+  if (prior) return Number(prior.amount) === amountHive ? NextResponse.json({ success: true, request: { id: prior.id, amount: prior.amount, status: prior.status, unlocksAt: prior.unlocksAt } }) : NextResponse.json({ error: 'This request reference was already used.' }, { status: 409 });
   if (!stake || (stake.activeAmount || 0) <= 0) {
     return NextResponse.json({ error: 'No active HIVE stake is available to unstake.' }, { status: 400 });
   }
@@ -342,7 +363,7 @@ async function handleRequestUnstake(db: any, staker: any, body: any) {
     return NextResponse.json({ error: blocker }, { status: 409 });
   }
 
-  const requestId = new ObjectId().toString();
+  const requestId = body.requestId || new ObjectId().toString();
   const now = new Date();
   const unlocksAt = new Date(now.getTime() + UNSTAKE_COOLDOWN_MS);
 
@@ -351,6 +372,7 @@ async function handleRequestUnstake(db: any, staker: any, body: any) {
       _id: stake._id,
       stakerId: staker.stakerId,
       activeAmount: { $gte: amountHive },
+      'pendingUnstakes.id': { $ne: requestId },
     },
     {
       $inc: {
@@ -514,19 +536,23 @@ async function handleClaimUnstake(db: any, staker: any, body: any) {
 
   let txSignature = '';
   try {
-    txSignature = await sendHiveFromTreasury(solanaAddress, amountHive);
+    txSignature = await sendHiveFromTreasury(solanaAddress, amountHive, async (signature) => {
+      const saved = await db.collection(COLLECTIONS.STAKES).updateOne({ _id: stake._id, pendingUnstakes: { $elemMatch: { id: requestId, status: 'claiming' } } }, { $set: { 'pendingUnstakes.$.claimTxSignature': signature } });
+      if (saved.modifiedCount !== 1) throw Error('The claim reference could not be saved.');
+      txSignature = signature;
+    });
   } catch (error: any) {
     await db.collection(COLLECTIONS.STAKES).updateOne(
       { _id: stake._id, 'pendingUnstakes.id': requestId },
       {
         $set: {
-          'pendingUnstakes.$.status': 'cooldown',
+          'pendingUnstakes.$.status': txSignature ? 'claiming' : 'cooldown',
           'pendingUnstakes.$.claimError': error.message || 'Treasury transfer failed.',
           updatedAt: new Date(),
         },
       }
     );
-    return NextResponse.json({ error: error.message || 'Treasury transfer failed.' }, { status: 502 });
+    return NextResponse.json({ error: txSignature ? 'The claim result is not confirmed. Check the saved transaction before taking another action.' : 'The claim could not be sent. Try again later.', ...(txSignature ? { txSignature } : {}) }, { status: 502 });
   }
 
   const claimedAt = new Date();
@@ -646,6 +672,7 @@ export async function POST(req: NextRequest) {
       return handleClaimUnstake(db, staker, body);
     }
 
+    if (!body || typeof body !== 'object' || (body.action && body.action !== 'stake')) return NextResponse.json({ error: 'Invalid staking action.' }, { status: 400 });
     const { txSignature, solanaAddress, amountHive } = body;
     const amountHiveNumber = Number(amountHive);
 

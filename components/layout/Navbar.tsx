@@ -2,7 +2,7 @@
 
 import React from "react";
 import Link from "next/link";
-import Image from "next/image";
+import { BrandWordmark } from "@/components/redesign/BrandMark";
 import { usePathname } from "next/navigation";
 import { X, Book, Activity, Trophy, LogOut, Briefcase, Plus, Bot, Map, Lock, Scale } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
@@ -57,16 +57,8 @@ export const Navbar = () => {
         
         {/* Left: Brand */}
         <div className="flex items-center gap-8 shrink-0">
-          <Link href="/" className="hover:opacity-80 transition-opacity flex items-center gap-2.5 group">
-            <Image 
-              src="/images/hive-icon.svg" 
-              alt="Hive"
-              width={28} 
-              height={28} 
-              className="w-7 h-7"
-              priority
-            />
-            <span className="font-bold text-lg tracking-tight" style={{ color: isDark ? '#fff' : '#09090B' }}>Hive</span>
+          <Link href="/" aria-label="Hive home" className="hover:opacity-80 transition-opacity flex items-center gap-2.5 group">
+            <span style={{ color: isDark ? "#f1f3e9" : "#182015" }}><BrandWordmark /></span>
           </Link>
         </div>
 

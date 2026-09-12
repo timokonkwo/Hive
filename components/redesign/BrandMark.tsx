@@ -1,16 +1,27 @@
-/** The established Hive identity is retained without altering its geometry or colors. */
+import brand from "./brand.module.css";
+/** Geometry and lime/olive fills from the user-supplied public/hive-icon.svg
+ * Interface text follows the surface text color; full exports stay available for artwork. */
 export function BrandMark({ className }: { className?: string }) {
-  return (
-    <svg viewBox="0 0 270 269" className={className} aria-hidden="true">
-      <image href="/images/hive-icon.svg" width="270" height="269" />
-    </svg>
-  );
+  return <svg viewBox="60 53 271 269" className={className} aria-hidden="true" data-hive-brand="icon">
+<path fillRule="evenodd" clipRule="evenodd" d="M254.387 215.276C253.783 213.009 252.017 211.237 249.752 210.626L193.108 195.35C190.844 194.739 188.426 195.383 186.765 197.038L145.213 238.455C143.552 240.111 142.9 242.527 143.503 244.794L159.571 305.15L203.603 261.117C205.261 259.459 207.679 258.811 209.944 259.418L270.454 275.632L254.387 215.276Z" fill="#BEFF00"/>
+<path d="M219.874 321.413C222.138 322.024 224.557 321.38 226.218 319.724L270.454 275.632L209.944 259.418C207.679 258.811 205.261 259.459 203.603 261.117L159.571 305.15L219.874 321.413Z" fill="#94C700"/>
+<path fillRule="evenodd" clipRule="evenodd" d="M171.605 132.493C171.001 130.227 169.235 128.455 166.97 127.844L110.326 112.567C108.062 111.957 105.643 112.6 103.982 114.256L62.4305 155.673C60.7694 157.329 60.1177 159.745 60.7211 162.011L76.7883 222.367L120.821 178.335C122.479 176.677 124.896 176.029 127.162 176.636L187.672 192.849L171.605 132.493Z" fill="#BEFF00"/>
+<path d="M137.092 238.631C139.356 239.242 141.774 238.598 143.436 236.942L187.672 192.849L127.162 176.636C124.896 176.029 122.479 176.677 120.821 178.335L76.7883 222.367L137.092 238.631Z" fill="#94C700"/>
+<path fillRule="evenodd" clipRule="evenodd" d="M220.241 80.9434L176.005 125.036C174.344 126.692 173.692 129.108 174.295 131.374L189.387 188.068C189.991 190.334 191.757 192.106 194.022 192.717L250.666 207.994C252.93 208.604 255.349 207.961 257.01 206.305L301.246 162.212L241.097 146.095C238.831 145.488 237.062 143.719 236.455 141.453L220.241 80.9434Z" fill="#BEFF00"/>
+<path d="M236.455 141.453C237.062 143.719 238.831 145.488 241.097 146.095L301.246 162.212L285.179 101.856C284.575 99.5899 282.809 97.8175 280.544 97.2068L220.241 80.9434L236.455 141.453Z" fill="#94C700"/>
+<path d="M101.762 233.978C102.718 233.024 104.111 232.654 105.414 233.005L138.024 241.8C139.328 242.152 140.345 243.172 140.692 244.477L149.381 277.115C149.728 278.42 149.353 279.811 148.397 280.764L124.475 304.608C123.519 305.561 122.127 305.932 120.823 305.58L88.2134 296.785C86.9097 296.434 85.8927 295.413 85.5453 294.109L76.8568 261.47C76.5094 260.165 76.8846 258.775 77.8409 257.821L101.762 233.978Z" fill="#BEFF00"/>
+<path d="M282.295 186.056C283.251 185.103 284.643 184.732 285.947 185.084L318.557 193.878C319.861 194.23 320.878 195.25 321.225 196.555L329.914 229.194C330.261 230.498 329.886 231.889 328.93 232.843L305.008 256.687C304.052 257.64 302.66 258.01 301.356 257.659L268.746 248.864C267.442 248.512 266.425 247.492 266.078 246.187L257.389 213.549C257.042 212.244 257.417 210.853 258.373 209.9L282.295 186.056Z" fill="#BEFF00"/>
+<path d="M149.904 54.1027C150.86 53.1495 152.253 52.7789 153.556 53.1305L186.166 61.9252C187.47 62.2768 188.487 63.2972 188.834 64.602L197.523 97.2406C197.87 98.5454 197.495 99.9364 196.539 100.89L172.617 124.733C171.661 125.687 170.269 126.057 168.965 125.706L136.355 116.911C135.051 116.559 134.034 115.539 133.687 114.234L124.998 81.5956C124.651 80.2908 125.026 78.8998 125.982 77.9466L149.904 54.1027Z" fill="#BEFF00"/>
+</svg>;
 }
-
+/** Compact interface lockup: supplied icon with independently sized text. */
+export function BrandWordmark({ className }: { className?: string }) {
+  return <span className={`${brand.lockup} ${className || ''}`} data-hive-brand="wordmark" aria-hidden="true"><BrandMark className={brand.mark}/><span className={brand.lettering}>Hive</span></span>;
+}
 export function StaticSculpture() {
-  return (
-    <svg viewBox="0 0 520 460" aria-hidden="true">
-      <image href="/images/hive-icon.svg" x="95" y="65" width="330" height="329" />
-    </svg>
-  );
+    return (<svg viewBox="0 0 520 460" fill="none" aria-hidden="true">
+      <g stroke="#91A26D" opacity=".4"><ellipse cx="260" cy="230" rx="220" ry="160"/><ellipse cx="260" cy="230" rx="190" ry="140"/><path d="m90 115 170 115 160-95M95 345l165-115 170 100"/></g>
+      <g transform="translate(169 146) rotate(-6 90 85)"><rect x="3" y="3" width="187" height="144" rx="30" fill="#647727"/><rect width="180" height="136" rx="28" fill="#CCFF00"/><rect x="20" y="27" width="140" height="86" rx="22" fill="#152319"/><rect x="53" y="52" width="14" height="34" rx="7" fill="#F1FFC6"/><rect x="112" y="52" width="14" height="34" rx="7" fill="#F1FFC6"/><path d="M90 0v-23" stroke="#B9C6A5" strokeWidth="5"/><circle cx="90" cy="-26" r="9" fill="#CCFF00"/></g>
+      {[[57, 76], [386, 90], [62, 310], [390, 305]].map(([x, y], i) => <g key={i} transform={`translate(${x} ${y})`}><rect width="76" height="60" rx="14" fill={i === 0 ? "#CCFF00" : "#B9C6A5"}/><rect x="9" y="13" width="58" height="35" rx="10" fill="#152319"/><path d="M25 25v10m25-10v10" stroke="#F1FFC6" strokeWidth="6" strokeLinecap="round"/></g>)}
+    </svg>);
 }

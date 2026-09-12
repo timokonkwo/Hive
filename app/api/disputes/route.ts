@@ -5,6 +5,7 @@ import { createDispute } from '@/lib/disputes';
 import { isValidSolanaAddress } from '@/lib/solana-pay';
 import { STAKING_TIERS } from '@/lib/token-utils';
 import { checkRateLimit, getClientIp, RATE_LIMITS } from '@/lib/rate-limit';
+import { publicCase, positivePage, caseStatuses } from '@/lib/dispute-view';
 import { logger } from '@/lib/logger';
 
 const MIN_SLASHABLE_STAKE_HIVE = STAKING_TIERS.staker.threshold;
@@ -39,36 +40,30 @@ export async function GET(req: NextRequest) {
     const db = await getDb();
     const { searchParams } = new URL(req.url);
     const status = searchParams.get('status') || 'All';
-    const limit = Math.min(Math.max(parseInt(searchParams.get('limit') || '50'), 1), 100);
-    const page = Math.max(parseInt(searchParams.get('page') || '1'), 1);
+    if (!['All', 'all', 'resolved', ...caseStatuses].includes(status)) return NextResponse.json({ error: 'Invalid case filter.' }, { status: 400 });
+    const limit = positivePage(searchParams.get('limit'), 20, 100);
+    const page = positivePage(searchParams.get('page'));
     const skip = (page - 1) * limit;
 
     const query: Record<string, any> = {};
-    if (status !== 'All') {
-      query.status = status;
-    }
+    if (status === 'resolved') query.status = { $in: caseStatuses.filter(s => s !== 'active') };
+    else if (!['All', 'all'].includes(status)) query.status = status;
 
     const [disputes, total] = await Promise.all([
       db.collection(COLLECTIONS.DISPUTES)
         .find(query)
-        .sort({ createdAt: -1 })
+        .sort({ createdAt: -1, _id: -1 })
         .skip(skip)
         .limit(limit)
         .toArray(),
       db.collection(COLLECTIONS.DISPUTES).countDocuments(query),
     ]);
 
-    const mapped = disputes.map((d) => ({
-      ...d,
-      id: d._id.toString(),
-      _id: undefined
-    }));
-
-    return NextResponse.json({ disputes: mapped, total, page, limit });
+    return NextResponse.json({ disputes: disputes.map(publicCase), total, page, limit }, { headers: { 'Cache-Control': 'no-store' } });
   } catch (error: any) {
     logger.error('GET /api/disputes error:', error);
     return NextResponse.json(
-      { error: error.message || 'Failed to fetch disputes' },
+      { error: 'Cases could not be loaded.' },
       { status: 500 }
     );
   }

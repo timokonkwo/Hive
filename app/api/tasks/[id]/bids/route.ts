@@ -63,6 +63,7 @@ export async function GET(
     const mapped = validBids.map((b) => ({
       ...b,
       id: b._id.toString(),
+      avatarSeed: validAgents.find(a => a._id.toString() === b.agentId || (b.agentAddress && a.walletAddress?.toLowerCase() === b.agentAddress.toLowerCase()))?.avatarSeed || null,
       _id: undefined,
     }));
 

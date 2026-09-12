@@ -199,7 +199,7 @@ export async function POST(req: NextRequest) {
       // Failure
       await db.collection(COLLECTIONS.AGENTS).updateOne(
         { _id: new ObjectId(agent.id) },
-        { $set: { tokenLaunchStatus: 'failed', tokenLaunchError: launchResult.error || 'Unknown error', updatedAt: new Date() } }
+        { $set: { tokenLaunchStatus: 'unknown', tokenLaunchError: launchResult.error || 'Unknown error', updatedAt: new Date() } }
       );
 
       logger.error(`[OWNER-LAUNCH] ${agent.name} failed: ${launchResult.error}`);

@@ -1,0 +1,41 @@
+import fs from 'node:fs/promises';
+const base = process.env.HIVE_CDP_URL || 'http://127.0.0.1:9350';
+const site = process.env.HIVE_PREVIEW_URL || 'http://localhost:3100';
+await fs.mkdir('/private/tmp/hive-redesign-qa',{recursive:true});
+const tabs = await (await fetch(base+'/json/list')).json();
+const tab = await (await fetch(base+'/json/new?about:blank',{method:'PUT'})).json();
+const ws = new WebSocket(tab.webSocketDebuggerUrl);
+await new Promise(resolve=>ws.addEventListener('open',resolve,{once:true}));
+let counter=0;const pending=new Map();const errors=[];
+ws.onmessage=e=>{const v=JSON.parse(e.data);if(v.id){const p=pending.get(v.id);if(p){pending.delete(v.id);v.error?p.reject(v.error):p.resolve(v.result)}}else if(v.method==='Fetch.requestPaused'){void intercept(v.params);}else if(v.method==='Runtime.exceptionThrown')errors.push(v.params.exceptionDetails);};
+const send=(method,params={})=>new Promise((resolve,reject)=>{const id=++counter;const timer=setTimeout(()=>{pending.delete(id);reject(new Error('Timed out: '+method));},20000);pending.set(id,{resolve:v=>{clearTimeout(timer);resolve(v)},reject:e=>{clearTimeout(timer);reject(e)}});ws.send(JSON.stringify({id,method,params}));});
+const sleep=ms=>new Promise(r=>setTimeout(r,ms));
+const evaluate=async(expression)=>{const r=await send('Runtime.evaluate',{expression,returnByValue:true,awaitPromise:true});if(r.exceptionDetails)throw new Error(r.exceptionDetails.exception?.description || r.exceptionDetails.text);return r.result.value};
+const shot=async(name,full=false)=>{const m=await send('Page.getLayoutMetrics');const data=await send('Page.captureScreenshot',{format:'png',captureBeyondViewport:full,...(full?{clip:{x:0,y:0,width:m.cssContentSize.width,height:m.cssContentSize.height,scale:1}}:{})});await fs.writeFile('/private/tmp/hive-redesign-qa/'+name+'.png',Buffer.from(data.data,'base64'));};
+
+const checks=[];const requests=[];let mode='real';let delayed=[];
+const check=(name,pass,detail)=>{checks.push({name,pass:!!pass,...(detail?{detail}:{})});if(!pass)console.error('FAIL',name,detail||'');};
+const until=async(expression)=>{for(let i=0;i<80;i++){if(await evaluate(`!!(${expression})`))return;await sleep(100);}throw new Error('Timed out: '+expression);};
+const settled=()=>until(`!!document.querySelector('main')`);
+const navigate=async(path)=>{await send('Page.navigate',{url:site+path});await until(`document.readyState==='complete'`);await settled();await sleep(500);};
+const click=async(selector,index=0)=>{await evaluate(`document.querySelectorAll(${JSON.stringify(selector)})[${index}].scrollIntoView({behavior:'instant',block:'center'})`);await sleep(80);const point=await evaluate(`(()=>{const r=document.querySelectorAll(${JSON.stringify(selector)})[${index}].getBoundingClientRect();return{x:r.x+r.width/2,y:r.y+r.height/2}})()`);await send('Input.dispatchMouseEvent',{type:'mousePressed',button:'left',clickCount:1,...point});await send('Input.dispatchMouseEvent',{type:'mouseReleased',button:'left',clickCount:1,...point});await sleep(120);};
+async function input(selector,value){await evaluate(`(()=>{const e=document.querySelector(${JSON.stringify(selector)});const proto=e.tagName==='TEXTAREA'?HTMLTextAreaElement.prototype:e.tagName==='SELECT'?HTMLSelectElement.prototype:HTMLInputElement.prototype;Object.getOwnPropertyDescriptor(proto,'value').set.call(e,${JSON.stringify(value)});e.dispatchEvent(new Event('input',{bubbles:true}));e.dispatchEvent(new Event('change',{bubbles:true}));})()`);await sleep(80);}
+async function button(label){await evaluate(`(()=>{document.querySelector('[data-qa-click]')?.removeAttribute('data-qa-click');const b=[...document.querySelectorAll('main button,dialog button')].find(e=>e.textContent.trim()===${JSON.stringify(label)});if(!b)throw Error('Missing button '+${JSON.stringify(label)});b.setAttribute('data-qa-click','true');})()`);await click('[data-qa-click]');}
+async function escape(){await send('Input.dispatchKeyEvent',{type:'keyDown',key:'Escape',code:'Escape',windowsVirtualKeyCode:27});await send('Input.dispatchKeyEvent',{type:'keyUp',key:'Escape',code:'Escape',windowsVirtualKeyCode:27});await sleep(100);}
+async function bounds(label){const d=await evaluate(`(()=>{const bad=[...document.querySelectorAll('main button,main input,main select,main textarea,header a,header button')].filter(e=>e.checkVisibility()&&e.getAttribute('aria-hidden')!=='true').filter(e=>{const r=e.getBoundingClientRect();return r.left<-.5||r.right>innerWidth+.5}).map(e=>e.textContent.slice(0,30));return{overflow:document.documentElement.scrollWidth>innerWidth,bad}})()`);check(label,!d.overflow&&!d.bad.length,d);}
+
+
+
+async function intercept(e){return send('Fetch.continueRequest',{requestId:e.requestId});}
+await send('Page.enable');await send('Runtime.enable');await send('Emulation.setEmulatedMedia',{features:[{name:'prefers-reduced-motion',value:'reduce'}]});await send('Emulation.setDeviceMetricsOverride',{width:1440,height:900,deviceScaleFactor:1,mobile:false});
+for(const path of ['/marketplace','/agents','/registry','/analytics','/dashboard','/agent/dashboard','/stake','/dao']){
+ await navigate(path);await until(`document.querySelector('[data-account-state="signed-out"]')`);
+ check(path+' exposes Sign in in the app header',await evaluate(`document.querySelector('header [data-account-state]').textContent==='Sign in'`));
+ for(const theme of ['light','dark']){await evaluate(`localStorage.setItem('hive-redesign-theme','${theme}');dispatchEvent(new Event('storage'))`);for(const width of [320,390,768,1100,1440]){await send('Emulation.setDeviceMetricsOverride',{width,height:900,deviceScaleFactor:1,mobile:width<600});await sleep(100);await bounds(path+' '+theme+' '+width);}}
+}
+await navigate('/marketplace');await until(`document.querySelector('[data-account-state="signed-out"]')`);await send('Emulation.setDeviceMetricsOverride',{width:320,height:800,deviceScaleFactor:1,mobile:true});await shot('auth-marketplace-320');await click('header [data-account-state]');await until(`document.querySelector('[role="dialog"]')`);check('Shared Sign in opens the real login flow without changing page',await evaluate(`location.pathname==='/marketplace'&&!!document.querySelector('[role="dialog"]')`));await sleep(800);check('Login modal displays actual sign-in methods',await evaluate(`/(MetaMask|Google|email|Connect a wallet)/i.test(document.querySelector('[role="dialog"]').innerText)`));await shot('auth-login-320');await escape();await click('summary[aria-label="App navigation menu"]');check('Post a task remains available in narrow mobile navigation',await evaluate(`!!document.querySelector('nav[aria-label="Mobile app navigation"] a[href="/create"]')`));await escape();
+await send('Emulation.setDeviceMetricsOverride',{width:1440,height:900,deviceScaleFactor:1,mobile:false});
+const provider=`(()=>{const e=document.querySelector('main'),key=Object.keys(e).find(k=>k.startsWith('__reactFiber$'));let f=e[key];while(f){if(typeof f.memoizedProps?.client?.getQueryCache==='function')return f.memoizedProps.client;f=f.return;}return null;})()`;
+check('Session provider can be tracked without exposing account data',await evaluate(`window.__qaSessionClient=${provider};!!window.__qaSessionClient`));
+for(const [href,path] of [['/dashboard','/dashboard'],['/docs','/docs'],['/','/'],['/marketplace','/marketplace']]){await click('a[href="'+href+'"]');await until(`location.pathname===${JSON.stringify(path)}&&!!document.querySelector('main')`);await sleep(500);check('One provider persists on client navigation to '+path,await evaluate(`${provider}===window.__qaSessionClient`));}
+await navigate('/dashboard');await until(`document.querySelector('[data-dashboard-state="signed-out"]')`);check('Signed-out dashboard still has its contextual sign-in action',await evaluate(`!!document.querySelector('#dashboard-sign-in-title')&&document.querySelector('header [data-account-state]').textContent==='Sign in'`));check('No runtime exceptions',errors.length===0,errors.map(e=>e.text));await fs.writeFile('/private/tmp/hive-redesign-qa/auth-access-results.json',JSON.stringify(checks,null,2));console.log(JSON.stringify({passed:checks.filter(c=>c.pass).length,total:checks.length,failures:checks.filter(c=>!c.pass)},null,2));ws.close();process.exitCode=checks.some(c=>!c.pass)?1:0;

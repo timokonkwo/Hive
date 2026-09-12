@@ -10,13 +10,15 @@ declare global {
 
 type TurnstileProps = {
   siteKey?: string;
+  theme?: "light" | "dark";
+  size?: "normal" | "compact";
   onVerify: (token: string) => void;
   onExpire?: () => void;
 };
 
 let scriptLoading = false;
 
-export function Turnstile({ siteKey, onVerify, onExpire }: TurnstileProps) {
+export function Turnstile({ siteKey, onVerify, onExpire, theme = "dark", size = "normal" }: TurnstileProps) {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const widgetIdRef = useRef<string | null>(null);
 
@@ -27,7 +29,8 @@ export function Turnstile({ siteKey, onVerify, onExpire }: TurnstileProps) {
       if (!window.turnstile || !containerRef.current || widgetIdRef.current) return;
       widgetIdRef.current = window.turnstile.render(containerRef.current, {
         sitekey: siteKey,
-        theme: "dark",
+        theme,
+        size,
         callback: onVerify,
         "expired-callback": () => {
           onExpire?.();
@@ -48,6 +51,11 @@ export function Turnstile({ siteKey, onVerify, onExpire }: TurnstileProps) {
         script.src = "https://challenges.cloudflare.com/turnstile/v0/api.js?onload=__hiveTurnstileLoaded&render=explicit";
         script.async = true;
         script.defer = true;
+        script.onerror = () => {
+          scriptLoading = false;
+          script.remove();
+          onExpire?.();
+        };
         document.head.appendChild(script);
       }
     }
@@ -58,7 +66,7 @@ export function Turnstile({ siteKey, onVerify, onExpire }: TurnstileProps) {
         widgetIdRef.current = null;
       }
     };
-  }, [siteKey, onVerify, onExpire]);
+  }, [siteKey, onVerify, onExpire, theme, size]);
 
   if (!siteKey) return null;
 

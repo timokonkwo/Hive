@@ -1,0 +1,105 @@
+@font-face {
+  font-family: Hive Manrope;
+  src: url('/redesign/fonts/manrope-regular.ttf') format('truetype');
+  font-weight: 400;
+  font-display: swap;
+}
+@font-face {
+  font-family: Hive Manrope;
+  src: url('/redesign/fonts/manrope-medium.ttf') format('truetype');
+  font-weight: 500;
+  font-display: swap;
+}
+@font-face {
+  font-family: Hive Manrope;
+  src: url('/redesign/fonts/manrope-semibold.ttf') format('truetype');
+  font-weight: 600;
+  font-display: swap;
+}
+.surface {
+  /* New tokens are isolated from app pages awaiting design approval. */
+  --canvas: #f5f5ef;
+  --surface: #fff;
+  --soft: #e9eddf;
+  --paper: #fafbf5;
+  --ink: #182015;
+  --muted: #5a6254;
+  --rule: #d0d6c7;
+  --accent: #ccff00;
+  --accent-ink: #182015;
+  --accent-text: #4a6200;
+  --document-rule: #d4dacb;
+  --gutter: clamp(24px,4.5vw,72px);
+  --section-space: clamp(80px,8.5vw,128px);
+  --ease: cubic-bezier(.2,.7,.2,1);
+  background: var(--canvas);
+  color: var(--ink);
+  font-family: Hive Manrope,Arial,sans-serif;
+  font-weight: 400;
+  font-size: 16px;
+  line-height: 1.5;
+  isolation: isolate;
+  -webkit-font-smoothing: antialiased;
+  overflow: clip;
+  color-scheme: light;
+}
+:global(html[data-hive-theme='dark']) .surface {
+  --canvas: #11140f;
+  --surface: #191e16;
+  --soft: #252d1f;
+  --paper: #20271b;
+  --ink: #f1f3e9;
+  --muted: #b5bcad;
+  --rule: #424c37;
+  --accent-text: #ccff00;
+  --document-rule: #46513a;
+  color-scheme: dark;
+}
+@media(prefers-color-scheme:dark) {
+  :global(html:not([data-hive-theme])) .surface {
+    --canvas: #11140f;
+    --surface: #191e16;
+    --soft: #252d1f;
+    --paper: #20271b;
+    --ink: #f1f3e9;
+    --muted: #b5bcad;
+    --rule: #424c37;
+    --accent-text: #ccff00;
+    --document-rule: #46513a;
+    color-scheme: dark;
+  }
+}
+.surface * {
+  box-sizing: border-box;
+}
+.surface h1,.surface h2,.surface h3,.surface p {
+  margin: 0;
+}
+.surface button,.surface a,.surface summary {
+  -webkit-tap-highlight-color: transparent;
+}
+.surface button {
+  font: inherit;
+  cursor: pointer;
+}
+.surface a {
+  color: inherit;
+  text-decoration: none;
+}
+.surface button,.surface summary {
+  color: inherit;
+}
+.surface :focus-visible {
+  outline: 2px solid var(--accent-text);
+  outline-offset: 5px;
+}
+.surface ::selection {
+  background: var(--accent);
+  color: var(--accent-ink);
+}
+.surface section {
+  scroll-margin-top: 96px;
+}
+.surface svg {
+  flex-shrink: 0;
+}

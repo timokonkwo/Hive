@@ -1,110 +1,41 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getDb, COLLECTIONS } from '@/lib/db';
 import { ObjectId } from 'mongodb';
-import { createHash } from 'crypto';
+import { getDb, COLLECTIONS } from '@/lib/db';
 import { checkRateLimit, getClientIp, RATE_LIMITS } from '@/lib/rate-limit';
+import { VerificationError, verificationId, verificationAccess, verificationView, verificationCode, postLink, xHandle, type VerificationAgent } from '@/lib/agent-verification';
+import { readXPost, checkXPost, xLookupConfigured } from '@/lib/x-post-proof';
 import { logger } from '@/lib/logger';
-
-/**
- * POST /api/agents/verify
- * Owner verification via tweet URL + optional token.
- */
+const headers = { 'Cache-Control': 'private, no-store' };
 export async function POST(req: NextRequest) {
+  const reply = (v: unknown, status = 200) => NextResponse.json(v, { status, headers });
   try {
-    // Rate limit
-    const ip = getClientIp(req);
-    const rl = checkRateLimit(`verify-agent:${ip}`, RATE_LIMITS.VERIFY_CLAIM);
-    if (!rl.allowed) {
-      return NextResponse.json(
-        { error: `Rate limited. Try again in ${rl.resetInSeconds}s.` },
-        { status: 429, headers: { 'Retry-After': String(rl.resetInSeconds) } }
-      );
+    const limit = checkRateLimit(`verify-agent:${getClientIp(req)}`, RATE_LIMITS.VERIFY_CLAIM);
+    if (!limit.allowed) return reply({ error: 'Too many checks. Try again shortly.' }, 429);
+    let body; try { body = await req.json(); } catch { return reply({ error: 'Invalid request.' }, 400); }
+    if (!body || !verificationId(body.agent_id)) return reply({ error: 'This agent link is invalid.' }, 400);
+    const db = await getDb(), collection = db.collection<VerificationAgent>('agents');
+    const agent = await collection.findOne({ _id: new ObjectId(body.agent_id) });
+    if (!agent) return reply({ error: 'This agent was not found.' }, 404);
+    const access = verificationAccess(req.headers, agent, body.token);
+    if (!access) return reply({ error: 'Use your verification link or agent access details.' }, 401);
+    if (agent.isVerified === true) return reply(verificationView(agent, true, xLookupConfigured()));
+    if (agent.ownerTwitter && !xHandle(agent.ownerTwitter)) return reply({ error: 'Update your X handle in My agents before verification.' }, 409);
+    const link = postLink(body.tweet_url), code = verificationCode(agent);
+    if (body.code !== code) return reply({ error: 'The verification code changed. Refresh and copy the current text.' }, 409);
+    const proof = checkXPost(await readXPost(link.id), link, code, agent);
+    const now = new Date();
+    const saved = await collection.updateOne({ _id: agent._id, isVerified: { $ne: true }, name: agent.name,
+      ownerTwitter: agent.ownerTwitter === undefined ? { $exists: false } : agent.ownerTwitter,
+      verificationTokenHash: agent.verificationTokenHash === undefined ? { $exists: false } : agent.verificationTokenHash,
+      ...(access === 'key' ? { apiKeyHash: agent.apiKeyHash } : {}),
+    }, { $set: { isVerified: true, verifiedAt: now, updatedAt: now, verificationTweet: link.url, ownershipVerification: proof, ownerTwitter: proof.username } });
+    if (saved.matchedCount !== 1) {
+      const current = await collection.findOne({ _id: agent._id });
+      if (current?.isVerified === true) return reply(verificationView(current, true, xLookupConfigured()));
+      return reply({ error: 'This agent changed during verification. Refresh and try again.' }, 409);
     }
-
-    const db = await getDb();
-    const body = await req.json();
-    const { agent_id, tweet_url, token } = body;
-
-    if (!agent_id || !tweet_url) {
-      return NextResponse.json(
-        { error: 'agent_id and tweet_url are required.' },
-        { status: 400 }
-      );
-    }
-
-    // Validate tweet URL format
-    const tweetPattern = /^https?:\/\/(x\.com|twitter\.com)\/\w+\/status\/\d+/;
-    if (!tweetPattern.test(tweet_url)) {
-      return NextResponse.json(
-        { error: 'Invalid tweet URL. Must be a link to a tweet/post on X (Twitter).' },
-        { status: 400 }
-      );
-    }
-
-    // Find agent
-    let agent;
-    try {
-      agent = await db.collection(COLLECTIONS.AGENTS).findOne({ _id: new ObjectId(agent_id) });
-    } catch {
-      return NextResponse.json({ error: 'Invalid agent ID.' }, { status: 400 });
-    }
-
-    if (!agent) {
-      return NextResponse.json({ error: 'Agent not found.' }, { status: 404 });
-    }
-
-    // Note: No verification token required here — the tweet URL is the proof of ownership.
-
-    if (agent.isVerified) {
-      return NextResponse.json(
-        { message: 'Agent is already verified.' },
-        { status: 200 }
-      );
-    }
-
-    // Store verification request (manual review or automated in future)
-    await db.collection('verifications').insertOne({
-      agentId: agent_id,
-      agentName: agent.name,
-      tweetUrl: tweet_url,
-      status: 'pending',
-      createdAt: new Date(),
-    });
-
-    // Auto-verify for now (can add tweet content validation later)
-    await db.collection(COLLECTIONS.AGENTS).updateOne(
-      { _id: new ObjectId(agent_id) },
-      {
-        $set: {
-          isVerified: true,
-          reputation: Math.max(agent.reputation || 0, 10),
-          verificationTweet: tweet_url,
-          verifiedAt: new Date(),
-          updatedAt: new Date(),
-        },
-      }
-    );
-
-    // Log activity
-    await db.collection(COLLECTIONS.ACTIVITY).insertOne({
-      type: 'AgentVerified',
-      agentId: agent_id,
-      actorName: agent.name,
-      metadata: { tweetUrl: tweet_url },
-      createdAt: new Date(),
-    });
-
-    return NextResponse.json({
-      verified: true,
-      agent_id,
-      agent_name: agent.name,
-      message: `Agent "${agent.name}" has been verified. Verification badge is now active.`,
-    });
-  } catch (error: any) {
-    logger.error('[HIVE] Verification error:', error);
-    return NextResponse.json(
-      { error: error.message || 'Verification failed' },
-      { status: 500 }
-    );
-  }
+    try { await db.collection(COLLECTIONS.ACTIVITY).insertOne({ type: 'AgentVerified', agentId: body.agent_id, actorName: agent.name, metadata: { postId: proof.postId, authorId: proof.authorId, method: proof.method }, createdAt: now }); }
+    catch { logger.warn('[HIVE] Verification activity could not be recorded.'); }
+    return reply(verificationView({ ...agent, isVerified: true, verifiedAt: now, ownerTwitter: proof.username, ownershipVerification: proof }, true, xLookupConfigured()));
+  } catch (error) { return reply({ error: error instanceof VerificationError ? error.message : 'Verification could not be confirmed. Check the saved status before trying again.' }, error instanceof VerificationError ? error.status : 500); }
 }

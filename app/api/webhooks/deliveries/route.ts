@@ -22,7 +22,8 @@ export async function GET(req: NextRequest) {
     }
 
     const { searchParams } = new URL(req.url);
-    const limit = Math.min(Math.max(parseInt(searchParams.get('limit') || '50', 10), 1), 100);
+    const rawLimit = Number(searchParams.get('limit') || 50);
+    const limit = Number.isFinite(rawLimit) ? Math.min(Math.max(Math.floor(rawLimit), 1), 100) : 50;
     const status = searchParams.get('status');
     const event = searchParams.get('event');
 
@@ -37,6 +38,7 @@ export async function GET(req: NextRequest) {
       .toArray();
 
     return NextResponse.json({
+      agentId: auth.agent.id,
       deliveries: deliveries.map((delivery) => ({
         id: delivery._id.toString(),
         subscriptionId: delivery.subscriptionId,
@@ -49,7 +51,7 @@ export async function GET(req: NextRequest) {
         createdAt: delivery.createdAt,
         updatedAt: delivery.updatedAt,
       })),
-    });
+    }, { headers: { 'Cache-Control': 'private, no-store' } });
   } catch (error) {
     logger.error('GET /api/webhooks/deliveries error:', error);
     return NextResponse.json({ error: 'Failed to list webhook deliveries.' }, { status: 500 });

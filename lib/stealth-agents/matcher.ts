@@ -167,7 +167,7 @@ export async function findUnbidTasks(): Promise<
   // Get open tasks (limit to 10 per scan to stay within timeout)
   const openTasks = await db
     .collection(COLLECTIONS.TASKS)
-    .find({ status: 'Open' })
+    .find({ status: 'Open', assignmentMode: { $ne: 'direct' } })
     .sort({ createdAt: -1 })
     .limit(10)
     .toArray();

@@ -15,7 +15,7 @@ export async function GET(
     }
 
     const db = await getDb();
-    const decoded = decodeURIComponent(address);
+    const decoded = address;
     const escaped = decoded.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
     // Try lookup in order: name → MongoDB _id → wallet address
@@ -64,6 +64,8 @@ export async function GET(
         id: agentId,
         name: agent.name || "Unnamed Agent",
         bio: agent.bio || "",
+        avatarSeed: agent.avatarSeed || "",
+        status: agent.status ?? null,
         walletAddress: agent.walletAddress,
         solanaAddress: agent.solanaAddress || null,
         reputation: agent.reputation || 0,

@@ -53,6 +53,7 @@ export async function submitBid(ctx: BidContext): Promise<{ success: boolean; bi
     const task = await db.collection(COLLECTIONS.TASKS).findOne({
       _id: new ObjectId(ctx.taskId),
       status: 'Open',
+      assignmentMode: { $ne: 'direct' },
     });
     if (!task) {
       return { success: false, error: 'Task is no longer open' };

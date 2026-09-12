@@ -3,6 +3,7 @@ import { getDb, COLLECTIONS } from './db';
 import { STAKING_TIERS, getStakingTierInfo } from './token-utils';
 import { awardPoints } from './points';
 import { Connection } from '@solana/web3.js';
+import { voteWindow } from './dispute-view';
 import { logger } from '@/lib/logger';
 
 function getConnection(): Connection {
@@ -147,126 +148,41 @@ export async function castDisputeVote(
   vote: 'slash' | 'dismiss',
   solanaAddress: string
 ): Promise<{ success: boolean; error?: string }> {
+  if (!/^[a-f0-9]{24}$/i.test(disputeId)) return { success: false, error: 'Invalid case.' };
+  const db = await getDb();
   try {
-    const db = await getDb();
-
+    await Promise.all([
+      db.collection(COLLECTIONS.DISPUTE_VOTES).createIndex({ disputeId: 1, userId: 1 }, { unique: true }),
+      db.collection(COLLECTIONS.DISPUTE_VOTES).createIndex({ disputeId: 1, solanaAddress: 1 }, { unique: true }),
+    ]);
+    const session = db.client.startSession();
     try {
-      await Promise.all([
-        db.collection(COLLECTIONS.DISPUTE_VOTES).createIndex(
-          { disputeId: 1, userId: 1 },
-          { unique: true, background: true }
-        ),
-        db.collection(COLLECTIONS.DISPUTE_VOTES).createIndex(
-          { disputeId: 1, solanaAddress: 1 },
-          { unique: true, background: true }
-        ),
-      ]);
-    } catch {
-      return { success: false, error: 'Vote replay protection is not ready. Try again shortly.' };
-    }
-    
-    // Find dispute
-    const oId = new ObjectId(disputeId);
-    const dispute = await db.collection(COLLECTIONS.DISPUTES).findOne({ _id: oId });
-
-    if (!dispute) {
-      return { success: false, error: 'Dispute not found.' };
-    }
-
-    if (dispute.status !== 'active') {
-      return { success: false, error: 'This dispute has already been resolved.' };
-    }
-
-    if (new Date() > new Date(dispute.deadline)) {
-      return { success: false, error: 'The voting window for this dispute has closed.' };
-    }
-
-    const now = new Date();
-    if (dispute.votingStartsAt && now < new Date(dispute.votingStartsAt)) {
-      return { success: false, error: 'This dispute is still in the evidence period. Voting has not started.' };
-    }
-
-    if (dispute.phase === 'evidence') {
-      await db.collection(COLLECTIONS.DISPUTES).updateOne(
-        { _id: oId, phase: 'evidence' },
-        { $set: { phase: 'voting', updatedAt: now } }
-      );
-    }
-
-    // Check if already voted
-    const alreadyVoted = await db.collection(COLLECTIONS.DISPUTE_VOTES).findOne({
-      disputeId,
-      $or: [{ userId }, { solanaAddress }]
-    });
-    if (alreadyVoted) {
-      return { success: false, error: 'You have already voted on this dispute.' };
-    }
-
-    // Use recorded stake for governance weight. Live token balance voting is
-    // intentionally excluded because it can be flash-loaned or moved between wallets.
-    let votingWeight = 0;
-    const votingSource = 'staked_hive';
-    try {
-      const stake = await db.collection(COLLECTIONS.STAKES).findOne({ solanaAddress });
-      const activeStake = stake?.activeAmount || 0;
-      if (activeStake < STAKING_TIERS.staker.threshold) {
-        votingWeight = 0;
-      } else {
-        const tierInfo = getStakingTierInfo(activeStake);
-        votingWeight = activeStake * (tierInfo?.governanceMultiplier || 1);
-      }
-    } catch (err: any) {
-      logger.warn('Failed to fetch governance weight', { tag: 'DISPUTES', error: err.message });
-      votingWeight = 0;
-    }
-
-    // Enforce holder status (only token holders can vote)
-    if (votingWeight <= 0) {
-      return { success: false, error: `At least ${STAKING_TIERS.staker.threshold.toLocaleString()} active staked HIVE is required before voting.` };
-    }
-
-    // Record the vote
-    try {
-      await db.collection(COLLECTIONS.DISPUTE_VOTES).insertOne({
-        userId,
-        disputeId,
-        vote,
-        weight: votingWeight,
-        source: votingSource,
-        solanaAddress,
-        timestamp: new Date()
+      await session.withTransaction(async () => {
+        const oId = new ObjectId(disputeId);
+        const dispute = await db.collection(COLLECTIONS.DISPUTES).findOne({ _id: oId }, { session });
+        if (!dispute || !voteWindow(dispute)) throw Error('Voting is not open for this case.');
+        const prior = await db.collection(COLLECTIONS.DISPUTE_VOTES).findOne({ disputeId, $or: [{ userId }, { solanaAddress }] }, { session });
+        if (prior) throw Error('You have already voted on this case.');
+        const stake = await db.collection(COLLECTIONS.STAKES).findOne({ solanaAddress }, { session });
+        const active = stake?.activeAmount;
+        if (typeof active !== 'number' || !Number.isFinite(active) || active < STAKING_TIERS.staker.threshold) throw Error(`At least ${STAKING_TIERS.staker.threshold.toLocaleString()} active staked HIVE is required before voting.`);
+        const weight = active * (getStakingTierInfo(active)?.governanceMultiplier || 1);
+        if (!Number.isFinite(weight)) throw Error('Voting weight could not be checked.');
+        const now = new Date();
+        if (!voteWindow(dispute, now.getTime())) throw Error('Voting is not open for this case.');
+        const changed = await db.collection(COLLECTIONS.DISPUTES).updateOne({ _id: oId, status: 'active', $expr: { $and: [{ $gt: ['$deadline', '$$NOW'] }, { $lte: ['$votingStartsAt', '$$NOW'] }] } }, { $inc: { voteCount: 1, [vote === 'slash' ? 'votesForSlash' : 'votesAgainstSlash']: weight }, $set: { phase: 'voting', updatedAt: now } }, { session });
+        if (changed.modifiedCount !== 1) throw Error('Voting is not open for this case.');
+        await db.collection(COLLECTIONS.DISPUTE_VOTES).insertOne({ userId, disputeId, vote, weight, source: 'staked_hive', solanaAddress, timestamp: now }, { session });
       });
-    } catch (error: any) {
-      if (error?.code === 11000) {
-        return { success: false, error: 'You have already voted on this dispute.' };
-      }
-      throw error;
-    }
-
-    // Increment dispute metrics
-    const incrementFields: Record<string, number> = {
-      voteCount: 1
-    };
-
-    if (vote === 'slash') {
-      incrementFields.votesForSlash = votingWeight;
-    } else {
-      incrementFields.votesAgainstSlash = votingWeight;
-    }
-
-    await db.collection(COLLECTIONS.DISPUTES).updateOne(
-      { _id: oId },
-      { $inc: incrementFields }
-    );
-
-    // Award +10 Hive Points for voting
-    await awardPoints(userId, 'dao_vote', 10, { disputeId, vote, votingWeight })
-      .catch((err) => logger.error('Failed to award points for DAO vote', { tag: 'POINTS', error: err.message }));
-
-    logger.info('Vote cast', { tag: 'DISPUTES', disputeId, userId, votingWeight });
+    } finally { await session.endSession(); }
+    await awardPoints(userId, 'dao_vote', 10, { disputeId, vote }).catch(() => logger.warn('Vote saved; points award unavailable.'));
     return { success: true };
   } catch (error: any) {
-    logger.error('Failed to cast vote', { tag: 'DISPUTES', error: (error as Error).message });
-    return { success: false, error: error.message || 'Failed to submit vote.' };
+    if (error?.code === 11000) return { success: false, error: 'You have already voted on this case.' };
+    const message = error instanceof Error ? error.message : '';
+    if (message.startsWith('At least ') || ['Voting is not open for this case.', 'You have already voted on this case.', 'Voting weight could not be checked.'].includes(message)) return { success: false, error: message };
+    logger.error('Vote result could not be confirmed', { tag: 'DISPUTES', disputeId });
+    // A commit response can be lost. The UI checks the account-scoped vote receipt.
+    throw Error('The vote result could not be confirmed. Check your vote.');
   }
 }

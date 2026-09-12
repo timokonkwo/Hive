@@ -1,0 +1,40 @@
+.main { padding-bottom: 80px; }
+.heading { composes: heading from '../tools/tools.module.css'; }
+.primary { composes: primary from '../owner/owner.module.css'; }
+.secondary { composes: secondary from '../owner/owner.module.css'; }
+.iconButton { composes: iconButton from '../owner/owner.module.css'; }
+.textLink { composes: textLink from '../owner/owner.module.css'; }
+.textButton { composes: textButton from '../tools/tools.module.css'; }
+.actions { composes: actions from '../owner/owner.module.css'; flex-wrap: wrap; }
+.field { composes: field from '../owner/owner.module.css'; }
+.details { composes: details from '../owner/owner.module.css'; }
+.hint { composes: hint from '../owner/owner.module.css'; margin-top: 12px; }
+.error { composes: error from '../owner/owner.module.css'; }
+.identity { composes: identity from '../tools/tools.module.css'; }
+.identityName { composes: identityName from '../tools/tools.module.css'; }
+.avatar { composes: avatar from '../tools/tools.module.css'; }
+.sectionHeading { display: flex; align-items: center; justify-content: space-between; max-width: 780px; margin: 20px 0 8px; }
+.sectionHeading h2 { font-size: 20px; font-weight: 500; letter-spacing: -.03em; }
+.wallet { max-width: 780px; padding: 28px 0 36px; border-bottom: 1px solid var(--rule); }
+.walletTitle { display: grid; grid-template-columns: 24px minmax(0,1fr) auto; align-items: center; gap: 16px; }
+.walletTitle h3 { font-size: 18px; font-weight: 500; letter-spacing: -.02em; }
+.walletTitle p { margin-top: 6px; color: var(--muted); font-size: 13px; }
+.status { font-size: 12px; color: var(--muted); }
+.savedAddress { display: flex; align-items: flex-start; gap: 16px; margin: 22px 0 12px; }
+.savedAddress .iconButton { flex: none; }
+.address { min-width: 0; overflow-wrap: anywhere; user-select: all; font-size: 15px; line-height: 1.8; font-variant-numeric: tabular-nums; }
+.savedAddress .address { flex: 1; padding-top: 7px; }
+.controls { margin-top: 24px; }
+.controls .field { margin: 0 0 20px; }
+.field select { font: inherit; font-size: 16px; width: 100%; min-width: 0; min-height: 48px; padding: 12px; border: 1px solid var(--rule); border-radius: 6px; background: var(--surface); color: var(--ink); }
+.notice { display: flex; gap: 10px; align-items: center; margin: 20px 0; color: var(--accent-text); font-size: 14px; }
+.recovery { max-width: 780px; border-left: 2px solid var(--accent-text); padding: 8px 0 8px 20px; margin: 24px 0; }
+.recovery h2 { font-size: 18px; font-weight: 500; }.recovery p { font-size: 14px; line-height: 1.8; margin: 12px 0; }
+.main :is(button,a,input,select):focus-visible { outline: 2px solid var(--accent-text); outline-offset: 4px; }
+@media(max-width:760px) {
+  .identity { display: grid; grid-template-columns: 42px minmax(0,1fr); gap: 4px 14px; }
+  .identity>.textLink { grid-column: 2; justify-self: start; }
+  .walletTitle { gap: 12px; }.walletTitle h3 { font-size: 17px; }
+  .walletTitle .status { grid-column: 2; }.savedAddress { gap: 8px; }.address { font-size: 14px; }
+  .actions { gap: 12px; }.actions button { max-width: 100%; white-space: normal; }
+}

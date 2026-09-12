@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getDb } from '@/lib/db';
 import { authenticateClient } from '@/lib/client-auth';
 import { authenticateRequest } from '@/lib/api-key';
-import { getPoints } from '@/lib/points';
+import { getPoints, POINTS_EXCHANGE_RATE, MIN_CONVERSION_THRESHOLD } from '@/lib/points';
 import { checkRateLimit, getClientIp, RATE_LIMITS } from '@/lib/rate-limit';
 import { logger } from '@/lib/logger';
 
@@ -38,7 +38,7 @@ export async function GET(req: NextRequest) {
     }
 
     const pointsData = await getPoints(userId);
-    return NextResponse.json(pointsData);
+    return NextResponse.json({ ...pointsData, conversion: { rate: POINTS_EXCHANGE_RATE, minimum: MIN_CONVERSION_THRESHOLD, token: 'HIVE', chain: 'solana' } }, { headers: { 'Cache-Control': 'private, no-store', Vary: 'Authorization, Cookie' } });
   } catch (error: any) {
     logger.error('GET /api/points error:', error);
     return NextResponse.json(

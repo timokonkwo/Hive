@@ -51,8 +51,11 @@ export async function GET(req: NextRequest) {
     }
 
     return NextResponse.json({
+      agentId: auth.agent.id,
+      currency: 'USDC',
+      paymentChain: 'solana',
       tools: Array.isArray(auth.agent.registeredTools) ? auth.agent.registeredTools : [],
-    });
+    }, { headers: { 'Cache-Control': 'private, no-store' } });
   } catch (error: any) {
     logger.error('GET /api/agents/me/tools error:', error);
     return NextResponse.json({ error: error.message || 'Failed to load tools.' }, { status: 500 });
@@ -183,9 +186,9 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Agents can register at most 25 tools.' }, { status: 400 });
     }
 
-    const query = objectId ? { _id: objectId } : { apiKeyHash: auth.agent.apiKeyHash };
+    const query = { ...(objectId ? { _id: objectId } : { apiKeyHash: auth.agent.apiKeyHash }), registeredTools: auth.agent.registeredTools === undefined ? { $exists: false } : auth.agent.registeredTools };
     try {
-      await db.collection(COLLECTIONS.AGENTS).updateOne(
+      const saved = await db.collection(COLLECTIONS.AGENTS).updateOne(
         query,
         {
           $set: {
@@ -197,6 +200,7 @@ export async function POST(req: NextRequest) {
           },
         }
       );
+      if (saved.matchedCount !== 1) return NextResponse.json({ error: 'Tools changed. Refresh before saving again.' }, { status: 409 });
     } catch (updateError: any) {
       if (updateError?.code === 11000) {
         return NextResponse.json(
@@ -207,7 +211,7 @@ export async function POST(req: NextRequest) {
       throw updateError;
     }
 
-    await db.collection(COLLECTIONS.ACTIVITY).insertOne({
+    try { await db.collection(COLLECTIONS.ACTIVITY).insertOne({
       type: existingIndex >= 0 ? 'McpToolUpdated' : 'McpToolRegistered',
       actorName: auth.agent.name,
       metadata: {
@@ -217,7 +221,7 @@ export async function POST(req: NextRequest) {
         costPerCall,
       },
       createdAt: now,
-    });
+    }); } catch { /* Keep the completed write visible if activity logging fails. */ }
 
     return NextResponse.json({ success: true, tool: nextTool });
   } catch (error: any) {
@@ -259,7 +263,7 @@ export async function DELETE(req: NextRequest) {
     }
 
     const objectId = agentObjectId(auth.agent);
-    const query = objectId ? { _id: objectId } : { apiKeyHash: auth.agent.apiKeyHash };
+    const query = { ...(objectId ? { _id: objectId } : { apiKeyHash: auth.agent.apiKeyHash }), registeredTools: auth.agent.registeredTools === undefined ? { $exists: false } : auth.agent.registeredTools };
     const update: any = {
       $set: {
         registeredTools,
@@ -269,12 +273,10 @@ export async function DELETE(req: NextRequest) {
         capabilities: name,
       },
     };
-    await db.collection(COLLECTIONS.AGENTS).updateOne(
-      query,
-      update
-    );
+    const removed = await db.collection(COLLECTIONS.AGENTS).updateOne(query, update);
+    if (removed.matchedCount !== 1) return NextResponse.json({ error: 'Tools changed. Refresh before removing again.' }, { status: 409 });
 
-    await db.collection(COLLECTIONS.ACTIVITY).insertOne({
+    try { await db.collection(COLLECTIONS.ACTIVITY).insertOne({
       type: 'McpToolRemoved',
       actorName: auth.agent.name,
       metadata: {
@@ -282,9 +284,9 @@ export async function DELETE(req: NextRequest) {
         toolName: name,
       },
       createdAt: new Date(),
-    });
+    }); } catch { /* The tool is already removed. */ }
 
-    return NextResponse.json({ success: true });
+    return NextResponse.json({ success: true, name });
   } catch (error: any) {
     logger.error('DELETE /api/agents/me/tools error:', error);
     return NextResponse.json({ error: error.message || 'Failed to remove tool.' }, { status: 500 });

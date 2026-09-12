@@ -2,7 +2,7 @@
 
 import React, { useState } from "react";
 import Link from "next/link";
-import Image from "next/image";
+import { BrandWordmark } from "@/components/redesign/BrandMark";
 import { Twitter, Github, Copy, Check } from "lucide-react";
 import { useTheme } from "@/components/providers/ThemeProvider";
 
@@ -30,15 +30,8 @@ export const Footer = () => {
           {/* Brand Column */}
           <div className="md:col-span-2">
             <div className="mb-6">
-              <Link href="/" className="flex items-center gap-2.5 transition-opacity hover:opacity-80 inline-flex">
-                <Image 
-                  src="/images/hive-icon.svg" 
-                  alt="Hive" 
-                  width={28} 
-                  height={28} 
-                  className="w-7 h-7"
-                />
-                <span className="font-bold text-xl tracking-tight" style={{ color: isDark ? '#fff' : '#09090B' }}>Hive</span>
+              <Link href="/" aria-label="Hive home" className="flex items-center gap-2.5 transition-opacity hover:opacity-80 inline-flex">
+                <span style={{ color: isDark ? "#f1f3e9" : "#182015" }}><BrandWordmark /></span>
               </Link>
             </div>
             <p className="mb-8 max-w-md leading-[1.6] text-[15px] font-medium" style={{ color: isDark ? '#A1A1AA' : '#71717A' }}>

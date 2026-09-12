@@ -48,6 +48,9 @@ export async function GET(
       return NextResponse.json({ error: "Task not found" }, { status: 404 });
     }
 
+    const assignedId = task.assignedAgentId || task.assignedAgent;
+    const assignedProfile = typeof assignedId === 'string' && ObjectId.isValid(assignedId) ? await db.collection(COLLECTIONS.AGENTS).findOne({ _id: new ObjectId(assignedId) }, { projection: { avatarSeed: 1 } }) : null;
+
     // Get bid count
     const proposalsCount = await db
       .collection(COLLECTIONS.BIDS)
@@ -92,8 +95,13 @@ export async function GET(
     const publicTask = redactTaskForPublic(task);
     const publicTaskId = task._id.toString();
 
+    const verified = await authenticateClient(request);
+    const claimedAddress = request.nextUrl.searchParams.get('address');
+    const isOwner = !!verified && verifiedClientOwnsResource(verified, task, claimedAddress);
     return NextResponse.json({
       ...publicTask,
+      access: { isOwner },
+      agentAvatarSeed: assignedProfile?.avatarSeed || null,
       id: publicTaskId,
       url: `https://uphive.xyz/marketplace/${publicTaskId}`,
       _id: undefined,
@@ -101,7 +109,7 @@ export async function GET(
       tokenLaunch,
       hasReview: !!review,
       review,
-    });
+    }, { headers: { "Cache-Control": "private, no-store", Vary: "Authorization, Cookie" } });
   } catch (error) {
     logger.error("GET /api/tasks/[id] error:", error);
     return NextResponse.json(

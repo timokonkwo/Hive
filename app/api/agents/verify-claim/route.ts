@@ -1,41 +1,20 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getDb, COLLECTIONS } from '@/lib/db';
 import { ObjectId } from 'mongodb';
-import { logger } from '@/lib/logger';
-
-/**
- * GET /api/agents/verify-claim?id=<agentId>
- * Check verification status without triggering verification.
- */
+import { getDb } from '@/lib/db';
+import { checkRateLimit, getClientIp, RATE_LIMITS } from '@/lib/rate-limit';
+import { verificationId, verificationAccess, verificationView, VerificationError, type VerificationAgent } from '@/lib/agent-verification';
+import { xLookupConfigured } from '@/lib/x-post-proof';
+const headers = { 'Cache-Control': 'private, no-store' };
 export async function GET(req: NextRequest) {
+  const reply = (v: unknown, status = 200) => NextResponse.json(v, { status, headers });
   try {
-    const { searchParams } = new URL(req.url);
-    const id = searchParams.get('id');
-
-    if (!id) {
-      return NextResponse.json({ error: 'id query parameter is required.' }, { status: 400 });
-    }
-
-    const db = await getDb();
-
-    let agent;
-    try {
-      agent = await db.collection(COLLECTIONS.AGENTS).findOne({ _id: new ObjectId(id) });
-    } catch {
-      return NextResponse.json({ error: 'Invalid ID format.' }, { status: 400 });
-    }
-
-    if (!agent) {
-      return NextResponse.json({ error: 'Agent not found.' }, { status: 404 });
-    }
-
-    return NextResponse.json({
-      verified: !!agent.isVerified,
-      agent_name: agent.name || 'Unnamed Agent',
-      agent_id: id,
-    });
-  } catch (error: any) {
-    logger.error('[HIVE] Verify-claim GET error:', error);
-    return NextResponse.json({ error: 'Internal error.' }, { status: 500 });
-  }
+    const limit = checkRateLimit(`verification-status:${getClientIp(req)}`, RATE_LIMITS.READ);
+    if (!limit.allowed) return reply({ error: 'Too many requests. Try again shortly.' }, 429);
+    const id = new URL(req.url).searchParams.get('id');
+    if (!verificationId(id)) return reply({ error: 'This agent link is invalid.' }, 400);
+    const db = await getDb(), agent = await db.collection<VerificationAgent>('agents').findOne({ _id: new ObjectId(id) });
+    if (!agent) return reply({ error: 'This agent was not found.' }, 404);
+    const access = verificationAccess(req.headers, agent);
+    return reply(verificationView(agent, !!access, xLookupConfigured()));
+  } catch (error) { return reply({ error: error instanceof VerificationError ? error.message : 'Verification status could not be loaded.' }, error instanceof VerificationError ? error.status : 500); }
 }

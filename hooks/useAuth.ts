@@ -1,14 +1,12 @@
 import { usePrivy } from "@privy-io/react-auth";
-import { useState, useEffect, useMemo } from "react";
-import { useAccount } from "wagmi";
-import { toast } from "sonner";
+import { useMemo } from "react";
 
 /**
  * Extended auth hook that provides a stable identity for ALL login methods.
  *
  * Priority order for wallet address:
- *  1. Solana wallet (if connected via Solana wallet like Phantom)
- *  2. Ethereum wallet (if connected via MetaMask, etc.)
+ *  1. EVM wallet (primary app direction)
+ *  2. Solana wallet (supported legacy account)
  *  3. Privy user ID (for email/Google users without a wallet)
  *
  * All consuming code should use `user.wallet.address` which this hook
@@ -16,74 +14,19 @@ import { toast } from "sonner";
  */
 export function useAuth() {
   const privy = usePrivy();
-  const { address: wagmiAddress, isConnected: wagmiConnected } = useAccount();
-
-  const [prevAddress, setPrevAddress] = useState<string | null>(null);
-  const [authStabilized, setAuthStabilized] = useState(false);
-
-  // Stabilization delay: after Privy authenticates, wait for wallet to sync
-  useEffect(() => {
-    if (!privy.authenticated) {
-      setAuthStabilized(false);
-      return;
-    }
-
-    const timer = setTimeout(() => {
-      setAuthStabilized(true);
-    }, 3000);
-
-    return () => clearTimeout(timer);
-  }, [privy.authenticated]);
-
-  // Detect MetaMask wallet switches via wagmi (EVM users only)
-  useEffect(() => {
-    if (!privy.authenticated || !wagmiAddress || !authStabilized) return;
-
-    const hasExternalEthWallet = privy.user?.linkedAccounts?.some(
-      (account: any) => account.type === 'wallet' && account.chainType === 'ethereum' && account.walletClientType !== 'privy'
-    );
-    if (!hasExternalEthWallet) return;
-
-    const currentPrivyAddress = privy.user?.wallet?.address?.toLowerCase();
-    const currentWagmiAddress = wagmiAddress?.toLowerCase();
-
-    if (!prevAddress) {
-      setPrevAddress(currentWagmiAddress || null);
-      return;
-    }
-
-    if (currentWagmiAddress && currentPrivyAddress && currentWagmiAddress !== currentPrivyAddress) {
-      toast.info("Wallet changed", {
-        description: "Reconnecting with the new wallet..."
-      });
-      privy.logout().then(() => {
-        setPrevAddress(null);
-      });
-    }
-  }, [wagmiAddress, privy.authenticated, privy.user?.wallet?.address, authStabilized, prevAddress, privy]);
-
-  // Handle disconnect from wagmi side (EVM users only)
-  useEffect(() => {
-    if (!authStabilized) return;
-    const hasExternalEthWallet = privy.user?.linkedAccounts?.some(
-      (account: any) => account.type === 'wallet' && account.chainType === 'ethereum' && account.walletClientType !== 'privy'
-    );
-    if (!hasExternalEthWallet) return;
-    if (privy.authenticated && prevAddress && !wagmiConnected) {
-      privy.logout().then(() => {
-        setPrevAddress(null);
-      });
-    }
-  }, [wagmiConnected, privy.authenticated, prevAddress, authStabilized, privy]);
+  // Privy owns account sign-in. Wallet changes and disconnects do not log it out.
+  // Transaction flows separately verify their required wallet and network.
 
   // Build a stable user object that ALWAYS has an address
   const userWithAddress = useMemo(() => {
     if (!privy.user) return privy.user;
 
-    // 1. Check for Solana wallet (prioritized for Hive)
-    const solanaWallet = privy.user.linkedAccounts?.find(
-      (account: any) => account.type === 'wallet' && account.chainType === 'solana'
-    ) as any;
+    // Prefer an EVM account when both wallet families are linked.
+    if (privy.user.wallet?.address && /^0x[a-f0-9]{40}$/i.test(privy.user.wallet.address)) return privy.user;
+    const evmWallet = privy.user.linkedAccounts?.filter(account => account.type === 'wallet').find(account => account.chainType === 'ethereum');
+    if (evmWallet?.address) return { ...privy.user, wallet: { address: evmWallet.address, chainType: 'ethereum' as const, chainId: 'chainId' in evmWallet && typeof evmWallet.chainId === 'string' ? evmWallet.chainId : '1', walletClientType: evmWallet.walletClientType || 'unknown' } };
+    // Keep Solana-only accounts supported.
+    const solanaWallet = privy.user.linkedAccounts?.filter(account => account.type === 'wallet').find(account => account.chainType === 'solana');
 
     if (solanaWallet?.address) {
       return {
@@ -97,11 +40,10 @@ export function useAuth() {
       };
     }
 
-    // 2. Check for Ethereum wallet (backward compat)
-    const ethWalletAddress = privy.user.wallet?.address;
-    if (ethWalletAddress) return privy.user;
+    // Preserve an existing wallet when linked-account metadata is unavailable.
+    if (privy.user.wallet?.address) return privy.user;
 
-    // 3. For email/Google users without a wallet, use Privy user ID
+    // For email/Google users without a wallet, use the canonical Privy ID.
     const userId = privy.user.id;
     return {
       ...privy.user,

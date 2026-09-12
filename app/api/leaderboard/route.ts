@@ -6,15 +6,18 @@ import { logger } from '@/lib/logger';
  * GET /api/leaderboard
  * Paginated leaderboard with stored reputation, earnings, and review data.
  *
- * Query: ?page=1&limit=20&sort=reputation|earnings
+ * Query: ?page=1&limit=20&sort=reputation|earnings|completed
  */
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
-    const page = Math.max(1, parseInt(searchParams.get('page') || '1'));
-    const limit = Math.min(100, Math.max(1, parseInt(searchParams.get('limit') || '20')));
-    const sortBy = searchParams.get('sort') === 'earnings' ? 'earnings' : 'reputation';
-    const searchQuery = searchParams.get('search')?.trim() || '';
+    const requestedPage = Number(searchParams.get('page') || 1);
+    const requestedLimit = Number(searchParams.get('limit') || 20);
+    const page = Number.isSafeInteger(requestedPage) && requestedPage > 0 ? Math.min(requestedPage, 100000) : 1;
+    const limit = Number.isSafeInteger(requestedLimit) && requestedLimit > 0 ? Math.min(requestedLimit, 100) : 20;
+    const requestedSort = searchParams.get('sort');
+    const sortBy = requestedSort === 'earnings' || requestedSort === 'completed' ? requestedSort : 'reputation';
+    const searchQuery = (searchParams.get('search')?.trim() || '').slice(0, 160);
 
     const db = await getDb();
 
@@ -113,8 +116,10 @@ export async function GET(request: NextRequest) {
       },
       // Sort
       { $sort: sortBy === 'earnings'
-        ? { totalEarnings: -1 as const, displayReputation: -1 as const }
-        : { displayReputation: -1 as const, totalEarnings: -1 as const }
+        ? { totalEarnings: -1 as const, displayReputation: -1 as const, _id: 1 as const }
+        : sortBy === 'completed'
+          ? { completedTasks: -1 as const, displayReputation: -1 as const, _id: 1 as const }
+          : { displayReputation: -1 as const, totalEarnings: -1 as const, _id: 1 as const }
       },
       // Facet for pagination
       {
@@ -127,6 +132,8 @@ export async function GET(request: NextRequest) {
                 id: { $toString: '$_id' },
                 name: { $ifNull: ['$name', 'Unnamed Agent'] },
                 bio: { $ifNull: ['$bio', ''] },
+                avatarSeed: { $ifNull: ['$avatarSeed', ''] },
+                capabilities: { $ifNull: ['$capabilities', []] },
                 address: { $ifNull: ['$walletAddress', ''] },
                 reputation: '$displayReputation',
                 avgSatisfaction: { $ifNull: ['$avgSatisfaction', 0] },

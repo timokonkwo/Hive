@@ -1,138 +1,39 @@
-import { NextRequest, NextResponse } from "next/server";
-import { getDb, COLLECTIONS } from "@/lib/db";
-import { ObjectId } from "mongodb";
-import { checkRateLimit, getClientIp, RATE_LIMITS } from "@/lib/rate-limit";
+import { NextRequest, NextResponse } from 'next/server';
+import { getDb, COLLECTIONS } from '@/lib/db';
+import { authenticateClient } from '@/lib/client-auth';
+import { checkRateLimit, getClientIp, RATE_LIMITS } from '@/lib/rate-limit';
+import { redactTaskForPublic } from '@/lib/public-redaction';
 import { logger } from '@/lib/logger';
-
-export const dynamic = "force-dynamic";
-
-// GET /api/dashboard?address=0x... — Fetch user's tasks and bids
+export const dynamic = 'force-dynamic';
+const headers = { 'Cache-Control': 'private, no-store', Vary: 'Authorization, Cookie' };
 export async function GET(request: NextRequest) {
+  const verified = await authenticateClient(request);
+  if (!verified) return NextResponse.json({ error: 'Sign in to view your tasks.' }, { status: 401, headers });
+  const rl = checkRateLimit(`dashboard:${getClientIp(request)}`, RATE_LIMITS.READ);
+  if (!rl.allowed) return NextResponse.json({ error: 'Too many requests. Try again shortly.' }, { status: 429, headers });
   try {
     const db = await getDb();
-    const { searchParams } = new URL(request.url);
-    const address = searchParams.get("address");
-
-    if (!address) {
-      return NextResponse.json(
-        { error: "address query parameter required" },
-        { status: 400 }
-      );
-    }
-
-    // Rate limit
-    const ip = getClientIp(request);
-    const rl = checkRateLimit(`dashboard:${ip}`, RATE_LIMITS.READ);
-    if (!rl.allowed) {
-      return NextResponse.json(
-        { error: `Rate limited. Try again in ${rl.resetInSeconds}s.` },
-        { status: 429, headers: { 'Retry-After': String(rl.resetInSeconds) } }
-      );
-    }
-
-    const escaped = address.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-    const addressRegex = new RegExp(`^${escaped}$`, "i");
-
-    // Tasks posted by this user
-    const postedTasks = await db
-      .collection(COLLECTIONS.TASKS)
-      .find({ clientAddress: { $regex: addressRegex } })
-      .sort({ createdAt: -1 })
-      .toArray();
-
-    const postedTasksMapped = postedTasks.map((t) => ({
-      ...t,
-      id: t._id.toString(),
-      _id: undefined,
-    }));
-
-    // Check which completed tasks have reviews
-    const completedTaskIds = postedTasks
-      .filter(t => t.status === 'Completed')
-      .map(t => t._id.toString());
-
-    let reviewedTaskIds = new Set<string>();
-    if (completedTaskIds.length > 0) {
-      const reviews = await db.collection('reviews')
-        .find({ taskId: { $in: completedTaskIds } }, { projection: { taskId: 1 } })
-        .toArray();
-      reviewedTaskIds = new Set(reviews.map((r: any) => r.taskId));
-    }
-
-    const postedTasksWithReviews = postedTasksMapped.map((t: any) => ({
-      ...t,
-      hasReview: reviewedTaskIds.has(t.id),
-    }));
-
-    // Bids/proposals submitted by this user
-    const myBids = await db
-      .collection(COLLECTIONS.BIDS)
-      .find({ agentAddress: { $regex: addressRegex } })
-      .sort({ createdAt: -1 })
-      .toArray();
-
-    const myBidsMapped = myBids.map((b: any) => ({
-      ...b,
-      id: b._id.toString(),
-      _id: undefined,
-    }));
-
-    // Get task titles for the bids
-    const taskIds = [...new Set(myBids.map((b) => b.taskId))];
-    const relatedTasks = taskIds.length > 0
-      ? await db.collection(COLLECTIONS.TASKS).find({
-          _id: { $in: taskIds.filter((id) => ObjectId.isValid(id)).map((id) => new ObjectId(id)) },
-        }).toArray()
-      : [];
-
-    const taskMap = new Map(relatedTasks.map((t: any) => [t._id.toString(), t.title]));
-    const bidsWithTitles = myBidsMapped.map((b: any) => ({
-      ...b,
-      taskTitle: taskMap.get(b.taskId) || "Unknown Task",
-    }));
-
-    // Get proposals on user's posted tasks
-    const postedTaskIds = postedTasks.map((t) => t._id.toString());
-    const incomingProposals = postedTaskIds.length > 0
-      ? await db
-          .collection(COLLECTIONS.BIDS)
-          .find({ taskId: { $in: postedTaskIds } })
-          .sort({ createdAt: -1 })
-          .toArray()
-      : [];
-
-    const incomingMapped = incomingProposals.map((b: any) => ({
-      ...b,
-      id: b._id.toString(),
-      _id: undefined,
-      taskTitle: postedTasks.find((t: any) => t._id.toString() === b.taskId)?.title || "Unknown",
-    }));
-
-    // Stats
-    const stats = {
-      totalPosted: postedTasks.length,
-      openTasks: postedTasks.filter((t) => t.status === "Open").length,
-      inProgressTasks: postedTasks.filter((t) => t.status === "In Progress").length,
-      inReviewTasks: postedTasks.filter((t) => t.status === "In Review").length,
-      completedTasks: postedTasks.filter((t) => t.status === "Completed").length,
-      totalBidsSubmitted: myBids.length,
-      activeBids: myBids.filter((b) => b.status === "Pending").length,
-      acceptedBids: myBids.filter((b) => b.status === "accepted").length,
-      incomingProposals: incomingProposals.length,
-      pendingReviews: postedTasks.filter((t) => t.status === "In Review").length,
-    };
-
-    return NextResponse.json({
-      postedTasks: postedTasksWithReviews,
-      myBids: bidsWithTitles,
-      incomingProposals: incomingMapped,
-      stats,
-    });
+    const profile = await db.collection(COLLECTIONS.CLIENTS).findOne({ address: verified.userId });
+    const identities = [verified.userId];
+    if (profile?.solanaAddressVerifiedAt && typeof profile.solanaAddress === 'string') identities.push(profile.solanaAddress);
+    // A supplied query address or unverified externalAddress cannot claim work.
+    const tasks = await db.collection(COLLECTIONS.TASKS).find({ $or: [
+      { clientPrivyUserId: verified.userId },
+      { clientPrivyUserId: { $exists: false }, clientAddress: { $in: identities } },
+      { clientPrivyUserId: null, clientAddress: { $in: identities } },
+    ] }).sort({ createdAt: -1, _id: -1 }).toArray();
+    const ids = tasks.map(t => t._id.toString());
+    const [reviews, proposals] = ids.length ? await Promise.all([
+      db.collection('reviews').find({ taskId: { $in: ids } }, { projection: { taskId: 1 } }).toArray(),
+      db.collection(COLLECTIONS.BIDS).find({ taskId: { $in: ids } }, { projection: { taskId: 1, status: 1 } }).toArray(),
+    ]) : [[], []];
+    const reviewed = new Set(reviews.map(r => String(r.taskId)));
+    return NextResponse.json({ accountId: verified.userId, postedTasks: tasks.map(t => ({
+      ...redactTaskForPublic(t), id: t._id.toString(), hasReview: reviewed.has(t._id.toString()),
+      pendingProposals: proposals.filter(b => String(b.taskId) === t._id.toString() && ['Pending','pending'].includes(b.status)).length,
+    })) }, { headers });
   } catch (error) {
-    logger.error("GET /api/dashboard error:", error);
-    return NextResponse.json(
-      { error: "Failed to fetch dashboard data" },
-      { status: 500 }
-    );
+    logger.error('GET /api/dashboard error:', error);
+    return NextResponse.json({ error: 'Your tasks could not be loaded.' }, { status: 500, headers });
   }
 }

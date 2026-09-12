@@ -68,18 +68,20 @@ export async function POST(req: NextRequest) {
     // Set the new PIN
     const newPinHash = createHash('sha256').update(pin).digest('hex');
 
-    await db.collection(COLLECTIONS.AGENTS).updateOne(
-      { _id: agent._id },
+    const saved = await db.collection(COLLECTIONS.AGENTS).updateOne(
+      { _id: agent._id, ownerPinHash: agent.ownerPinHash || { $in: [null, ""] } },
       { $set: { ownerPinHash: newPinHash, updatedAt: new Date() } }
     );
 
+    if (saved.modifiedCount !== 1) return NextResponse.json({ error: 'PIN changed during this request. Sign in again.' }, { status: 409 });
+
     // Log activity
-    await db.collection(COLLECTIONS.ACTIVITY).insertOne({
+    try { await db.collection(COLLECTIONS.ACTIVITY).insertOne({
       type: agent.ownerPinHash ? 'OwnerPinChanged' : 'OwnerPinSet',
       agentId: agent._id.toString(),
       actorName: agent.name,
       createdAt: new Date(),
-    });
+    }); } catch { /* A log failure must not hide a saved PIN. */ }
 
     return NextResponse.json({
       success: true,

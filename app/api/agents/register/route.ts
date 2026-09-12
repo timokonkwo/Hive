@@ -1,10 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getDb, COLLECTIONS } from '@/lib/db';
-import { generateApiKey, hashApiKey, isValidApiKeyFormat } from '@/lib/api-key';
+import { generateApiKey, hashApiKey } from '@/lib/api-key';
 import { checkRateLimit, getClientIp, RATE_LIMITS } from '@/lib/rate-limit';
 import { PublicKey } from '@solana/web3.js';
 import { randomBytes, createHash } from 'crypto';
 import { validateTokenSymbol, generateTokenSymbol, createAgentBagsClient } from '@/lib/bags-agent';
+import { verifyRegistrationWallet } from '@/lib/registration-wallet';
 import { logger } from '@/lib/logger';
 
 /**
@@ -42,7 +43,7 @@ export async function POST(req: NextRequest) {
     const db = await getDb();
     const body = await req.json();
 
-    const { name: rawName, bio: rawBio, capabilities, owner_twitter, website, solana_address, referralCode: incomingReferral, launchToken, tokenSymbol: rawTokenSymbol, tokenImageUrl: rawTokenImageUrl } = body;
+    const { avatarSeed, wallet_address, wallet_proof, name: rawName, bio: rawBio, capabilities, owner_twitter, website, solana_address, referralCode: incomingReferral, launchToken, tokenSymbol: rawTokenSymbol, tokenImageUrl: rawTokenImageUrl } = body;
 
     // Sanitize inputs
     const name = typeof rawName === 'string' ? rawName.trim() : '';
@@ -89,6 +90,18 @@ export async function POST(req: NextRequest) {
           { status: 400 }
         );
       }
+    }
+
+    if (avatarSeed !== undefined && (typeof avatarSeed !== 'string' || !/^[a-z0-9_-]{1,64}$/i.test(avatarSeed))) return NextResponse.json({ error: 'Choose a valid avatar.' }, { status: 400 });
+    if (website !== undefined && website !== '') {
+      try { const url = new URL(website); if (typeof website !== 'string' || website.length > 200 || !['https:','http:'].includes(url.protocol) || url.username || url.password) throw Error(); }
+      catch { return NextResponse.json({ error: 'Use a full http or https website address.' }, { status: 400 }); }
+    }
+    if (owner_twitter !== undefined && (typeof owner_twitter !== 'string' || owner_twitter.length > 50)) return NextResponse.json({ error: 'X handle must be 50 characters or less.' }, { status: 400 });
+    let evmWallet: {address:string;digest:string} | null = null;
+    if (wallet_address !== undefined && wallet_address !== '') {
+      try { evmWallet = await verifyRegistrationWallet(name, wallet_address, wallet_proof); }
+      catch (error) { return NextResponse.json({ error: error instanceof Error ? error.message : 'Verify your wallet again.' }, { status: 400 }); }
     }
 
     // ── Token launch validation (only when launchToken is true) ──
@@ -215,29 +228,11 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    // Check for duplicate name (skip agents stuck in 'pending' for over 1 hour)
-    const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000);
-    const existing = await db.collection(COLLECTIONS.AGENTS).findOne({
-      name: { $regex: new RegExp(`^${name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i') },
-      $or: [
-        { status: { $ne: 'pending' } },         // active agents always block
-        { status: 'pending', createdAt: { $gte: oneHourAgo } }, // recent pending agents block
-      ],
-    });
-
-    if (existing) {
-      return NextResponse.json(
-        { error: `An agent named "${name}" already exists. Choose a different name.` },
-        { status: 409 }
-      );
-    }
-
-    // Clean up stale pending agents with this name (allow re-registration)
-    await db.collection(COLLECTIONS.AGENTS).deleteMany({
-      name: { $regex: new RegExp(`^${name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i') },
-      status: 'pending',
-      createdAt: { $lt: oneHourAgo },
-    });
+    // Pending listings keep their names; never delete them during another registration.
+    const existing = await db.collection(COLLECTIONS.AGENTS).findOne({ name: { $regex: new RegExp(`^${name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i') } });
+    if (existing) return NextResponse.json({ error: 'That agent name is already in use.' }, { status: 409 });
+    await db.collection(COLLECTIONS.AGENTS).createIndex({ nameKey: 1 }, { unique: true, partialFilterExpression: { nameKey: { $type: 'string' } }, name: 'unique_agent_name_key' });
+    await db.collection(COLLECTIONS.AGENTS).createIndex({ registrationWalletProofDigest: 1 }, { unique: true, partialFilterExpression: { registrationWalletProofDigest: { $type: 'string' } }, name: 'unique_registration_wallet_proof' });
 
     // Generate API key
     const rawApiKey = generateApiKey();
@@ -270,16 +265,20 @@ export async function POST(req: NextRequest) {
 
     const agent = {
       name,
+      nameKey: name.toLowerCase(),
+      ...(avatarSeed ? { avatarSeed } : {}),
       bio,
       capabilities: capabilities || [],
       ownerTwitter: owner_twitter || null,
       website: website || null,
-      walletAddress: null, // EVM wallet — set later via manage page
+      walletAddress: evmWallet?.address || null,
+      ...(evmWallet ? { walletAddressVerifiedAt: new Date(), registrationWalletProofDigest: evmWallet.digest } : {}),
       solanaAddress: validatedSolanaAddress, // Solana wallet for receiving USDC
       apiKeyHash,
       recoveryCodeHash, // Hashed recovery code for key recovery
       ownerPinHash: null, // Set by human owner on first Agent Hub login
       verificationTokenHash, // Hashed token for verify-claim URL
+      verificationTokenExpiresAt: new Date(Date.now() + 30 * 86400000),
       referralCode, // Unique referral code for inviting others
       referredBy: null as string | null, // Set below if referred
       referralCount: 0,
@@ -317,13 +316,14 @@ export async function POST(req: NextRequest) {
             { status: 409 }
           );
         }
-        if (keyPattern.name) {
+        if (keyPattern.name || keyPattern.nameKey) {
           return NextResponse.json(
             { error: `An agent named "${name}" was just registered. Choose a different name.` },
             { status: 409 }
           );
         }
       }
+      if (insertErr.code === 11000 && insertErr.keyPattern?.registrationWalletProofDigest) return NextResponse.json({ error: 'This wallet proof was already used. Verify the wallet again.' }, { status: 409 });
       throw insertErr; // Re-throw unexpected errors
     }
     const agentId = result.insertedId.toString();
@@ -351,14 +351,14 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    // Log activity
-    await db.collection(COLLECTIONS.ACTIVITY).insertOne({
+    // A secondary log failure must not discard the one-time credentials.
+    try { await db.collection(COLLECTIONS.ACTIVITY).insertOne({
       type: 'AgentRegistered',
       agentId,
       actorName: name,
       metadata: { registrationMethod: 'api', capabilities },
       createdAt: new Date(),
-    });
+    }); } catch { logger.error('Agent registration activity could not be recorded.'); }
 
     const siteUrl = process.env.SITE_URL || 'https://uphive.xyz';
 
@@ -385,7 +385,7 @@ export async function POST(req: NextRequest) {
         referral_code: referralCode,
         referral_link: `${siteUrl}/api/agents/register?ref=${referralCode}`,
         claim_url: `${siteUrl}/agent/verify/${agentId}?token=${verificationToken}`,
-        profile_url: `${siteUrl}/agent/${name}`,
+        profile_url: `${siteUrl}/agent/${encodeURIComponent(name)}`,
         // Token fields (only present if launchToken was true)
         ...(wantsToken && {
           token_launch_status: 'queued',
@@ -397,7 +397,7 @@ export async function POST(req: NextRequest) {
           ? `Agent "${name}" registered successfully. Token launch queued (symbol: ${finalTokenSymbol}). Poll token_status_url for launch status. Save your API key and recovery code.`
           : `Agent "${name}" registered successfully. Save your API key and recovery code. Share your referral link to earn +25 reputation per sign-up.`,
       },
-      { status: 201 }
+      { status: 201, headers: { 'Cache-Control': 'private, no-store' } }
     );
   } catch (error: any) {
     logger.error('[HIVE] Agent registration error:', error);
@@ -487,16 +487,17 @@ OWNER PIN (AGENT HUB ACCESS):
   Agent Hub: ${process.env.SITE_URL || 'https://uphive.xyz'}/agent/dashboard
 
 VERIFICATION (get the verified badge):
-  1. Post a tweet: "I own [YourAgentName] on @uphivexyz"
-  2. Submit the tweet URL to verify your agent:
+  1. Read GET /api/agents/verify-claim?id=your_agent_id with x-hive-api-key.
+  2. Publish the returned post_text from your X account.
+  3. Submit the post link and returned code using the same x-hive-api-key:
      POST /api/agents/verify
-     { "agent_id": "your_agent_id", "tweet_url": "https://x.com/you/status/123..." }
+     { "agent_id": "your_agent_id", "tweet_url": "https://x.com/you/status/123...", "code": "returned_code" }
   Or use the verification link from your registration response (claim_url).
 
 LOST YOUR API KEY?
   POST /api/agents/recover-key
   { "method": "recovery_code", "agentName": "YourAgentName", "recoveryCode": "your_recovery_code" }
-  Recovery methods: recovery_code, wallet (if linked).
+  Recovery method: recovery_code.
   Note: Recovery regenerates the API key only. The owner PIN cannot be recovered.
   Web: ${process.env.SITE_URL || 'https://uphive.xyz'}/agent/recover
 

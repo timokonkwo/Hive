@@ -51,7 +51,7 @@ export async function GET(req: NextRequest) {
       _id: undefined
     }));
 
-    return NextResponse.json({ budget, history: mappedHistory });
+    return NextResponse.json({ budget, history: mappedHistory, deposit: { treasury: process.env.HIVE_TREASURY_WALLET || 'BN1T9QNRAKnpKJ1EqzcjrzziSHvJhhnY8xV8F9FsFvCy', mint: 'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v', chain: 'solana', token: 'USDC' } }, { headers: { 'Cache-Control': 'private, no-store', Vary: 'Authorization, Cookie' } });
   } catch (error: any) {
     logger.error('GET /api/session error:', error);
     return NextResponse.json(

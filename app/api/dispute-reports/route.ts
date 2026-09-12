@@ -6,21 +6,12 @@ import { authenticateRequest } from '@/lib/api-key';
 import { isValidSolanaAddress } from '@/lib/solana-pay';
 import { STAKING_TIERS } from '@/lib/token-utils';
 import { checkRateLimit, getClientIp, RATE_LIMITS } from '@/lib/rate-limit';
+import { createHash } from 'crypto';
+import { evidenceUri as isValidEvidenceUri, privateReport, positivePage } from '@/lib/dispute-view';
 import { logger } from '@/lib/logger';
 
 const REPORT_CATEGORIES = new Set(['failed_execution', 'malicious_output', 'billing', 'uptime', 'policy', 'other']);
 const MAX_DISPUTE_REPORT_BODY_BYTES = 12 * 1024;
-
-function isValidEvidenceUri(value: string): boolean {
-  if (typeof value !== 'string' || value.length < 8 || value.length > 500) return false;
-  if (value.startsWith('ipfs://') || value.startsWith('ar://')) return true;
-  try {
-    const url = new URL(value);
-    return url.protocol === 'https:';
-  } catch {
-    return false;
-  }
-}
 
 async function resolveReporter(req: NextRequest, db: any) {
   const client = await authenticateClient(req);
@@ -48,22 +39,22 @@ export async function GET(req: NextRequest) {
     if (!reporter) return NextResponse.json({ error: 'Authentication required.' }, { status: 401 });
 
     const { searchParams } = new URL(req.url);
+    if (searchParams.get('access') === '1') return NextResponse.json({ accountId: reporter.reporterId }, { headers: { 'Cache-Control': 'private, no-store' } });
     const status = searchParams.get('status') || 'all';
     const query: Record<string, any> = { reporterId: reporter.reporterId };
+    const requestId = searchParams.get('requestId');
+    if (requestId) {
+      if (!/^[a-f0-9]{24}$/.test(requestId)) return NextResponse.json({ error: 'Invalid request.' }, { status: 400 });
+      const report = await db.collection(COLLECTIONS.DISPUTE_REPORTS).findOne({ ...query, _id: new ObjectId(requestId) });
+      return NextResponse.json({ report: report ? privateReport(report) : null }, { headers: { 'Cache-Control': 'private, no-store' } });
+    }
     if (status !== 'all') query.status = status;
-
-    const reports = await db.collection(COLLECTIONS.DISPUTE_REPORTS)
-      .find(query)
-      .sort({ createdAt: -1 })
-      .limit(50)
-      .toArray();
-
-    return NextResponse.json({
-      reports: reports.map((report) => ({ ...report, id: report._id.toString(), _id: undefined })),
-    });
+    const page = positivePage(searchParams.get('page')), limit = positivePage(searchParams.get('limit'), 20, 50);
+    const [reports, total] = await Promise.all([db.collection(COLLECTIONS.DISPUTE_REPORTS).find(query).sort({ createdAt: -1, _id: -1 }).skip((page - 1) * limit).limit(limit).toArray(), db.collection(COLLECTIONS.DISPUTE_REPORTS).countDocuments(query)]);
+    return NextResponse.json({ reports: reports.map(privateReport), total, page, limit }, { headers: { 'Cache-Control': 'private, no-store' } });
   } catch (error: any) {
     logger.error('GET /api/dispute-reports error:', error);
-    return NextResponse.json({ error: error.message || 'Failed to load dispute reports.' }, { status: 500 });
+    return NextResponse.json({ error: 'Reports could not be loaded.' }, { status: 500 });
   }
 }
 
@@ -94,11 +85,14 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Invalid JSON body.' }, { status: 400 });
     }
 
-    const providerAddress = String(body.providerAddress || '').trim();
+    if (!body || typeof body !== 'object') return NextResponse.json({ error: 'Invalid report.' }, { status: 400 });
+    if (body.requestId !== undefined && !/^[a-f0-9]{24}$/.test(body.requestId)) return NextResponse.json({ error: 'Invalid request.' }, { status: 400 });
+    const providerAddress = typeof body.providerAddress === 'string' ? body.providerAddress.trim() : '';
     const toolId = String(body.toolId || '').trim();
     const evidenceUri = String(body.evidenceUri || '').trim();
     const reason = String(body.reason || '').trim();
-    const category = REPORT_CATEGORIES.has(body.category) ? body.category : 'other';
+    if (!REPORT_CATEGORIES.has(body.category)) return NextResponse.json({ error: 'Choose a report category.' }, { status: 400 });
+    const category = body.category;
     const sessionLedgerId = body.sessionLedgerId ? String(body.sessionLedgerId).trim() : null;
 
     if (!providerAddress || !toolId || !evidenceUri || !reason) {
@@ -127,13 +121,19 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'evidenceUri must be an https, ipfs, or arweave URI.' }, { status: 400 });
     }
 
+    const fingerprint = createHash('sha256').update(JSON.stringify([providerAddress, toolId, evidenceUri, reason, category, sessionLedgerId])).digest('hex');
+    if (body.requestId) {
+      const prior = await db.collection(COLLECTIONS.DISPUTE_REPORTS).findOne({ _id: new ObjectId(body.requestId) });
+      if (prior) return prior.reporterId === reporter.reporterId && prior.fingerprint === fingerprint ? NextResponse.json({ success: true, report: privateReport(prior) }, { headers: { 'Cache-Control': 'private, no-store' } }) : NextResponse.json({ error: 'This request was already used. Check your reports.' }, { status: 409 });
+    }
+    if (sessionLedgerId && !/^[a-f0-9]{24}$/i.test(sessionLedgerId)) return NextResponse.json({ error: 'Enter a valid usage reference or leave it blank.' }, { status: 400 });
     const provider = await db.collection(COLLECTIONS.AGENTS).findOne({ solanaAddress: providerAddress });
     if (!provider) {
       return NextResponse.json({ error: 'No registered provider exists for this Solana address.' }, { status: 404 });
     }
 
     const registeredTools = Array.isArray(provider.registeredTools) ? provider.registeredTools : [];
-    if (registeredTools.length > 0) {
+    {
       const ownsTool = registeredTools.some((tool: any) =>
         tool?.name === toolId || tool?.id === toolId || tool?.toolId === toolId
       );
@@ -149,6 +149,7 @@ export async function POST(req: NextRequest) {
         && ledger.userId === reporter.reporterId
         && ledger.providerAddress === providerAddress
         && ledger.toolId === toolId;
+      if (!affectedParty) return NextResponse.json({ error: 'This usage reference does not match your account, provider and tool.' }, { status: 400 });
     }
 
     const reporterStake = await db.collection(COLLECTIONS.STAKES).findOne({ stakerId: reporter.reporterId, status: 'active' });
@@ -183,6 +184,8 @@ export async function POST(req: NextRequest) {
 
     const now = new Date();
     const report = {
+      _id: body.requestId ? new ObjectId(body.requestId) : new ObjectId(),
+      fingerprint,
       reporterId: reporter.reporterId,
       reporterType: reporter.reporterType,
       providerAddress,
@@ -226,14 +229,14 @@ export async function POST(req: NextRequest) {
         watchdogEligible,
       },
       createdAt: now,
-    });
+    }).catch(() => logger.warn('Report saved; activity log unavailable.'));
 
     return NextResponse.json({
       success: true,
-      report: { ...report, id: result.insertedId.toString() },
-    }, { status: 201 });
+      report: privateReport(report),
+    }, { status: 201, headers: { 'Cache-Control': 'private, no-store' } });
   } catch (error: any) {
     logger.error('POST /api/dispute-reports error:', error);
-    return NextResponse.json({ error: error.message || 'Failed to submit dispute report.' }, { status: 500 });
+    return NextResponse.json({ error: 'The report result could not be confirmed. Check your reports.' }, { status: 500 });
   }
 }

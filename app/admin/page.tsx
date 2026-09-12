@@ -1,4 +1,5 @@
 "use client";
+import { Select } from '@/components/redesign/Select';
 
 import React, { useState, useEffect, useCallback } from "react";
 import { Navbar } from "@/components/layout/Navbar";
@@ -835,7 +836,7 @@ export default function AdminDashboardPage() {
                   {task.createdAt ? new Date(task.createdAt).toLocaleDateString() : '—'}
                 </span>
                 <div className="flex items-center gap-1">
-                  <select
+                  <Select
                     value={task.status}
                     disabled={changingTaskStatus === task.id}
                     onChange={(e) => handleChangeTaskStatus(task.id, e.target.value)}
@@ -844,7 +845,7 @@ export default function AdminDashboardPage() {
                     {['Open', 'In Progress', 'In Review', 'Completed'].map(s => (
                       <option key={s} value={s}>{s}</option>
                     ))}
-                  </select>
+                  </Select>
                   <Link
                     href={`/marketplace/${task.id}`}
                     className="px-2 py-1 text-[10px] font-mono uppercase border border-zinc-700 text-zinc-400 hover:text-white hover:border-zinc-500 rounded transition-colors"
@@ -1139,7 +1140,7 @@ export default function AdminDashboardPage() {
               </button>
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mt-3">
-              <select
+              <Select
                 value={stakeReconcileForm.stakerType}
                 onChange={(e) => setStakeReconcileForm((prev) => ({ ...prev, stakerType: e.target.value }))}
                 className="bg-black/40 border border-zinc-800 rounded-lg px-3 py-2.5 text-xs text-zinc-300 outline-none focus:border-zinc-600 font-mono"
@@ -1147,7 +1148,7 @@ export default function AdminDashboardPage() {
                 <option value="">Auto-detect verified profile</option>
                 <option value="client">Client</option>
                 <option value="agent">Agent</option>
-              </select>
+              </Select>
               <input
                 value={stakeReconcileForm.stakerId}
                 onChange={(e) => setStakeReconcileForm((prev) => ({ ...prev, stakerId: e.target.value }))}
@@ -1288,7 +1289,7 @@ export default function AdminDashboardPage() {
               <p className="text-zinc-500 text-xs font-mono mt-1">Triage reports before they become slashable governance votes.</p>
             </div>
             <div className="flex flex-wrap items-center gap-2">
-              <select
+              <Select
                 value={daoReportStatus}
                 onChange={(e) => setDaoReportStatus(e.target.value)}
                 className="bg-zinc-900 border border-zinc-800 text-white text-xs font-mono px-3 py-2 rounded outline-none"
@@ -1298,8 +1299,8 @@ export default function AdminDashboardPage() {
                 <option value="needs_evidence">Needs Evidence</option>
                 <option value="rejected">Rejected</option>
                 <option value="escalated">Escalated</option>
-              </select>
-              <select
+              </Select>
+              <Select
                 value={daoDisputeStatus}
                 onChange={(e) => setDaoDisputeStatus(e.target.value)}
                 className="bg-zinc-900 border border-zinc-800 text-white text-xs font-mono px-3 py-2 rounded outline-none"
@@ -1309,7 +1310,7 @@ export default function AdminDashboardPage() {
                 <option value="dismissed">Dismissed</option>
                 <option value="slashed">Slashed</option>
                 <option value="all">All Disputes</option>
-              </select>
+              </Select>
               <button
                 onClick={fetchDaoData}
                 disabled={daoLoading}
@@ -1486,7 +1487,7 @@ export default function AdminDashboardPage() {
       {activeTab === "feedback" && (
         <div>
           <div className="flex items-center gap-3 mb-6">
-            <select
+            <Select
               value={feedbackTypeFilter}
               onChange={(e) => setFeedbackTypeFilter(e.target.value)}
               className="bg-zinc-900 border border-zinc-800 text-white text-xs font-mono px-3 py-2 rounded-sm outline-none"
@@ -1494,8 +1495,8 @@ export default function AdminDashboardPage() {
               <option value="all">All Types</option>
               <option value="bug">Bug Reports</option>
               <option value="feature">Feature Requests</option>
-            </select>
-            <select
+            </Select>
+            <Select
               value={feedbackStatusFilter}
               onChange={(e) => setFeedbackStatusFilter(e.target.value)}
               className="bg-zinc-900 border border-zinc-800 text-white text-xs font-mono px-3 py-2 rounded-sm outline-none"
@@ -1505,7 +1506,7 @@ export default function AdminDashboardPage() {
               <option value="reviewed">Reviewed</option>
               <option value="resolved">Resolved</option>
               <option value="dismissed">Dismissed</option>
-            </select>
+            </Select>
             <span className="text-zinc-600 text-xs font-mono ml-auto">{feedbackTotal} total</span>
           </div>
 
@@ -1539,7 +1540,7 @@ export default function AdminDashboardPage() {
                         {item.contactInfo && <span>Contact: {item.contactInfo}</span>}
                       </div>
                     </div>
-                    <select
+                    <Select
                       value={item.status}
                       onChange={(e) => updateFeedbackStatus(item.id, e.target.value)}
                       className="bg-zinc-900 border border-zinc-800 text-zinc-400 text-[10px] font-mono px-2 py-1 rounded-sm outline-none shrink-0"
@@ -1548,7 +1549,7 @@ export default function AdminDashboardPage() {
                       <option value="reviewed">Reviewed</option>
                       <option value="resolved">Resolved</option>
                       <option value="dismissed">Dismissed</option>
-                    </select>
+                    </Select>
                   </div>
                 </div>
               ))}
@@ -2117,7 +2118,7 @@ export default function AdminDashboardPage() {
                   placeholder="Title"
                   className="bg-black border border-zinc-700 rounded px-3 py-2 text-sm text-white font-mono outline-none focus:border-emerald-500"
                 />
-                <select
+                <Select
                   value={roadmapForm.status}
                   onChange={e => setRoadmapForm(f => ({ ...f, status: e.target.value }))}
                   className="bg-black border border-zinc-700 rounded px-3 py-2 text-sm text-white font-mono outline-none focus:border-emerald-500"
@@ -2125,7 +2126,7 @@ export default function AdminDashboardPage() {
                   <option value="completed">Completed</option>
                   <option value="in-progress">In Progress</option>
                   <option value="planned">Planned</option>
-                </select>
+                </Select>
                 <input
                   value={roadmapForm.date}
                   onChange={e => setRoadmapForm(f => ({ ...f, date: e.target.value }))}
@@ -2138,7 +2139,7 @@ export default function AdminDashboardPage() {
                   placeholder="Tag (optional, e.g. npm)"
                   className="bg-black border border-zinc-700 rounded px-3 py-2 text-sm text-white font-mono outline-none focus:border-emerald-500"
                 />
-                <select
+                <Select
                   value={roadmapForm.icon}
                   onChange={e => setRoadmapForm(f => ({ ...f, icon: e.target.value }))}
                   className="bg-black border border-zinc-700 rounded px-3 py-2 text-sm text-white font-mono outline-none focus:border-emerald-500"
@@ -2147,7 +2148,7 @@ export default function AdminDashboardPage() {
                   {ROADMAP_ICONS.map(name => (
                     <option key={name} value={name}>{name}</option>
                   ))}
-                </select>
+                </Select>
               </div>
               <textarea
                 value={roadmapForm.description}

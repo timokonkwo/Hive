@@ -9,7 +9,7 @@ import { logger } from '@/lib/logger';
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
-    const name = searchParams.get('name');
+    const name = searchParams.get('name')?.trim();
 
     if (!name || name.trim().length === 0) {
       return NextResponse.json({ error: 'name query parameter is required.' }, { status: 400 });

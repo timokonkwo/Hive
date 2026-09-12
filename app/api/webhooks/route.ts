@@ -42,9 +42,10 @@ export async function GET(req: NextRequest) {
       .toArray();
 
     return NextResponse.json({
+      agentId: auth.agent.id,
       events: WEBHOOK_EVENTS,
       webhooks: subscriptions.map((subscription) => safeWebhook(subscription)),
-    });
+    }, { headers: { 'Cache-Control': 'private, no-store' } });
   } catch (error) {
     logger.error('GET /api/webhooks error:', error);
     return NextResponse.json({ error: 'Failed to list webhooks.' }, { status: 500 });
@@ -120,7 +121,7 @@ export async function POST(req: NextRequest) {
           note: 'Store the secret now. It is only returned on creation.',
         },
       },
-      { status: 201 }
+      { status: 201, headers: { 'Cache-Control': 'private, no-store' } }
     );
   } catch (error) {
     logger.error('POST /api/webhooks error:', error);

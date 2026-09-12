@@ -69,55 +69,41 @@ export async function PATCH(
     }
     const actorAddress = getClientActorAddress(verified, task, clientAddress);
 
-    // Update the bid status
     let bidObjectId;
-    try {
-      bidObjectId = new ObjectId(bidId);
-    } catch {
-      return NextResponse.json({ error: "Invalid bid ID" }, { status: 400 });
+    try { bidObjectId = new ObjectId(bidId); }
+    catch { return NextResponse.json({ error: 'Invalid proposal ID.' }, { status: 400 }); }
+    const bid = await db.collection(COLLECTIONS.BIDS).findOne({ _id: bidObjectId, taskId });
+    if (!bid) return NextResponse.json({ error: 'Proposal not found.' }, { status: 404 });
+
+    const retryAccepted = task.status === 'In Progress' && task.acceptedBidId === bidId && status === 'accepted';
+    if (!retryAccepted && (task.status !== 'Open' || !['Pending', 'pending'].includes(bid.status))) {
+      return NextResponse.json({ error: 'The task or proposal changed. Refresh before choosing an agent.' }, { status: 409 });
     }
-
-    const bid = await db
-      .collection(COLLECTIONS.BIDS)
-      .findOne({ _id: bidObjectId, taskId });
-
-    if (!bid) {
-      return NextResponse.json({ error: "Bid not found" }, { status: 404 });
+    if (task.assignmentMode === 'direct' && task.requestedAgentId !== bid.agentId) {
+      return NextResponse.json({ error: 'This task is reserved for the selected agent.' }, { status: 409 });
     }
-
-    await db
-      .collection(COLLECTIONS.BIDS)
-      .updateOne({ _id: bidObjectId }, { $set: { status, updatedAt: new Date() } });
-
-    // If accepted, update the task
-    if (status === "accepted") {
-      const queryIds = [{ id: taskId }];
-      if (ObjectId.isValid(taskId)) {
-        queryIds.push({ _id: new ObjectId(taskId) } as any);
-      } else {
-        queryIds.push({ _id: taskId } as any);
-        queryIds.push({ _id: parseInt(taskId) } as any);
+    if (status === 'accepted') {
+      if (!retryAccepted) {
+        const claim = await db.collection(COLLECTIONS.TASKS).updateOne(
+          { _id: task._id, status: 'Open' },
+          { $set: { status: 'In Progress', acceptedBidId: bidId,
+            assignedAgent: bid.agentId || bid.agentAddress, assignedAgentId: bid.agentId || null,
+            assignedAgentName: bid.agentName, assignedAgentAddress: bid.agentAddress || null, updatedAt: new Date() } }
+        );
+        if (claim.modifiedCount !== 1) return NextResponse.json({ error: 'Another proposal was selected. Refresh this task.' }, { status: 409 });
       }
-
-      await db.collection(COLLECTIONS.TASKS).updateOne(
-        { $or: queryIds },
-        {
-          $set: {
-            status: "In Progress",
-            assignedAgent: bid.agentId || bid.agentAddress,
-            assignedAgentName: bid.agentName,
-            assignedAgentAddress: bid.agentAddress || null,
-            updatedAt: new Date(),
-          },
-        }
-      );
-
-      // Reject all other pending bids for this task
+      await db.collection(COLLECTIONS.BIDS).updateOne({ _id: bidObjectId }, { $set: { status, updatedAt: new Date() } });
       await db.collection(COLLECTIONS.BIDS).updateMany(
-        { taskId, _id: { $ne: bidObjectId }, status: "Pending" },
-        { $set: { status: "rejected", updatedAt: new Date() } }
+        { taskId, _id: { $ne: bidObjectId }, status: { $in: ['Pending', 'pending'] } },
+        { $set: { status: 'rejected', updatedAt: new Date() } }
       );
+    } else {
+      const result = await db.collection(COLLECTIONS.BIDS).updateOne(
+        { _id: bidObjectId, status: { $in: ['Pending', 'pending'] } }, { $set: { status, updatedAt: new Date() } }
+      );
+      if (result.modifiedCount !== 1) return NextResponse.json({ error: 'The proposal changed. Refresh this task.' }, { status: 409 });
     }
+    if (retryAccepted) return NextResponse.json({ success: true, status });
 
     // Log activity
     await db.collection(COLLECTIONS.ACTIVITY).insertOne({
