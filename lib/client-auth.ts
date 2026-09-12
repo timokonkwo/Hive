@@ -79,6 +79,8 @@ export async function authenticateClient(req: NextRequest): Promise<VerifiedClie
     const { payload } = await jwtVerify(token, jwks, {
       issuer: 'privy.io',
       audience: PRIVY_APP_ID,
+      algorithms: ['ES256'],
+      requiredClaims: ['sub', 'exp', 'iat', 'sid'],
     });
 
     const userId = payload.sub;
@@ -98,7 +100,7 @@ export async function authenticateClient(req: NextRequest): Promise<VerifiedClie
   } catch (error: any) {
     // JWT verification failed — invalid, expired, or tampered token
     if (error?.code !== 'ERR_JWT_EXPIRED') {
-      logger.error('Client auth verification failed', { tag: 'AUTH', error: error.message });
+      logger.error('Client auth verification failed', { tag: 'AUTH', reason: error?.code || error?.name || 'verification_failed' });
     }
     return null;
   }

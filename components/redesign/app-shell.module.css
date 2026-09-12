@@ -62,3 +62,8 @@
 .header .accountPanel :is(a,button) { display:flex;align-items:center;gap:12px;width:100%;min-height:44px;padding:10px;font-size:13px;text-align:left;background:transparent;border:0;border-radius:4px; }
 .accountPanel :is(a,button):hover { background:var(--soft); }
 @media(max-width:600px){.header .postAction { display:none; }.headerActions { gap:4px; }.header { gap:10px; }.header .signIn { padding-inline:10px;font-size:12px; }.accountMenu summary { gap:6px;font-size:12px;padding-inline:4px; }.accountMenu summary>svg:last-child { display:none; }}
+
+.connectedWallets:empty { display:none; }
+.connectedWallets { border-block:1px solid var(--rule); padding:8px 0; margin:4px 0; }
+.connectedWallets p { display:flex; align-items:center; gap:8px; padding:8px 12px; }
+.connectedWallets small { margin-left:auto; color:var(--accent-text); font-size:11px; }

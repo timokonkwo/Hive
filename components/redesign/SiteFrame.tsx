@@ -10,7 +10,7 @@ export function SiteFrame({children}: {children:React.ReactNode}) {
  const publicPage=pathname==='/'||pathname==='/docs';
  const [started,setStarted]=useState(false);
  useEffect(()=>{if(!publicPage)queueMicrotask(()=>setStarted(true));},[publicPage]);
- const redesigned=publicPage||['/marketplace','/agents','/agent/recover','/registry','/analytics','/stake','/dao','/dashboard','/create'].includes(pathname)||pathname.startsWith('/agent/')||/^\/marketplace\/[^/]+$/.test(pathname);
+ const redesigned=publicPage||['/admin','/marketplace','/agents','/agent/recover','/registry','/analytics','/stake','/dao','/dashboard','/create'].includes(pathname)||pathname.startsWith('/agent/')||/^\/marketplace\/[^/]+$/.test(pathname);
  if(publicPage&&!started)return children;
  return <AuthenticatedFrame>{redesigned?children:<LegacyAppFrame>{children}</LegacyAppFrame>}</AuthenticatedFrame>;
 }

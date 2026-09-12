@@ -3,8 +3,9 @@
 import { useEffect, useRef } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { ArrowUpRight, Bot, ChartNoAxesCombined, ChevronDown, ClipboardList, Compass, Flag, HelpCircle, Layers2, Menu, MessageSquare, Moon, Plus, Scale, Sun, Wrench, X } from 'lucide-react';
+import { Shield, ArrowUpRight, Bot, ChartNoAxesCombined, ChevronDown, ClipboardList, Compass, Flag, HelpCircle, Layers2, Menu, MessageSquare, Moon, Plus, Scale, Sun, Wrench, X } from 'lucide-react';
 import { BrandWordmark } from './BrandMark';
+import { useAdminAccess } from './AdminAccess';
 import { AccountControl } from './AccountControl';
 import { useHiveTheme } from './theme';
 import styles from './app-shell.module.css';
@@ -24,6 +25,7 @@ const moreLinks = [
 
 function Navigation({ mobile = false, close }: { mobile?: boolean; close?: () => void }) {
   const pathname = usePathname();
+  const admin=useAdminAccess();
   function active(href: string) {
     if (href === '/marketplace') return pathname === '/agents' || pathname.startsWith('/marketplace') || /^\/agent\/[^/]+$/.test(pathname) && !['/agent/dashboard', '/agent/register', '/agent/recover'].includes(pathname);
     if (href === '/dashboard') return pathname === '/dashboard' || pathname === '/create';
@@ -35,6 +37,7 @@ function Navigation({ mobile = false, close }: { mobile?: boolean; close?: () =>
     <span className={styles.groupLabel}>Workspace</span>
     {mobile && <Link prefetch={false} href="/create" onClick={close}><Plus size={18} aria-hidden="true"/>Post a task</Link>}
     {workLinks.map(item)}
+    {admin.state==='allowed'&&item({href:'/admin',label:'Admin',icon:Shield})}
     <details className={styles.more} open={moreLinks.some(link => pathname === link.href)}>
       <summary><Layers2 size={18} aria-hidden="true" />More<ChevronDown size={15} aria-hidden="true" /></summary>
       <div>{moreLinks.map(item)}</div>

@@ -237,3 +237,12 @@ Review: http://localhost:3100/docs . Changes remain local and unpushed on main_r
 Fixed the existing Privy integration: removed automatic logout on wallet disconnect/mismatch, retained one auth provider across app/public navigation, added a bounded retry for rejected authenticated reads, and separated authenticated session errors from the My tasks signed-out gate. Shared app headers now provide Sign in / Account, including Connect wallet, with compact mobile access. Server JWT verification and ownership boundaries remain unchanged.
 
 Production build, TypeScript, scoped lint, 28 focused tests, 98 auth-access browser checks and 29 dashboard browser checks passed. The actual login modal and mobile header were reviewed. Full npm test still has older redesign source-guard failures; see HIVE_AUTH_ACCESS_FIX.md for details and evidence. A real account login has not been completed during validation. Review at http://localhost:3100/dashboard . Local changes remain unpushed on main_redesign; no subsequent page unit was started.
+
+
+## September 12 — Admin and connected-wallet follow-up
+
+Pushed the existing redesign/login snapshot as 3a88066 to main_redesign and fast-forwarded/pushed main before starting this user-requested unit. Verified both remote refs. Admin (original Unit 21) was brought forward: server-verified sidebar/mobile entry, shared app shell, ten management sections, light/dark themes, modular task/agent records, responsive rows and explicit delete/launch confirmations. Preserved API operations and corrected missing authenticated transport on deletion/roadmap edits. Admin wallet authority requires a signed identity for the authenticated account; request-supplied wallet claims cannot grant access.
+
+Connected EVM/Solana wallets now show their address and Change wallet in Account. Token grant/identity updates refresh dependent requests; stale sessions have an explicit reauthentication action. The user confirmed live login succeeds; local development was restarted after observed Privy HMR failures. Real localhost login remains unconfirmed.
+
+Build and types passed; 33 focused tests and 104 admin + 9 record + 98 auth browser checks passed. No real admin/account/payment writes. Existing full-suite source-guard failures and inherited admin typing warnings remain documented in HIVE_ADMIN_BRIEF.md. This follow-up is local for review at http://localhost:3100/admin . Roadmap/Feedback remain pending.

@@ -288,7 +288,7 @@ describe('token page consolidation', () => {
 });
 
 describe('admin staking visibility', () => {
-  const adminPage = read('app/admin/page.tsx');
+  const adminPage = read('components/redesign/admin/AdminPage.tsx');
   const stakersRoute = read('app/api/admin/stakers/route.ts');
   const reconcileRoute = read('app/api/admin/stakers/reconcile/route.ts');
   const adminAuth = read('lib/admin-auth.ts');
@@ -314,10 +314,10 @@ describe('admin staking visibility', () => {
     assert.match(reconcileRoute, /deleteOne\(\{\s*txSignature,\s*status:\s*'pending_reconcile'\s*\}\)/);
   });
 
-  it('does not allow request-supplied admin addresses unless explicitly enabled', () => {
+  it('requires a configured DID or signed wallet proof and never trusts address claims', () => {
     assert.match(adminAuth, /ADMIN_PRIVY_DID/);
-    assert.match(adminAuth, /ENABLE_LEGACY_ADMIN_ADDRESS_AUTH === 'true'/);
-    assert.match(adminAuth, /Disabled by default because the address is request-supplied/);
+    assert.match(adminAuth, /verifyAdminWallet/);
+    assert.doesNotMatch(adminAuth, /ENABLE_LEGACY_ADMIN_ADDRESS_AUTH|headers\.get\('x-admin-address'\)/);
     assert.doesNotMatch(adminAuth, /if \(adminAddress\) \{/);
   });
 });

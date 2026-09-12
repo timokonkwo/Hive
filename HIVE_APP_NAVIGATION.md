@@ -19,7 +19,7 @@ Use a persistent left navigation on desktop and a scrollable navigation menu on 
 | Help | `/docs` | Product guide and technical documentation |
 | Feedback | `/feedback` | Feedback form |
 
-The original logo links back to the website. Admin is not public navigation; its existing route and authorization remain separate. Account-specific pages keep their current sign-in checks. Do not invent a signed-in identity, a wallet balance, or an account control without the existing authentication contract.
+The original logo links back to the website. Admin appears in the workspace sidebar and mobile menu only after server verification of the signed-in account. It is never a public navigation item. Account-specific pages keep their current sign-in checks. Do not invent a signed-in identity, a wallet balance, or an account control without the existing authentication contract.
 
 ## Route behavior
 
