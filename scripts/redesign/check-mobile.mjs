@@ -49,7 +49,7 @@ await shot('audit-320-large-text');
 await send('Page.reload');await sleep(1200);
 await send('Emulation.setTouchEmulationEnabled',{enabled:true,maxTouchPoints:1});
 const touchChecks=[];
-for(const selector of ['[aria-label="Explore agent roles"] button','[aria-controls="work-example"]','[aria-controls="guide-panel"]','[aria-controls="agent-check"]']){
+for(const selector of ['[aria-label="Explore agent roles"] button','[aria-controls="work-preview"]','[aria-controls="task-walkthrough"]','[aria-controls="agent-anatomy"]']){
  const count=await evaluate(`document.querySelectorAll(${JSON.stringify(selector)}).length`);
  for(let i=0;i<count;i++){
   await evaluate(`document.querySelectorAll(${JSON.stringify(selector)})[${i}].scrollIntoView({behavior:'instant',block:'center'})`);await sleep(100);

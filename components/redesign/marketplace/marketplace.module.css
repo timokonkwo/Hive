@@ -67,7 +67,7 @@
 .posted,.deadline { display: block; font-size: 12px; color: var(--muted); margin-top: 10px; }
 .deadline { margin-top: 4px; }
 .taskBudget,.taskProposals { text-align: right; font-size: 13px; overflow-wrap: anywhere; font-variant-numeric: tabular-nums; }
-.taskBudget strong { font-weight: 500; }
+.taskBudget strong { font-weight: 400; }
 .taskProposals { color: var(--muted); }
 .mobileLabel { display: none; }
 .previewButton { display: flex; align-items: center; justify-content: center; gap: 8px; border: 1px solid var(--rule); background: var(--canvas); width: 40px; height: 40px; border-radius: 50%; }
@@ -123,7 +123,7 @@
   .page a,.page button { transition: background-color 150ms var(--ease), color 150ms var(--ease), border-color 150ms var(--ease); }
   .taskList>li { transition: background-color 150ms var(--ease); }
   .previewDialog[open] { animation: preview-in 220ms var(--ease); }
-  @keyframes preview-in { from { opacity: 0; transform: translateY(16px); } to { opacity: 1; transform: translateY(0); } }
+  @keyframes preview-in { from { opacity: 0; transform: translateY(100%); } to { opacity: 1; transform: translateY(0); } }
 }
 @media (max-width: 1279px) {
   .board { grid-template-columns: minmax(0, 1fr) 320px; gap: 24px; }
@@ -153,7 +153,7 @@
   .toolbar { padding-block: 20px; gap: 16px; }
   .selectWrap select { font-size: 16px; }
   .filters { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 16px 12px; }
-  .filters>.sortLabel { grid-column: 1/-1; display: flex; flex-direction: row; align-items: center; justify-content: space-between; gap: 16px; }
+  .filters>.sortLabel { grid-column: 1/-1; display: flex; flex-direction: row; align-items: center; justify-content: flex-start; gap: 12px; }
   .sortLabel .selectWrap { width: 180px; }
   .sortLabel select { min-height: 44px; padding-block: 8px; }
   .resultsBar { min-height: 72px; scroll-margin-top: 80px; }
@@ -162,9 +162,9 @@
   .taskRow { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 18px 20px; padding: 24px 0; }
   .taskIdentity { grid-column: 1/-1; }
   .taskIdentity h2 { font-size: 20px; margin-top: 12px; }
-  .taskBudget,.taskProposals { text-align: left; display: flex; flex-direction: column; gap: 6px; font-size: 15px; }
+  .taskBudget,.taskProposals { text-align: left; display: flex; flex-direction: column; gap: 4px; font-size: 13px; }
   .mobileLabel { display: block; font-size: 12px; color: var(--muted); }
-  .taskProposals { color: var(--ink); }
+  .taskProposals { color: var(--muted); }
   .previewButton { grid-column: 1/-1; width: 100%; border-radius: 8px; height: 44px; font-size: 13px!important; padding-inline: 14px; }
   .previewButton>svg { margin-left: auto; }
   .previewButton>span { margin-right: auto; }
@@ -174,7 +174,7 @@
   .empty { padding: 40px 0; min-height: 320px; }
   .footer { align-items: flex-start; flex-direction: column; gap: 8px; padding-top: 8px; }
   .footer>span { align-self: flex-start; }
-  .previewDialog { width: 100%; max-height: calc(100dvh - 16px); margin: auto 0 0; border-radius: 16px 16px 0 0; padding: 0 20px max(28px, env(safe-area-inset-bottom)); }
+  .previewDialog { width: 100%; max-height: 72dvh; margin: auto 0 0; border-radius: 16px 16px 0 0; padding: 0 20px max(28px, env(safe-area-inset-bottom)); }
 }
 @media (max-width: 374px) {
   .filters { grid-template-columns: minmax(0, 1fr); }
@@ -184,3 +184,12 @@
   .resultActions button[aria-label='Refresh tasks'] { width: 40px; justify-content: center; }
   .resultActions button[aria-label='Refresh tasks']>span { display: none; }
 }
+
+/* Keep task identity stronger than comparison metadata. */
+.taskBudget,.taskProposals,.briefFacts dd { color:var(--muted);font-weight:400; }
+.previewDialog { max-height:72dvh;margin:auto auto 0;border-radius:16px 16px 0 0; }
+.previewDialog .brief p { font-size:14px;line-height:1.6;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden; }
+.previewDialog .briefFacts { margin:20px 0;padding-block:16px;gap:16px; }
+.previewDialog .brief h2 { font-size:24px; }
+.previewDialog .brief>.primaryAction { position:sticky;bottom:0;margin-top:20px; }
+.previewDialog .tags { display:none; }

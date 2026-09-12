@@ -2,7 +2,7 @@
 :global(html[data-hive-theme='dark']) .main { --danger:#ff9a90; --danger-soft:#38211f; }
 .heading { display:flex; align-items:center; justify-content:space-between; gap:24px; padding-bottom:28px; border-bottom:1px solid var(--rule); }
 .eyebrow { color:var(--muted); font-size:12px; display:flex; align-items:center; gap:8px; margin-bottom:8px; }
-.heading h1 { font-size:clamp(30px,3vw,44px); font-weight:500; letter-spacing:-.045em; line-height:1.15; }
+.heading h1 { font-size:var(--app-title); font-weight:500; letter-spacing:-.045em; line-height:1.15; }
 .back { display:flex; align-items:center; gap:12px; font-size:13px; min-height:44px; }
 .workbench { display:grid; grid-template-columns:164px minmax(0,1fr); gap:32px; padding-top:28px; }
 .navigation { position:sticky; top:104px; align-self:start; display:grid; gap:24px; }

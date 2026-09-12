@@ -9,12 +9,12 @@ function SolanaFees() {
   const fee = d?.fees, usd = d?.usd;
   const estimate = fee && usd && !usd.stale ? Number(fee.data) / 1e9 * usd.data : null;
   return <>
-    <div className={styles.sectionHeading}><div><h3>Solana fees</h3><p>Solana · Lifetime · Source: Bags</p></div><button className={styles.secondary} aria-label="Refresh token fees" disabled={r.state === 'loading'} onClick={() => setRevision(v => v + 1)}><RefreshCw size={16} aria-hidden="true" />Refresh</button></div>
+    <div className={styles.sectionHeading}><div><p>Lifetime · Bags</p></div><button className={styles.secondary} aria-label="Refresh token fees" disabled={r.state === 'loading'} onClick={() => setRevision(v => v + 1)}><RefreshCw size={16} aria-hidden="true" />Refresh</button></div>
     {r.state === 'loading' && <p role="status">Loading token fees…</p>}
     {r.state === 'error' && <p role="alert" className={styles.error}>{r.error}{d ? ' Showing the last loaded data.' : ''}</p>}
-    {d && <><div className={styles.feeAmount}>{fee ? <><strong>{sol(fee.data)} SOL</strong><span>{fee.stale || r.state === 'error' ? 'Last available value · ' : ''}{stamp(fee.asOf)}</span>{estimate !== null && Number.isFinite(estimate) && <span>About {estimate.toLocaleString('en', { style: 'currency', currency: 'USD', maximumFractionDigits: 2 })} · SOL price as of {stamp(usd!.asOf)}</span>}</> : <p>Token fee data is not available.</p>}</div>
+    {d && <><div className={styles.feeAmount}>{fee ? <><strong>{sol(fee.data)} SOL</strong><span>{fee.stale || r.state === 'error' ? 'Last available value · ' : ''}{stamp(fee.asOf)}</span>{estimate !== null && Number.isFinite(estimate) && <span>About {estimate.toLocaleString('en', { style: 'currency', currency: 'USD', maximumFractionDigits: 2 })}</span>}</> : <p>Token fee data is not available.</p>}</div>
       <a className={styles.textLink} href={'https://bags.fm/' + d.token} target="_blank" rel="noopener noreferrer">View token on Bags<ArrowUpRight size={15} aria-hidden="true" /></a>
-      <p className={styles.hint}>Token trading fees are separate from task payments. Bags data is cached for up to five minutes.</p>
+      <details className={styles.definitions}><summary>About token fees</summary><p>Trading fees, separate from task payments. Updated every five minutes.</p></details>
       <div className={styles.people}>{(['recipients', 'creators'] as const).map(k => { const part = d[k]; return <details key={k}><summary>{k === 'recipients' ? 'Fee recipients' : 'Token creators'}</summary>{part ? <><p className={styles.hint}>{part.stale ? 'Last available data · ' : ''}{stamp(part.asOf)}</p>{part.data.length ? <ul>{part.data.map((p, i) => <li key={p.wallet + i}><div><strong>{p.name || 'Wallet'}</strong><a href={'https://solscan.io/account/' + p.wallet} target="_blank" rel="noopener noreferrer">{p.wallet}<ArrowUpRight size={13} aria-hidden="true" /></a></div>{k === 'creators' && p.shareBps !== null && <span>{(p.shareBps / 100).toLocaleString('en', { maximumFractionDigits: 2 })}% fee share</span>}</li>)}</ul> : <p>No records returned.</p>}</> : <p>This data is not available.</p>}</details>; })}</div>
     </>}
   </>;
@@ -37,7 +37,7 @@ export function Fees() {
       }}>{value === 'robinhood' ? 'Robinhood' : 'Solana'}{value === 'robinhood' && <span>Coming soon</span>}</button>)}
     </div>
     <div id="fees-panel-robinhood" role="tabpanel" aria-labelledby="fees-tab-robinhood" tabIndex={0} hidden={network !== 'robinhood'}>
-      <div className={styles.comingSoon}><span className={styles.networkLabel}>HIVE on Robinhood</span><h3>Coming soon</h3><p>Token fee data will be available after launch.</p></div>
+      <div className={styles.comingSoon}><span className={styles.networkLabel}>HIVE on Robinhood</span><h3>Coming soon</h3></div>
     </div>
     <div id="fees-panel-solana" role="tabpanel" aria-labelledby="fees-tab-solana" tabIndex={0} hidden={network !== 'solana'}>{network === 'solana' && <SolanaFees />}</div>
   </section>;

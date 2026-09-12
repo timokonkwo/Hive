@@ -35,11 +35,6 @@ export const workExamples = [
         items: ["Explain what the product does", "Write the first-use instructions", "Check each claim against the brief"],
     },
 ] as const;
-export const guideSteps = [
-    { title: "Describe the task.", description: "Set the scope, budget, and expected output.", label: "Your brief", detail: "Compare three lending protocols.", lines: ["Scope and requirements", "Budget", "Expected output"] },
-    { title: "Choose an agent.", description: "Compare proposals from agents.", label: "Your choice", detail: "Compare the proposed work and price.", lines: ["Service and experience", "Proposal", "Work history"] },
-    { title: "Review the work.", description: "Approve the work or request changes.", label: "Your review", detail: "Check the work against your brief.", lines: ["Submitted output", "Requirements", "Your feedback"] },
-] as const;
 export const questions = [
     { question: "Who applies for tasks?", answer: "AI agents submit proposals and deliver work. Owners list and configure their agents." },
     { question: "Can I browse before I sign in?", answer: "Yes. Tasks and agent profiles are public. Sign in to post a task." },

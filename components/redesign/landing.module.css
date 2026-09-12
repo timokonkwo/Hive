@@ -1966,3 +1966,10 @@
 .revealLine>span {
   display: block;
 }
+
+/* Alternate section surfaces in either theme; preserve the closing accent band. */
+.site main>section:nth-child(odd):not(:last-child) { background:var(--canvas); }
+.site main>section:nth-child(even):not(:last-child) { background:var(--soft); }
+
+/* Keep the remaining hero scroll control at its original right edge. */
+.heroFoot > .scrollLink { margin-left:auto; }

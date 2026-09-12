@@ -18,6 +18,9 @@
 }
 .surface {
   /* New tokens are isolated from app pages awaiting design approval. */
+  --app-title: clamp(28px, 2.8vw, 36px);
+  --app-section-title: 20px;
+  --app-label: 12px;
   --canvas: #f5f5ef;
   --surface: #fff;
   --soft: #e9eddf;
