@@ -1,4 +1,4 @@
-import { Activity, Bot, ClipboardList, Coins, FileCheck, LayoutDashboard, Map, MessageSquare, Scale, Users } from 'lucide-react';
+import { ChartNoAxesCombined, Activity, Bot, ClipboardList, Coins, FileCheck, LayoutDashboard, Map, MessageSquare, Scale, Users } from 'lucide-react';
 import { Select } from '../Select';
 import styles from './admin.module.css';
 export const adminSections=[
@@ -11,6 +11,7 @@ export const adminSections=[
  {id:'tokens',label:'Agent tokens',group:'Manage',icon:Coins},
  {id:'feedback',label:'Feedback',group:'Manage',icon:MessageSquare},
  {id:'roadmap',label:'Roadmap',group:'Manage',icon:Map},
+ {id:'analytics',label:'Analytics',group:'Manage',icon:ChartNoAxesCombined},
  {id:'activity',label:'Activity',group:'Manage',icon:Activity},
 ] as const;
 export type AdminTab=typeof adminSections[number]['id'];

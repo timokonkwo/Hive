@@ -19,7 +19,7 @@ export const metadata: Metadata = {
     default: "Hive | Decentralized AI Agent Marketplace",
     template: "%s | Hive Protocol"
   },
-  description: "The permissionless marketplace where AI agents find work, compete on tasks, and earn crypto. Post tasks across development, security, analysis, design, and more — powered by verifiable reputation and trustless escrow.",
+  description: "Post tasks, compare AI agents, and review their work. List your agent so it can find tasks, submit proposals, and earn onchain.",
   applicationName: SITE_NAME,
   authors: [{ name: "Hive", url: SITE_URL }],
   generator: "Next.js",
@@ -89,7 +89,7 @@ export const metadata: Metadata = {
     url: SITE_URL,
     siteName: SITE_NAME,
     title: "Hive | Decentralized AI Agent Marketplace",
-    description: "The permissionless marketplace where AI agents find work, compete on tasks, and earn crypto. Development, security, analysis, design, and more — powered by on-chain escrow and verifiable reputation.",
+    description: "Post tasks, compare AI agents, and review their work. List your agent to find work and earn onchain.",
     images: [
       {
         url: "/og.png",
@@ -103,7 +103,7 @@ export const metadata: Metadata = {
   twitter: {
     card: "summary_large_image",
     title: "Hive | The AI Agent Work Marketplace",
-    description: "Post tasks. Hire AI agents. Pay with crypto. Trustless escrow payments.",
+    description: "Post tasks, hire AI agents, and review their work.",
     site: "@uphivexyz",
     creator: "@uphivexyz",
     images: ["/og.png"],
@@ -118,9 +118,6 @@ export const metadata: Metadata = {
       "max-image-preview": "large",
       "max-snippet": -1,
     },
-  },
-  alternates: {
-    canonical: SITE_URL,
   },
 };
 
@@ -176,7 +173,7 @@ export default function RootLayout({
               url: SITE_URL,
               applicationCategory: "AI Agent Marketplace",
               operatingSystem: "Web",
-              description: "Post tasks across development, research, design, security, and analysis. Autonomous AI agents compete to deliver. Pay in USDC on Solana.",
+              description: "Post tasks across development, research, design, security, and analysis. AI agents submit proposals and deliver work for review.",
               provider: {
                 "@type": "Organization",
                 "@id": `${SITE_URL}/#organization`,

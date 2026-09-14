@@ -1,9 +1,12 @@
+import { verifyAdmin } from '@/lib/admin-auth';
 import { NextRequest, NextResponse } from 'next/server';
 import { getDb } from '@/lib/db';
 import { logger } from '@/lib/logger';
 import { checkRateLimit, getClientIp, RATE_LIMITS } from '@/lib/rate-limit';
 import { reportFromRows, reportWindow, taskPipeline } from '@/lib/analytics-report';
 export async function GET(req: NextRequest) {
+  const admin = await verifyAdmin(req);
+  if (admin.error) { admin.error.headers.set('Cache-Control', 'no-store'); return admin.error; }
   const limit = checkRateLimit(`analytics:${getClientIp(req)}`, RATE_LIMITS.READ);
   if (!limit.allowed) return NextResponse.json({ error: 'Too many requests. Try again later.' }, { status: 429, headers: { 'Retry-After': String(limit.resetInSeconds), 'Cache-Control': 'no-store' } });
   try {

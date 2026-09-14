@@ -3,7 +3,7 @@
 import { useEffect, useRef } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { Shield, ArrowUpRight, Bot, ChartNoAxesCombined, ChevronDown, ClipboardList, Compass, Flag, HelpCircle, Layers2, Menu, MessageSquare, Moon, Plus, Scale, Sun, Wrench, X } from 'lucide-react';
+import { Shield, ArrowUpRight, Bot, ChevronDown, ClipboardList, Compass, Flag, HelpCircle, Layers2, Menu, MessageSquare, Moon, Plus, Scale, Sun, Wrench, X } from 'lucide-react';
 import { BrandWordmark } from './BrandMark';
 import { useAdminAccess } from './AdminAccess';
 import { AccountControl } from './AccountControl';
@@ -17,7 +17,8 @@ const workLinks = [
 ];
 const moreLinks = [
   { href: '/registry', label: 'Tools', icon: Wrench },
-  { href: '/analytics', label: 'Analytics', icon: ChartNoAxesCombined },
+  // Hidden until platform analytics serves a user workflow:
+  // { href: '/analytics', label: 'Analytics', icon: ChartNoAxesCombined },
   { href: '/dao', label: 'Disputes', icon: Scale },
   { href: '/stake', label: 'HIVE', icon: Layers2 },
   { href: '/roadmap', label: 'Roadmap', icon: Flag },
@@ -30,6 +31,7 @@ function Navigation({ mobile = false, close }: { mobile?: boolean; close?: () =>
     if (href === '/marketplace') return pathname === '/agents' || pathname.startsWith('/marketplace') || /^\/agent\/[^/]+$/.test(pathname) && !['/agent/dashboard', '/agent/register', '/agent/recover'].includes(pathname);
     if (href === '/dashboard') return pathname === '/dashboard' || pathname === '/create';
     if (href === '/agent/dashboard') return pathname.startsWith('/agent/') && !/^\/agent\/[^/]+$/.test(pathname) || ['/agent/dashboard', '/agent/register', '/agent/recover'].includes(pathname);
+    if (href === '/stake') return pathname === '/stake' || pathname === '/token';
     return pathname === href;
   }
   const item = ({ href, label, icon: Icon }: typeof workLinks[number]) => <Link prefetch={false} key={href} href={href} aria-current={active(href) ? 'page' : undefined} onClick={close}><Icon size={18} aria-hidden="true" />{label}</Link>;
@@ -38,13 +40,13 @@ function Navigation({ mobile = false, close }: { mobile?: boolean; close?: () =>
     {mobile && <Link prefetch={false} href="/create" onClick={close}><Plus size={18} aria-hidden="true"/>Post a task</Link>}
     {workLinks.map(item)}
     {admin.state==='allowed'&&item({href:'/admin',label:'Admin',icon:Shield})}
-    <details className={styles.more} open={moreLinks.some(link => pathname === link.href)}>
+    <details className={styles.more} open={moreLinks.some(link => active(link.href))}>
       <summary><Layers2 size={18} aria-hidden="true" />More<ChevronDown size={15} aria-hidden="true" /></summary>
       <div>{moreLinks.map(item)}</div>
     </details>
     <div className={styles.support}>
-      <Link prefetch={false} href="/docs" onClick={close}><HelpCircle size={18} aria-hidden="true" />Help</Link>
-      <Link prefetch={false} href="/feedback" onClick={close}><MessageSquare size={18} aria-hidden="true" />Feedback</Link>
+      <Link prefetch={false} href="/docs" aria-current={active('/docs') ? 'page' : undefined} onClick={close}><HelpCircle size={18} aria-hidden="true" />Help</Link>
+      <Link prefetch={false} href="/feedback" aria-current={active('/feedback') ? 'page' : undefined} onClick={close}><MessageSquare size={18} aria-hidden="true" />Feedback</Link>
     </div>
   </nav>;
 }

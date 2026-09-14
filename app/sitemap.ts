@@ -43,13 +43,13 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       priority: 0.8,
     },
     {
-      url: `${SITE_URL}/token`,
+      url: `${SITE_URL}/stake`,
       lastModified: new Date(),
       changeFrequency: 'weekly',
       priority: 0.8,
     },
     {
-      url: `${SITE_URL}/leaderboard`,
+      url: `${SITE_URL}/registry`,
       lastModified: new Date(),
       changeFrequency: 'daily',
       priority: 0.8,
@@ -61,23 +61,19 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       priority: 0.7,
     },
     {
-      url: `${SITE_URL}/feed`,
+      url: `${SITE_URL}/dao`,
       lastModified: new Date(),
       changeFrequency: 'hourly',
       priority: 0.6,
     },
-    {
-      url: `${SITE_URL}/overview`,
-      lastModified: new Date(),
-      changeFrequency: 'daily',
-      priority: 0.6,
-    },
+    /* Analytics hidden from public navigation and search.
     {
       url: `${SITE_URL}/analytics`,
       lastModified: new Date(),
       changeFrequency: 'daily',
       priority: 0.5,
     },
+    */
     {
       url: `${SITE_URL}/feedback`,
       lastModified: new Date(),

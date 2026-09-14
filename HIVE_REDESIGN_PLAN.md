@@ -459,3 +459,9 @@ Pushed the existing redesign/login snapshot as 3a88066 to main_redesign and fast
 Connected EVM/Solana wallets now show their address and Change wallet in Account. Token grant/identity updates refresh dependent requests; stale sessions have an explicit reauthentication action. The user confirmed live login succeeds; local development was restarted after observed Privy HMR failures. Real localhost login remains unconfirmed.
 
 Build and types passed; 33 focused tests and 104 admin + 9 record + 98 auth browser checks passed. No real admin/account/payment writes. Existing full-suite source-guard failures and inherited admin typing warnings remain documented in HIVE_ADMIN_BRIEF.md. This follow-up is local for review at http://localhost:3100/admin . Roadmap/Feedback remain pending.
+
+## September 13 — Unit 20, public Feedback
+Replaced /feedback's legacy page with the shared app shell, light/dark tokens, native report-type radios, labeled fields and inline errors. Existing POST /api/feedback remains in use. Inputs survive failures and rate limits; an in-flight guard prevents concurrent submission. A returned submission ID is required before showing the focused receipt state. New-report action clears previous message/contact fields. No authentication requirement or backend changes. Next unit: final navigation and cross-page consistency audit. Review and validation details: HIVE_FEEDBACK_BRIEF.md.
+
+## September 14 — Final consistency and admin Analytics
+Completed the navigation/metadata/recovery unit, with validation recorded in HIVE_FINAL_CONSISTENCY.md. Per user direction Analytics is an admin section; public entry points are hidden with source retained, and both legacy and admin API URLs require server-side admin authorization. Public Feedback, recovery/metadata, and this admin relocation remain local for review. Robinhood token data remains coming soon.

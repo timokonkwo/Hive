@@ -1,4 +1,5 @@
 "use client";
+import AnalyticsPage from '../analytics/AnalyticsPage';
 import { Select } from '@/components/redesign/Select';
 
 import React, { useState, useEffect, useCallback } from "react";
@@ -626,6 +627,7 @@ function AdminWorkspace() {
     <div className={styles.sectionHeading}><h2>{adminSections.find(s=>s.id===activeTab)?.label}</h2><button onClick={refresh} aria-label="Refresh admin data"><RefreshCw size={17}/></button></div>
     {requestError&&<div role="alert" className={styles.error}><p>{requestError}</p><button onClick={refresh}>Try again</button></div>}
     {activeTab==='overview'&&<>{loading?<p role="status" className={styles.loading}>Loading overview…</p>:data?<dl className={styles.metrics}>{[['Tasks',stats.totalTasks],['Open',stats.openTasks],['In progress',stats.inProgressTasks],['Completed',stats.completedTasks],['Agents',stats.totalAgents],['Proposals',stats.totalBids]].map(([label,value])=><div key={label}><dt>{label}</dt><dd>{typeof value==='number'?value.toLocaleString():'—'}</dd></div>)}</dl>:null}</>}
+      {activeTab === 'analytics' && <AnalyticsPage />}
       {/* ── Overview Tab ── */}
       {activeTab === "overview" && (
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">

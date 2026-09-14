@@ -1,0 +1,36 @@
+import fs from 'node:fs/promises';
+const base = process.env.HIVE_CDP_URL || 'http://127.0.0.1:9350';
+const site = process.env.HIVE_PREVIEW_URL || 'http://localhost:3102';
+await fs.mkdir('/private/tmp/hive-redesign-qa',{recursive:true});
+const tab = await (await fetch(base+'/json/new?about:blank',{method:'PUT'})).json();
+const ws = new WebSocket(tab.webSocketDebuggerUrl);
+await new Promise(resolve=>ws.addEventListener('open',resolve,{once:true}));
+let counter=0;const pending=new Map();const errors=[];
+ws.onmessage=e=>{const v=JSON.parse(e.data);if(v.id){const p=pending.get(v.id);if(p){pending.delete(v.id);if(v.error)p.reject(v.error);else p.resolve(v.result)}}else if(v.method==='Fetch.requestPaused'){void intercept(v.params);}else if(v.method==='Runtime.exceptionThrown')errors.push(v.params.exceptionDetails);};
+const send=(method,params={})=>new Promise((resolve,reject)=>{const id=++counter;const timer=setTimeout(()=>{pending.delete(id);reject(new Error('Timed out: '+method));},20000);pending.set(id,{resolve:v=>{clearTimeout(timer);resolve(v)},reject:e=>{clearTimeout(timer);reject(e)}});ws.send(JSON.stringify({id,method,params}));});
+const sleep=ms=>new Promise(r=>setTimeout(r,ms));
+const evaluate=async(expression)=>{const r=await send('Runtime.evaluate',{expression,returnByValue:true,awaitPromise:true});if(r.exceptionDetails)throw new Error(r.exceptionDetails.exception?.description || r.exceptionDetails.text);return r.result.value};
+const shot=async(name,full=false)=>{const m=await send('Page.getLayoutMetrics');const data=await send('Page.captureScreenshot',{format:'png',captureBeyondViewport:full,...(full?{clip:{x:0,y:0,width:m.cssContentSize.width,height:m.cssContentSize.height,scale:1}}:{})});await fs.writeFile('/private/tmp/hive-redesign-qa/'+name+'.png',Buffer.from(data.data,'base64'));};
+
+const checks=[];
+const check=(name,pass,detail)=>{checks.push({name,pass:!!pass,...(detail?{detail}:{})});if(!pass)console.error('FAIL',name,detail||'');};
+const until=async(expression)=>{for(let i=0;i<80;i++){if(await evaluate(`!!(${expression})`))return;await sleep(100);}throw new Error('Timed out: '+expression);};
+const settled=()=>until(`!!document.querySelector('main')`);
+const navigate=async(path)=>{await send('Page.navigate',{url:site+path});await until(`document.readyState==='complete'`);await settled();await sleep(500);};
+const click=async(selector,index=0)=>{await evaluate(`document.querySelectorAll(${JSON.stringify(selector)})[${index}].scrollIntoView({behavior:'instant',block:'center'})`);await sleep(80);const point=await evaluate(`(()=>{const r=document.querySelectorAll(${JSON.stringify(selector)})[${index}].getBoundingClientRect();return{x:r.x+r.width/2,y:r.y+r.height/2}})()`);await send('Input.dispatchMouseEvent',{type:'mousePressed',button:'left',clickCount:1,...point});await send('Input.dispatchMouseEvent',{type:'mouseReleased',button:'left',clickCount:1,...point});await sleep(120);};
+async function escape(){await send('Input.dispatchKeyEvent',{type:'keyDown',key:'Escape',code:'Escape',windowsVirtualKeyCode:27});await send('Input.dispatchKeyEvent',{type:'keyUp',key:'Escape',code:'Escape',windowsVirtualKeyCode:27});await sleep(100);}
+
+
+
+async function intercept(e){return send('Fetch.continueRequest',{requestId:e.requestId});}
+await send('Page.enable');await send('Runtime.enable');await send('Emulation.setEmulatedMedia',{features:[{name:'prefers-reduced-motion',value:'reduce'}]});await send('Emulation.setDeviceMetricsOverride',{width:1440,height:900,deviceScaleFactor:1,mobile:false});
+
+await navigate('/feedback');
+check('Analytics hidden from navigation',await evaluate(`!document.querySelector('a[href="/analytics"]')`));
+check('Feedback active in desktop navigation',await evaluate(`document.querySelector('nav[aria-label="App navigation"] a[href="/feedback"]').getAttribute('aria-current')==='page'`));
+await send('Emulation.setDeviceMetricsOverride',{width:390,height:900,deviceScaleFactor:1,mobile:true});await click('summary[aria-label="App navigation menu"]');check('Feedback active in mobile menu',await evaluate(`document.querySelector('nav[aria-label="Mobile app navigation"] a[href="/feedback"]').getAttribute('aria-current')==='page'`));await escape();check('Escape restores menu focus',await evaluate(`document.activeElement.getAttribute('aria-label')==='App navigation menu'&&!document.querySelector('details[class*=mobileMenu]').open`));
+await navigate('/missing-page-consistency-check');
+for(const width of [320,390,768,1440]){await send('Emulation.setDeviceMetricsOverride',{width,height:900,deviceScaleFactor:1,mobile:width<600});for(const theme of ['dark','light']){await evaluate(`document.documentElement.dataset.hiveTheme='${theme}'`);check('404 fits '+width+' '+theme,await evaluate(`document.documentElement.scrollWidth<=innerWidth&&document.querySelector('h1').innerText==='Page not found'&&!!document.querySelector('main a[href="/marketplace"]')`));if(width===390||width===1440)await shot('recovery-'+width+'-'+theme);}}
+for(const [path,target] of [['/analytics','/admin?section=analytics'],['/overview','/'],['/feed','/'],['/leaderboard','/agents'],['/token?network=solana&view=stake','/stake?network=solana&view=stake']]){await navigate(path);check('Redirect '+path,await evaluate(`location.pathname+location.search===${JSON.stringify(target)}`));}
+for(const route of ['feedback','registry','dao','stake']){await navigate('/'+route);check('Canonical '+route,await evaluate(`document.querySelector('link[rel=canonical]')?.href==='https://uphive.xyz/${route}'`));}
+check('No runtime exceptions',errors.length===0,errors.map(e=>e.text));console.log(JSON.stringify({passed:checks.filter(c=>c.pass).length,total:checks.length,failures:checks.filter(c=>!c.pass)},null,2));ws.close();process.exitCode=checks.some(c=>!c.pass)?1:0;

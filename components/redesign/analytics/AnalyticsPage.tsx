@@ -3,7 +3,6 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Download, RefreshCw } from 'lucide-react';
 import gsap from 'gsap';
-import { AppShell } from '../AppShell';
 import { ActivityChart } from './ActivityChart';
 import { Fees } from './Fees';
 import { csv, dayLabel, labels, number, readDays, readReport, stamp, type Report } from './model';
@@ -29,14 +28,14 @@ export default function AnalyticsPage() {
   const params = useSearchParams(), router = useRouter(), days = readDays(params.get('days'));
   const [revision, setRevision] = useState(0), root = useRef<HTMLElement>(null);
   const parse = useCallback((v: unknown) => readReport(v, days), [days]);
-  const r = useResource('/api/analytics?days=' + days, revision, parse);
+  const r = useResource('/api/admin/analytics?days=' + days, revision, parse);
   useEffect(() => { if (!r.data || matchMedia('(prefers-reduced-motion: reduce)').matches) return; const ctx = gsap.context(() => gsap.fromTo('[data-analytics-enter]', { y: 10, opacity: 0 }, { y: 0, opacity: 1, duration: .3, stagger: .05, clearProps: 'all' }), root); return () => ctx.revert(); }, [r.data]);
-  return <div className={common.page} data-hive-app><a className={common.skipLink} href="#analytics-main">Skip to Analytics</a><AppShell area="Analytics" page="Overview"><main ref={root} id="analytics-main" tabIndex={-1} className={`${common.main} ${styles.main}`}>
-    <header className={styles.heading}><div><h1>Analytics</h1></div><button className={styles.secondary} aria-label="Refresh activity" disabled={r.state === 'loading'} onClick={() => setRevision(v => v + 1)}><RefreshCw size={16} aria-hidden="true" />Refresh</button></header>
-    <nav className={styles.ranges} aria-label="Activity period">{[7, 30, 90].map(n => <button key={n} aria-pressed={days === n} onClick={() => router.push('/analytics' + (n === 30 ? '' : '?days=' + n), { scroll: false })}>{n} days</button>)}</nav>
+  return <section ref={root} className={styles.main} aria-label="Platform analytics">
+    <header className={styles.heading}><div><h3>Task activity</h3></div><button className={styles.secondary} aria-label="Refresh activity" disabled={r.state === 'loading'} onClick={() => setRevision(v => v + 1)}><RefreshCw size={16} aria-hidden="true" />Refresh</button></header>
+    <nav className={styles.ranges} aria-label="Activity period">{[7, 30, 90].map(n => <button key={n} aria-pressed={days === n} onClick={() => router.push('/admin?section=analytics' + (n === 30 ? '' : '&days=' + n), { scroll: false })}>{n} days</button>)}</nav>
     {r.state === 'loading' && <div className={styles.loading} role="status">Loading activity…<div aria-hidden="true" /></div>}
     {r.state === 'error' && <div role="alert" className={styles.error}><p>{r.error}{r.data ? ' Showing the last loaded report below.' : ''}</p><button className={styles.secondary} onClick={() => setRevision(v => v + 1)}>Try again</button></div>}
     {r.data && <ReportBody key={r.data.asOf + days} report={r.data} />}
     <Fees />
-  </main></AppShell></div>;
+  </section>;
 }

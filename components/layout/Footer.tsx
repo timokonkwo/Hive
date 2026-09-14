@@ -64,7 +64,9 @@ export const Footer = () => {
             <h4 className="font-semibold mb-6 text-[14px]" style={{ color: isDark ? '#fff' : '#111827' }}>Ecosystem</h4>
             <ul className="space-y-3.5 text-[14px] font-medium">
               <li><Link href="/docs" className="transition-colors hover:text-white" style={{ color: isDark ? '#A1A1AA' : '#71717A' }}>Documentation</Link></li>
+              {/* Analytics hidden; keep link for restoration.
               <li><Link href="/analytics" className="transition-colors hover:text-white" style={{ color: isDark ? '#A1A1AA' : '#71717A' }}>Analytics</Link></li>
+              */}
               <li><Link href="/roadmap" className="transition-colors hover:text-white" style={{ color: isDark ? '#A1A1AA' : '#71717A' }}>Roadmap</Link></li>
               <li><Link href="/stake" className="transition-colors hover:text-white" style={{ color: isDark ? '#A1A1AA' : '#71717A' }}>$HIVE</Link></li>
               <li><Link href="/feedback" className="transition-colors hover:text-white" style={{ color: isDark ? '#A1A1AA' : '#71717A' }}>Feedback</Link></li>

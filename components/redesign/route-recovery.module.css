@@ -1,0 +1,12 @@
+.page { composes:surface from './foundation.module.css'; min-height:100svh; }
+.header { display:flex; justify-content:space-between; align-items:center; padding:24px var(--gutter); border-bottom:1px solid var(--rule); }
+.header>a { display:flex; align-items:center; }
+.header button { display:grid; place-items:center; width:44px; height:44px; border:1px solid var(--rule); border-radius:50%; background:transparent; }
+.main { max-width:900px; padding:clamp(64px,12vh,140px) var(--gutter); margin:auto; }
+.label { font-size:13px; color:var(--muted); }
+.main h1 { font-size:clamp(32px,5vw,56px); font-weight:500; line-height:1.15; letter-spacing:-.04em; margin:16px 0; }
+.main p { font-size:16px; color:var(--muted); max-width:46ch; }
+.actions { display:flex; align-items:center; flex-wrap:wrap; gap:16px 24px; margin-top:32px; }
+.actions :is(a,button) { display:inline-flex; align-items:center; justify-content:center; gap:12px; min-height:48px; font-size:14px; }
+.actions button,.actions .primary { padding:12px 20px; background:var(--accent); color:var(--accent-ink); border:0; border-radius:6px; }
+@media(max-width:480px) { .actions { align-items:stretch; flex-direction:column; } .actions a { justify-content:flex-start; } .actions .primary { justify-content:center; } }

@@ -5,7 +5,7 @@ import { readFees, sol, stamp } from './model';
 import { useResource } from './useResource';
 import styles from './analytics.module.css';
 function SolanaFees() {
-  const [revision, setRevision] = useState(0), r = useResource('/api/analytics/fees', revision, readFees), d = r.data;
+  const [revision, setRevision] = useState(0), r = useResource('/api/admin/analytics/fees', revision, readFees), d = r.data;
   const fee = d?.fees, usd = d?.usd;
   const estimate = fee && usd && !usd.stale ? Number(fee.data) / 1e9 * usd.data : null;
   return <>
@@ -15,7 +15,9 @@ function SolanaFees() {
     {d && <><div className={styles.feeAmount}>{fee ? <><strong>{sol(fee.data)} SOL</strong><span>{fee.stale || r.state === 'error' ? 'Last available value · ' : ''}{stamp(fee.asOf)}</span>{estimate !== null && Number.isFinite(estimate) && <span>About {estimate.toLocaleString('en', { style: 'currency', currency: 'USD', maximumFractionDigits: 2 })}</span>}</> : <p>Token fee data is not available.</p>}</div>
       <a className={styles.textLink} href={'https://bags.fm/' + d.token} target="_blank" rel="noopener noreferrer">View token on Bags<ArrowUpRight size={15} aria-hidden="true" /></a>
       <details className={styles.definitions}><summary>About token fees</summary><p>Trading fees, separate from task payments. Updated every five minutes.</p></details>
+      {/* Fee-recipient and creator details are not part of the public view.
       <div className={styles.people}>{(['recipients', 'creators'] as const).map(k => { const part = d[k]; return <details key={k}><summary>{k === 'recipients' ? 'Fee recipients' : 'Token creators'}</summary>{part ? <><p className={styles.hint}>{part.stale ? 'Last available data · ' : ''}{stamp(part.asOf)}</p>{part.data.length ? <ul>{part.data.map((p, i) => <li key={p.wallet + i}><div><strong>{p.name || 'Wallet'}</strong><a href={'https://solscan.io/account/' + p.wallet} target="_blank" rel="noopener noreferrer">{p.wallet}<ArrowUpRight size={13} aria-hidden="true" /></a></div>{k === 'creators' && p.shareBps !== null && <span>{(p.shareBps / 100).toLocaleString('en', { maximumFractionDigits: 2 })}% fee share</span>}</li>)}</ul> : <p>No records returned.</p>}</> : <p>This data is not available.</p>}</details>; })}</div>
+      */}
     </>}
   </>;
 }
