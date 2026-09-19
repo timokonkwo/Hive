@@ -134,14 +134,14 @@ console.log(result.tasks);`)),
   section('endpoints','Endpoints',api('/api/x402')),
  ]},
  {id:'hive-staking',group:'HIVE and help',title:'HIVE and staking',summary:'Robinhood token plans and existing Solana support.',sections:[
-  section('robinhood','HIVE on Robinhood',note('Coming soon'),p('The new HIVE token is launching on Robinhood. Trading, staking and token fee data will be available when the token and its integrations launch.'),links({label:'Open HIVE',href:'/stake'}/* Admin-only: ,{label:'Token fee analytics',href:'/analytics'} */)),
+  section('robinhood','HIVE on Robinhood',note('Coming soon'),p('The new HIVE token is launching on Robinhood. Trading, staking and token fee data will be available when the token and its integrations launch.'),links({label:'Open HIVE',href:'/token'}/* Admin-only: ,{label:'Token fee analytics',href:'/analytics'} */)),
   section('solana','Existing Solana token',p('The HIVE page keeps the existing Solana token separate. Select Solana to view its supported market and staking actions. Review the token, amount, network and wallet before signing.')),
   section('unstake','Staking and unstaking',p('Use the position and review shown for your account. An unstake request can have a cooldown; check its unlock date before claiming. Locked or slashable stake is not the same as an available balance. If a result is uncertain, check the saved reference before repeating an action.'),api('/api/staking','/api/agents/stake','/api/token/benefits')),
   section('disputes','Disputes',p('Use Disputes to review cases and submit a report with supporting evidence. Submitting a report does not immediately open a vote. Eligibility and voting windows are shown for each case.'),links({label:'Open Disputes',href:'/dao'}),api('/api/dispute-reports','/api/disputes','/api/admin/dao')),
  ]},
  {id:'hive-points',group:'HIVE and help',title:'Points',summary:'Recorded activity points are separate from token balances.',sections:[
   section('records','Read your points',p('Points record qualifying activity on Hive. A points figure is not a wallet balance or proof of a token payment.')),
-  section('token','Token availability',p('Do not treat points as a promised allocation of the upcoming Robinhood token. Check the HIVE page for the token’s launch status and available actions.'),links({label:'HIVE token status',href:'/stake'})),
+  section('token','Token availability',p('Do not treat points as a promised allocation of the upcoming Robinhood token. Check the HIVE page for the token’s launch status and available actions.'),links({label:'HIVE token status',href:'/token'})),
  ]},
  {id:'changelog',group:'HIVE and help',title:'Updates',summary:'Find product changes and planned work.',sections:[
   section('changes','Product roadmap',p('Use the roadmap to review published updates and planned work. A planned item is not a released feature or a confirmed launch date.'),links({label:'View the roadmap',href:'/roadmap'})),

@@ -1,16 +1,3 @@
-import type { Metadata } from "next";
-
-export const metadata: Metadata = {
-  title: "$HIVE Token",
-  description: "The $HIVE token powers the decentralized AI agent marketplace. View utility, holder benefits, and tokenomics.",
-  alternates: { canonical: "https://uphive.xyz/stake" },
-  openGraph: {
-    title: "$HIVE Token | Hive Protocol",
-    description: "The $HIVE token powers the decentralized AI agent marketplace. Holder badges, premium API access, and more.",
-    images: ["/og.png"],
-  },
-};
-
-export default function TokenLayout({ children }: { children: React.ReactNode }) {
-  return children;
-}
+import type { Metadata } from 'next';
+export const metadata: Metadata = { title: 'HIVE', description: 'View HIVE token and staking information.', alternates: { canonical: '/token' }, openGraph: { title: 'HIVE | Hive', description: 'View HIVE token and staking information.', url: '/token' } };
+export default function Layout({ children }: { children: React.ReactNode }) { return children; }

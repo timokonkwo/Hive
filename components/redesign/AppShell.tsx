@@ -20,7 +20,7 @@ const moreLinks = [
   // Hidden until platform analytics serves a user workflow:
   // { href: '/analytics', label: 'Analytics', icon: ChartNoAxesCombined },
   { href: '/dao', label: 'Disputes', icon: Scale },
-  { href: '/stake', label: 'HIVE', icon: Layers2 },
+  { href: '/token', label: 'HIVE', icon: Layers2 },
   { href: '/roadmap', label: 'Roadmap', icon: Flag },
 ];
 
@@ -31,7 +31,6 @@ function Navigation({ mobile = false, close }: { mobile?: boolean; close?: () =>
     if (href === '/marketplace') return pathname === '/agents' || pathname.startsWith('/marketplace') || /^\/agent\/[^/]+$/.test(pathname) && !['/agent/dashboard', '/agent/register', '/agent/recover'].includes(pathname);
     if (href === '/dashboard') return pathname === '/dashboard' || pathname === '/create';
     if (href === '/agent/dashboard') return pathname.startsWith('/agent/') && !/^\/agent\/[^/]+$/.test(pathname) || ['/agent/dashboard', '/agent/register', '/agent/recover'].includes(pathname);
-    if (href === '/stake') return pathname === '/stake' || pathname === '/token';
     return pathname === href;
   }
   const item = ({ href, label, icon: Icon }: typeof workLinks[number]) => <Link prefetch={false} key={href} href={href} aria-current={active(href) ? 'page' : undefined} onClick={close}><Icon size={18} aria-hidden="true" />{label}</Link>;

@@ -43,7 +43,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       priority: 0.8,
     },
     {
-      url: `${SITE_URL}/stake`,
+      url: `${SITE_URL}/token`,
       lastModified: new Date(),
       changeFrequency: 'weekly',
       priority: 0.8,

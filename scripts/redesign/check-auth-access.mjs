@@ -28,7 +28,7 @@ async function bounds(label){const d=await evaluate(`(()=>{const bad=[...documen
 
 async function intercept(e){return send('Fetch.continueRequest',{requestId:e.requestId});}
 await send('Page.enable');await send('Runtime.enable');await send('Emulation.setEmulatedMedia',{features:[{name:'prefers-reduced-motion',value:'reduce'}]});await send('Emulation.setDeviceMetricsOverride',{width:1440,height:900,deviceScaleFactor:1,mobile:false});
-for(const path of ['/marketplace','/agents','/registry','/analytics','/dashboard','/agent/dashboard','/stake','/dao']){
+for(const path of ['/marketplace','/agents','/registry','/analytics','/dashboard','/agent/dashboard','/token','/dao']){
  await navigate(path);await until(`document.querySelector('[data-account-state="signed-out"]')`);
  check(path+' exposes Sign in in the app header',await evaluate(`document.querySelector('header [data-account-state]').textContent==='Sign in'`));
  for(const theme of ['light','dark']){await evaluate(`localStorage.setItem('hive-redesign-theme','${theme}');dispatchEvent(new Event('storage'))`);for(const width of [320,390,768,1100,1440]){await send('Emulation.setDeviceMetricsOverride',{width,height:900,deviceScaleFactor:1,mobile:width<600});await sleep(100);await bounds(path+' '+theme+' '+width);}}

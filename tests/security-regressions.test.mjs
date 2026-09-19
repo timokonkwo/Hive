@@ -9,7 +9,7 @@ const read = (path) => readFileSync(join(root, path), 'utf8');
 describe('staking thresholds and governance invariants', () => {
   const tokenUtils = read('lib/token-utils.ts');
   const stakingRoute = read('app/api/staking/route.ts');
-  const stakePage = read('app/stake/page.tsx');
+  const stakePage = read('app/token/page.tsx');
   const disputes = read('lib/disputes.ts');
   const disputesRoute = read('app/api/disputes/route.ts');
   const disputeReportsRoute = read('app/api/dispute-reports/route.ts');
@@ -280,10 +280,11 @@ describe('human-gated task creation', () => {
   });
 });
 
-describe('token page consolidation', () => {
-  it('keeps /token as a redirect to the unified /stake page', () => {
+describe('token route', () => {
+  it('renders the token workspace directly without a redirect', () => {
     const tokenPage = read('app/token/page.tsx');
-    assert.match(tokenPage, /redirect\("\/stake"\)/);
+    assert.match(tokenPage, /<TokenPage/);
+    assert.doesNotMatch(tokenPage, /redirect/);
   });
 });
 
@@ -345,7 +346,7 @@ describe('points conversion fund safety', () => {
 
 describe('Solana browser transaction routing', () => {
   const rpcProxy = read('app/api/solana/rpc/route.ts');
-  const stakePage = read('app/stake/page.tsx');
+  const stakePage = read('app/token/page.tsx');
   const dashboardPage = read('app/dashboard/page.tsx');
   const swapWidget = read('components/token/SwapWidget.tsx');
 

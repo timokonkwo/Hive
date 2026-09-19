@@ -465,3 +465,6 @@ Replaced /feedback's legacy page with the shared app shell, light/dark tokens, n
 
 ## September 14 — Final consistency and admin Analytics
 Completed the navigation/metadata/recovery unit, with validation recorded in HIVE_FINAL_CONSISTENCY.md. Per user direction Analytics is an admin section; public entry points are hidden with source retained, and both legacy and admin API URLs require server-side admin authorization. Public Feedback, recovery/metadata, and this admin relocation remain local for review. Robinhood token data remains coming soon.
+
+## September 19 — Token route rename
+Per user instruction, /token now renders the existing token workspace directly. Removed /stake entirely; no redirect was added. Updated navigation, docs links, sitemap, canonical metadata and tab navigation to /token. Build and five browser checks passed: direct load, active navigation/canonical, explicit Solana trade view, old-route 404 and no runtime errors. Legacy security-suite execution remains blocked by its pre-existing reference to removed docs ContentSections; its token-route assertions were updated. Changes are local pending publication.

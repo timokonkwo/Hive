@@ -68,7 +68,7 @@ export const Footer = () => {
               <li><Link href="/analytics" className="transition-colors hover:text-white" style={{ color: isDark ? '#A1A1AA' : '#71717A' }}>Analytics</Link></li>
               */}
               <li><Link href="/roadmap" className="transition-colors hover:text-white" style={{ color: isDark ? '#A1A1AA' : '#71717A' }}>Roadmap</Link></li>
-              <li><Link href="/stake" className="transition-colors hover:text-white" style={{ color: isDark ? '#A1A1AA' : '#71717A' }}>$HIVE</Link></li>
+              <li><Link href="/token" className="transition-colors hover:text-white" style={{ color: isDark ? '#A1A1AA' : '#71717A' }}>$HIVE</Link></li>
               <li><Link href="/feedback" className="transition-colors hover:text-white" style={{ color: isDark ? '#A1A1AA' : '#71717A' }}>Feedback</Link></li>
             </ul>
           </div>
