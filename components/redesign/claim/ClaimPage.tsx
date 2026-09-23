@@ -1,6 +1,5 @@
 'use client';
 import { useEffect, useRef, useState, type FormEvent } from 'react';
-import Link from 'next/link';
 import { ArrowLeft, ArrowRight } from 'lucide-react';
 import { AppShell } from '../AppShell';
 import { compactHive as tokens, exactHive } from '@/lib/hive-claim-format';
@@ -9,6 +8,7 @@ import { isReimbursementLookup, type ReimbursementLookup } from '@/lib/hive-reim
 import common from '../marketplace/marketplace.module.css';
 import styles from './claim.module.css';
 import LiveMigration from './LiveMigration';
+import { TokenNav } from '../token/TokenNav';
 import { claimCountdown, type ClaimSchedule } from '@/lib/hive-claim-schedule';
 
 const reasons: Record<string, string> = {
@@ -56,13 +56,13 @@ export default function ClaimPage({ schedule = null }: { schedule?: ClaimSchedul
   function edit(value: string) { controller.current?.abort(); controller.current = null; setAddress(value); setReviewOpen(false); setResult(null); setError(''); setLoading(false); }
   const preview = result ? migrationReview(result) : null;
   return <div className={common.page} data-hive-app><a className={common.skipLink} href="#claim-main">Skip to claim</a><AppShell area="HIVE" page="Claim"><main id="claim-main" tabIndex={-1} className={`${common.main} ${styles.main}`}>
+    <TokenNav active="claim" />
     {reviewOpen && result ? <>
       <button className={styles.back} onClick={() => setReviewOpen(false)}><ArrowLeft size={16} aria-hidden="true" />Back</button>
       <header className={styles.heading}><span className={styles.label}>2 / 2</span><h1 ref={reviewHeading} tabIndex={-1}>Deposit &amp; claim</h1></header>
       <Migration result={result} enabled={migrationEnabled} canStart={windowOpen} />
     </> : <>
-      <Link className={styles.back} href="/token"><ArrowLeft size={16} aria-hidden="true" />Back to HIVE</Link>
-      <header className={styles.heading}><span className={styles.label}>1 / 2</span><h1>Check your wallet</h1></header>
+      <header className={styles.heading}><h1>Claim HIVE</h1><p>HIVE has migrated from Solana to Robinhood Chain. Check your old HIVE wallet below for your new HIVE allocation.</p></header>
       <section className={styles.checker} aria-label="Wallet checker">
         <form onSubmit={event => lookup(event)} noValidate aria-busy={loading}>
           <label htmlFor="claim-owner">Solana wallet address</label>

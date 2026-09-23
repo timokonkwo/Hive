@@ -4,10 +4,10 @@
  */
 export type HiveLaunch = { status: 'coming-soon' | 'launched'; message: string; tokenAddress: string | null; tradeUrl: string | null; stakeUrl: string | null };
 export const hiveLaunch: HiveLaunch = {
-  status: 'coming-soon',
-  message: '$Hive Launching soon On RobinHood',
-  tokenAddress: null,
-  tradeUrl: null,
+  status: 'launched',
+  message: '$HIVE is live on Robinhood',
+  tokenAddress: '0xc65e9630D8Af1eA278cbE359f78931684b4ff9f8',
+  tradeUrl: 'https://www.ponsfamily.com/launchpad/0xc65e9630D8Af1eA278cbE359f78931684b4ff9f8',
   stakeUrl: null,
 };
 export function launchReady(config: HiveLaunch, action: 'trade' | 'stake') {

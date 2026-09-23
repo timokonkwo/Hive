@@ -1,0 +1,7 @@
+.nav { display:flex;align-items:center;gap:28px;border-bottom:1px solid var(--rule);margin:8px 0 32px; }
+.nav a { display:inline-flex;align-items:center;gap:5px;min-height:48px;padding:12px 0;color:var(--muted);font-size:14px;border-bottom:2px solid transparent; }
+.nav a[aria-current="page"] { color:var(--ink);border-bottom-color:var(--accent); }
+.nav a:hover { color:var(--ink); }
+.nav a:focus-visible { outline:2px solid var(--accent-text);outline-offset:4px; }
+.comingSoon { min-height:55vh;display:grid;place-items:center;text-align:center;padding:40px 16px; }
+.comingSoon h1 { font-size:clamp(28px,4vw,44px);font-weight:500;letter-spacing:-.04em;line-height:1.2; }

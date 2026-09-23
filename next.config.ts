@@ -1,6 +1,10 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
+  webpack(config) {
+    if (process.env.HIVE_BUILD_NO_CACHE === 'true') config.cache = false;
+    return config;
+  },
   // Subdomain redirects
   async redirects() {
     return [
