@@ -5,7 +5,7 @@ services:
     runtime: node
     plan: starter
     numInstances: 1
-    buildCommand: npm ci --omit=dev
+    buildCommand: npm ci --prefix tools/hive-migration/escrow --omit=dev
     startCommand: node tools/hive-migration/escrow/render/start.mjs
     autoDeployTrigger: off
     disk:
