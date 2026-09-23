@@ -1,0 +1,1248 @@
+{
+  "slot": 449032979,
+  "capturedAt": "2026-09-21T10:48:43.000Z",
+  "holdersSha256": "cce4c645194e8b7fa1f1b600c0332e099cb488dce47ffa66fcf6b50920f5daaa",
+  "sourceMint": "6JfonM6a24xngXh5yJ1imZzbMhpfvEsiafkb4syHBAGS",
+  "holders": [
+    {
+      "owner": "HLnpSz9h2S4hiLQ43rnSD9XkcUThA7B8hQMKmDaiTLcC",
+      "amountRaw": "417730521839199739",
+      "kind": "pool"
+    },
+    {
+      "owner": "FbsyX35H7cyqq51djs2V2dzH9NRzUg9utNWX33rHaxtG",
+      "amountRaw": "40684376870249221",
+      "kind": "wallet"
+    },
+    {
+      "owner": "J6cApZerLEBhDjag5RaZjWe8vE37hdXW5Az7dnZDBbY",
+      "amountRaw": "39218052993290151",
+      "kind": "wallet"
+    },
+    {
+      "owner": "3WGC1csSg3KMZvEidzv2HrpdfEvkSbMNzWJbk5oysVdw",
+      "amountRaw": "30666600778468559",
+      "kind": "wallet"
+    },
+    {
+      "owner": "2s5pZMxvCHXyEzZpyhax3eqA6LnjYfospHYcSqgx3AKR",
+      "amountRaw": "30164237379878784",
+      "kind": "wallet"
+    },
+    {
+      "owner": "2qW5LsgAGnCnyfVvzhwBQBfLsQ6hz3o2uaB29U3CSHBy",
+      "amountRaw": "29606622916317674",
+      "kind": "wallet"
+    },
+    {
+      "owner": "5qDbuS8Rxss49j5X3bjkyM29KieRqmpMFEPUqKcVn2wQ",
+      "amountRaw": "27337967392312204",
+      "kind": "wallet"
+    },
+    {
+      "owner": "FAcSRC4MzaRNU1dL2v99vR3PsHRQBVY6kbnhx5msxGpx",
+      "amountRaw": "26696714024166165",
+      "kind": "wallet"
+    },
+    {
+      "owner": "6rSx8nR3Yu9zzuueTV4fYp4z7ZFv6DCwSwsz3CgkqbyR",
+      "amountRaw": "26186420682461736",
+      "kind": "wallet"
+    },
+    {
+      "owner": "EEAurpGV57sakJ1vBUzebJBcMXTu1obDaDX4kTEitN8c",
+      "amountRaw": "20435967483010493",
+      "kind": "wallet"
+    },
+    {
+      "owner": "DG3RGstAd85WS9Mphvpgu1EGyXwmWRdvgs3gW3GyHVbr",
+      "amountRaw": "14490277222569297",
+      "kind": "wallet"
+    },
+    {
+      "owner": "2uvGNj3zfWcQAcrjJuSgDge5MqZyYnDkBtA61Sy3LQC9",
+      "amountRaw": "13914216402180834",
+      "kind": "wallet"
+    },
+    {
+      "owner": "FtjDmXk6mPCxzgcwp8d23cKP7nPT1HZLFZ4p9N9euLTC",
+      "amountRaw": "12957393707759755",
+      "kind": "wallet"
+    },
+    {
+      "owner": "7XycEkwV1MHKMZ6SwZRfrYXwTSHKe5iSpCcGbZveC2TP",
+      "amountRaw": "12632323705834089",
+      "kind": "wallet"
+    },
+    {
+      "owner": "74cHFwWfF9WK98LA5TuV6s6ymohr5xiDPYTLmiwJeBi9",
+      "amountRaw": "12627615316402372",
+      "kind": "wallet"
+    },
+    {
+      "owner": "7MZTYh4C1jFvczTdGBZ6tYqTKkKWaChrpatMv8DkXbMy",
+      "amountRaw": "10099806030453807",
+      "kind": "wallet"
+    },
+    {
+      "owner": "2hdSqKAJuHmUN78J8GdD7MioetuAuLc6R4e17XbfRFaC",
+      "amountRaw": "10008409421757740",
+      "kind": "wallet"
+    },
+    {
+      "owner": "A8ZtrwVx8p7kWcAsrDWmJmQ3gZbB4uP7ikmUWQSsep4v",
+      "amountRaw": "10007255736412836",
+      "kind": "wallet"
+    },
+    {
+      "owner": "39wp66dVVGBc5SNKDbAYD6HFRrawAkVLGe2xhVrcAxF6",
+      "amountRaw": "9530141632453959",
+      "kind": "wallet"
+    },
+    {
+      "owner": "5WNHaQMzvfbEYaVLt2k7cojqaTMD8TRJrYiczkYFe3Cb",
+      "amountRaw": "9460000262088982",
+      "kind": "wallet"
+    },
+    {
+      "owner": "BA8ZeYxdeJUwhj4iY5hqsE6bSjhtbTNA6BmGSVfrramG",
+      "amountRaw": "8319068112777311",
+      "kind": "wallet"
+    },
+    {
+      "owner": "9eTYJTn6pBGzCjjugNVBQcLK7GSqBnvdefUV88FvK7fX",
+      "amountRaw": "7787923445132881",
+      "kind": "wallet"
+    },
+    {
+      "owner": "anvLNoXDX2JbgmX66YBoxR5ZqfyK5bj8cNvToCmKq9h",
+      "amountRaw": "7292049616559655",
+      "kind": "wallet"
+    },
+    {
+      "owner": "2vFejHAkY8E61k1cZeKpoW9dWsZENpRDnCkj3AZb3Ltj",
+      "amountRaw": "6852467217358790",
+      "kind": "wallet"
+    },
+    {
+      "owner": "2oUcVMJBgRUUbURh4tLyNCxZG8xX5Y9qFv3Z3XSv2LJA",
+      "amountRaw": "6384919596995593",
+      "kind": "wallet"
+    },
+    {
+      "owner": "4hPDPTCAMsRwXEGf8d4X23K8T5VvroDpu4tiYTMNsdcc",
+      "amountRaw": "6160520634049278",
+      "kind": "wallet"
+    },
+    {
+      "owner": "H2TFTTGKQ1Qzsps9ETZ1tZyvYXvsY6EK736KZ1dMtRLV",
+      "amountRaw": "6000000758862918",
+      "kind": "wallet"
+    },
+    {
+      "owner": "G1G1jvfDBRBjbLrptBqjBVvsCG64MScu85DdhippCqpm",
+      "amountRaw": "5995853144270393",
+      "kind": "wallet"
+    },
+    {
+      "owner": "6to3KWVHUhGfMSpCgXwwUFeUrKSgJXe6RCrpNzNGdF2x",
+      "amountRaw": "5978520041278748",
+      "kind": "wallet"
+    },
+    {
+      "owner": "DzuF5ShzEL7iHhAhVdw2u3yTuTdHLAHBcg2dMdhEuDp9",
+      "amountRaw": "5779324780328602",
+      "kind": "wallet"
+    },
+    {
+      "owner": "2sqAQADM819T27BxJoRa5JsRDX6Ws53GkZpq4RhrFQEJ",
+      "amountRaw": "5617504811397609",
+      "kind": "wallet"
+    },
+    {
+      "owner": "9sA76NtAytu7GwSoepAc7SsCHGifqxRqmqNzmVTPnDWz",
+      "amountRaw": "5370080462553216",
+      "kind": "wallet"
+    },
+    {
+      "owner": "4utBB6tyVnUyxAybgfGoTxG5R6osazsmLz6G4qXkGZdv",
+      "amountRaw": "5266012512848794",
+      "kind": "wallet"
+    },
+    {
+      "owner": "F8XNzQLhxauQPtPVC6ZcbUcdqWLtu1VY8WgZX7LDsJog",
+      "amountRaw": "5233025546369796",
+      "kind": "wallet"
+    },
+    {
+      "owner": "4rwZCmiSFwtQdCXKiU8hrky8YjjRKFWMXgbd3KAhFouY",
+      "amountRaw": "5164481530210915",
+      "kind": "wallet"
+    },
+    {
+      "owner": "HdK9ZEf644XNAe1SV38jC4qYMkdGfCUomaQdVEYZnVnE",
+      "amountRaw": "5135244937811290",
+      "kind": "wallet"
+    },
+    {
+      "owner": "34MgQc8x8UFaYPcc4vyC5KJLvuru6wybgL82qm4JsWtJ",
+      "amountRaw": "5081770288536468",
+      "kind": "wallet"
+    },
+    {
+      "owner": "BvLMrWBzz6ej7r9hDT8fHtTD8bQkJthdHQ7vaJwsjZrG",
+      "amountRaw": "5057710559176437",
+      "kind": "wallet"
+    },
+    {
+      "owner": "BU4My73QwHDvxaQmGKF32UyGjUMA5DpJwgDW5wET8UkW",
+      "amountRaw": "4769504180102198",
+      "kind": "wallet"
+    },
+    {
+      "owner": "5frXhGckAfTbDE86uvtgQAkED8TNs1YcLyz5hGErhpk",
+      "amountRaw": "4305867871211248",
+      "kind": "wallet"
+    },
+    {
+      "owner": "C8hn6JTLVQS3URM6MVc9WNTEbPHoxP8vgeyuNFRrLAdW",
+      "amountRaw": "4003889653360263",
+      "kind": "wallet"
+    },
+    {
+      "owner": "aY8fuA9xHPqLnT3fGCvbUHzM3cVK67WCRmrr72bXgX1",
+      "amountRaw": "3956016918483915",
+      "kind": "wallet"
+    },
+    {
+      "owner": "FJW5JE9bwEDdQhCFKHXkXLJHFYnPnmHjdGg89VPTBvUn",
+      "amountRaw": "3435614855705892",
+      "kind": "wallet"
+    },
+    {
+      "owner": "DHLnFSbc1BnJABP28WntCmBFsefVaHcfQz6qdPxstVbc",
+      "amountRaw": "3277500721995365",
+      "kind": "wallet"
+    },
+    {
+      "owner": "2t3yLVNRuiKRiKZZNbcQ1ae1DW5DydJpwrH6cmMboZt2",
+      "amountRaw": "3000000000000009",
+      "kind": "wallet"
+    },
+    {
+      "owner": "D6CZvbnsjffowaS4zagotHfdmZthxNBVqKwzp9C3tZYS",
+      "amountRaw": "2899170461950590",
+      "kind": "wallet"
+    },
+    {
+      "owner": "H1GRqX8n7Nsjw78oEqZWGQZCMPVyn7AW7zMuoTd2Um1q",
+      "amountRaw": "2856659753930331",
+      "kind": "wallet"
+    },
+    {
+      "owner": "ErMLf7JFzosrCF5pkBFU7F592mKZokyBmyyn3BcQNvre",
+      "amountRaw": "2497664250255811",
+      "kind": "wallet"
+    },
+    {
+      "owner": "JBpnoASf2VCC7ABpv9m4HJKgNQfTXxfZtRUkoNa74Dhj",
+      "amountRaw": "2183732459543600",
+      "kind": "wallet"
+    },
+    {
+      "owner": "Ct41N6Mjvh2XqNBvza5Yijo4k95Fqa5yjMfk7PG6vk8B",
+      "amountRaw": "2135891147041465",
+      "kind": "wallet"
+    },
+    {
+      "owner": "JZ4AmqcqVtz5bxZ228bHqYtNvRnoUKZpCS9tFuLdxn6",
+      "amountRaw": "2043160761011457",
+      "kind": "wallet"
+    },
+    {
+      "owner": "CGePo4dPhQ3kwapXtbMskz2SGYecCoW1KETfCEKQBcKZ",
+      "amountRaw": "2012994165958289",
+      "kind": "wallet"
+    },
+    {
+      "owner": "9mh3RrNeRK6Z83T7UVqcJRwPGVkAYZsV4vUMqdfkPKQE",
+      "amountRaw": "1843531191045754",
+      "kind": "wallet"
+    },
+    {
+      "owner": "9Pw3usSRbJer6RdgSgGWTJLQxPuoC9UCoPTMUET8DQzi",
+      "amountRaw": "1570775858243095",
+      "kind": "wallet"
+    },
+    {
+      "owner": "CtwHZPqSS3rqJr2Tze1F4QCFsWx9ghdPziUY1KDSjQhp",
+      "amountRaw": "1510227723064925",
+      "kind": "wallet"
+    },
+    {
+      "owner": "HyWyWboybEXxpGVBMc46yRiKfUu1uR4SKxRd978EWcwk",
+      "amountRaw": "1439868037713931",
+      "kind": "wallet"
+    },
+    {
+      "owner": "HQeoisMWVhKgx1MzuRbCyFdChE8ZCiJ1MgAJ6uEEsgjp",
+      "amountRaw": "1436623065398990",
+      "kind": "wallet"
+    },
+    {
+      "owner": "CZwNGHooidZw85QRCCYeJhzfSwqhVnTMKavZEoDQueK7",
+      "amountRaw": "1414289295065022",
+      "kind": "wallet"
+    },
+    {
+      "owner": "9GARV56Z4rjKuKUzp9Mw489y7KztdBmsTp8koGcNKhdY",
+      "amountRaw": "1367052138826623",
+      "kind": "wallet"
+    },
+    {
+      "owner": "2F5xRQY8pfmws9adiXQCySHYoHuroMqLtAFdpz2sMzrA",
+      "amountRaw": "1333488496135716",
+      "kind": "wallet"
+    },
+    {
+      "owner": "27kzxqqbKys3yQCtcvBZ1VdQNDu3FzXDS6tAfBNoVoeD",
+      "amountRaw": "1291199771310929",
+      "kind": "wallet"
+    },
+    {
+      "owner": "3cVg7jJCtx2T5x4vzpoHwjA9umDsnzy8RBQjF3vdiJ92",
+      "amountRaw": "1234243239425713",
+      "kind": "wallet"
+    },
+    {
+      "owner": "6N34uvQTjagKxKDTPbN4w9GKkH8xisqbfEPai3V24Ko3",
+      "amountRaw": "1228019426202079",
+      "kind": "wallet"
+    },
+    {
+      "owner": "69oHSdMY2RLKFuSCHzr4L5itZPWu65pPCR9hQSoLrPjA",
+      "amountRaw": "1213839767580746",
+      "kind": "wallet"
+    },
+    {
+      "owner": "EyLisgBNhBT1ggN9gi2Rx641aYnQU5XwFnaKgDW6nWKY",
+      "amountRaw": "1165356747058598",
+      "kind": "wallet"
+    },
+    {
+      "owner": "CdiveAsGvqBAfv34za2feYDtWs7qdua8TGKFsYQeQxHM",
+      "amountRaw": "1131205509785087",
+      "kind": "wallet"
+    },
+    {
+      "owner": "Hb6TGddh7bcr5ECazrdQUUMSnmZHu1h1GfqmvTMZqxzS",
+      "amountRaw": "1062764533496988",
+      "kind": "wallet"
+    },
+    {
+      "owner": "89yPnMHX6yqqLbNitjjpzDs5YwHe6t3waj4sAJ2SZELs",
+      "amountRaw": "1050520281399363",
+      "kind": "wallet"
+    },
+    {
+      "owner": "7sXpmvN7A5LYGhHZik9CoyQCv44FqBzMd7FRiLWzmVjR",
+      "amountRaw": "1032170837260062",
+      "kind": "wallet"
+    },
+    {
+      "owner": "EG7bKBSPNZ9WEPUwkTxCaHJ4r2i4LFunmyYqhMBdwUAT",
+      "amountRaw": "1025918685807120",
+      "kind": "wallet"
+    },
+    {
+      "owner": "3xyQLBdBySjEnd1vCVfbq11vJ3z9A94rDTrhGk6jV8U4",
+      "amountRaw": "1004973852523495",
+      "kind": "wallet"
+    },
+    {
+      "owner": "FqoZs7qEGE23L953doe8UZL9WoHyJCrutoiZa3KGwrGH",
+      "amountRaw": "1003281771277512",
+      "kind": "wallet"
+    },
+    {
+      "owner": "HzLWkSeeTKLYvVBs9rmPdDUCKw6i5WSgwVvaMtZKKrgp",
+      "amountRaw": "1000000000000000",
+      "kind": "wallet"
+    },
+    {
+      "owner": "7C5hQfsJFNdtz9gh5bvDn2DJygtZgmz1epAq6ZNfSKzT",
+      "amountRaw": "713825682396384",
+      "kind": "wallet"
+    },
+    {
+      "owner": "2dFHTCdPDNp44TCADjvrBxoRm5Nv2vRS6RtWoTuiZFjs",
+      "amountRaw": "629873692753243",
+      "kind": "wallet"
+    },
+    {
+      "owner": "9QdBNhCgEW35mpMsHCrrJzECLqiaG5uYZgHsm9XvCD8M",
+      "amountRaw": "593995104143807",
+      "kind": "wallet"
+    },
+    {
+      "owner": "8cqfyUcLuV1YFo4WTPRyqjdY2PzqzHVSbXVo2Zw4MuET",
+      "amountRaw": "511774867975214",
+      "kind": "wallet"
+    },
+    {
+      "owner": "4xpcFayDhf4Vtns1pNkvN5cgVk9WqUotw9LecBziuy36",
+      "amountRaw": "507468630027942",
+      "kind": "wallet"
+    },
+    {
+      "owner": "3CgvbiM3op4vjrrjH2zcrQUwsqh5veNVRjFCB9N6sRoD",
+      "amountRaw": "486305759618235",
+      "kind": "custody"
+    },
+    {
+      "owner": "HZirW9NKGbMsTznfPbWCWcprtxLnN7VCKefMn5JjBSM9",
+      "amountRaw": "485293746250850",
+      "kind": "wallet"
+    },
+    {
+      "owner": "HU23r7UoZbqTUuh3vA7emAGztFtqwTeVips789vqxxBw",
+      "amountRaw": "483212727007686",
+      "kind": "custody"
+    },
+    {
+      "owner": "68fT2cWgfptXsmTpawCT3eD4ZpvBqP1E2zn32UdYxEn2",
+      "amountRaw": "455206508429475",
+      "kind": "wallet"
+    },
+    {
+      "owner": "AfQ1oaudsGjvznX4JNEw671hi57JfWo4CWqhtkdgoVHU",
+      "amountRaw": "450690889572637",
+      "kind": "wallet"
+    },
+    {
+      "owner": "HFqp6ErWHY6Uzhj8rFyjYuDya2mXUpYEk8VW75K9PSiY",
+      "amountRaw": "407563107586950",
+      "kind": "custody"
+    },
+    {
+      "owner": "69yhtoJR4JYPPABZcSNkzuqbaFbwHsCkja1sP1Q2aVT5",
+      "amountRaw": "388591509060762",
+      "kind": "custody"
+    },
+    {
+      "owner": "8psNvWTrdNTiVRNzAgsou9kETXNJm2SXZyaKuJraVRtf",
+      "amountRaw": "380037263241289",
+      "kind": "wallet"
+    },
+    {
+      "owner": "89Q4wvuXhoJJvHvPXUvZmEBN7QQQFVThMvV4k1XryK3M",
+      "amountRaw": "377242503394149",
+      "kind": "wallet"
+    },
+    {
+      "owner": "48SA4HvRUDmMKoKa6FABTL2YSWAYULzF9p1s5pghkVJA",
+      "amountRaw": "376876890479768",
+      "kind": "wallet"
+    },
+    {
+      "owner": "BM24UYBJstrEQpyMXwQeve4rmj94pCYzvAhd5u1NR3Cz",
+      "amountRaw": "356508700107755",
+      "kind": "wallet"
+    },
+    {
+      "owner": "DSN3j1ykL3obAVNv7ZX49VsFCPe4LqzxHnmtLiPwY6xg",
+      "amountRaw": "342644420319294",
+      "kind": "custody"
+    },
+    {
+      "owner": "FhVo3mqL8PW5pH5U2CN4XE33DokiyZnUwuGpH2hmHLuM",
+      "amountRaw": "340001111708751",
+      "kind": "custody"
+    },
+    {
+      "owner": "4wjr7PKThPAmaueje6Sp47GqvDTH5TA9CwnVcWYAoTEQ",
+      "amountRaw": "329461895295400",
+      "kind": "wallet"
+    },
+    {
+      "owner": "3LoAYHuSd7Gh8d7RTFnhvYtiTiefdZ5ByamU42vkzd76",
+      "amountRaw": "328575540866962",
+      "kind": "custody"
+    },
+    {
+      "owner": "waRMEfV5PcAs54QYqvfxa8p3EhMESXHPa8QDbfQWMgq",
+      "amountRaw": "320999058825600",
+      "kind": "wallet"
+    },
+    {
+      "owner": "FMVHP1xw6ZHB9zLGyrJeeAvEzCBgouH8bPzdkYqq2C5W",
+      "amountRaw": "319641242784368",
+      "kind": "wallet"
+    },
+    {
+      "owner": "98LF7YAGjPx3Y8PJAwTrg4esrDYx7giH9QM2fjvfo5tw",
+      "amountRaw": "314336995958855",
+      "kind": "wallet"
+    },
+    {
+      "owner": "GP8StUXNYSZjPikyRsvkTbvRV1GBxMErb59cpeCJnDf1",
+      "amountRaw": "304212116778297",
+      "kind": "custody"
+    },
+    {
+      "owner": "49BM7J61NqYa1kXT7j9TrDX3TjVSgCqhngRzNiZkmXKi",
+      "amountRaw": "295592592421449",
+      "kind": "wallet"
+    },
+    {
+      "owner": "7iWnBRRhBCiNXXPhqiGzvvBkKrvFSWqqmxRyu9VyYBxE",
+      "amountRaw": "290534446306376",
+      "kind": "custody"
+    },
+    {
+      "owner": "3dGx4gpTaZULRnTsZpxUsVnbnedW8vSEi8JuyayhALeq",
+      "amountRaw": "276341104577556",
+      "kind": "wallet"
+    },
+    {
+      "owner": "E457iTdv3hMDXCfPj9w34cS2zdSfaCD5NmgNkmjL9vaz",
+      "amountRaw": "261865898415760",
+      "kind": "wallet"
+    },
+    {
+      "owner": "9nSomRjG4J8bDbpWTp9ieoKHmXjn8VwPiBG7jzX8Z1Vf",
+      "amountRaw": "258587767353207",
+      "kind": "wallet"
+    },
+    {
+      "owner": "BqaET2cMnnN3NpKarJpFknh6T9Bt4Ggk8uUb9NubFPxg",
+      "amountRaw": "252231900188166",
+      "kind": "wallet"
+    },
+    {
+      "owner": "7yf4AUUgWtsUREuYNjq2ysNHnnCEq9CjYMF53Ru8k33G",
+      "amountRaw": "247645686819766",
+      "kind": "wallet"
+    },
+    {
+      "owner": "CxJLK4shzZxGSJsAjcK4EWa7LDjc6RG4HRNXJMU4TcoR",
+      "amountRaw": "228798294481463",
+      "kind": "wallet"
+    },
+    {
+      "owner": "9MNpyNCsBYkN3C4DqZsxqyCboh9Bcbjzgxya2UrA25FE",
+      "amountRaw": "223407410955016",
+      "kind": "wallet"
+    },
+    {
+      "owner": "98CV2LK2qszvjPJ5TJ1fDaWLcyEaYwdZmCFzGgWEVKqY",
+      "amountRaw": "212704434005594",
+      "kind": "wallet"
+    },
+    {
+      "owner": "2mDJhjbLTupFk7zaqvdGFkXfdAa5S3U9qQfGfJ9AYh3j",
+      "amountRaw": "212220414811067",
+      "kind": "wallet"
+    },
+    {
+      "owner": "4W1j4vqyckKjLDMkjewYMtFK9GjVRuL4EEZrSNmaSX2P",
+      "amountRaw": "210239811941166",
+      "kind": "wallet"
+    },
+    {
+      "owner": "5hRihNaWd4zizrPtXUQSSAvoFqXX1fuNxAeX73A5s7kY",
+      "amountRaw": "202532519561686",
+      "kind": "wallet"
+    },
+    {
+      "owner": "GsFe2gscg1c7bDR3DdnscR9JTnab319YFhY7jrETAgKX",
+      "amountRaw": "201899778243033",
+      "kind": "wallet"
+    },
+    {
+      "owner": "DwuKDPu6wpVhq1SsZuD2CSqhVrmziZzXkGmwRDB59vDo",
+      "amountRaw": "186069269521159",
+      "kind": "wallet"
+    },
+    {
+      "owner": "veWfvbnCX3BZoHuz7GNnMZCHGBXq7enwRrK56FP8Mhk",
+      "amountRaw": "185817303149594",
+      "kind": "wallet"
+    },
+    {
+      "owner": "71RdAVUaZQSd3qwf5EKy4purRwss8qH2tg5QsPY9tYsk",
+      "amountRaw": "182119825160291",
+      "kind": "wallet"
+    },
+    {
+      "owner": "AWfjYy566Dgtgzawt3sL14JT7JREHhCV7ZUUyZUowHy6",
+      "amountRaw": "171707326062046",
+      "kind": "wallet"
+    },
+    {
+      "owner": "DicZKXmFUSHzuo1Ywsc1YYr6bMqLrjwjLcudVwrwkysF",
+      "amountRaw": "171117897824367",
+      "kind": "wallet"
+    },
+    {
+      "owner": "HKUGRAjTFaa51nQUYeo9x1Hh4WRjBs2BjtjEfnp5dymm",
+      "amountRaw": "150216977796585",
+      "kind": "wallet"
+    },
+    {
+      "owner": "CWG6vDeQH1EsB7GJTfgrmAjQ3f4GXnKWgnYFFvNdqYc1",
+      "amountRaw": "149748747660269",
+      "kind": "wallet"
+    },
+    {
+      "owner": "AkTgH1uW6J6j6QHmFNGzZuZwwXaHQsPCpHUriED28tRj",
+      "amountRaw": "147423222081157",
+      "kind": "wallet"
+    },
+    {
+      "owner": "9WF4zVuqrHVpmAsxxXdp3QTK1igrRTvGfrBSgWGebp6G",
+      "amountRaw": "141391154004844",
+      "kind": "wallet"
+    },
+    {
+      "owner": "DJxat3ybx6UbEZgaQrTfV2ov78RecoffPTiPZmokrS6",
+      "amountRaw": "136950193619372",
+      "kind": "custody"
+    },
+    {
+      "owner": "BJWWJdGvmD3DGhVyajaFFyvop7jcdPwe9n7EehSndqWS",
+      "amountRaw": "136869533449529",
+      "kind": "wallet"
+    },
+    {
+      "owner": "GuM7SQR7BQnbVY9VFQBi61kNdTVqR5z538Eq86yJnzr2",
+      "amountRaw": "133258175246121",
+      "kind": "wallet"
+    },
+    {
+      "owner": "4uHwAxVii7HcH88AT68aiWPaajAqhraBaiEeHApG4PHG",
+      "amountRaw": "127456314515263",
+      "kind": "wallet"
+    },
+    {
+      "owner": "5BtDumXTFqL4TPJhLpokV2U6gzNtbcUWX1Q5c9rnwDSx",
+      "amountRaw": "119323195875560",
+      "kind": "wallet"
+    },
+    {
+      "owner": "E8fw8rB8KcA1SBM32aS7fcbSbvueAsw44duVsgNn9wNG",
+      "amountRaw": "116099694431742",
+      "kind": "wallet"
+    },
+    {
+      "owner": "8CrDTtkdDr54LsB9vQi1PZzVNmAA1KHkcts2EAK9W11z",
+      "amountRaw": "105369141646690",
+      "kind": "wallet"
+    },
+    {
+      "owner": "CyG1pS7DQuoaay45FtZbMwtqfmCF2c34zt4E8dSnYdRQ",
+      "amountRaw": "100203003624585",
+      "kind": "wallet"
+    },
+    {
+      "owner": "FZFYcfqiHLjdPh52V4DPLfRs2V2fuqgBAu81D4zGnPHv",
+      "amountRaw": "98102716488607",
+      "kind": "wallet"
+    },
+    {
+      "owner": "8q4k6LAGPoaJyr2yaz3z4FTGufB7XtnbTMxo9EFqDjUt",
+      "amountRaw": "71615564331706",
+      "kind": "wallet"
+    },
+    {
+      "owner": "CUswZXSaVjeK9Rk4vA2zVb5NdjQi1eBxsygWEG9n4oNL",
+      "amountRaw": "65310799444382",
+      "kind": "wallet"
+    },
+    {
+      "owner": "D9GYt4W7VvteKCSvTgyjzuiBJyTy94Kmr6YiC9fbxGjW",
+      "amountRaw": "51292297513205",
+      "kind": "wallet"
+    },
+    {
+      "owner": "EvzBx73mvj276jF3oXbBYZdqYWYsxzpDxqiNm11s8qpu",
+      "amountRaw": "49502594066773",
+      "kind": "wallet"
+    },
+    {
+      "owner": "7A4UXCNm9UdPHNeja8YExSYvfLAeiTqHg2KbZiC5dyUU",
+      "amountRaw": "47368069994593",
+      "kind": "wallet"
+    },
+    {
+      "owner": "GrSjwdFt2ZrWPycFekLysdjS4UvRkuAjZgG4WWgz8Zt2",
+      "amountRaw": "47098760807681",
+      "kind": "wallet"
+    },
+    {
+      "owner": "CCUefYreEu9ZTee3RDodfFVxk7QgDumYWN7zyxkgo1Kb",
+      "amountRaw": "45083411804362",
+      "kind": "wallet"
+    },
+    {
+      "owner": "4gPeVxkqK3zD5eehGknTPCTYiNp82BAjSpo7KRbMMx6n",
+      "amountRaw": "44896132074965",
+      "kind": "wallet"
+    },
+    {
+      "owner": "4pf2soU2ZgtR3LAiw5QWRP6iiMLNYNKJg8UtbYfodA6z",
+      "amountRaw": "44479776024636",
+      "kind": "wallet"
+    },
+    {
+      "owner": "FuAzqbAxPk8AXCC38XkzbhwzCtd47pqVkTvHE1oJdD7f",
+      "amountRaw": "44053172069409",
+      "kind": "wallet"
+    },
+    {
+      "owner": "45ruCyfdRkWpRNGEqWzjCiXRHkZs8WXCLQ67Pnpye7Hp",
+      "amountRaw": "42642039626479",
+      "kind": "custody"
+    },
+    {
+      "owner": "DyiJuVBYoZVVN2FcSB6CXPxikpWj5E1eQ4b7utbuMK2a",
+      "amountRaw": "39965008398135",
+      "kind": "wallet"
+    },
+    {
+      "owner": "2tXPtr7CoHAx5qC1c4YpKNEVEDkBVYMpRi4zyy2MAGqc",
+      "amountRaw": "37221040258830",
+      "kind": "wallet"
+    },
+    {
+      "owner": "6eMfH3DvKsNhmfJgc3TPg9JcYaXyNL3GGGQsyDSbEhf6",
+      "amountRaw": "36715214839666",
+      "kind": "wallet"
+    },
+    {
+      "owner": "7QW1g6GgJCuDsaBf9unp34TZnFrTBriw7nDSAicnJ9Cg",
+      "amountRaw": "35492186320478",
+      "kind": "wallet"
+    },
+    {
+      "owner": "BPEK6SccvH4otA7FDXw8Z4Uh5N8WKFEQA3DM4zBqx8Hr",
+      "amountRaw": "31139467748992",
+      "kind": "wallet"
+    },
+    {
+      "owner": "4eEff64BsdNrayneHqoWx8EBqdxvRERYBRpYK9KzpShH",
+      "amountRaw": "31059106224357",
+      "kind": "wallet"
+    },
+    {
+      "owner": "4tAkYxCu6L2rSYLeRjpjkoF8ctMxNYHc9CkBdktxEr91",
+      "amountRaw": "27197527778062",
+      "kind": "wallet"
+    },
+    {
+      "owner": "EsfTt3NiCMb8VsoSjwNx5uteZxfWnJWKx9PHUZfciwsZ",
+      "amountRaw": "25331997781099",
+      "kind": "wallet"
+    },
+    {
+      "owner": "8UxxocMH1XsU9DNqaPEkx5ZvmC6rCBcP8vpsbDeN396C",
+      "amountRaw": "24584663517798",
+      "kind": "wallet"
+    },
+    {
+      "owner": "5NvuHVa11u2S2r5yp2zN4WUHyPEThDzDi3UdvU8q3Hke",
+      "amountRaw": "24464620000000",
+      "kind": "wallet"
+    },
+    {
+      "owner": "2M8XjMeFvpATBuHHhBL3ed1z8epDCmayvaSVYTZEuycc",
+      "amountRaw": "22938546535045",
+      "kind": "wallet"
+    },
+    {
+      "owner": "3AVJBwtawyMo9dcLfinW4NbNaGqWtbuBSehwSaUP638r",
+      "amountRaw": "19884573886881",
+      "kind": "wallet"
+    },
+    {
+      "owner": "95ZUufj9Vb83ecJUtPH2Dds7PfJGxGCScoDUirrJJbxg",
+      "amountRaw": "18861808278519",
+      "kind": "wallet"
+    },
+    {
+      "owner": "DXq7pYxbBhiJfRhmknv4P72R1xnazMbLx4tS9mbSB8G8",
+      "amountRaw": "18605418288213",
+      "kind": "wallet"
+    },
+    {
+      "owner": "EnGEBRiqa6xqrTpc5m76f12JitL4LbyJ6rKDKg61G5as",
+      "amountRaw": "18348468834705",
+      "kind": "wallet"
+    },
+    {
+      "owner": "BZ9YUmg8rhcFrM612szwtV6jD4P6o4UK19kgV9jLJXH2",
+      "amountRaw": "17010826392212",
+      "kind": "wallet"
+    },
+    {
+      "owner": "GA6653eGabw4QCfMjVAin2e9283opW96ZfXi7TTjmnYG",
+      "amountRaw": "15775405500000",
+      "kind": "wallet"
+    },
+    {
+      "owner": "FxiLXZhqEiBcMUG4LnxVKtMkFv6xx7a3ypCDzb2PDLMr",
+      "amountRaw": "14956356419745",
+      "kind": "wallet"
+    },
+    {
+      "owner": "3cEjt2j7WsATECLZBfmnhFXnnBwg9gH1JbnQUBzRQg62",
+      "amountRaw": "13671275166314",
+      "kind": "wallet"
+    },
+    {
+      "owner": "6ooVBXhnqAXaF91cu49YmWhoFuE6WLdZWTwNYvTuhyBd",
+      "amountRaw": "12193359306169",
+      "kind": "wallet"
+    },
+    {
+      "owner": "H6EyafWdbJSk75rCdB1S8YAdwdfSZTWUqWdRC8GhxCGy",
+      "amountRaw": "11955309827525",
+      "kind": "wallet"
+    },
+    {
+      "owner": "HCb4v1mAakPPnbS3GP5GqJYPE5V7KxGzKANjxPcya3PK",
+      "amountRaw": "11948969978787",
+      "kind": "wallet"
+    },
+    {
+      "owner": "3cTmWDWG4hR3E7rytQaxvcvKFxV8U7XkmK9xMRte8xSQ",
+      "amountRaw": "11135707566259",
+      "kind": "wallet"
+    },
+    {
+      "owner": "CoqouayuEJcEJ43LWDVXfdzUDSfmaRG1U6RqqfL7ov8b",
+      "amountRaw": "9550233487285",
+      "kind": "wallet"
+    },
+    {
+      "owner": "A5G11Mt7MsAQrdTjZitax8TE32f1xsyCsacDxfmQQSZA",
+      "amountRaw": "9547120891450",
+      "kind": "wallet"
+    },
+    {
+      "owner": "DtJkhjwW4XiTm7KuL4J71ZJivo8NRqFR6MHbQgjdD9pg",
+      "amountRaw": "8925271970603",
+      "kind": "wallet"
+    },
+    {
+      "owner": "GgCJTkXuCjNYSanjXJigjhHyjSjHB6L26UtDMMTv2JJN",
+      "amountRaw": "7829580549048",
+      "kind": "wallet"
+    },
+    {
+      "owner": "EbBj8Gsz5dsgKJZB1cioYScrtDX8BgKhj2VuXS3QRstS",
+      "amountRaw": "6755408127287",
+      "kind": "wallet"
+    },
+    {
+      "owner": "4rK5Dy3ZKHadi6fuoz7yRt1hbbdxMwBf6JMRY36VQRwW",
+      "amountRaw": "6076296531178",
+      "kind": "wallet"
+    },
+    {
+      "owner": "BJiCELsMtnPbQy25W1NdKXZz354TPft4PSVur2EXuNaS",
+      "amountRaw": "5054162799483",
+      "kind": "wallet"
+    },
+    {
+      "owner": "9TUpAmgSaR7zBgctx8fecY1ozLoaSqTDaexcVnGtJQFy",
+      "amountRaw": "4250709754806",
+      "kind": "wallet"
+    },
+    {
+      "owner": "75ncTF4KzokY5zvwFahdo4En9esqPks8H64CJuBPAy9t",
+      "amountRaw": "3449453314504",
+      "kind": "wallet"
+    },
+    {
+      "owner": "APqeFSegwC8KawCoqT5FhWmXNEM5TKFFVjfwabN8TZLv",
+      "amountRaw": "2879026231253",
+      "kind": "wallet"
+    },
+    {
+      "owner": "pSwTTFE92RsRtvMCpb3mjruv5ww2KgBNVPscwdWwbxk",
+      "amountRaw": "2810534151671",
+      "kind": "custody"
+    },
+    {
+      "owner": "GTpR8B1zhBuQL6wnFR7mVPWKZ61R5Lw4jMCgjiBSd5Uu",
+      "amountRaw": "2247540112944",
+      "kind": "wallet"
+    },
+    {
+      "owner": "5eWKM5ah441eB2FcxxPRU4TXzSS9JDv55s1zsgzU5yTi",
+      "amountRaw": "1527949655925",
+      "kind": "custody"
+    },
+    {
+      "owner": "DSnzFwofbu4TC61BJVZ7fnZmicDovAZu3BqnAEec6zSb",
+      "amountRaw": "1206559966044",
+      "kind": "wallet"
+    },
+    {
+      "owner": "CkUdYXbV8zV2V3EUk3s5XiC98ifaYRe7yJJ6NYJLxfe3",
+      "amountRaw": "1085402449439",
+      "kind": "wallet"
+    },
+    {
+      "owner": "3hYt6kPS9oYddUqkk9FvVuaX2hN5qGcuo8kDXzL7apks",
+      "amountRaw": "983970283423",
+      "kind": "wallet"
+    },
+    {
+      "owner": "Cd3QksH2mvwgRb39nsBbjeu57NAUM1cwUMTKX7q72cGp",
+      "amountRaw": "952735381117",
+      "kind": "wallet"
+    },
+    {
+      "owner": "9TajsW8HDra7jAsCvzMwBqzx6ptYuxR9uPjSHDntDksV",
+      "amountRaw": "839153504367",
+      "kind": "wallet"
+    },
+    {
+      "owner": "DyZXuDHTZBQ7py96uuXz88dQs44VFCEgDgptGRi6x9x5",
+      "amountRaw": "652872400232",
+      "kind": "wallet"
+    },
+    {
+      "owner": "34FKjAdVcTax2DHqV2XnbXa9J3zmyKcFuFKWbcmgxjgm",
+      "amountRaw": "641755752956",
+      "kind": "wallet"
+    },
+    {
+      "owner": "CWGQPqtYdECUH7Hip8nvwex5ps3abrQt8q1Nj6M5piY2",
+      "amountRaw": "585032020993",
+      "kind": "wallet"
+    },
+    {
+      "owner": "6oWx5tfjawYyJ92RG5u5sYDHLy6jqnTuRUZFe4Pz18J",
+      "amountRaw": "438083599141",
+      "kind": "wallet"
+    },
+    {
+      "owner": "GuyUhahYYzrchpPDHnFZHypjuHJE3RcLqzzGS6HPcPp5",
+      "amountRaw": "294765609783",
+      "kind": "wallet"
+    },
+    {
+      "owner": "DgXiSwbaK12G7XJXvTD9Q1mohgdh5HnUGLPPXXuRdPxE",
+      "amountRaw": "294226491157",
+      "kind": "wallet"
+    },
+    {
+      "owner": "3RoTvtxpdHXsQcf3peUjfxz1YVSiU6U126rcbXQzhtAk",
+      "amountRaw": "258634886128",
+      "kind": "wallet"
+    },
+    {
+      "owner": "Gkt2GDJgKjo8L7QLDqefBaB7VUexwML6E4WjFS2ZybP8",
+      "amountRaw": "201083470268",
+      "kind": "wallet"
+    },
+    {
+      "owner": "GYQGSp9jevkjUSLooSRJ2z2VcRGSNAxpf8YjQa6qUAF6",
+      "amountRaw": "144474420228",
+      "kind": "wallet"
+    },
+    {
+      "owner": "sobLmyY3kjTYqk2r7Ui18PC6YzHUBDaD2tk6PPNAv4o",
+      "amountRaw": "134743306571",
+      "kind": "wallet"
+    },
+    {
+      "owner": "6b7Q4DiNQ2As1hTr2GCKzL1uzSvHa8YEGb9rEd9kBbQA",
+      "amountRaw": "100998245531",
+      "kind": "wallet"
+    },
+    {
+      "owner": "J8xVb8HzbiqMHZ8NJHDKP1By8ESCw1yGfjF34hZVeDDG",
+      "amountRaw": "100000000000",
+      "kind": "wallet"
+    },
+    {
+      "owner": "4PSBw7bjBiqUdzAhvH2ch2BxB9EEgfL8fSJYVZ9ScJ4f",
+      "amountRaw": "85594893945",
+      "kind": "wallet"
+    },
+    {
+      "owner": "9BEcuixX6G8RJhsT52Z7nw6DxHK8GGKzDgteuPqQs3S",
+      "amountRaw": "32167063740",
+      "kind": "wallet"
+    },
+    {
+      "owner": "2YW29JWjfNpFkcY9t5Jf4pttsjcuRdviJrPxM8KUY5Eq",
+      "amountRaw": "26471634316",
+      "kind": "wallet"
+    },
+    {
+      "owner": "Bqb6oCKNWnP89ghzS6Dd3gEV7hZqiU1t6w9P1nw7QJQn",
+      "amountRaw": "10963466863",
+      "kind": "wallet"
+    },
+    {
+      "owner": "2rbMgYvzAb3xDk6vXrzKkY3VwsmyDZsJTkvB3JJYsRzA",
+      "amountRaw": "8548088406",
+      "kind": "wallet"
+    },
+    {
+      "owner": "gsgtp4gUXdrrae18EyK4TVRTzF6bP6yta9J41BpWLxH",
+      "amountRaw": "5068546762",
+      "kind": "wallet"
+    },
+    {
+      "owner": "5Qsjc4sRiBPcRLe3V1Pn9bEA4rzYMscz18vbCxnk6f9b",
+      "amountRaw": "4458592503",
+      "kind": "wallet"
+    },
+    {
+      "owner": "ERAaJeswRCYd4cZ2YTVESC2pZ54psim3syEsETyVLrga",
+      "amountRaw": "1490419020",
+      "kind": "wallet"
+    },
+    {
+      "owner": "EoqdpHGUoHkWdfubYPQ7T6xxdWiYLYYxL7PkVtV79tmw",
+      "amountRaw": "948578926",
+      "kind": "wallet"
+    },
+    {
+      "owner": "6CMDpxjX3qRpHWCKsDyhr1Zr2LcAdUfpXFdFjzCKEzXg",
+      "amountRaw": "704920086",
+      "kind": "wallet"
+    },
+    {
+      "owner": "FTtbaXw9KVygdqasbotKD1pRCmoVGf3tXcy5MbcmfQ2R",
+      "amountRaw": "596143605",
+      "kind": "wallet"
+    },
+    {
+      "owner": "4HnmWQtaS7gfmTtRwhZJ9Wamswx5j6n1enuYXJULoD8i",
+      "amountRaw": "397817152",
+      "kind": "wallet"
+    },
+    {
+      "owner": "BVo3qt34sdpTapsnEfGA9fx7GtR4jVk9d4bzUv1w5LXU",
+      "amountRaw": "342128271",
+      "kind": "wallet"
+    },
+    {
+      "owner": "GLGcZGdyXT1aWSexKR2oELDfjgFgoovF5eq53UsKofht",
+      "amountRaw": "311668456",
+      "kind": "wallet"
+    },
+    {
+      "owner": "AzPAXJwWwyAByuMckFVoi2QKT2d4TfkcLgMWkCzb2hoQ",
+      "amountRaw": "250416393",
+      "kind": "wallet"
+    },
+    {
+      "owner": "BM9CcyErJcu2mjrFvUsRRrD3snGeHDDVirJLvL6EjvMN",
+      "amountRaw": "248475413",
+      "kind": "custody"
+    },
+    {
+      "owner": "F8jYgm4nMGxxa1QWM6ZPnft4pEAac5kT6sDeZJRZcrv8",
+      "amountRaw": "53190969",
+      "kind": "wallet"
+    },
+    {
+      "owner": "8sX3832BeKDzDUHoc1Mbszc8en5b7hoti8c6JMCE21G7",
+      "amountRaw": "9949527",
+      "kind": "custody"
+    },
+    {
+      "owner": "3d4qDhpNpPCLAXms2L8qPM36R9uwxqy4J18W75jGP6tn",
+      "amountRaw": "1055302",
+      "kind": "wallet"
+    },
+    {
+      "owner": "8n6twMsiex2PbmR2m3PK2mXK7NBar2RoHhWRw944gpVp",
+      "amountRaw": "6219",
+      "kind": "wallet"
+    },
+    {
+      "owner": "3R5bgrfpcqEq48Dxz8XgQQ5NP7DHrt8kcBed8oP5QGnv",
+      "amountRaw": "4279",
+      "kind": "wallet"
+    },
+    {
+      "owner": "8LEifK94aBiAnTgyvZ9F6KoiQn9Zt9g7K4kASZH3R3Z9",
+      "amountRaw": "799",
+      "kind": "wallet"
+    },
+    {
+      "owner": "DZ9xVysSNFfGe31SwrE5a1qYmUpvXxKEqCgruh6nbozB",
+      "amountRaw": "471",
+      "kind": "wallet"
+    },
+    {
+      "owner": "ANA8EnDZyyknHJ8bqpgsT8WaJaTTkSiWeWta3oHq7Z5D",
+      "amountRaw": "320",
+      "kind": "wallet"
+    },
+    {
+      "owner": "mP4tnNkwAtRLpSZG5CqcH3CVPJHgVw7XH3j6YRyayQP",
+      "amountRaw": "89",
+      "kind": "custody"
+    },
+    {
+      "owner": "AofvjRm9oYoFSQQGAmEuhuU6S5FViQSznJu5QYerae7W",
+      "amountRaw": "2",
+      "kind": "wallet"
+    },
+    {
+      "owner": "BURNNeQ2zERsVhL6GgJR45CvGtwdxHeWBs4B5V4zRFgL",
+      "amountRaw": "2",
+      "kind": "wallet"
+    },
+    {
+      "owner": "2PfoPwHGD33wB8tjMuV7F7G1wkxMSBGULzy6UKWFW12X",
+      "amountRaw": "1",
+      "kind": "wallet"
+    },
+    {
+      "owner": "2TUU27An9Zj3SGp48Za6tgsxFv1dJKLE51UoimMoXMse",
+      "amountRaw": "1",
+      "kind": "wallet"
+    },
+    {
+      "owner": "2X59oUwVHKBnNGvUjbqtAvGACBDgNE5JAK1XVEv1xQhD",
+      "amountRaw": "1",
+      "kind": "wallet"
+    },
+    {
+      "owner": "2zbieprKVLspJ2XbJDLoJq6wsPB49NsRKHWTcmW58F4w",
+      "amountRaw": "1",
+      "kind": "wallet"
+    },
+    {
+      "owner": "5UXuFtTbwrdiVak728RucFYaWyVFvTWBKmctaJ57Bfp",
+      "amountRaw": "1",
+      "kind": "wallet"
+    },
+    {
+      "owner": "6QaboGaRft5D1HbshJyjMmi19Yr3nAmpLA1ufVdnDP4m",
+      "amountRaw": "1",
+      "kind": "wallet"
+    },
+    {
+      "owner": "7FmzQGgx9prLspJPGAAaTGzwgLbYHMyKdLBd8qDxYJrb",
+      "amountRaw": "1",
+      "kind": "wallet"
+    },
+    {
+      "owner": "7GckMwhHfu2fG7U4kZWYZFMGupg5ruK4Zt148wvKqA4J",
+      "amountRaw": "1",
+      "kind": "wallet"
+    },
+    {
+      "owner": "7qCJ7vtnEwsrQNa67EnQo6pdFFU9vnQGXt2QGB9KTAdo",
+      "amountRaw": "1",
+      "kind": "wallet"
+    },
+    {
+      "owner": "7r91rkvf796QZQmKb4DHCShKLWTePXDTBhyRYhSxgEGw",
+      "amountRaw": "1",
+      "kind": "wallet"
+    },
+    {
+      "owner": "7XjZR36Ap2A8McacrzVktZnwYyG8qn8HbquPkNv5GXNZ",
+      "amountRaw": "1",
+      "kind": "wallet"
+    },
+    {
+      "owner": "88gQrn3De1wK52tonrE3DkFP5DGTrCeKCgKiMYnLNzC3",
+      "amountRaw": "1",
+      "kind": "wallet"
+    },
+    {
+      "owner": "8a2UsHh2WqLcYQ9eVTgXWfJFK7ng5dA7hWbBXJsfBZ8c",
+      "amountRaw": "1",
+      "kind": "wallet"
+    },
+    {
+      "owner": "8QntQEQARqKM5GHgjBtoZGYjnNVv9MRjCJXsNvbsWZQx",
+      "amountRaw": "1",
+      "kind": "wallet"
+    },
+    {
+      "owner": "9M7AfpjbHPXfDY4Sfb8CfBSVDu1eqdcgJT2PKRj398Kh",
+      "amountRaw": "1",
+      "kind": "wallet"
+    },
+    {
+      "owner": "9UTEsW4sysu7VWzUiiJdHhK4hrDgePaTXXzojVhNX2Rw",
+      "amountRaw": "1",
+      "kind": "wallet"
+    },
+    {
+      "owner": "AFQZGM9Mqe6MRbRXmKGse6dH2bH4FCagpa6DoFUhC3RC",
+      "amountRaw": "1",
+      "kind": "wallet"
+    },
+    {
+      "owner": "B4H4Qf2PRGoAHtc7sh8D18fNqDSZosx3ieMTRnSZjiCP",
+      "amountRaw": "1",
+      "kind": "wallet"
+    },
+    {
+      "owner": "B8YN3q8HrnMeJcpmKNxMSyDE16EJ962PaKhgfmBkMgEw",
+      "amountRaw": "1",
+      "kind": "wallet"
+    },
+    {
+      "owner": "CDfppuiX8thswwgEZkyKKqPkxVf1eGEbAaTZSCad8ybH",
+      "amountRaw": "1",
+      "kind": "wallet"
+    },
+    {
+      "owner": "CidpVoF66pY5x6bmivxcsWerdnUjGEi2hKbLoemrpEao",
+      "amountRaw": "1",
+      "kind": "wallet"
+    },
+    {
+      "owner": "DYFG8AXzXg3DynzzZNu588c4Ys5Zkj5BxGQP5BVyTU39",
+      "amountRaw": "1",
+      "kind": "wallet"
+    },
+    {
+      "owner": "EgaEsTJpH8huBFyNzJoKuCjqEoGumupvjSsHgYgNkzpJ",
+      "amountRaw": "1",
+      "kind": "wallet"
+    },
+    {
+      "owner": "FGZQ4g2kYZtD3sJtyXDbDBwcKMKkPPfxKvjRMnKVVLqv",
+      "amountRaw": "1",
+      "kind": "wallet"
+    },
+    {
+      "owner": "GPXFa8mgLxzWcBqy4KSavHSf78iQ2gek7sUQkNiMKWjR",
+      "amountRaw": "1",
+      "kind": "wallet"
+    },
+    {
+      "owner": "Sjc9FmjZEtzeiUFq3HsqoyXP3YHQtN1TrCAWpTMex4a",
+      "amountRaw": "1",
+      "kind": "wallet"
+    },
+    {
+      "owner": "UhRJecufpaF9dLn4woCZPm8Cunv3kUPS3vPqfAr3xhG",
+      "amountRaw": "1",
+      "kind": "wallet"
+    },
+    {
+      "owner": "Vqpqawq2exVVMsxnAz6MVbum5HuaXcSFdZAqtCiZBLt",
+      "amountRaw": "1",
+      "kind": "wallet"
+    }
+  ]
+}
