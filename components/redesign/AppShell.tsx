@@ -31,6 +31,7 @@ function Navigation({ mobile = false, close }: { mobile?: boolean; close?: () =>
     if (href === '/marketplace') return pathname === '/agents' || pathname.startsWith('/marketplace') || /^\/agent\/[^/]+$/.test(pathname) && !['/agent/dashboard', '/agent/register', '/agent/recover'].includes(pathname);
     if (href === '/dashboard') return pathname === '/dashboard' || pathname === '/create';
     if (href === '/agent/dashboard') return pathname.startsWith('/agent/') && !/^\/agent\/[^/]+$/.test(pathname) || ['/agent/dashboard', '/agent/register', '/agent/recover'].includes(pathname);
+    if (href === '/token') return pathname === '/token' || pathname.startsWith('/token/');
     return pathname === href;
   }
   const item = ({ href, label, icon: Icon }: typeof workLinks[number]) => <Link prefetch={false} key={href} href={href} aria-current={active(href) ? 'page' : undefined} onClick={close}><Icon size={18} aria-hidden="true" />{label}</Link>;

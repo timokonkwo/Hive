@@ -1,14 +1,11 @@
 'use client';
 import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { ArrowLeft, ArrowRight } from 'lucide-react';
-import { AppShell } from '../AppShell';
 import { compactHive as tokens, exactHive } from '@/lib/hive-claim-format';
 import { migrationReview, parseOldHiveInput } from '@/lib/hive-claim-review';
 import { isReimbursementLookup, type ReimbursementLookup } from '@/lib/hive-reimbursement';
-import common from '../marketplace/marketplace.module.css';
 import styles from './claim.module.css';
 import LiveMigration from './LiveMigration';
-import { TokenNav } from '../token/TokenNav';
 import { claimCountdown, type ClaimSchedule } from '@/lib/hive-claim-schedule';
 
 const reasons: Record<string, string> = {
@@ -55,14 +52,13 @@ export default function ClaimPage({ schedule = null }: { schedule?: ClaimSchedul
   }
   function edit(value: string) { controller.current?.abort(); controller.current = null; setAddress(value); setReviewOpen(false); setResult(null); setError(''); setLoading(false); }
   const preview = result ? migrationReview(result) : null;
-  return <div className={common.page} data-hive-app><a className={common.skipLink} href="#claim-main">Skip to claim</a><AppShell area="HIVE" page="Claim"><main id="claim-main" tabIndex={-1} className={`${common.main} ${styles.main}`}>
-    <TokenNav active="claim" />
+  return <section className={styles.main} aria-label="HIVE migration">
     {reviewOpen && result ? <>
       <button className={styles.back} onClick={() => setReviewOpen(false)}><ArrowLeft size={16} aria-hidden="true" />Back</button>
       <header className={styles.heading}><span className={styles.label}>2 / 2</span><h1 ref={reviewHeading} tabIndex={-1}>Deposit &amp; claim</h1></header>
       <Migration result={result} enabled={migrationEnabled} canStart={windowOpen} />
     </> : <>
-      <header className={styles.heading}><h1>Claim HIVE</h1><p>HIVE has migrated from Solana to Robinhood Chain. Check your old HIVE wallet below for your new HIVE allocation.</p></header>
+      <header className={styles.heading}><span className={styles.label}>SOLANA → ROBINHOOD</span><h1>Claim HIVE</h1><p>HIVE has migrated from Solana to Robinhood Chain. Check your old HIVE wallet below for your new HIVE allocation.</p></header>
       <section className={styles.checker} aria-label="Wallet checker">
         <form onSubmit={event => lookup(event)} noValidate aria-busy={loading}>
           <label htmlFor="claim-owner">Solana wallet address</label>
@@ -80,7 +76,7 @@ export default function ClaimPage({ schedule = null }: { schedule?: ClaimSchedul
       <span>{now < schedule.opensAt ? (new Date(now + 86400000).toLocaleDateString('en-GB', { timeZone: 'Africa/Lagos' }) === new Date(schedule.opensAt).toLocaleDateString('en-GB', { timeZone: 'Africa/Lagos' }) ? 'Claims start tomorrow' : 'Claims start soon') : now >= schedule.closesAt ? 'Claims closed' : migrationEnabled ? 'Claims close in' : 'Claims opening soon'}</span>
       {(now < schedule.opensAt || (windowOpen && migrationEnabled)) && <time role="timer" aria-label={now < schedule.opensAt ? 'Time until claims open' : 'Time until claims close'}>{claimCountdown(schedule, now)}</time>}
     </div> : <p className={styles.hint}>Claims start soon</p>}
-  </main></AppShell></div>;
+  </section>;
 }
 
 function Migration({ result, enabled, canStart }: { result: ReimbursementLookup; enabled: boolean; canStart: boolean }) {
