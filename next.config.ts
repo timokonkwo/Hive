@@ -1,6 +1,7 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
+  turbopack: {},
   webpack(config) {
     if (process.env.HIVE_BUILD_NO_CACHE === 'true') config.cache = false;
     return config;
