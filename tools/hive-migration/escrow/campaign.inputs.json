@@ -1,0 +1,43 @@
+{
+  "note": "Deployment preparation only. Public values; never put keys here. Program/distributor addresses are filled by deployment tooling.",
+  "snapshotDirectory": "../local/snapshot-2026-09-21T10-48-52.230Z",
+  "snapshotSlot": 449032979,
+  "holdersSha256": "cce4c645194e8b7fa1f1b600c0332e099cb488dce47ffa66fcf6b50920f5daaa",
+  "reviewedHoldersFile": "../local/eligibility-minimum-v2/reviewed-holders.json",
+  "approvedWalletCandidatesFile": "../local/eligibility-minimum-v2/approved-wallets.json",
+  "classificationsApproved": true,
+  "grantAmountsApproved": true,
+  "terminalAttemptPolicyApproved": false,
+  "campaignId": null,
+  "program": null,
+  "admin": "CmKcjG6tvNy26z5CVd58mgPTs5RPzeJvmjGDvqXxpwLF",
+  "collection": "CmKcjG6tvNy26z5CVd58mgPTs5RPzeJvmjGDvqXxpwLF",
+  "mint": "6JfonM6a24xngXh5yJ1imZzbMhpfvEsiafkb4syHBAGS",
+  "destinationChain": "4663",
+  "destinationToken": "0xc65e9630D8Af1eA278cbE359f78931684b4ff9f8",
+  "distributor": null,
+  "destinationAdmin": "0xC5496066af938bf19B0f78E2197262Bf10AF9FD0",
+  "opensAt": null,
+  "claimWindowSeconds": "604800",
+  "closesAt": null,
+  "claimGrace": null,
+  "fundingBudgetRaw": "10000000000000000000000000",
+  "authorityModel": "single_admin_automated_verifier",
+  "allocationRevision": {
+    "maximumNewPerOldNumerator": "7",
+    "maximumNewPerOldDenominator": "10",
+    "status": "wallet_allocation_finalized",
+    "preClaimPreviewRequired": true,
+    "method": "proportional_to_frozen_eligible_holdings",
+    "rounding": "floor_to_destination_raw_unit"
+  },
+  "totalEligibleOldRaw": "564937895383759533",
+  "allowPartialSurrender": true,
+  "minimumCurrentHoldingRaw": "1000000000000000",
+  "fundingSources": [
+    {
+      "address": "0xC5496066af938bf19B0f78E2197262Bf10AF9FD0",
+      "maximumContributionRaw": "10000000000000000000000000"
+    }
+  ]
+}
