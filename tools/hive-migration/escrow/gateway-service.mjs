@@ -14,6 +14,7 @@ const observer=createObserver(review,{solanaRpc:process.env.SOLANA_RPC_URL,evmRp
 const handle=createGateway({review,observer,executionEnabled:settings.executionEnabled,requestsDirectory:resolve(base,settings.requestsDirectory),stateDirectory:resolve(base,settings.stateDirectory)});
 createServer(async(req,res)=>{
   const reply=(status,data)=>{res.writeHead(status,{'Content-Type':'application/json','Cache-Control':'no-store'});res.end(JSON.stringify(data));};
+  if(req.method==='GET'&&req.url==='/healthz')return reply(200,{mode:'configured'});
   const token=Buffer.from(req.headers.authorization??''),expected=Buffer.from('Bearer '+secret);
   if(token.length!==expected.length||!timingSafeEqual(token,expected))return reply(401,{error:'Unauthorized'});
   const action=req.url?.slice(1);
