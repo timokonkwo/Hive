@@ -1,3 +1,5 @@
+/** Public opening time approved by the campaign owner. */
+export const CLAIM_OPENING_TIME = '2026-09-25T09:00:00Z';
 /** Explicit claim opening time. Publishing the checker does not start the claim clock. */
 export function claimSchedule(openingTime: string | undefined) {
   if (!openingTime) return null;

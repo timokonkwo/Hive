@@ -1,11 +1,11 @@
-import { claimSchedule } from '@/lib/hive-claim-schedule';
+import { claimSchedule, CLAIM_OPENING_TIME } from '@/lib/hive-claim-schedule';
 import { NextResponse } from 'next/server';
 import { checkRateLimit, getClientIp } from '@/lib/rate-limit';
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 const headers = { 'Cache-Control': 'private, no-store' };
 async function forward(action: string, input: unknown) {
-  const schedule = claimSchedule(process.env.HIVE_CLAIMS_OPEN_AT);
+  const schedule = claimSchedule(process.env.HIVE_CLAIMS_OPEN_AT ?? CLAIM_OPENING_TIME);
   const now = Date.now();
   const endpoint = process.env.HIVE_CLAIM_GATEWAY_URL, token = process.env.HIVE_CLAIM_GATEWAY_TOKEN;
   if (!endpoint || !token || process.env.HIVE_CLAIM_UI_ENABLED !== 'true') return NextResponse.json(action === 'availability' ? { enabled: false } : { error: 'Migration is not open.' }, { status: action === 'availability' ? 200 : 503, headers });

@@ -1,6 +1,6 @@
 'use client';
 import { useEffect, useRef, useState, type FormEvent } from 'react';
-import { ArrowLeft, ArrowRight, Check, LoaderCircle, Wallet } from 'lucide-react';
+import { ArrowLeft, ArrowRight, Check, ChevronDown, LoaderCircle, Wallet } from 'lucide-react';
 import { compactHive as tokens, exactHive } from '@/lib/hive-claim-format';
 import { migrationReview, parseOldHiveInput } from '@/lib/hive-claim-review';
 import { isReimbursementLookup, type ReimbursementLookup } from '@/lib/hive-reimbursement';
@@ -76,6 +76,13 @@ export default function ClaimPage({ schedule = null }: { schedule?: ClaimSchedul
         </div>
       </section>
     </>}
+    <section className={styles.faq} aria-labelledby="claim-faq-title"><h2 id="claim-faq-title">How it works</h2>
+      {[
+        ['How do I claim?', 'When claims open, connect your Solana and Robinhood wallets, deposit your eligible HIVE on Solana, and receive your allocation of HIVE on Robinhood. Each wallet can claim once.'],
+        ['Who is eligible?', 'Your wallet needed at least 1M HIVE on Solana at the snapshot and must still hold at least 1M when you deposit. Buying more now cannot make a wallet below the snapshot minimum eligible or increase its snapshot allowance.'],
+        ['How much will I receive?', 'A pool of 10M HIVE on Robinhood is shared proportionally across eligible snapshot holdings. You can deposit all or part of your eligible balance, up to your snapshot holding; a smaller deposit receives proportionally less. Claims cannot exceed 70% of the HIVE deposited. Your estimate appears above before you connect a wallet.'],
+      ].map(([question, answer]) => <details key={question}><summary>{question}<ChevronDown size={16} aria-hidden="true" /></summary><p>{answer}</p></details>)}
+    </section>
   </section>;
 }
 
