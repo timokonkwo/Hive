@@ -14,13 +14,13 @@ const workLinks = [
   { href: '/marketplace', label: 'Marketplace', icon: Compass },
   { href: '/dashboard', label: 'My tasks', icon: ClipboardList },
   { href: '/agent/dashboard', label: 'My agents', icon: Bot },
+  { href: '/token', label: 'Token', icon: Layers2 },
 ];
 const moreLinks = [
   { href: '/registry', label: 'Tools', icon: Wrench },
   // Hidden until platform analytics serves a user workflow:
   // { href: '/analytics', label: 'Analytics', icon: ChartNoAxesCombined },
   { href: '/dao', label: 'Disputes', icon: Scale },
-  { href: '/token', label: 'HIVE', icon: Layers2 },
   { href: '/roadmap', label: 'Roadmap', icon: Flag },
 ];
 

@@ -1,10 +1,12 @@
-// Loopback-only deployment. Keys stay in the browser; this server accepts signed transactions only.
+// Browser signing by default; explicit direct-local consent can load a memory-only test operator.
 import {createServer} from 'node:http';import {readFileSync,writeFileSync,existsSync,openSync,fsyncSync,closeSync} from 'node:fs';import {dirname,resolve} from 'node:path';import {fileURLToPath} from 'node:url';import {randomBytes,createHash,createPublicKey,verify} from 'node:crypto';
 import {Connection,Keypair,PublicKey,VersionedTransaction,ComputeBudgetProgram} from '@solana/web3.js';import {getBase58Decoder} from '@solana/kit';import {createPublicClient,http,encodeFunctionData,parseAbi,keccak256,toHex,formatUnits} from 'viem';
 import {Journal,acquireServiceLock} from '../journal.mjs';import {initializeInstruction,unsignedTransaction,decodeCampaign} from '../client.mjs';import {createObserver} from '../observer.mjs';import {LOADER,programDataAddress,createBuffer,writeBuffer,deployProgram} from './loader.mjs';
 import {saveJson,verifyEvmTransaction,verifySignedEvm} from './safety.mjs';
 import {deploymentOrigin,validAccessToken,sessionCookie} from './access.mjs';
 import {expiredUpload} from './reconcile-upload.mjs';
+import {distributorReceiptPending} from './receipt-state.mjs';
+import {createLocalTest,requireDirectLocal} from './local-test.mjs';
 const here=dirname(fileURLToPath(import.meta.url)),escrow=resolve(here,'..'),root=resolve(escrow,'../../..'),dir=resolve(escrow,'local/deployment-100k');
 const reviewPath=resolve(dir,'review.json');const review=JSON.parse(readFileSync(reviewPath));const c=review.config;
 const programBytes=readFileSync(resolve(escrow,'solana/target/deploy/hive_redemption_escrow.so'));
@@ -17,6 +19,7 @@ const buffer=Keypair.fromSecretKey(Uint8Array.from(JSON.parse(readFileSync(buffe
 const admin=new PublicKey(c.admin);const sol=new Connection(process.env.SOLANA_RPC_URL,'finalized');const evm=createPublicClient({transport:http('https://rpc.mainnet.chain.robinhood.com',{retryCount:0,timeout:20000})});
 check(await sol.getGenesisHash()==='5eykt4UsFv8P8NJdTREpY1vzqKqZKvdpKuc147dw2N9d'&&await evm.getChainId()===4663,'Wrong networks');
 const tokenAbi=parseAbi(['function balanceOf(address) view returns(uint256)','function transfer(address,uint256) returns(bool)']);const journal=new Journal(dir);const unlock=acquireServiceLock(dir);const plans=new Map();const cookie=randomBytes(32).toString('hex');const port=8789;const allowedHosts=new Set(['localhost:'+port,'127.0.0.1:'+port]);let busy=false;
+const localTest=createLocalTest({review,dir,solanaRpc:process.env.SOLANA_RPC_URL});
 function saveReview(){saveJson(reviewPath,review);}
 async function reconcile(){
  for(const entry of journal.latest().values()){
@@ -48,23 +51,25 @@ async function state(){
   const code=await evm.getBytecode({address:c.distributor});
   if(!code||code==='0x'){stage='distributor';description='Deploy the Robinhood distributor paused.';}
   else{
-   check([...journal.latest().values()].some(e=>e.action==='distributor'&&e.status==='confirmed'),'Distributor deployment receipt must be reconciled before funding');
+   if(distributorReceiptPending([...journal.latest().values()])){stage='distributor';description='Robinhood deployment confirmed in a block. Waiting for chain finality before funding.';}else{
    // The contract is immutable; compare all constructor terms before funding.
-   const fields={admin:c.destinationAdmin,token:c.destinationToken,campaignId:c.campaignId,sourceCampaign:'0x'+new PublicKey(review.sourceCampaign).toBuffer().toString('hex'),sourceMint:'0x'+new PublicKey(c.mint).toBuffer().toString('hex'),snapshotRoot:c.root,opensAt:c.opensAt,closesAt:c.closesAt,claimGrace:c.claimGrace,totalEligibleOldRaw:c.totalEligibleOldRaw,fundingBudgetRaw:c.fundingBudgetRaw,allowPartialSurrender:c.allowPartialSurrender,exceptionOwner:'0x'+new PublicKey(c.exceptionOwner).toBuffer().toString('hex'),exceptionAllowanceRaw:c.exceptionAllowanceRaw,exceptionGrantRaw:c.exceptionGrantRaw,exceptionOpensAt:c.exceptionOpensAt,paused:true};
+   const fields={admin:c.destinationAdmin,token:c.destinationToken,campaignId:c.campaignId,sourceCampaign:'0x'+new PublicKey(review.sourceCampaign).toBuffer().toString('hex'),sourceMint:'0x'+new PublicKey(c.mint).toBuffer().toString('hex'),snapshotRoot:c.root,opensAt:c.opensAt,closesAt:c.closesAt,claimGrace:c.claimGrace,totalEligibleOldRaw:c.totalEligibleOldRaw,fundingBudgetRaw:c.fundingBudgetRaw,allowPartialSurrender:c.allowPartialSurrender,exceptionOwner:'0x'+new PublicKey(c.exceptionOwner).toBuffer().toString('hex'),exceptionAllowanceRaw:c.exceptionAllowanceRaw,exceptionGrantRaw:c.exceptionGrantRaw,exceptionOpensAt:c.exceptionOpensAt,...(!review.localTestActivationApproved?{paused:true}:{})};
    for(const [name,value]of Object.entries(fields))check(String(await evm.readContract({address:c.distributor,abi:review.evmDeployment.abi,functionName:name})).toLowerCase()===String(value).toLowerCase(),'Distributor mismatch: '+name);
    const balance=await evm.readContract({address:c.destinationToken,abi:tokenAbi,functionName:'balanceOf',args:[c.distributor]});
-   if(balance<BigInt(review.totalFundingRequiredRaw)){stage='fund';description='Fund 10.1M HIVE: 10M ordinary allocation plus 100K supplemental allocation.';}
+   if(!review.deploymentVerified&&balance<BigInt(review.totalFundingRequiredRaw)){stage='fund';description='Fund 10.1M HIVE: 10M ordinary allocation plus 100K supplemental allocation.';}
    else{
     const campaign=await sol.getAccountInfo(new PublicKey(review.sourceCampaign),'finalized');
     if(!campaign){stage='initialize';description='Initialize the Solana campaign paused.';}
     else{
-     check(campaign.owner.equals(program.publicKey),'Wrong campaign owner');const decoded=decodeCampaign(campaign.data);check(decoded.paused,'Campaign unexpectedly active');
+     check(campaign.owner.equals(program.publicKey),'Wrong campaign owner');const decoded=decodeCampaign(campaign.data);check(decoded.paused||review.localTestActivationApproved,'Campaign unexpectedly active');
      const deploy=[...journal.latest().values()].find(e=>e.action==='distributor'&&e.status==='confirmed');check(deploy?.block,'Distributor deployment receipt is missing');
-     review.deployment={solanaProgramDataAddress:programDataAddress(program.publicKey).toBase58(),solanaProgramDataSha256:hash(d.data),destinationRuntimeCodeHash:keccak256(code),destinationBlock:deploy.block};
-     await createObserver(review,{solanaRpc:process.env.SOLANA_RPC_URL}).read(c.exceptionOwner);saveReview();stage='complete';description='Verified and funded. Both contracts are paused; public claims are disabled.';
+     const fingerprints={solanaProgramDataAddress:programDataAddress(program.publicKey).toBase58(),solanaProgramDataSha256:hash(d.data),destinationRuntimeCodeHash:keccak256(code),destinationBlock:deploy.block};
+     if(review.deployment)check(JSON.stringify(review.deployment)===JSON.stringify(fingerprints),'Deployment fingerprints changed');else review.deployment=fingerprints;
+     await createObserver(review,{solanaRpc:process.env.SOLANA_RPC_URL}).read(c.exceptionOwner);review.deploymentVerified=true;saveReview();stage='complete';description=review.localTestActivationApproved?'Deployment verified. Local test activation is separate from the public countdown.':'Verified and funded. Both contracts are paused; public claims are disabled.';
     }
    }
   }
+ }
  }
  return {stage,pending,description,review:{solanaAdmin:c.admin,robinhoodAdmin:c.destinationAdmin,program:c.program,distributor:c.distributor,ordinaryWallets:review.tree.holders.length,ordinaryHIVE:'10M',supplementalHIVE:'100K',supplementalSolanaDeposit:'1,507,505.338430267 HIVE',totalHIVE:'10.1M',solanaStorageSOL:review.solanaRentLamports/1e9,estimatedDistributorFeeETH:formatUnits(BigInt(review.evmDeployment.estimatedMaximumFeeWei),18),publicOpens:'25 September 2026, 10:00 WAT',publicCloses:'2 October 2026, 10:00 WAT',localEarlyTestWallet:c.exceptionOwner,claimGraceHours:24,claimsEnabled:false}};
 }
@@ -98,6 +103,9 @@ async function prepare(){
  const id=s.stage+'-'+randomBytes(12).toString('hex');const plan={id,action:s.stage,chain:'evm',transaction,maximumCost:maximumCost.toString()};plans.set(id,plan);return plan;
 }
 async function action(path,input){
+ if(path==='/local-test/load')return localTest.load(input);
+ if(path==='/local-test/clear')return localTest.clear();
+ if(path==='/local-test/start'){check(input.consent==='activate-local-exception-only','Local test activation consent required');const s=await state();check(s.stage==='complete'&&!s.pending,'Finish deployment first');review.localTestActivationApproved=true;saveReview();return localTest.start();}
  if(path==='/approve'){check(input.terminalPolicy===true&&input.graceSeconds==='86400'&&input.upgradeAuthority===c.admin,'Review acknowledgement mismatch');review.terminalPolicyUserConfirmed=true;c.terminalAttemptPolicyApproved=true;saveReview();return {approved:true};}
  if(path==='/prepare')return prepare();
  const plan=plans.get(input.id)??journal.latest().get(input.id);check(plan,'Unknown plan');
@@ -147,10 +155,12 @@ const server=createServer(async(req,res)=>{
   check(session,'Deployment session required');
   if(req.method==='GET'&&path==='/recovery')return reply(200,{unresolved:[...journal.latest().values()].filter(e=>e.chain==='evm'&&['awaiting_wallet','unknown'].includes(e.status)&&!e.hash).map(e=>({id:e.id,action:e.action,nonce:e.transaction.nonce}))});
   if(req.method==='GET'&&path==='/status')return reply(200,await state());
+  if(req.method==='GET'&&path==='/local-test/status'){requireDirectLocal(req,origin);return reply(200,localTest.status());}
   check(req.method==='POST'&&req.headers.origin===origin&&req.headers['content-type']?.startsWith('application/json'),'Same-origin JSON POST required');
+  if(path.startsWith('/local-test/'))requireDirectLocal(req,origin);
   check(!busy,'Another operation is running');busy=true;
   try{let size=0;const chunks=[];for await(const chunk of req){size+=chunk.length;check(size<=65536,'Request too large');chunks.push(chunk);}return reply(200,await action(path,JSON.parse(Buffer.concat(chunks).toString())));}finally{busy=false;}
  }catch(error){let message=error.shortMessage??error.message??'Deployment request failed';if(process.env.SOLANA_RPC_URL)message=message.split(process.env.SOLANA_RPC_URL).join('[private RPC]');reply(409,{error:message});}
 });
 server.listen(port,'127.0.0.1',()=>console.log('Deployment review ready at http://localhost:8789 — wallet signatures required; no automatic transactions.'));
-for(const signal of ['SIGINT','SIGTERM'])process.on(signal,()=>server.close(()=>{unlock();process.exit(0);}));
+for(const signal of ['SIGINT','SIGTERM'])process.on(signal,()=>server.close(async()=>{await localTest.close();unlock();process.exit(0);}));

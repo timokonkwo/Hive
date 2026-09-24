@@ -5,6 +5,7 @@ import {join} from 'node:path';
 import {createHash,createPublicKey,verify,randomUUID} from 'node:crypto';
 import {VersionedTransaction} from '@solana/web3.js';
 import {getBase58Decoder} from '@solana/kit';
+import {Journal} from './journal.mjs';
 import {quoteRegistration} from './quote-registration.mjs';
 import {acceptRegistration} from './accept-registration.mjs';
 import {authenticateRegistration} from './registration.mjs';
@@ -61,7 +62,18 @@ export function createGateway({review,observer,requestsDirectory,stateDirectory,
       else depositFromAccounts(review.config,{...q,sourceTokenAccount:accounts[0].address},accounts);
     }
     if(action==='status'){
-      const result={state,signature:receipt?.signature??null,deposit:null};
+      const result={state,claimId:q.claimId,observedAt:new Date().toISOString(),signature:receipt?.signature??null,deposit:null,payout:null};
+      if(Number(observed.destination.status)===3){
+        try { result.payout={hash:await observer.settlementEvidence(q,observed),status:'finalized'}; }
+        catch(error){
+          if(error.message!=='Finalized settlement event missing')throw error;
+          // A provider can expose a newer paid state before its event is finalized.
+          // Keep tracking; never present that as a successful payout.
+          result.state='claim';
+          const entry=new Journal(stateDirectory).latest().get(q.claimId+':claim');
+          if(entry?.hash && entry.status!=='failed')result.payout={hash:entry.hash,status:'pending'};
+        }
+      }
       if(receipt){
         const status=(await observer.sol.getSignatureStatuses([receipt.signature],{searchTransactionHistory:true})).value[0];
         result.submission=status?.err?'failed':status?.confirmationStatus==='finalized'?'finalized':'pending_or_unknown';

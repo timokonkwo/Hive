@@ -23,6 +23,8 @@ export async function verifySignedEvm(raw,expected) {
   const transaction=parseTransaction(raw);
   if(transaction.type!=='eip1559'||transaction.chainId!==4663||(transaction.accessList?.length??0)!==0)throw Error('Unexpected transaction envelope');
   const from=await recoverTransactionAddress({serializedTransaction:raw});
-  verifyEvmTransaction({...transaction,from,input:transaction.data??'0x',value:transaction.value??0n},expected);
+  // RLP represents zero as an empty byte string; viem omits these parsed fields.
+  // Normalize only the signed EIP-1559 envelope, not arbitrary RPC responses.
+  verifyEvmTransaction({...transaction,from,input:transaction.data??'0x',value:transaction.value??0n,maxFeePerGas:transaction.maxFeePerGas??0n,maxPriorityFeePerGas:transaction.maxPriorityFeePerGas??0n},expected);
   return keccak256(raw);
 }

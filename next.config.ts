@@ -1,6 +1,9 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
+  ...(process.env.NODE_ENV === 'development' && process.env.HIVE_LOCAL_CLAIM_TEST_OWNER
+    ? { distDir: '.next/claim-local-test' }
+    : {}),
   turbopack: {},
   webpack(config) {
     if (process.env.HIVE_BUILD_NO_CACHE === 'true') config.cache = false;

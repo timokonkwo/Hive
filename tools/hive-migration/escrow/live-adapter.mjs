@@ -5,7 +5,7 @@ import {Keypair,PublicKey} from '@solana/web3.js';
 import {getBase58Decoder} from '@solana/kit';
 import {privateKeyToAccount} from 'viem/accounts';
 import {keccak256,encodeFunctionData} from 'viem';
-import {depositEvidence,depositFromAccounts,settlementInstructions,unsignedTransaction} from './client.mjs';
+import {depositEvidence,depositFromAccounts,settlementInstructions,unsignedTransaction,pauseInstruction} from './client.mjs';
 const requireValue=(value,message)=>{if(!value)throw Error(message);};
 export function loadSignerFromFd(fdValue){
   const fd=Number(fdValue);requireValue(Number.isInteger(fd)&&fd>=3,'A private inherited signer FD (>=3) is required');
@@ -17,7 +17,7 @@ export function loadSignerFromFd(fdValue){
   const evm=privateKeyToAccount(parsed.evmPrivateKey);parsed.evmPrivateKey='';
   return {solana,evm};
 }
-export function createLiveAdapter(review,observer,policy,signers,journal){
+export function createLiveAdapter(review,observer,policy,signers,journal,{allowUnpause=false}={}){
   const c=review.config,{sol,evm,abi}=observer;
   requireValue(signers.solana.publicKey.toBase58()===c.admin&&signers.evm.address.toLowerCase()===c.destinationAdmin.toLowerCase(),'Loaded signers do not match the single admin on both chains');
   for(const k of ['maxEvmGas','maxFeePerGasWei','maxTotalEvmFeeWei','maxSolanaTransactionCostLamports','maxTotalSolanaCostLamports'])requireValue(typeof policy[k]==='string'&&/^[1-9][0-9]*$/.test(policy[k]),`Explicit positive operational limit required: ${k}`);
@@ -39,8 +39,9 @@ export function createLiveAdapter(review,observer,policy,signers,journal){
     },
     async prepare(chain,a){
       if(chain==='evm'){
-        const functions={reserve:['reserve',[{sourceOwner:`0x${new PublicKey(a.owner).toBuffer().toString('hex')}`,recipient:a.recipient,snapshotAmount:BigInt(a.snapshotAmount),depositAmount:BigInt(a.amount),depositDeadline:BigInt(a.depositDeadline),claimDeadline:BigInt(a.claimDeadline)},a.proof]],confirm_deposit:['confirmDeposit',[a.claimId,a.depositSignature?depositEvidence(a.depositSignature):null]],claim:['claim',[a.claimId]],cancel_expired:['cancelExpired',[a.claimId]]};
-        const call=functions[a.action];requireValue(call,'Unsupported automatic EVM action');
+        const functions={reserve:()=>['reserve',[{sourceOwner:`0x${new PublicKey(a.owner).toBuffer().toString('hex')}`,recipient:a.recipient,snapshotAmount:BigInt(a.snapshotAmount),depositAmount:BigInt(a.amount),depositDeadline:BigInt(a.depositDeadline),claimDeadline:BigInt(a.claimDeadline)},a.proof]],confirm_deposit:()=>['confirmDeposit',[a.claimId,a.depositSignature?depositEvidence(a.depositSignature):null]],claim:()=>['claim',[a.claimId]],cancel_expired:()=>['cancelExpired',[a.claimId]]};
+        if(allowUnpause)functions.unpause=()=>['setPaused',[false]];
+        const buildCall=functions[a.action];requireValue(buildCall,'Unsupported automatic EVM action');const call=buildCall();
         const data=encodeFunctionData({abi,functionName:call[0],args:call[1]});
         const estimated=await evm.estimateGas({account:signers.evm.address,to:c.distributor,data,value:0n});
         const gas=(estimated*120n+99n)/100n;
@@ -52,8 +53,8 @@ export function createLiveAdapter(review,observer,policy,signers,journal){
         const raw=await signers.evm.signTransaction({chainId:4663,type:'eip1559',to:c.distributor,data,value:0n,nonce,gas,...fees});
         return {raw,hash:keccak256(raw),nonce,maximumCost:cost.toString()};
       }
-      requireValue(chain==='solana'&&['release','refund'].includes(a.action),'Unsupported automatic Solana action');
-      const instructions=settlementInstructions(c,a.owner,a.action==='release',a.destinationTransactionHash,c.admin);
+      requireValue(chain==='solana'&&(['release','refund'].includes(a.action)||(allowUnpause&&a.action==='unpause')),'Unsupported automatic Solana action');
+      const instructions=a.action==='unpause'?[pauseInstruction(c,false)]:settlementInstructions(c,a.owner,a.action==='release',a.destinationTransactionHash,c.admin);
       const block=await sol.getLatestBlockhash('finalized');
       const tx=unsignedTransaction(instructions,c.admin,block.blockhash);
       const fee=(await sol.getFeeForMessage(tx.message,'finalized')).value;

@@ -93,3 +93,20 @@ test('gateway binds signed deposits, persists before broadcast and never retries
  await assert.rejects(handle('status',{request:{...request,amount:'1'}}),/authorization/);
  const off=createGateway({review:f.review,observer,requestsDirectory:f.dir,stateDirectory,executionEnabled:false});assert.equal((await off('availability')).enabled,false);await assert.rejects(off('deposit',{}),/not open/);
 });
+
+test('paid status exposes only verified finalized payout evidence',async()=>{
+ const f=await fixture(),request=await f.signed();
+ await acceptRegistration(f.review,request,f.dir,100n);
+ const q=await authenticateRegistration(f.review,request);
+ const observed={finalized:true,deploymentVerified:true,source:{status:1,recipient:q.recipient,snapshotAmount:q.snapshotAmount,depositDeadline:q.depositDeadline,claimDeadline:q.claimDeadline,amount:q.amount,grant:q.grant},destination:{status:3,grant:q.grant,quote:{sourceOwner:'0x'+f.sol.publicKey.toBuffer().toString('hex'),recipient:q.recipient,depositAmount:q.amount,snapshotAmount:q.snapshotAmount,depositDeadline:q.depositDeadline,claimDeadline:q.claimDeadline}},destinationTimestamp:'100'};
+ let verified=0;
+ const observer={read:async()=>observed,settlementEvidence:async()=>{verified++;return '0x'+'ab'.repeat(32);}};
+ const handle=createGateway({review:f.review,observer,requestsDirectory:f.dir,stateDirectory:join(f.dir,'state'),executionEnabled:true});
+ const status=await handle('status',{request});
+ assert.equal(status.state,'release_to_collection');assert.equal(status.claimId,q.claimId);
+ assert.deepEqual(status.payout,{hash:'0x'+'ab'.repeat(32),status:'finalized'});assert.equal(verified,1);
+ observer.settlementEvidence=async()=>{throw Error('Finalized settlement event missing');};
+ assert.equal((await handle('status',{request})).state,'claim');
+ observer.settlementEvidence=async()=>{throw Error('Noncanonical payout');};
+ await assert.rejects(handle('status',{request}),/Noncanonical/);
+});

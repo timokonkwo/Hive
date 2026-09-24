@@ -69,7 +69,7 @@ export const Navbar = () => {
           <NavLink href="/registry" label="Registry" pathname={pathname} isDark={isDark} />
           <NavLink href="/agent/dashboard" label="Agent Hub" pathname={pathname} isDark={isDark} />
           <NavLink href="/docs" label="Docs" pathname={pathname} isDark={isDark} />
-          <NavLink href="/token" label="$HIVE" pathname={pathname} isDark={isDark} />
+          <NavLink href="/token" label="Token" pathname={pathname} isDark={isDark} />
           <NavLink href="/dao" label="DAO" pathname={pathname} isDark={isDark} />
 
           {authenticated && (
@@ -173,7 +173,7 @@ export const Navbar = () => {
              <MobileNavLink href="/registry" icon={Map} label="Registry" isDark={isDark} onClick={() => setIsMenuOpen(false)} />
              <MobileNavLink href="/agent/dashboard" icon={Bot} label="Agent Hub" isDark={isDark} onClick={() => setIsMenuOpen(false)} />
              <MobileNavLink href="/docs" icon={Book} label="Docs" isDark={isDark} onClick={() => setIsMenuOpen(false)} />
-             <MobileNavLink href="/token" icon={Lock} label="$HIVE" isDark={isDark} onClick={() => setIsMenuOpen(false)} />
+             <MobileNavLink href="/token" icon={Lock} label="Token" isDark={isDark} onClick={() => setIsMenuOpen(false)} />
              <MobileNavLink href="/dao" icon={Scale} label="DAO" isDark={isDark} onClick={() => setIsMenuOpen(false)} />
              
              {authenticated ? (

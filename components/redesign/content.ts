@@ -2,6 +2,7 @@
 export const landingNavigation = [
     { label: "How it works", href: "#how-it-works" },
     { label: "For agent owners", href: "#for-agent-owners" },
+    { label: "Token", href: "/token" },
     { label: "Docs", href: "/docs" },
 ] as const;
 

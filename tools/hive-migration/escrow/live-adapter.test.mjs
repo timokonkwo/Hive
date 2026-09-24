@@ -54,3 +54,9 @@ test('fees, total operating budgets and settlement simulation stop signing',asyn
   assert.ok(VersionedTransaction.deserialize(Buffer.from(signed.raw,'base64')).signatures[0].some(x=>x!==0));
   f.policy.maxSolanaTransactionCostLamports='1';await assert.rejects(f.adapter().prepare('solana',settlement),/cost/);
 });
+test('unpause signing is unavailable by default and opt-in activation stays bound to the campaign',async()=>{
+ const f=fixture();await assert.rejects(f.adapter().prepare('evm',{action:'unpause'}),/Unsupported/);await assert.rejects(f.adapter().prepare('solana',{action:'unpause'}),/Unsupported/);
+ const adapter=createLiveAdapter({config:f.c},{sol:f.sol,evm:f.evm,abi},f.policy,f.signers,f.journal,{allowUnpause:true});
+ const raw=await adapter.prepare('evm',{action:'unpause'}),tx=parseTransaction(raw.raw),call=decodeFunctionData({abi,data:tx.data});assert.equal(call.functionName,'setPaused');assert.deepEqual(call.args,[false]);assert.equal(tx.to.toLowerCase(),f.c.distributor.toLowerCase());
+ const signed=await adapter.prepare('solana',{action:'unpause'}),source=VersionedTransaction.deserialize(Buffer.from(signed.raw,'base64'));assert.ok(source.signatures[0].some(n=>n!==0));assert.equal(source.message.staticAccountKeys[0].toBase58(),f.c.admin);
+});

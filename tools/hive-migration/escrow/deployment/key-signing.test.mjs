@@ -26,3 +26,8 @@ test('server accepts only locally signed EVM transactions matching the fixed pla
  const wrongChain=await evm.signTransaction({chainId:1,type:'eip1559',to:evm.address,value:0n,nonce:0,data:plan.data,gas:30000n,maxFeePerGas:100n,maxPriorityFeePerGas:1n});await assert.rejects(verifySignedEvm(wrongChain,plan),/envelope/);
  s.forget();await assert.rejects(s.signEvm(plan),/no longer loaded/);
 });
+test('zero priority fee in the signed RLP envelope remains zero and does not raise ceilings',async()=>{
+ const signer=make(),zeroTip={...plan,maxPriorityFeePerGas:'0x0'};
+ const raw=await signer.signEvm(zeroTip);assert.match(await verifySignedEvm(raw,zeroTip),/^0x[0-9a-f]{64}$/);
+ await assert.rejects(verifySignedEvm(await signer.signEvm(plan),zeroTip),/ceiling/);signer.forget();
+});

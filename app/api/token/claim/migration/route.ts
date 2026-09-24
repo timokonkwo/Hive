@@ -19,10 +19,14 @@ async function forward(action: string, input: unknown, localOwner: string | null
     if (url.protocol !== 'https:' && !(url.protocol === 'http:' && ['localhost', '127.0.0.1'].includes(url.hostname))) throw Error();
     if (url.username || url.password || url.search || url.hash) throw Error();
     const response = await fetch(new URL(action, url.href.replace(/\/?$/, '/')), { method: 'POST', headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' }, body: JSON.stringify(input), cache: 'no-store', redirect: 'error', signal: AbortSignal.timeout(30000) });
-    if (!response.ok) return NextResponse.json({ error: 'The migration request could not be verified. Refresh the claim status or recheck your holdings.' }, { status: 409, headers });
+    if (!response.ok) {
+      const issue = await response.json().catch(() => ({}));
+      const safeCodes = ['REGISTRATION_NOT_FOUND', 'CLAIM_WINDOW', 'SERVICE_UNAVAILABLE', 'BALANCE_CHANGED', 'CLAIM_EXISTS', 'AUTHORIZATION_REQUIRED', 'CLAIM_UNVERIFIED'];
+      return NextResponse.json(safeCodes.includes(issue.code) ? { code: issue.code, error: issue.error, recovery: issue.recovery } : { code: 'CLAIM_UNVERIFIED', error: 'Your claim could not be verified. Check its status to continue.', recovery: 'check_status' }, { status: response.status === 503 ? 503 : 409, headers });
+    }
     const payload = await response.json();
     return NextResponse.json(action === 'availability' && localOwner && payload.enabled === true ? { ...payload, localTestOwner: localOwner } : payload, { headers });
-  } catch { return NextResponse.json(action === 'availability' ? { enabled: false } : { error: 'Migration service unavailable. Keep your saved request and retry status.' }, { status: action === 'availability' ? 200 : 503, headers }); }
+  } catch { return NextResponse.json(action === 'availability' ? { enabled: false } : { error: 'Connection interrupted. Your claim is saved. Try again.' }, { status: action === 'availability' ? 200 : 503, headers }); }
 }
 export async function GET(request: Request) { return forward('availability', {}, localClaimTestOwner(request.url)); }
 export async function POST(request: Request) {
