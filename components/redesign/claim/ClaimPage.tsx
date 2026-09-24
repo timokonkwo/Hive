@@ -79,7 +79,7 @@ export default function ClaimPage({ schedule = null }: { schedule?: ClaimSchedul
       {[
         ['How do I claim?', 'When claims open, connect your Solana and Robinhood wallets, deposit your eligible HIVE on Solana, and receive your allocation of HIVE on Robinhood. Each wallet can claim once.'],
         ['Who is eligible?', 'Your wallet needed at least 1M HIVE on Solana at the snapshot and must still hold at least 1M when you deposit.'],
-        ['How much will I receive?', 'Your allocation is proportional to the HIVE you deposit. You can deposit all or part of your eligible balance, up to your snapshot holding; a smaller deposit receives proportionally less. Claims cannot exceed 70% of the HIVE deposited. Your estimate appears above before you connect a wallet.'],
+        ['How much will I receive?', 'Your allocation is proportional to the HIVE you deposit. You can deposit all or part of your eligible balance, up to your snapshot holding; a smaller deposit receives proportionally less. Your estimate appears above before you connect a wallet.'],
       ].map(([question, answer]) => <details key={question}><summary>{question}<ChevronDown size={16} aria-hidden="true" /></summary><p>{answer}</p></details>)}
     </section>
   </section>;
