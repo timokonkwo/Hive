@@ -25,3 +25,18 @@
 .stake p { margin:20px 0 16px;max-width:320px; }
 .quietLink { display:inline-flex;align-items:center;gap:8px;min-height:44px;font-size:13px;text-decoration:underline!important;text-underline-offset:4px; }
 @media(max-width:600px) { .nav { margin-bottom:24px; }.tradeIntro { padding:24px; }.identity { gap:12px; }.identity img { width:44px;height:44px; }.identity h1 span { display:block;margin:4px 0 0; }.facts { margin:0 24px 24px; }.tradeFooter { padding:24px;flex-direction:column;align-items:stretch;gap:20px; }.stake { padding:40px 24px;min-height:400px; } }
+/* One content edge and spacing scale across Trade, Stake and Claim. */
+.main.main { max-width:1088px;padding:28px 32px 64px; }
+.nav { margin-bottom:28px; }
+.panel { max-width:none; }
+.tradeIntro { padding:32px; }
+.panel .identity h1 { margin:6px 0 0;line-height:1.2; }
+.panel .tradeIntro>p { margin:24px 0 0; }
+.facts { margin:0 32px 32px;gap:24px; }
+.tradeFooter { padding:24px 32px; }
+.panel .tradeFooter h2 { margin:0 0 6px; }
+.stake { min-height:360px;padding:40px 32px; }
+.panel .stake h1 { margin:12px 0 16px; }
+.panel .stake p { margin:20px 0 12px; }
+@media(max-width:760px) { .main.main { padding:24px 24px 48px; }.nav { margin-bottom:24px; }.tradeIntro { padding:24px; }.facts { margin:0 24px 24px; }.tradeFooter { padding:24px; }.stake { padding:32px 24px; } }
+@media(max-width:480px) { .main.main { padding:16px 16px 40px; }.nav { margin-bottom:20px; }.tradeIntro { padding:20px; }.facts { margin:0 20px 24px; }.tradeFooter { padding:20px; }.stake { min-height:340px;padding:32px 20px; } }

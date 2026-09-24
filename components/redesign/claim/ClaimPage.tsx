@@ -1,20 +1,20 @@
 'use client';
 import { useEffect, useRef, useState, type FormEvent } from 'react';
-import { ArrowLeft, ArrowRight } from 'lucide-react';
+import { ArrowLeft, ArrowRight, Check, LoaderCircle, Wallet } from 'lucide-react';
 import { compactHive as tokens, exactHive } from '@/lib/hive-claim-format';
 import { migrationReview, parseOldHiveInput } from '@/lib/hive-claim-review';
 import { isReimbursementLookup, type ReimbursementLookup } from '@/lib/hive-reimbursement';
 import styles from './claim.module.css';
 import LiveMigration from './LiveMigration';
-import { claimCountdown, type ClaimSchedule } from '@/lib/hive-claim-schedule';
+import { type ClaimSchedule } from '@/lib/hive-claim-schedule';
 
 const reasons: Record<string, string> = {
   'snapshot-required': 'This wallet is not eligible.',
-  'snapshot-below-minimum': 'Not eligible: less than 1M old HIVE at the snapshot.',
+  'snapshot-below-minimum': 'Not eligible: less than 1M HIVE on Solana at the snapshot.',
   'custody-review': 'This wallet needs an eligibility review.',
   'balance-unavailable': 'Balance unavailable. Try again.',
-  'no-holdings': 'At least 1M old HIVE is required in this wallet.',
-  'below-minimum': 'At least 1M old HIVE is required in this wallet.',
+  'no-holdings': 'At least 1M HIVE on Solana is required in this wallet.',
+  'below-minimum': 'At least 1M HIVE on Solana is required in this wallet.',
 };
 export default function ClaimPage({ schedule = null }: { schedule?: ClaimSchedule }) {
   const [now, setNow] = useState<number | null>(null);
@@ -52,31 +52,40 @@ export default function ClaimPage({ schedule = null }: { schedule?: ClaimSchedul
   }
   function edit(value: string) { controller.current?.abort(); controller.current = null; setAddress(value); setReviewOpen(false); setResult(null); setError(''); setLoading(false); }
   const preview = result ? migrationReview(result) : null;
+  const claimReady = windowOpen && migrationEnabled;
   return <section className={styles.main} aria-label="HIVE migration">
-    {reviewOpen && result ? <>
+    {reviewOpen && result && claimReady ? <>
       <button className={styles.back} onClick={() => setReviewOpen(false)}><ArrowLeft size={16} aria-hidden="true" />Back</button>
       <header className={styles.heading}><span className={styles.label}>2 / 2</span><h1 ref={reviewHeading} tabIndex={-1}>Deposit &amp; claim</h1></header>
       <Migration result={result} enabled={migrationEnabled} canStart={windowOpen} />
     </> : <>
-      <header className={styles.heading}><span className={styles.label}>SOLANA → ROBINHOOD</span><h1>Claim HIVE</h1><p>HIVE has migrated from Solana to Robinhood Chain. Check your old HIVE wallet below for your new HIVE allocation.</p></header>
+      <div className={styles.intro}><header className={styles.heading}><span className={styles.label}>SOLANA → ROBINHOOD</span><h1>Claim HIVE</h1><p>HIVE has migrated to Robinhood Chain. Check your Solana wallet to see your allocation.</p></header><ClaimCountdown schedule={schedule} now={now} enabled={migrationEnabled} /></div>
       <section className={styles.checker} aria-label="Wallet checker">
+        <div className={styles.checkerTitle}><Wallet size={20} aria-hidden="true" /><h2>Check your allocation</h2></div>
         <form onSubmit={event => lookup(event)} noValidate aria-busy={loading}>
           <label htmlFor="claim-owner">Solana wallet address</label>
-          <div className={styles.formRow}><input ref={input} id="claim-owner" type="text" value={address} onChange={event => edit(event.target.value)} autoComplete="off" autoCapitalize="none" spellCheck={false} maxLength={64} aria-invalid={!!error} aria-describedby={error ? 'claim-error' : undefined} placeholder="Your old HIVE wallet" /><button type="submit" disabled={loading}>{loading ? 'Checking…' : 'Check'}</button></div>
+          <div className={styles.formRow}><input ref={input} id="claim-owner" type="text" value={address} onChange={event => edit(event.target.value)} autoComplete="off" autoCapitalize="none" spellCheck={false} maxLength={64} aria-invalid={!!error} aria-describedby={error ? 'claim-error' : undefined} placeholder="Enter your Solana wallet address" /><button type="submit" disabled={loading}>{loading ? <><LoaderCircle className={styles.spinner} size={16} aria-hidden="true" />Checking…</> : <>Check wallet<ArrowRight size={16} aria-hidden="true" /></>}</button></div>
           {error && <p id="claim-error" role="alert" className={styles.error}>{error}</p>}
         </form>
+        <p className={styles.hint}>No wallet connection needed.</p>
         <div aria-live="polite">
+          {loading && <div className={styles.checking} role="status"><span className={styles.scan} aria-hidden="true" />Checking snapshot and current holdings…</div>}
           {result && preview && <div className={styles.result}>
-            {preview.receiveRaw !== null ? <><span className={styles.label}>Holding requirement met</span><dl className={styles.amounts}><div><dt>New HIVE · estimated</dt><dd>{tokens(preview.receiveRaw, 18)} HIVE</dd></div></dl><form onSubmit={event => lookup(event, true)}><button className={styles.primary} disabled={loading}>Next<ArrowRight size={16} aria-hidden="true" /></button></form></> : <><p>{reasons[preview.status]}</p>{result.status === 'allocation-pending' && <button className={styles.secondary} onClick={() => setReviewOpen(true)}>View existing claim</button>}</>}
+            {preview.receiveRaw !== null ? <><span className={styles.eligible}><Check size={16} aria-hidden="true" />Holding requirement met</span><dl className={styles.amounts}><div><dt>HIVE on Robinhood · estimated</dt><dd>{tokens(preview.receiveRaw, 18)} HIVE</dd></div></dl>{claimReady && <form onSubmit={event => lookup(event, true)}><button className={styles.primary} disabled={loading}>Continue to claim<ArrowRight size={16} aria-hidden="true" /></button></form>}</> : <><p>{reasons[preview.status]}</p>{claimReady && result.status === 'allocation-pending' && <button className={styles.secondary} onClick={() => setReviewOpen(true)}>View existing claim</button>}</>}
           </div>}
         </div>
       </section>
     </>}
-    {schedule && now !== null ? <div className={styles.countdown}>
-      <span>{now < schedule.opensAt ? (new Date(now + 86400000).toLocaleDateString('en-GB', { timeZone: 'Africa/Lagos' }) === new Date(schedule.opensAt).toLocaleDateString('en-GB', { timeZone: 'Africa/Lagos' }) ? 'Claims start tomorrow' : 'Claims start soon') : now >= schedule.closesAt ? 'Claims closed' : migrationEnabled ? 'Claims close in' : 'Claims opening soon'}</span>
-      {(now < schedule.opensAt || (windowOpen && migrationEnabled)) && <time role="timer" aria-label={now < schedule.opensAt ? 'Time until claims open' : 'Time until claims close'}>{claimCountdown(schedule, now)}</time>}
-    </div> : <p className={styles.hint}>Claims start soon</p>}
   </section>;
+}
+
+function ClaimCountdown({ schedule, now, enabled }: { schedule: ClaimSchedule; now: number | null; enabled: boolean }) {
+  if (!schedule) return <aside className={styles.countdown}><span>Claims start soon</span></aside>;
+  const started = now !== null && now >= schedule.opensAt;
+  const closed = now !== null && now >= schedule.closesAt;
+  const remaining = now === null ? null : Math.max(0, Math.floor(((started ? schedule.closesAt : schedule.opensAt) - now) / 1000));
+  const values = remaining === null ? ['--', '--', '--', '--'] : [Math.floor(remaining / 86400), Math.floor(remaining / 3600) % 24, Math.floor(remaining / 60) % 60, remaining % 60].map(n => String(n).padStart(2, '0'));
+  return <aside className={styles.countdown} aria-label="Claim schedule"><span>{closed ? 'Claims closed' : started ? enabled ? 'Claims close in' : 'Claims opening soon' : 'Claims start in'}</span>{!closed && (!started || enabled) && <div className={styles.clock} role="timer" aria-label={started ? 'Time until claims close' : 'Time until claims open'}>{['Days', 'Hours', 'Minutes', 'Seconds'].map((label, i) => <div key={label}><strong>{values[i]}</strong><span>{label}</span></div>)}</div>}<time dateTime={new Date(schedule.opensAt).toISOString()}>{new Date(schedule.opensAt).toLocaleString('en-GB', { timeZone: 'Africa/Lagos', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit', hour12: false })} WAT</time></aside>;
 }
 
 function Migration({ result, enabled, canStart }: { result: ReimbursementLookup; enabled: boolean; canStart: boolean }) {
@@ -86,8 +95,8 @@ function Migration({ result, enabled, canStart }: { result: ReimbursementLookup;
   const review = migrationReview(result, parsed ?? '0');
   return <section className={styles.checker} aria-label="Deposit and claim">
     {maximum.depositRaw === null ? <p>{reasons[maximum.status]}</p> : <>
-      <div className={styles.depositInput}><label htmlFor="deposit-amount">Deposit old HIVE</label><div className={styles.formRow}><input id="deposit-amount" type="text" inputMode="decimal" value={amount} maxLength={30} onChange={event => setAmount(event.target.value)} aria-invalid={review.status === 'invalid-amount'} aria-describedby="deposit-hint" /><button type="button" onClick={() => setAmount(exactHive(maximum.depositRaw!, 9))}>Max</button></div><p id="deposit-hint" className={styles.hint}>Available: {tokens(maximum.depositRaw, 9)} HIVE</p>{review.status === 'invalid-amount' && <p role="alert" className={styles.error}>Enter a valid amount within your available balance.</p>}</div>
-      {review.receiveRaw !== null && <dl className={styles.amounts}><div><dt>Receive new HIVE · estimated</dt><dd>{tokens(review.receiveRaw, 18)} HIVE</dd></div></dl>}
+      <div className={styles.depositInput}><label htmlFor="deposit-amount">Deposit HIVE on Solana</label><div className={styles.formRow}><input id="deposit-amount" type="text" inputMode="decimal" value={amount} maxLength={30} onChange={event => setAmount(event.target.value)} aria-invalid={review.status === 'invalid-amount'} aria-describedby="deposit-hint" /><button type="button" onClick={() => setAmount(exactHive(maximum.depositRaw!, 9))}>Max</button></div><p id="deposit-hint" className={styles.hint}>Available: {tokens(maximum.depositRaw, 9)} HIVE</p>{review.status === 'invalid-amount' && <p role="alert" className={styles.error}>Enter a valid amount within your available balance.</p>}</div>
+      {review.receiveRaw !== null && <dl className={styles.amounts}><div><dt>Receive HIVE on Robinhood · estimated</dt><dd>{tokens(review.receiveRaw, 18)} HIVE</dd></div></dl>}
     </>}
     <LiveMigration key={result.owner + ':' + review.depositRaw} owner={result.owner} amount={review.depositRaw} enabled={enabled} canStart={canStart} />
   </section>;

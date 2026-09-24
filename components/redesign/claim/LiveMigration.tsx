@@ -13,17 +13,17 @@ type Status = { state: string; signature: string | null; submission?: string; de
 type SolWallet = { publicKey?: { toBase58(): string }; connect(): Promise<unknown>; signMessage(bytes: Uint8Array): Promise<{ signature: Uint8Array }>; signTransaction(tx: VersionedTransaction): Promise<VersionedTransaction> };
 type EvmWallet = { request(args: { method: string; params?: unknown[] }): Promise<unknown> };
 const messages: Record<string, string> = {
-  below_minimum: 'This wallet must currently hold at least 1M spendable old HIVE before depositing.',
+  below_minimum: 'This wallet must currently hold at least 1M spendable HIVE on Solana before depositing.',
   reserve: 'Preparing your claim…',
   deposit: 'Ready to deposit.',
   confirm_deposit: 'Confirming your deposit…',
-  claim: 'Sending your new HIVE…',
-  release_to_collection: 'New HIVE sent. Finishing…',
-  complete: 'Claim complete. New HIVE sent to your wallet.',
+  claim: 'Sending your HIVE on Robinhood…',
+  release_to_collection: 'HIVE on Robinhood sent. Finishing…',
+  complete: 'Claim complete. HIVE on Robinhood sent to your wallet.',
   cancel_expired: 'The claim window expired. Cancellation is being reconciled before any refund.',
-  refund_to_owner: 'The payout was cancelled. Your old HIVE is being returned.',
-  refunded: 'Your old HIVE was refunded to the original Solana wallet.',
-  cancelled_without_observed_deposit: 'This attempt was cancelled. No finalized old-HIVE deposit has been observed.',
+  refund_to_owner: 'The payout was cancelled. Your HIVE on Solana is being returned.',
+  refunded: 'Your HIVE on Solana was refunded to the original Solana wallet.',
+  cancelled_without_observed_deposit: 'This attempt was cancelled. No finalized HIVE on Solana deposit has been observed.',
   deposit_window_closed_reconcile_inflight: 'The deposit window closed. Any submitted transaction is being reconciled.',
 };
 async function call(action: string, input: unknown) {
@@ -67,9 +67,9 @@ export default function LiveMigration({ owner, amount, enabled, canStart = true 
   }
   async function refresh(r = request) { if (!r) return; const value = await call('status', { request: r }); assertHere(); setStatus(value); }
   return <section className={styles.migration} aria-label="Wallet migration">
-    {!enabled ? <button className={styles.primary} disabled>Claims start soon</button> : <>
-      {!request && !quote && <button className={styles.primary} disabled={busy || !amount || !canStart} onClick={() => run(async () => { if (!amount) return; const { recipient } = await accounts(); const q = await call('quote', { owner, recipient, amount }); assertHere(); validateQuote(q, owner, recipient, amount); setQuote(q); })}>{busy ? 'Working…' : 'Connect wallets'}</button>}
-      {quote && !request && <><dl className={styles.details}><div><dt>Old HIVE to deposit</dt><dd>{compactHive(quote.oldAmountRaw, 9)}</dd></div><div><dt>New HIVE to receive</dt><dd>{compactHive(quote.newGrantRaw, 18)}</dd></div><div><dt>Robinhood recipient</dt><dd>{quote.request.recipient}</dd></div><div><dt>Deposit before</dt><dd>{new Date(Number(quote.expiresAt) * 1000).toLocaleString()}</dd></div></dl><details className={styles.exact}><summary>Exact amounts</summary><p>{exactHive(quote.oldAmountRaw, 9)} old HIVE → {exactHive(quote.newGrantRaw, 18)} new HIVE</p></details><p>One deposit per wallet; unused allowance is forfeited. Network fees apply.</p><button className={styles.primary} disabled={busy} onClick={() => run(async () => {
+    {!enabled ? <p className={styles.hint}>Claims are not open yet.</p> : <>
+      {canStart && !request && !quote && <button className={styles.primary} disabled={busy || !amount || !canStart} onClick={() => run(async () => { if (!amount) return; const { recipient } = await accounts(); const q = await call('quote', { owner, recipient, amount }); assertHere(); validateQuote(q, owner, recipient, amount); setQuote(q); })}>{busy ? 'Working…' : 'Connect wallets'}</button>}
+      {canStart && quote && !request && <><dl className={styles.details}><div><dt>HIVE on Solana to deposit</dt><dd>{compactHive(quote.oldAmountRaw, 9)}</dd></div><div><dt>HIVE on Robinhood to receive</dt><dd>{compactHive(quote.newGrantRaw, 18)}</dd></div><div><dt>Robinhood recipient</dt><dd>{quote.request.recipient}</dd></div><div><dt>Deposit before</dt><dd>{new Date(Number(quote.expiresAt) * 1000).toLocaleString()}</dd></div></dl><details className={styles.exact}><summary>Exact amounts</summary><p>{exactHive(quote.oldAmountRaw, 9)} HIVE on Solana → {exactHive(quote.newGrantRaw, 18)} HIVE on Robinhood</p></details><p>One deposit per wallet; unused allowance is forfeited. Network fees apply.</p><button className={styles.primary} disabled={busy} onClick={() => run(async () => {
         if (!canStart) throw Error('Claims are not open.');
         validateQuote(quote, owner, quote.request.recipient, amount!);
         const { sol } = await checkAccounts(quote.request.recipient);
