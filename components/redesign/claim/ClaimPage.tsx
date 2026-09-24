@@ -67,7 +67,6 @@ export default function ClaimPage({ schedule = null }: { schedule?: ClaimSchedul
           <div className={styles.formRow}><input ref={input} id="claim-owner" type="text" value={address} onChange={event => edit(event.target.value)} autoComplete="off" autoCapitalize="none" spellCheck={false} maxLength={64} aria-invalid={!!error} aria-describedby={error ? 'claim-error' : undefined} placeholder="Enter your Solana wallet address" /><button type="submit" disabled={loading}>{loading ? <><LoaderCircle className={styles.spinner} size={16} aria-hidden="true" />Checking…</> : <>Check wallet<ArrowRight size={16} aria-hidden="true" /></>}</button></div>
           {error && <p id="claim-error" role="alert" className={styles.error}>{error}</p>}
         </form>
-        <p className={styles.hint}>No wallet connection needed.</p>
         <div aria-live="polite">
           {loading && <div className={styles.checking} role="status"><span className={styles.scan} aria-hidden="true" />Checking snapshot and current holdings…</div>}
           {result && preview && <div className={styles.result}>
