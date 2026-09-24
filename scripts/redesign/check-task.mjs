@@ -59,7 +59,7 @@ const web3=await import('/Users/tim/Coding/vibecoding/hive-protocol/node_modules
 const transaction=new web3.Transaction({feePayer:new web3.PublicKey('1'.repeat(32)),recentBlockhash:'1'.repeat(32)}).add(web3.SystemProgram.transfer({fromPubkey:new web3.PublicKey('1'.repeat(32)),toPubkey:new web3.PublicKey('1'.repeat(32)),lamports:1}));
 const unsignedTransaction=transaction.serialize({requireAllSignatures:false,verifySignatures:false}).toString('base64');
 await send('Page.enable');await send('Runtime.enable');await send('Emulation.setFocusEmulationEnabled',{enabled:true});await send('Emulation.setEmulatedMedia',{features:[{name:'prefers-reduced-motion',value:'reduce'}]});await send('Emulation.setDeviceMetricsOverride',{width:1440,height:1000,deviceScaleFactor:1,mobile:false});
-await send('Page.navigate',{url:site+'/marketplace'});await until(`!!document.querySelector('main')`);
+await send('Page.navigate',{url:site+'/tasks'});await until(`!!document.querySelector('main')`);
 const actual=await evaluate(`(async()=>{const d=await(await fetch('/api/tasks?limit=1')).json();return{id:d.tasks[0].id,title:d.tasks[0].title,budget:d.tasks[0].budget}})()`);
 await navigate('/marketplace/'+actual.id);
 check('Actual task title and budget render',await evaluate(`document.querySelector('h1').innerText===${JSON.stringify(actual.title)} && document.querySelector('aside[aria-label="Task summary"]').innerText.includes(${JSON.stringify(actual.budget)})`));

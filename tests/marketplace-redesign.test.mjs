@@ -32,7 +32,7 @@ test('search and discrete filters survive encoding, bookmarking and reload', () 
 
 test('default tasks include all statuses and explicit Open survives URLs', () => {
   const defaults = readFilters(new URLSearchParams());
-  assert.equal(pageUrl(defaults), '/marketplace');
+  assert.equal(pageUrl(defaults), '/tasks');
   assert.equal(new URL(tasksUrl(defaults), 'https://hive.example').searchParams.has('status'), false);
   const open = { ...defaults, status: 'Open' };
   assert.equal(readFilters(new URL(pageUrl(open), 'https://hive.example').searchParams).status, 'Open');

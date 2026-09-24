@@ -37,13 +37,13 @@ async function intercept(event){
  const page=Number(u.searchParams.get('page')||1);return reply(event.requestId,{tasks:list.slice((page-1)*12,page*12),total:list.length,page,limit:12});
 }
 await send('Page.enable');await send('Emulation.setFocusEmulationEnabled',{enabled:true});await send('Runtime.enable');await send('Emulation.setEmulatedMedia',{features:[{name:'prefers-reduced-motion',value:'reduce'}]});await send('Emulation.setDeviceMetricsOverride',{width:1440,height:1000,deviceScaleFactor:1,mobile:false});
-await navigate('/marketplace');
+await navigate('/tasks');
 check('Public API returns a real task list',await evaluate('document.querySelectorAll("[data-task-row]").length>0'));
 check('App navigation and task heading',await evaluate('document.querySelector("h1").innerText==="Tasks" && !!document.querySelector("[aria-label=\\\"App navigation\\\"]")'));
 check('Agents remains a separate route',await evaluate('document.querySelector("[aria-label=\\\"Browse marketplace\\\"] a[href=\\\"/agents\\\"]")!==null'));
 check('Supplied Hive wordmark',await evaluate('!!document.querySelector("aside [data-hive-brand=wordmark] path")'));
 for(const theme of ['light','dark']){await evaluate(`localStorage.setItem('hive-redesign-theme','${theme}');window.dispatchEvent(new Event('storage'))`);await shot('marketplace-live-'+theme+'-1440',true);}
-await send('Fetch.enable',{patterns:[{urlPattern:'*/api/tasks?*',requestStage:'Request'}]});mode='fixtures';await navigate('/marketplace?status=All');
+await send('Fetch.enable',{patterns:[{urlPattern:'*/api/tasks?*',requestStage:'Request'}]});mode='fixtures';await navigate('/tasks?status=All');
 check('Pagination renders one page',await evaluate('document.querySelectorAll("[data-task-row]").length===12'));
 await click('[aria-label="Next page"]');await until('new URL(location.href).searchParams.get("page")==="2"');await settled();
 check('Next page has correct range',await evaluate('document.querySelector("[aria-label=\\\"Task pages\\\"]").innerText.includes("13–24 of 25")'));
@@ -82,7 +82,7 @@ for(const theme of ['light','dark']){
   layoutChecks.push({theme,width,height,...findings});check(`${theme} ${width}x${height} text and controls fit`,!findings.overflow&&!findings.outside.length,findings.outside);
  }
 }
-mode='long';await navigate('/marketplace');await send('Emulation.setDeviceMetricsOverride',{width:320,height:568,deviceScaleFactor:1,mobile:true});await sleep(100);
+mode='long';await navigate('/tasks');await send('Emulation.setDeviceMetricsOverride',{width:320,height:568,deviceScaleFactor:1,mobile:true});await sleep(100);
 check('Missing budget/count remain explicit',await evaluate('document.querySelector("[data-task-row]").innerText.match(/Not listed/g)?.length===2'));
 check('Long task title does not overflow',await evaluate('document.documentElement.scrollWidth===innerWidth'));
 await click('[aria-label^="Preview "]');await until('document.querySelector("dialog").open');check('Long brief fits modal width',await evaluate('document.querySelector("dialog").scrollWidth<=document.querySelector("dialog").clientWidth'));
@@ -92,7 +92,7 @@ mode='fixtures';await click('[role=alert] button');await settled();check('Retry 
 mode='rate';await click('[aria-label="Refresh tasks"]');await until('!!document.querySelector("[role=alert]")');check('Rate-limit state is honest',await evaluate('document.querySelector("[role=alert]").innerText.includes("Wait a moment")'));
 mode='malformed';await click('[role=alert] button');await until('!!document.querySelector("[role=alert]")');check('Malformed response is an error',await evaluate('!document.querySelector("main").innerText.includes("No open tasks right now.")'));
 mode='empty';await click('[role=alert] button');await settled();check('No open tasks has an all-tasks action',await evaluate('document.querySelector("main").innerText.includes("No open tasks right now.")&&document.querySelector("main").innerText.includes("See all tasks")'));
-mode='fixtures';await navigate('/marketplace?page=999');check('Out of range page can recover',await evaluate('document.querySelector("main").innerText.includes("Go to first page")'));
+mode='fixtures';await navigate('/tasks?page=999');check('Out of range page can recover',await evaluate('document.querySelector("main").innerText.includes("Go to first page")'));
 await click('[class*=empty] button');await until('!new URL(location.href).searchParams.has("page")');await settled();
 mode='slow';await choose('Category','Research');await until('new URL(location.href).searchParams.get("category")==="Research"');await until('document.querySelector("[aria-label=Tasks]")?.getAttribute("aria-busy")==="true"');
 check('Loading does not present old rows',await evaluate('document.querySelectorAll("[data-task-row]").length===0'));
@@ -102,5 +102,5 @@ await sleep(200);check('A stale response cannot replace the active filter',await
 check('No runtime exceptions',errors.length===0,errors);
 await fs.writeFile('/private/tmp/hive-redesign-qa/marketplace-results.json',JSON.stringify({checks,layoutChecks},null,2));
 console.log(JSON.stringify({passed:checks.filter(c=>c.pass).length,total:checks.length,failures:checks.filter(c=>!c.pass)},null,2));
-await send('Fetch.disable');await send('Emulation.setDeviceMetricsOverride',{width:1440,height:1000,deviceScaleFactor:1,mobile:false});await navigate('/marketplace');
+await send('Fetch.disable');await send('Emulation.setDeviceMetricsOverride',{width:1440,height:1000,deviceScaleFactor:1,mobile:false});await navigate('/tasks');
 ws.close();process.exitCode=checks.some(c=>!c.pass)?1:0;

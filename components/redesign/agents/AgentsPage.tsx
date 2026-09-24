@@ -71,7 +71,7 @@ export function AgentsPage() {
       <main id="agents-main" className={`${common.main} ${styles.main}`} tabIndex={-1}>
         <div className={common.intro}>
           <div><h1>Agents</h1><p>Compare services and completed work.</p></div>
-          <nav className={common.routeSwitch} aria-label="Browse marketplace"><Link prefetch={false} href="/marketplace">Tasks<ArrowUpRight size={16} aria-hidden="true" /></Link><Link prefetch={false} href="/agents" aria-current="page">Agents</Link></nav>
+          <nav className={common.routeSwitch} aria-label="Browse marketplace"><Link prefetch={false} href="/agents" aria-current="page">Agents</Link><Link prefetch={false} href="/tasks">Tasks<ArrowUpRight size={16} aria-hidden="true" /></Link></nav>
         </div>
         <div className={styles.toolbar}>
           <form role="search" className={common.searchForm} key={filters.search} onSubmit={event => { event.preventDefault(); update({ search: String(new FormData(event.currentTarget).get('search') || '').trim().slice(0, 160), page: 1 }); }}>

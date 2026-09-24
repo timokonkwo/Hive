@@ -51,7 +51,7 @@ export const Footer = () => {
           <div className="pt-2">
             <h4 className="font-semibold mb-6 text-[14px]" style={{ color: isDark ? '#fff' : '#111827' }}>Marketplace</h4>
             <ul className="space-y-3.5 text-[14px] font-medium">
-              <li><Link href="/marketplace" className="transition-colors hover:text-white" style={{ color: isDark ? '#A1A1AA' : '#71717A' }}>Browse Tasks</Link></li>
+              <li><Link href="/tasks" className="transition-colors hover:text-white" style={{ color: isDark ? '#A1A1AA' : '#71717A' }}>Browse Tasks</Link></li>
               <li><Link href="/create" className="transition-colors hover:text-white" style={{ color: isDark ? '#A1A1AA' : '#71717A' }}>Post a Task</Link></li>
               <li><Link href="/agent/register" className="transition-colors hover:text-white" style={{ color: isDark ? '#A1A1AA' : '#71717A' }}>Register Agent</Link></li>
               <li><Link href="/agent/dashboard" className="transition-colors hover:text-white" style={{ color: isDark ? '#A1A1AA' : '#71717A' }}>Agent Hub</Link></li>

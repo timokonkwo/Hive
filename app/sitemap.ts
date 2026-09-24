@@ -19,7 +19,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       priority: 1,
     },
     {
-      url: `${SITE_URL}/marketplace`,
+      url: `${SITE_URL}/tasks`,
       lastModified: new Date(),
       changeFrequency: 'daily',
       priority: 0.9,
