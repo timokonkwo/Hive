@@ -3,6 +3,7 @@ import {createServer} from 'node:http';import {readFileSync,writeFileSync,exists
 import {Connection,Keypair,PublicKey,VersionedTransaction,ComputeBudgetProgram} from '@solana/web3.js';import {getBase58Decoder} from '@solana/kit';import {createPublicClient,http,encodeFunctionData,parseAbi,keccak256,toHex,formatUnits} from 'viem';
 import {Journal,acquireServiceLock} from '../journal.mjs';import {initializeInstruction,unsignedTransaction,decodeCampaign} from '../client.mjs';import {createObserver} from '../observer.mjs';import {LOADER,programDataAddress,createBuffer,writeBuffer,deployProgram} from './loader.mjs';
 import {saveJson,verifyEvmTransaction,verifySignedEvm} from './safety.mjs';
+import {deploymentOrigin,validAccessToken,sessionCookie} from './access.mjs';
 const here=dirname(fileURLToPath(import.meta.url)),escrow=resolve(here,'..'),root=resolve(escrow,'../../..'),dir=resolve(escrow,'local/deployment-100k');
 const reviewPath=resolve(dir,'review.json');const review=JSON.parse(readFileSync(reviewPath));const c=review.config;
 const programBytes=readFileSync(resolve(escrow,'solana/target/deploy/hive_redemption_escrow.so'));
@@ -128,13 +129,23 @@ const server=createServer(async(req,res)=>{
  res.setHeader('Content-Security-Policy',"default-src 'none'; script-src 'self'; connect-src 'self'; style-src 'unsafe-inline'; img-src 'self'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'");res.setHeader('X-Content-Type-Options','nosniff');res.setHeader('Referrer-Policy','no-referrer');
  const reply=(status,value)=>{res.writeHead(status,{'Content-Type':'application/json','Cache-Control':'no-store'});res.end(JSON.stringify(value));};
  try{
-  check(allowedHosts.has(req.headers.host),'Loopback host required');const path=new URL(req.url,'http://'+req.headers.host).pathname;
-  if(req.method==='GET'&&path==='/'){res.writeHead(200,{'Content-Type':'text/html','Cache-Control':'no-store','Set-Cookie':`hiveDeploy=${cookie}; HttpOnly; SameSite=Strict; Path=/`,'X-Frame-Options':'DENY'});return res.end(readFileSync(resolve(here,'wallet.html')));}
+  const remotePath=resolve(dir,'remote-access.json'),remote=existsSync(remotePath)?JSON.parse(readFileSync(remotePath)):null;
+  const origin=deploymentOrigin(req.headers.host,remote),path=new URL(req.url,origin).pathname;
+  const session=(req.headers.cookie??'').split(';').map(s=>s.trim()).includes('hiveDeploy='+cookie)&&(!remote||remote.expiresAt>Date.now());
+  if(req.method==='GET'&&path==='/access.js'){res.writeHead(200,{'Content-Type':'application/javascript','Cache-Control':'no-store'});return res.end(readFileSync(resolve(here,'access.js')));}
+  if(path==='/session'){
+   check(req.method==='POST'&&req.headers.origin===origin&&req.headers['content-type']?.startsWith('application/json'),'Same-origin session request required');
+   let size=0;const chunks=[];for await(const chunk of req){size+=chunk.length;check(size<=1024,'Session request too large');chunks.push(chunk);}
+   check(validAccessToken(JSON.parse(Buffer.concat(chunks).toString()).token,remote),'Signing link expired or invalid');
+   res.setHeader('Set-Cookie',sessionCookie(cookie,origin,Math.max(1,Math.floor((remote.expiresAt-Date.now())/1000))));return reply(200,{ready:true});
+  }
+  if(req.method==='GET'&&path==='/'){res.writeHead(200,{'Content-Type':'text/html','Cache-Control':'no-store',...(!remote?{'Set-Cookie':sessionCookie(cookie,origin)}:{}),'X-Frame-Options':'DENY'});return res.end(readFileSync(resolve(here,remote&&!session?'access.html':'wallet.html')));}
+  check(!remote||session,'Private signing session required');
   if(req.method==='GET'&&['/wallet.js','/web3.js','/key-signing.js'].includes(path)){res.writeHead(200,{'Content-Type':'application/javascript','Cache-Control':'no-store'});return res.end(readFileSync(path==='/wallet.js'?resolve(here,'wallet.js'):path==='/key-signing.js'?resolve(dir,'key-signing.bundle.js'):resolve(root,'node_modules/@solana/web3.js/lib/index.iife.min.js')));}
-  check((req.headers.cookie??'').split(';').map(s=>s.trim()).includes('hiveDeploy='+cookie),'Deployment session required');
+  check(session,'Deployment session required');
   if(req.method==='GET'&&path==='/recovery')return reply(200,{unresolved:[...journal.latest().values()].filter(e=>e.chain==='evm'&&['awaiting_wallet','unknown'].includes(e.status)&&!e.hash).map(e=>({id:e.id,action:e.action,nonce:e.transaction.nonce}))});
   if(req.method==='GET'&&path==='/status')return reply(200,await state());
-  check(req.method==='POST'&&req.headers.origin==='http://'+req.headers.host&&req.headers['content-type']?.startsWith('application/json'),'Same-origin JSON POST required');
+  check(req.method==='POST'&&req.headers.origin===origin&&req.headers['content-type']?.startsWith('application/json'),'Same-origin JSON POST required');
   check(!busy,'Another operation is running');busy=true;
   try{let size=0;const chunks=[];for await(const chunk of req){size+=chunk.length;check(size<=65536,'Request too large');chunks.push(chunk);}return reply(200,await action(path,JSON.parse(Buffer.concat(chunks).toString())));}finally{busy=false;}
  }catch(error){let message=error.shortMessage??error.message??'Deployment request failed';if(process.env.SOLANA_RPC_URL)message=message.split(process.env.SOLANA_RPC_URL).join('[private RPC]');reply(409,{error:message});}

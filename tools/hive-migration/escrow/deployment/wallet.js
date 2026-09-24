@@ -1,4 +1,5 @@
 const $=id=>document.getElementById(id);let running=false,localSigner=null,lastState=null;
+if(location.hash.startsWith('#access='))history.replaceState(null,'',location.pathname);
 async function api(path,body){const r=await fetch(path,{method:body?'POST':'GET',headers:body?{'Content-Type':'application/json'}:{},body:body?JSON.stringify(body):undefined});const v=await r.json();if(!r.ok)throw Error(v.error||'Request failed');return v;}
 const sleep=ms=>new Promise(r=>setTimeout(r,ms));
 function controls(){const useKeys=$('method').value==='keys';$('key-panel').hidden=!useKeys;$('method').disabled=running;$('load-keys').disabled=running||!lastState;$('forget-keys').disabled=running||!localSigner;$('start').disabled=running||!lastState||!$('terms').checked||lastState.stage==='complete'||(useKeys&&!localSigner);$('terms').disabled=running;}
