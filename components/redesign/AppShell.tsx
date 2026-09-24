@@ -28,7 +28,7 @@ function Navigation({ mobile = false, close }: { mobile?: boolean; close?: () =>
   const pathname = usePathname();
   const admin=useAdminAccess();
   function active(href: string) {
-    if (href === '/marketplace') return pathname === '/agents' || pathname.startsWith('/marketplace') || /^\/agent\/[^/]+$/.test(pathname) && !['/agent/dashboard', '/agent/register', '/agent/recover'].includes(pathname);
+    if (href === '/marketplace') return pathname === '/tasks' || pathname === '/agents' || pathname.startsWith('/marketplace') || /^\/agent\/[^/]+$/.test(pathname) && !['/agent/dashboard', '/agent/register', '/agent/recover'].includes(pathname);
     if (href === '/dashboard') return pathname === '/dashboard' || pathname === '/create';
     if (href === '/agent/dashboard') return pathname.startsWith('/agent/') && !/^\/agent\/[^/]+$/.test(pathname) || ['/agent/dashboard', '/agent/register', '/agent/recover'].includes(pathname);
     return pathname === href;

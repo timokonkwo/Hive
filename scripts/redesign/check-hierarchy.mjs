@@ -41,7 +41,7 @@ async function intercept(event){
 await send('Page.enable');await send('Runtime.enable');await send('Emulation.setEmulatedMedia',{features:[{name:'prefers-reduced-motion',value:'reduce'}]});await send('Fetch.enable',{patterns:[{urlPattern:'*/api/tasks?*'},{urlPattern:'*/api/roadmap'}]});
 mode='long';
 for(const theme of ['light','dark']){for(const width of [320,390,768]){
- await send('Emulation.setDeviceMetricsOverride',{width,height:844,deviceScaleFactor:1,mobile:true});await navigate('/marketplace');await evaluate(`localStorage.setItem('hive-redesign-theme','${theme}');dispatchEvent(new Event('storage'))`);await click('button[aria-label^="Preview "]');await until('!!document.querySelector("dialog[open]")');
+ await send('Emulation.setDeviceMetricsOverride',{width,height:844,deviceScaleFactor:1,mobile:true});await navigate('/tasks');await evaluate(`localStorage.setItem('hive-redesign-theme','${theme}');dispatchEvent(new Event('storage'))`);await click('button[aria-label^="Preview "]');await until('!!document.querySelector("dialog[open]")');
  const box=await evaluate(`(()=>{const d=document.querySelector('dialog[open]'),r=d.getBoundingClientRect();return{height:r.height,top:r.top,bottom:r.bottom,viewport:innerHeight,overflow:document.documentElement.scrollWidth>innerWidth}})()`);check('Bottom sheet '+theme+width,box.height<=box.viewport*.73&&box.top>=box.viewport*.27&&Math.abs(box.bottom-box.viewport)<2&&!box.overflow,box);
  await shot('hierarchy-sheet-'+theme+'-'+width);await click('[aria-label="Close task preview"]');check('Dismiss sheet '+width,await evaluate(`!document.querySelector('dialog[open]')`));
 }}

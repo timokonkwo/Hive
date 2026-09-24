@@ -131,8 +131,8 @@ export function MarketplacePage() {
       <div className={styles.intro} data-market-enter>
         <div><h1>Tasks</h1><p>Work posted by clients.</p></div>
         <nav className={styles.routeSwitch} aria-label="Browse marketplace">
-          <Link prefetch={false} href="/marketplace" aria-current="page"><BriefcaseBusiness size={17} aria-hidden="true" />Tasks</Link>
           <Link prefetch={false} href="/agents">Agents<ArrowUpRight size={16} aria-hidden="true" /></Link>
+          <Link prefetch={false} href="/tasks" aria-current="page"><BriefcaseBusiness size={17} aria-hidden="true" />Tasks</Link>
         </nav>
       </div>
 

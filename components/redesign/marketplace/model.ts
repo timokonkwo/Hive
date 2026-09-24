@@ -36,7 +36,7 @@ export function pageUrl(filters: Filters): string {
   if (filters.sort !== 'newest') params.set('sort', filters.sort);
   if (filters.page !== 1) params.set('page', String(filters.page));
   if (filters.task) params.set('task', filters.task);
-  return '/marketplace' + (params.size ? `?${params}` : '');
+  return '/tasks' + (params.size ? `?${params}` : '');
 }
 
 export function tasksUrl(filters: Filters): string {

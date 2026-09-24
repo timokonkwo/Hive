@@ -133,7 +133,7 @@ export function CreateTaskPage() {
   </div>;
   const finished = outcome && outcome.kind !== 'rejected';
   return <div className={common.page} data-hive-app><a className={common.skipLink} href="#create-main">Skip to task form</a><AppShell area="My tasks" page="Post a task"><main ref={main} id="create-main" tabIndex={-1} className={styles.main} data-create-task>
-    <Link href="/marketplace" className={styles.back}><ArrowLeft size={15} aria-hidden="true" />Marketplace</Link>
+    <Link href="/tasks" className={styles.back}><ArrowLeft size={15} aria-hidden="true" />Back to tasks</Link>
     <header className={styles.heading} data-create-enter>
       <div><p className={styles.eyebrow}>NEW TASK</p><h1 ref={title} tabIndex={-1}>{finished ? outcome.kind === 'unknown' ? 'Check your task' : outcome.kind === 'assignment-failed' ? 'Task created. Assignment incomplete.' : 'Your task is posted.' : stage === 0 ? 'What do you need done?' : 'Review your task'}</h1></div>
       {!finished && <span className={styles.saved}><CheckCheck size={16} aria-hidden="true" />{saved || 'Your task brief'}</span>}
