@@ -1,7 +1,7 @@
 import 'server-only';
 import { createHash } from 'node:crypto';
 import snapshot from '@/data/hive-reimbursement-snapshot.json';
-import { lookupReimbursement, publicSolanaAddress, reimbursementCampaign, validateCheckerSnapshot, type CurrentBalance } from './hive-reimbursement';
+import { lookupReimbursement, supplementalClaim, publicSolanaAddress, reimbursementCampaign, validateCheckerSnapshot, type CurrentBalance } from './hive-reimbursement';
 
 export function validateCheckerIntegrity(value: typeof snapshot) {
   validateCheckerSnapshot(value);
@@ -44,6 +44,6 @@ export async function readCurrentOldHive(owner: string, endpoint: string | undef
 export async function getReimbursementLookup(owner: string) {
   publicSolanaAddress(owner);
   const row = snapshot.holders.find(h => h.owner === owner);
-  const balance = row?.kind === 'wallet' ? await readCurrentOldHive(owner, process.env.SOLANA_RPC_URL) : notRequested;
+  const balance = row?.kind === 'wallet' || owner===supplementalClaim.owner ? await readCurrentOldHive(owner, process.env.SOLANA_RPC_URL) : notRequested;
   return lookupReimbursement(snapshot, owner, balance);
 }

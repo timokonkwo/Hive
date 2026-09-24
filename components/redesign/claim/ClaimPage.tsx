@@ -3,7 +3,7 @@ import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { ArrowLeft, ArrowRight, Check, ChevronDown, LoaderCircle, Wallet } from 'lucide-react';
 import { compactHive as tokens, exactHive } from '@/lib/hive-claim-format';
 import { migrationReview, parseOldHiveInput } from '@/lib/hive-claim-review';
-import { isReimbursementLookup, type ReimbursementLookup } from '@/lib/hive-reimbursement';
+import { isReimbursementLookup, supplementalClaim, type ReimbursementLookup } from '@/lib/hive-reimbursement';
 import styles from './claim.module.css';
 import LiveMigration from './LiveMigration';
 import { type ClaimSchedule } from '@/lib/hive-claim-schedule';
@@ -24,10 +24,12 @@ export default function ClaimPage({ schedule = null }: { schedule?: ClaimSchedul
   const [loading, setLoading] = useState(false), [error, setError] = useState('');
   const [reviewOpen, setReviewOpen] = useState(false);
   const [migrationEnabled, setMigrationEnabled] = useState(false);
+  const [localTestOwner, setLocalTestOwner] = useState<string | null>(null);
+  function availability(v: { enabled?: boolean; localTestOwner?: string }) { setMigrationEnabled(v.enabled === true); setLocalTestOwner(v.enabled === true && v.localTestOwner === supplementalClaim.owner ? v.localTestOwner : null); }
   useEffect(() => {
     const abort = new AbortController();
-    fetch('/api/token/claim/migration', { cache: 'no-store', signal: abort.signal }).then(r => r.ok ? r.json() : { enabled: false }).then(v => setMigrationEnabled(v.enabled === true)).catch(() => {});
-    const timer = setInterval(() => { fetch('/api/token/claim/migration', { cache: 'no-store', signal: abort.signal }).then(r => r.ok ? r.json() : { enabled: false }).then(v => setMigrationEnabled(v.enabled === true)).catch(() => setMigrationEnabled(false)); }, 30000);
+    fetch('/api/token/claim/migration', { cache: 'no-store', signal: abort.signal }).then(r => r.ok ? r.json() : { enabled: false }).then(availability).catch(() => {});
+    const timer = setInterval(() => { fetch('/api/token/claim/migration', { cache: 'no-store', signal: abort.signal }).then(r => r.ok ? r.json() : { enabled: false }).then(availability).catch(() => setMigrationEnabled(false)); }, 30000);
     return () => { abort.abort(); clearInterval(timer); };
   }, []);
   const reviewHeading = useRef<HTMLHeadingElement>(null);
@@ -52,14 +54,15 @@ export default function ClaimPage({ schedule = null }: { schedule?: ClaimSchedul
   }
   function edit(value: string) { controller.current?.abort(); controller.current = null; setAddress(value); setReviewOpen(false); setResult(null); setError(''); setLoading(false); }
   const preview = result ? migrationReview(result) : null;
-  const claimReady = windowOpen && migrationEnabled;
+  const localTest = !!result && result.owner === localTestOwner;
+  const claimReady = (windowOpen || localTest) && migrationEnabled;
   return <section className={styles.main} aria-label="HIVE migration">
     {reviewOpen && result && claimReady ? <>
       <button className={styles.back} onClick={() => setReviewOpen(false)}><ArrowLeft size={16} aria-hidden="true" />Back</button>
       <header className={styles.heading}><span className={styles.label}>2 / 2</span><h1 ref={reviewHeading} tabIndex={-1}>Deposit &amp; claim</h1></header>
-      <Migration result={result} enabled={migrationEnabled} canStart={windowOpen} />
+      <Migration result={result} enabled={migrationEnabled} canStart={windowOpen || localTest} />
     </> : <>
-      <div className={styles.intro}><header className={styles.heading}><span className={styles.label}>SOLANA → ROBINHOOD</span><h1>Claim HIVE</h1><p>HIVE has migrated to Robinhood Chain. Check your Solana wallet to see your allocation.</p></header><ClaimCountdown schedule={schedule} now={now} enabled={migrationEnabled} /></div>
+      <div className={styles.intro}><header className={styles.heading}><span className={styles.label}>SOLANA → ROBINHOOD</span><h1>Claim HIVE</h1><p>HIVE has migrated to Robinhood Chain. Check your Solana wallet to see your allocation.</p></header>{localTestOwner ? <aside className={styles.countdown}><span>Local claim test</span></aside> : <ClaimCountdown schedule={schedule} now={now} enabled={migrationEnabled} />}</div>
       <section className={styles.checker} aria-label="Wallet checker">
         <div className={styles.checkerTitle}><Wallet size={20} aria-hidden="true" /><h2>Check your allocation</h2></div>
         <form onSubmit={event => lookup(event)} noValidate aria-busy={loading}>
@@ -70,7 +73,7 @@ export default function ClaimPage({ schedule = null }: { schedule?: ClaimSchedul
         <div aria-live="polite">
           {loading && <div className={styles.checking} role="status"><span className={styles.scan} aria-hidden="true" />Checking snapshot and current holdings…</div>}
           {result && preview && <div className={styles.result}>
-            {preview.receiveRaw !== null ? <><span className={styles.eligible}><Check size={16} aria-hidden="true" />Holding requirement met</span><dl className={styles.amounts}><div><dt>HIVE on Robinhood · estimated</dt><dd>{tokens(preview.receiveRaw, 18)} HIVE</dd></div></dl>{claimReady && <form onSubmit={event => lookup(event, true)}><button className={styles.primary} disabled={loading}>Continue to claim<ArrowRight size={16} aria-hidden="true" /></button></form>}</> : <><p>{reasons[preview.status]}</p>{claimReady && result.status === 'allocation-pending' && <button className={styles.secondary} onClick={() => setReviewOpen(true)}>View existing claim</button>}</>}
+            {preview.receiveRaw !== null ? <><span className={styles.eligible}><Check size={16} aria-hidden="true" />Holding requirement met</span><dl className={styles.amounts}><div><dt>HIVE on Robinhood · estimated</dt><dd>{tokens(preview.receiveRaw, 18)} HIVE</dd></div></dl>{claimReady && <form onSubmit={event => lookup(event, true)}><button className={styles.primary} disabled={loading}>Continue to claim<ArrowRight size={16} aria-hidden="true" /></button></form>}</> : <><p>{reasons[preview.status]}</p>{claimReady && ['allocation-pending','approved-exception'].includes(result.status) && <button className={styles.secondary} onClick={() => setReviewOpen(true)}>View existing claim</button>}</>}
           </div>}
         </div>
       </section>

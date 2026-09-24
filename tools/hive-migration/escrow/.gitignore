@@ -1,0 +1,4 @@
+evm/out/
+evm/cache/
+solana/target/
+local/

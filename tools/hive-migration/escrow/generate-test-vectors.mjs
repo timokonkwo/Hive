@@ -1,0 +1,13 @@
+import {writeFileSync} from 'node:fs';
+import {PublicKey} from '@solana/web3.js';
+import {addresses, claimId, hex, snapshotTree, initializeInstruction, depositInstruction,grantForDeposit} from './client.mjs';
+const key = n => new PublicKey(Buffer.alloc(32,n)).toBase58();
+const c = {program:key(1),admin:key(2),mint:key(3),collection:key(4),campaignId:hex(Buffer.alloc(32,12)),destinationChain:'4663',distributor:hex(Buffer.alloc(20,9)),opensAt:'100',closesAt:'10000',claimGrace:'3600',totalEligibleOldRaw:'102000000000001',fundingBudgetRaw:'30600000000000000000000',allowPartialSurrender:true};
+const tree = snapshotTree(c.campaignId,c.mint,[{owner:key(5),amountRaw:'2000000000000'},{owner:key(10),amountRaw:'100000000000000'},{owner:key(11),amountRaw:'1'}]);
+c.root=tree.root;
+const h=tree.holders.find(x=>x.owner===key(5));
+const q={owner:key(5),sourceTokenAccount:key(15),snapshotAmount:h.amountRaw,amount:h.amountRaw,recipient:hex(Buffer.alloc(20,16)),depositDeadline:'1000',proof:h.proof};
+const p=addresses(c.program,c.admin,c.campaignId,q.owner);
+const output={grantRaw:grantForDeposit(c,q.amount,q.snapshotAmount),config:c,quote:q,holders:tree.holders,campaign:p.campaign.toBase58(),vault:p.vault.toBase58(),claim:p.claim.toBase58(),claimId:hex(claimId(p.campaign,q.owner)),initializeHex:hex(initializeInstruction(c).data),depositHex:hex(depositInstruction(c,q).data)};
+writeFileSync(new URL('./test-vectors.json',import.meta.url),JSON.stringify(output,null,2)+'\n');
+console.log('Wrote deterministic public test vectors; no wallet keys generated.');

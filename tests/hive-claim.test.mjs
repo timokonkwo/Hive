@@ -71,8 +71,8 @@ test('GET endpoint rejects invalid input, limits abuse and cannot enable claims'
 test('migration proxy defaults closed and rejects cross-origin, oversized and unknown actions',async()=>{
  const old=process.env.HIVE_CLAIM_UI_ENABLED;delete process.env.HIVE_CLAIM_UI_ENABLED;
  try {
-  const route=load('../app/api/token/claim/migration/route.ts',{'@/lib/hive-claim-schedule':load('../lib/hive-claim-schedule.ts'),'next/server':{NextResponse:{json:(data,init)=>Response.json(data,init)}},'@/lib/rate-limit':{getClientIp:()=> 'test',checkRateLimit:()=>({allowed:true})}});
-  assert.deepEqual(await (await route.GET()).json(),{enabled:false});
+  const route=load('../app/api/token/claim/migration/route.ts',{'@/lib/hive-local-claim-test':{localClaimTestOwner:()=>null},'@/lib/hive-claim-schedule':load('../lib/hive-claim-schedule.ts'),'next/server':{NextResponse:{json:(data,init)=>Response.json(data,init)}},'@/lib/rate-limit':{getClientIp:()=> 'test',checkRateLimit:()=>({allowed:true})}});
+  assert.deepEqual(await (await route.GET(new Request('https://hive.test/api/token/claim/migration'))).json(),{enabled:false});
   const req=(body,origin='http://test')=>new Request('http://test/api/token/claim/migration',{method:'POST',headers:{origin,'content-type':'application/json'},body:JSON.stringify(body)});
   assert.equal((await route.POST(req({action:'quote',input:{}},'https://other.invalid'))).status,403);
   assert.equal((await route.POST(req({action:'execute',input:{}}))).status,400);
@@ -141,4 +141,28 @@ test('final wallet allocation conserves the 10M budget and matches every eligibl
  for(const h of eligible){const r=a.rows.find(r=>r.owner===h.owner);assert.equal(r.amountRaw,h.amountRaw);assert.equal(r.allocationNewRaw,proportionalQuote(BigInt(h.amountRaw),BigInt(a.totalEligibleOldRaw),BigInt(a.budgetNewRaw)).toString());total+=BigInt(r.allocationNewRaw);}
  assert.equal(total+BigInt(a.unallocatedNewRaw),10000000000000000000000000n);
  assert.equal(a.unallocatedNewRaw,'37');
+});
+
+test('explicit supplemental wallet is eligible without falsifying the snapshot or changing ordinary awards',()=>{
+ const e=model.supplementalClaim;const current={status:'available',amountRaw:e.allowanceRaw,slot:449983604,checkedAt:new Date().toISOString()};
+ assert.equal(snapshot.holders.some(h=>h.owner===e.owner),false);
+ const result=model.lookupReimbursement(snapshot,e.owner,current);
+ assert.equal(result.status,'approved-exception');assert.equal(result.snapshotBalanceRaw,null);assert.equal(result.exceptionAllowanceRaw,e.allowanceRaw);assert.equal(result.estimateRaw,e.grantRaw);
+ assert.equal(model.isReimbursementLookup(result,e.owner),true);
+ assert.equal(model.isReimbursementLookup({...result,estimateRaw:'1'},e.owner),false);
+ assert.equal(model.isReimbursementLookup({...result,snapshotBalanceRaw:e.allowanceRaw},e.owner),false);
+ const review=load('../lib/hive-claim-review.ts',{'./hive-reimbursement':model,'../tools/hive-migration/proportional-model.mjs':{proportionalQuote}});
+ assert.equal(review.migrationReview(result).receiveRaw,e.grantRaw);
+ const partial=review.migrationReview(result,'1000000000000000');assert.equal(partial.receiveRaw,(1000000000000000n*BigInt(e.grantRaw)/BigInt(e.allowanceRaw)).toString());
+ assert.equal(review.migrationReview({...result,currentBalance:{...current,amountRaw:'999999999999999'}}).status,'below-minimum');
+});
+test('local early-claim gate rejects production, remote hosts and other wallet settings',()=>{
+ const priorNode=process.env.NODE_ENV,priorWallet=process.env.HIVE_LOCAL_CLAIM_TEST_OWNER;
+ const gate=load('../lib/hive-local-claim-test.ts',{'./hive-reimbursement':model});
+ try{
+  process.env.HIVE_LOCAL_CLAIM_TEST_OWNER=model.supplementalClaim.owner;process.env.NODE_ENV='production';assert.equal(gate.localClaimTestOwner('http://localhost:3000'),null);
+  process.env.NODE_ENV='development';assert.equal(gate.localClaimTestOwner('https://uphive.xyz'),null);assert.equal(gate.localClaimTestOwner('http://localhost.attacker.test'),null);
+  assert.equal(gate.localClaimTestOwner('http://localhost:3000'),model.supplementalClaim.owner);
+  process.env.HIVE_LOCAL_CLAIM_TEST_OWNER=owner;assert.equal(gate.localClaimTestOwner('http://localhost:3000'),null);
+ }finally{if(priorNode===undefined)delete process.env.NODE_ENV;else process.env.NODE_ENV=priorNode;if(priorWallet===undefined)delete process.env.HIVE_LOCAL_CLAIM_TEST_OWNER;else process.env.HIVE_LOCAL_CLAIM_TEST_OWNER=priorWallet;}
 });

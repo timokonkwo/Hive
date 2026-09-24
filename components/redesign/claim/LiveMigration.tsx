@@ -3,6 +3,8 @@ import { useEffect, useRef, useState } from 'react';
 import { VersionedTransaction } from '@solana/web3.js';
 import { getBase58Decoder } from '@solana/kit';
 import { getAddress } from 'viem';
+import { supplementalClaim, reimbursementCampaign } from '@/lib/hive-reimbursement';
+import { proportionalQuote } from '@/tools/hive-migration/proportional-model.mjs';
 import { compactHive, exactHive } from '@/lib/hive-claim-format';
 import styles from './claim.module.css';
 
@@ -37,9 +39,12 @@ function wallets() {
   return { sol, evm };
 }
 function validateQuote(q: Quote, owner: string, recipient: string, amount: string) {
-  if (!q || q.reserved !== false || !/^Hive redemption authorization v5\n/.test(q.message)) throw Error('Invalid quote.');
+  if (!q || q.reserved !== false || !/^Hive redemption authorization v6\n/.test(q.message)) throw Error('Invalid quote.');
   const t = JSON.parse(q.message.slice(q.message.indexOf('\n') + 1));
-  if (q.request.owner !== owner || q.request.recipient !== recipient || q.request.amount !== amount || q.oldAmountRaw !== amount || q.request.depositDeadline !== q.expiresAt || t.owner !== owner || t.recipient !== recipient || t.oldAmountRaw !== amount || t.newGrantRaw !== q.newGrantRaw || t.nonce !== q.request.nonce || t.depositDeadline !== q.expiresAt || t.minimumSnapshotHoldingRaw !== '1000000000000000' || t.minimumCurrentHoldingRaw !== '1000000000000000' || t.destinationChain !== '4663' || t.sourceMint !== '6JfonM6a24xngXh5yJ1imZzbMhpfvEsiafkb4syHBAGS' || t.destinationToken.toLowerCase() !== '0xc65e9630d8af1ea278cbe359f78931684b4ff9f8' || !/^[1-9][0-9]{0,38}$/.test(q.newGrantRaw) || BigInt(q.newGrantRaw) > BigInt(amount) * 700000000n || BigInt(q.expiresAt) <= BigInt(Math.floor(Date.now() / 1000))) throw Error('Quote does not match your selected wallets and amount.');
+  const extra = owner === supplementalClaim.owner;
+  const expectedGrant = proportionalQuote(BigInt(amount), BigInt(extra ? supplementalClaim.allowanceRaw : reimbursementCampaign.eligibleOldRaw), BigInt(extra ? supplementalClaim.grantRaw : reimbursementCampaign.budgetRaw)).toString();
+  if (q.newGrantRaw !== expectedGrant || t.totalEligibleOldRaw !== reimbursementCampaign.eligibleOldRaw || t.fundingBudgetRaw !== reimbursementCampaign.budgetRaw || t.exceptionOwner !== supplementalClaim.owner || t.exceptionAllowanceRaw !== supplementalClaim.allowanceRaw || t.exceptionGrantRaw !== supplementalClaim.grantRaw || t.eligibilityBasis !== (extra ? 'explicit_supplemental_exception' : 'frozen_snapshot')) throw Error('Quote allocation terms do not match this campaign.');
+  if (q.request.owner !== owner || q.request.recipient !== recipient || q.request.amount !== amount || q.oldAmountRaw !== amount || q.request.depositDeadline !== q.expiresAt || t.owner !== owner || t.recipient !== recipient || t.oldAmountRaw !== amount || t.newGrantRaw !== q.newGrantRaw || t.nonce !== q.request.nonce || t.depositDeadline !== q.expiresAt || t.minimumSnapshotHoldingRaw !== (extra ? '0' : '1000000000000000') || t.minimumCurrentHoldingRaw !== '1000000000000000' || t.destinationChain !== '4663' || t.sourceMint !== '6JfonM6a24xngXh5yJ1imZzbMhpfvEsiafkb4syHBAGS' || t.destinationToken.toLowerCase() !== '0xc65e9630d8af1ea278cbe359f78931684b4ff9f8' || !/^[1-9][0-9]{0,38}$/.test(q.newGrantRaw) || BigInt(q.newGrantRaw) > BigInt(amount) * 700000000n || BigInt(q.expiresAt) <= BigInt(Math.floor(Date.now() / 1000))) throw Error('Quote does not match your selected wallets and amount.');
 }
 export default function LiveMigration({ owner, amount, enabled, canStart = true }: { owner: string; amount: string | null; enabled: boolean; canStart?: boolean }) {
   const [busy, setBusy] = useState(false), [error, setError] = useState('');

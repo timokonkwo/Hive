@@ -1,25 +1,30 @@
+import { localClaimTestOwner } from '@/lib/hive-local-claim-test';
 import { claimSchedule, CLAIM_OPENING_TIME } from '@/lib/hive-claim-schedule';
 import { NextResponse } from 'next/server';
 import { checkRateLimit, getClientIp } from '@/lib/rate-limit';
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 const headers = { 'Cache-Control': 'private, no-store' };
-async function forward(action: string, input: unknown) {
+async function forward(action: string, input: unknown, localOwner: string | null = null) {
   const schedule = claimSchedule(process.env.HIVE_CLAIMS_OPEN_AT ?? CLAIM_OPENING_TIME);
   const now = Date.now();
   const endpoint = process.env.HIVE_CLAIM_GATEWAY_URL, token = process.env.HIVE_CLAIM_GATEWAY_TOKEN;
   if (!endpoint || !token || process.env.HIVE_CLAIM_UI_ENABLED !== 'true') return NextResponse.json(action === 'availability' ? { enabled: false } : { error: 'Migration is not open.' }, { status: action === 'availability' ? 200 : 503, headers });
-  if (['quote', 'register', 'deposit'].includes(action) && (!schedule || now < schedule.opensAt || now >= schedule.closesAt)) return NextResponse.json({ error: 'Claims are not open.' }, { status: 409, headers });
+  const candidate = input as { owner?: string; request?: { owner?: string } } | null;
+  const inputOwner = candidate?.owner ?? candidate?.request?.owner;
+  if (localOwner && action !== 'availability' && inputOwner !== localOwner) return NextResponse.json({ error: 'This local test is limited to the configured wallet.' }, { status: 403, headers });
+  if (!localOwner && ['quote', 'register', 'deposit'].includes(action) && (!schedule || now < schedule.opensAt || now >= schedule.closesAt)) return NextResponse.json({ error: 'Claims are not open.' }, { status: 409, headers });
   try {
     const url = new URL(endpoint);
     if (url.protocol !== 'https:' && !(url.protocol === 'http:' && ['localhost', '127.0.0.1'].includes(url.hostname))) throw Error();
     if (url.username || url.password || url.search || url.hash) throw Error();
     const response = await fetch(new URL(action, url.href.replace(/\/?$/, '/')), { method: 'POST', headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' }, body: JSON.stringify(input), cache: 'no-store', redirect: 'error', signal: AbortSignal.timeout(30000) });
     if (!response.ok) return NextResponse.json({ error: 'The migration request could not be verified. Refresh the claim status or recheck your holdings.' }, { status: 409, headers });
-    return NextResponse.json(await response.json(), { headers });
+    const payload = await response.json();
+    return NextResponse.json(action === 'availability' && localOwner && payload.enabled === true ? { ...payload, localTestOwner: localOwner } : payload, { headers });
   } catch { return NextResponse.json(action === 'availability' ? { enabled: false } : { error: 'Migration service unavailable. Keep your saved request and retry status.' }, { status: action === 'availability' ? 200 : 503, headers }); }
 }
-export async function GET() { return forward('availability', {}); }
+export async function GET(request: Request) { return forward('availability', {}, localClaimTestOwner(request.url)); }
 export async function POST(request: Request) {
   const origin = request.headers.get('origin');
   const url = new URL(request.url);
@@ -36,6 +41,6 @@ export async function POST(request: Request) {
     while (true) { const { done, value } = await reader.read(); if (done) break; length += value.length; if (length > 16384) { await reader.cancel(); throw Error(); } chunks.push(value); }
     const data = JSON.parse(Buffer.concat(chunks).toString());
     if (!['quote', 'register', 'status', 'deposit'].includes(data.action)) throw Error();
-    return forward(data.action, data.input);
+    return forward(data.action, data.input, localClaimTestOwner(request.url));
   } catch { return NextResponse.json({ error: 'Invalid migration request.' }, { status: 400, headers }); }
 }

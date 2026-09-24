@@ -1,0 +1,32 @@
+// Generates a pinned public review. No signing, funding, unpause or broadcast.
+import {readFileSync,writeFileSync,mkdirSync,existsSync} from 'node:fs';import {resolve,dirname} from 'node:path';import {fileURLToPath} from 'node:url';import {randomBytes,createHash} from 'node:crypto';
+import {Keypair,Connection,PublicKey} from '@solana/web3.js';import {createPublicClient,http,getContractAddress,encodeDeployData,formatEther} from 'viem';
+import {validateCampaign} from '../prepare-campaign.mjs';
+import {requireFreshReview,saveJson} from './safety.mjs';
+const root=resolve(dirname(fileURLToPath(import.meta.url)),'../../../..');
+const escrow=resolve(root,'tools/hive-migration/escrow');
+const dir=resolve(escrow,'local/deployment-100k');mkdirSync(dir,{recursive:true,mode:0o700});
+requireFreshReview(dir);
+const hash=b=>createHash('sha256').update(b).digest('hex');
+const c=JSON.parse(readFileSync(resolve(escrow,'campaign.inputs.json')));
+const bytes=readFileSync(resolve(escrow,'solana/target/deploy/hive_redemption_escrow.so'));
+const programKey=Keypair.fromSecretKey(Uint8Array.from(JSON.parse(readFileSync(resolve(escrow,'solana/target/deploy/hive_redemption_escrow-keypair.json')))));
+const identityPath=resolve(dir,'identity.json');if(!existsSync(identityPath))writeFileSync(identityPath,JSON.stringify({campaignId:'0x'+randomBytes(32).toString('hex'),program:programKey.publicKey.toBase58()}),{flag:'wx',mode:0o600});
+const identity=JSON.parse(readFileSync(identityPath));if(identity.program!==programKey.publicKey.toBase58())throw Error('Program identity changed');
+const rpc=new Connection(process.env.SOLANA_RPC_URL,'finalized');const evm=createPublicClient({transport:http('https://rpc.mainnet.chain.robinhood.com',{retryCount:0,timeout:20000})});
+if(await rpc.getGenesisHash()!=='5eykt4UsFv8P8NJdTREpY1vzqKqZKvdpKuc147dw2N9d'||await evm.getChainId()!==4663)throw Error('Wrong deployment networks');
+const [pendingNonce,nonce]=await Promise.all([evm.getTransactionCount({address:c.destinationAdmin,blockTag:'pending'}),evm.getTransactionCount({address:c.destinationAdmin,blockTag:'latest'})]);if(nonce!==pendingNonce)throw Error('An EVM transaction is pending; reconcile it first');
+const distributor=getContractAddress({from:c.destinationAdmin,nonce:BigInt(nonce)});
+const config={...c,...identity,distributor,opensAt:String(Date.parse('2026-09-25T09:00:00Z')/1000),closesAt:String(Date.parse('2026-10-02T09:00:00Z')/1000),claimGrace:'86400',terminalAttemptPolicyApproved:true};
+const snapshotBytes=readFileSync(resolve(escrow,c.snapshotDirectory,'holders.json'));if(hash(snapshotBytes)!==c.holdersSha256)throw Error('Frozen snapshot digest mismatch');
+const selected=JSON.parse(readFileSync(resolve(escrow,c.reviewedHoldersFile)));const review=validateCampaign(config,JSON.parse(snapshotBytes),selected);
+const artifact=JSON.parse(readFileSync(resolve(escrow,'evm/out/HiveDistributor.sol/HiveDistributor.json')));const x=review.config;
+const args=[x.destinationToken,x.destinationAdmin,x.campaignId,'0x'+new PublicKey(review.sourceCampaign).toBuffer().toString('hex'),'0x'+new PublicKey(x.mint).toBuffer().toString('hex'),x.root,BigInt(x.opensAt),BigInt(x.closesAt),BigInt(x.claimGrace),BigInt(x.totalEligibleOldRaw),BigInt(x.fundingBudgetRaw),x.allowPartialSurrender,{owner:'0x'+new PublicKey(x.exceptionOwner).toBuffer().toString('hex'),allowance:BigInt(x.exceptionAllowanceRaw),grant:BigInt(x.exceptionGrantRaw),opensAt:BigInt(x.exceptionOpensAt)}];
+const data=encodeDeployData({abi:artifact.abi,bytecode:artifact.bytecode.object,args});const gas=(await evm.estimateGas({account:x.destinationAdmin,data}))*120n/100n;const fees=await evm.estimateFeesPerGas();
+if(!fees.maxFeePerGas)throw Error('Gas quote missing');const cost=gas*fees.maxFeePerGas;if(cost>500000000000000n)throw Error('Deployment exceeds the 0.0005 ETH review cap');
+const rents=await Promise.all([36,bytes.length+37,bytes.length+45].map(n=>rpc.getMinimumBalanceForRentExemption(n,'finalized')));
+const output={...review,mode:'unsigned_review_only',financialActivationApproved:false,terminalPolicyUserConfirmed:false,createdAt:new Date().toISOString(),nonce,programSha256:hash(bytes),programBytes:bytes.length,solanaRentLamports:rents[0]+Math.max(rents[1],rents[2]),evmDeployment:{abi:artifact.abi,bytecode:artifact.bytecode.object,constructorArguments:args,data,estimatedGas:gas.toString(),estimatedMaximumFeeWei:cost.toString()},limits:{maxTotalEvmFeeWei:'500000000000000',maxTotalSolanaFeeLamports:'20000000'},requiresWalletSignatures:true};
+// Policy remains an unsigned proposal until explicitly confirmed in the local deployment UI.
+output.config.terminalAttemptPolicyApproved=false;
+saveJson(resolve(dir,'review.json'),output);
+console.log(JSON.stringify({review:resolve(dir,'review.json'),program:x.program,distributor,ordinaryWallets:selected.length,ordinaryBudget:'10000000',supplementalGrant:'100000',totalFunding:'10100000',solanaRentSOL:output.solanaRentLamports/1e9,estimatedEvmMaximumFeeETH:formatEther(cost),walletSignaturesRequired:true,transactionsSent:0}));

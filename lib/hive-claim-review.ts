@@ -1,5 +1,5 @@
 import type { ReimbursementLookup } from './hive-reimbursement';
-import { reimbursementCampaign } from './hive-reimbursement';
+import { reimbursementCampaign, supplementalClaim } from './hive-reimbursement';
 import { proportionalQuote } from '../tools/hive-migration/proportional-model.mjs';
 export type MigrationReview = {
   status: 'snapshot-required' | 'snapshot-below-minimum' | 'custody-review' | 'balance-unavailable' | 'no-holdings' | 'below-minimum' | 'invalid-amount' | 'campaign-pending';
@@ -11,16 +11,18 @@ export type MigrationReview = {
 export function migrationReview(result: ReimbursementLookup, requestedRaw?: string): MigrationReview {
   const blocked = (status: MigrationReview['status']): MigrationReview => ({ status, depositRaw: null, receiveRaw: null, executable: false });
   if (result.status === 'custody-review') return blocked('custody-review');
-  if (result.status !== 'allocation-pending' || result.snapshotBalanceRaw === null) return blocked('snapshot-required');
-  if (BigInt(result.snapshotBalanceRaw) < BigInt(reimbursementCampaign.minimumCurrentHoldingRaw)) return blocked('snapshot-below-minimum');
+  const extra=result.status==='approved-exception' && result.owner===supplementalClaim.owner;
+  const allowance=extra?supplementalClaim.allowanceRaw:result.snapshotBalanceRaw;
+  if ((!extra && result.status !== 'allocation-pending') || allowance === null) return blocked('snapshot-required');
+  if (BigInt(allowance) < BigInt(reimbursementCampaign.minimumCurrentHoldingRaw)) return blocked('snapshot-below-minimum');
   if (result.currentBalance.status !== 'available') return blocked('balance-unavailable');
-  const frozen = BigInt(result.snapshotBalanceRaw), current = BigInt(result.currentBalance.amountRaw);
+  const frozen = BigInt(allowance), current = BigInt(result.currentBalance.amountRaw);
   if (current === 0n) return blocked('no-holdings');
   if (current < BigInt(reimbursementCampaign.minimumCurrentHoldingRaw)) return blocked('below-minimum');
   const maximum = frozen < current ? frozen : current;
   if (requestedRaw !== undefined && (!/^[1-9][0-9]*$/.test(requestedRaw) || requestedRaw.length > 20 || BigInt(requestedRaw) > maximum)) return blocked('invalid-amount');
   const deposit = requestedRaw === undefined ? maximum : BigInt(requestedRaw);
-  return { status: 'campaign-pending', depositRaw: deposit.toString(), receiveRaw: proportionalQuote(deposit, BigInt(reimbursementCampaign.eligibleOldRaw), BigInt(reimbursementCampaign.budgetRaw)).toString(), executable: false };
+  return { status: 'campaign-pending', depositRaw: deposit.toString(), receiveRaw: proportionalQuote(deposit, BigInt(extra?supplementalClaim.allowanceRaw:reimbursementCampaign.eligibleOldRaw), BigInt(extra?supplementalClaim.grantRaw:reimbursementCampaign.budgetRaw)).toString(), executable: false };
 }
 
 /** Exact human input; abbreviated display values must never become deposit amounts. */

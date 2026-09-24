@@ -1,0 +1,27 @@
+# Blueprint path: tools/hive-migration/escrow/render/render.yaml
+services:
+  - type: web
+    name: hive-claim-operator
+    runtime: node
+    plan: starter
+    numInstances: 1
+    buildCommand: npm ci --prefix tools/hive-migration/escrow --omit=dev
+    startCommand: node tools/hive-migration/escrow/render/start.mjs
+    autoDeployTrigger: off
+    disk:
+      name: hive-claim-journal
+      mountPath: /var/data
+      sizeGB: 1
+    envVars:
+      - key: NODE_VERSION
+        value: 22.16.0
+      - key: HIVE_OPERATOR_EXECUTE
+        value: 'false'
+      - key: HIVE_OPERATOR_DATA_DIR
+        value: /var/data/hive
+      - key: HIVE_CLAIM_GATEWAY_TOKEN
+        generateValue: true
+      - key: SOLANA_RPC_URL
+        sync: false
+      - key: HIVE_REDEMPTION_RH_RPC_URL
+        value: https://rpc.mainnet.chain.robinhood.com
