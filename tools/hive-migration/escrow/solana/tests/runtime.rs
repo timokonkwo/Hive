@@ -92,7 +92,7 @@ async fn fixture_with_exception(allow_partial_surrender: bool, funding_budget_ra
     let mut ctx = pt.start_with_context().await;
     ctx.set_sysvar(&Clock { unix_timestamp: 100, ..Clock::default() });
     let init = EscrowIx::Initialize { id: CAMPAIGN, collection,
-        root: snapshot_leaf(&CAMPAIGN, &mint, &if extra { a.pubkey() } else { owner.pubkey() }, CAP), 
+        root: snapshot_leaf(&CAMPAIGN, &mint, &if extra { a.pubkey() } else { owner.pubkey() }, CAP),
         destination_chain: 4663, distributor: [7; 20], opens_at: if extra { 200 } else { 100 }, closes_at: 10000, claim_grace: 3600,
         total_eligible_old_raw: CAP, funding_budget_raw, allow_partial_surrender, minimum_current_holding_raw, exception_owner: if extra { owner.pubkey() } else { Pubkey::default() }, exception_allowance_raw: if extra { CAP } else { 0 }, exception_grant_raw: if extra { 100 * 10u128.pow(18) } else { 0 }, exception_opens_at: if extra { 100 } else { 0 }, };
 

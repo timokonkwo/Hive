@@ -1,6 +1,6 @@
 # HIVE redemption escrow
 
-Implemented locally: a Solana SPL-token escrow program, a prefunded Robinhood ERC-20 distributor, unsigned client/preparation tools, a finalized-state inspector, and an automated single-admin verifier service. **The service has not been activated. No mainnet escrow deployment, public checker deployment, deposit, payout or unpause has occurred.**
+Implemented locally: a Solana SPL-token escrow program, a prefunded Robinhood ERC-20 distributor, unsigned client/preparation tools, a finalized-state inspector, and an automated single-admin verifier service. **The service has not been activated. The public checker is deployed. No mainnet escrow deployment, deposit, payout or unpause has occurred.**
 
 The collection wallet selected by the user is **`CmKcjG6tvNy26z5CVd58mgPTs5RPzeJvmjGDvqXxpwLF`**. Its old-HIVE associated token account derives to `46YZhh9FJtKufB7f6tBTZkLZxywzy5tHaG72RaNnLFJH`; derivation does not establish account creation or wallet ownership. The settlement builder creates the associated token account idempotently when needed.
 
@@ -23,7 +23,7 @@ A reservation can be cancelled while a previously co-signed deposit is in flight
 
 - Frozen cutoff: **slot 449032979, 21 September 2026 at 11:48:43 UTC+1**. Raw snapshot evidence remains unchanged. A new tree includes only explicitly reviewed eligible owners and allowances no greater than that snapshot.
 - Old mint: `6JfonM6a24xngXh5yJ1imZzbMhpfvEsiafkb4syHBAGS`, standard SPL, nine decimals, revoked mint/freeze authorities.
-- New token: `0xc65e9630D8Af1eA278cbE359f78931684b4ff9f8`, Robinhood chain **4663**, eighteen decimals. Allocations use the frozen eligible-holdings denominator and 7M campaign budget, rounded down to 18 decimals and capped at 70% of surrendered old HIVE. They are not price-oracle values or 1:1 conversion.
+- New token: `0xc65e9630D8Af1eA278cbE359f78931684b4ff9f8`, Robinhood chain **4663**, eighteen decimals. Allocations use the frozen eligible-holdings denominator and 10M ordinary campaign budget, rounded down to 18 decimals and capped at 70% of surrendered old HIVE. They are not price-oracle values or 1:1 conversion.
 - V1 allows **one escrow deposit per source owner per campaign**. Both paid and refunded attempts are terminal. No close/reinitialize, remainder claim or retry nonce exists. This stricter rule requires confirmation before deployment; a retry feature would require a new allowance/nonce design and tests.
 - Partial surrender is selected (`allowPartialSurrender: true`). Smaller deposits receive the same proportional rate on the amount actually surrendered, capped by the snapshot allowance; there is no full award for a partial deposit. Zero-allocation deposits are rejected. The quote must display the actual award and terminal-attempt policy before the user signs.
 - The preparation tool excludes the known pool and rejects program-controlled source owners for V1. Custody, staking and team exclusions require separate review. Program custodians cannot automatically use an ordinary wallet-signature flow.
@@ -100,7 +100,7 @@ The verifier checks `depositEvidence` against a successful finalized source inst
 
 The selected budget is **10,000,000 new HIVE**, split proportionally by frozen eligible holdings, with a 70% per-holder ceiling. The reviewed holder list determines the denominator; preparation derives its exact sum and rejects a conflicting supplied total or legacy tier fields. Both contracts use integer arithmetic, and the distributor additionally bounds lifetime allocated HIVE and committed old-token amounts. Cancellation does not redistribute a share. High budgets that hit the 70% ceiling leave excess funds unallocated.
 
-The current provisional preview covers 247 non-pool candidates with 582,229,876.983614953 old HIVE, including 16 unresolved program owners. It is not an approved campaign tree. Final custody/eligibility decisions can change the denominator. No addresses are silently excluded or approved by the preview. See the root inputs and current redemption plan.
+The final ordinary allocation covers 72 approved snapshot wallets, each with at least 1M Solana HIVE at the cutoff. Its denominator is 564,937,895.383759533 Solana HIVE. Current holdings must still meet the 1M minimum. A separately funded, explicitly approved 100K exception has been added for the admin wallet; it does not change this denominator or any ordinary award. See [the deployment review](deployment/README.md) for exact terms and current readiness.
 
 The proportional contracts, serializers, registration v3 signatures, unsigned exports and finalized-state observers replace the previous tier implementation. Regenerate review/deployment artifacts; old initialization/account layouts are incompatible and are rejected. The read-only `/token/claim` checker is implemented locally; public launch, transaction claim integration and the deployed end-to-end rehearsal remain pending.
 
