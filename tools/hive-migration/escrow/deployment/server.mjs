@@ -1,8 +1,8 @@
-// Loopback-only, fixed-purpose wallet deployment. Never accepts keys or arbitrary instructions.
+// Loopback-only deployment. Keys stay in the browser; this server accepts signed transactions only.
 import {createServer} from 'node:http';import {readFileSync,writeFileSync,existsSync,openSync,fsyncSync,closeSync} from 'node:fs';import {dirname,resolve} from 'node:path';import {fileURLToPath} from 'node:url';import {randomBytes,createHash,createPublicKey,verify} from 'node:crypto';
 import {Connection,Keypair,PublicKey,VersionedTransaction,ComputeBudgetProgram} from '@solana/web3.js';import {getBase58Decoder} from '@solana/kit';import {createPublicClient,http,encodeFunctionData,parseAbi,keccak256,toHex,formatUnits} from 'viem';
 import {Journal,acquireServiceLock} from '../journal.mjs';import {initializeInstruction,unsignedTransaction,decodeCampaign} from '../client.mjs';import {createObserver} from '../observer.mjs';import {LOADER,programDataAddress,createBuffer,writeBuffer,deployProgram} from './loader.mjs';
-import {saveJson,verifyEvmTransaction} from './safety.mjs';
+import {saveJson,verifyEvmTransaction,verifySignedEvm} from './safety.mjs';
 const here=dirname(fileURLToPath(import.meta.url)),escrow=resolve(here,'..'),root=resolve(escrow,'../../..'),dir=resolve(escrow,'local/deployment-100k');
 const reviewPath=resolve(dir,'review.json');const review=JSON.parse(readFileSync(reviewPath));const c=review.config;
 const programBytes=readFileSync(resolve(escrow,'solana/target/deploy/hive_redemption_escrow.so'));
@@ -98,6 +98,17 @@ async function action(path,input){
  if(path==='/approve'){check(input.terminalPolicy===true&&input.graceSeconds==='86400'&&input.upgradeAuthority===c.admin,'Review acknowledgement mismatch');review.terminalPolicyUserConfirmed=true;c.terminalAttemptPolicyApproved=true;saveReview();return {approved:true};}
  if(path==='/prepare')return prepare();
  const plan=plans.get(input.id)??journal.latest().get(input.id);check(plan,'Unknown plan');
+ if(path==='/evm-signed'){
+  check(plan.chain==='evm','Wrong signing plan');
+  const signature=await verifySignedEvm(input.raw,plan.transaction);
+  const existing=journal.latest().get(plan.id);if(existing){check(existing.hash===signature,'A different transaction is already journaled');return {hash:signature,status:existing.status};}
+  check(!await reconcile(),'Another transaction is pending');
+  const spent=[...journal.latest().values()].filter(e=>e.chain==='evm'&&e.status!=='rejected').reduce((n,e)=>n+BigInt(e.maximumCost??0),0n);check(spent+BigInt(plan.maximumCost)<=BigInt(review.limits.maxTotalEvmFeeWei),'EVM fee budget exceeded');
+  check(await evm.getTransactionCount({address:c.destinationAdmin,blockTag:'pending'})===Number(BigInt(plan.transaction.nonce)),'Wallet nonce changed; do not submit this plan');
+  const entry={...plan,hash:signature,raw:input.raw,status:'submitted'};journal.append(entry);
+  try{check(await evm.sendRawTransaction({serializedTransaction:input.raw})===signature,'RPC hash mismatch');}catch{journal.append({...entry,status:'unknown'});}
+  return {hash:signature,status:journal.latest().get(plan.id).status};
+ }
  if(path==='/solana-submit'){
   check(plan.chain==='solana'&&typeof input.base64==='string'&&input.base64.length<3000,'Invalid signed transaction');const existing=journal.latest().get(plan.id);if(existing)return {signature:existing.hash,status:existing.status};
   check(await sol.getBlockHeight('finalized')<=plan.lastValidBlockHeight,'Signing blockhash expired');
@@ -114,17 +125,18 @@ async function action(path,input){
  throw Error('Unsupported action');
 }
 const server=createServer(async(req,res)=>{
+ res.setHeader('Content-Security-Policy',"default-src 'none'; script-src 'self'; connect-src 'self'; style-src 'unsafe-inline'; img-src 'self'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'");res.setHeader('X-Content-Type-Options','nosniff');res.setHeader('Referrer-Policy','no-referrer');
  const reply=(status,value)=>{res.writeHead(status,{'Content-Type':'application/json','Cache-Control':'no-store'});res.end(JSON.stringify(value));};
  try{
   check(allowedHosts.has(req.headers.host),'Loopback host required');const path=new URL(req.url,'http://'+req.headers.host).pathname;
   if(req.method==='GET'&&path==='/'){res.writeHead(200,{'Content-Type':'text/html','Cache-Control':'no-store','Set-Cookie':`hiveDeploy=${cookie}; HttpOnly; SameSite=Strict; Path=/`,'X-Frame-Options':'DENY'});return res.end(readFileSync(resolve(here,'wallet.html')));}
-  if(req.method==='GET'&&['/wallet.js','/web3.js'].includes(path)){res.writeHead(200,{'Content-Type':'application/javascript','Cache-Control':'no-store'});return res.end(readFileSync(path==='/wallet.js'?resolve(here,'wallet.js'):resolve(root,'node_modules/@solana/web3.js/lib/index.iife.min.js')));}
+  if(req.method==='GET'&&['/wallet.js','/web3.js','/key-signing.js'].includes(path)){res.writeHead(200,{'Content-Type':'application/javascript','Cache-Control':'no-store'});return res.end(readFileSync(path==='/wallet.js'?resolve(here,'wallet.js'):path==='/key-signing.js'?resolve(dir,'key-signing.bundle.js'):resolve(root,'node_modules/@solana/web3.js/lib/index.iife.min.js')));}
   check((req.headers.cookie??'').split(';').map(s=>s.trim()).includes('hiveDeploy='+cookie),'Deployment session required');
   if(req.method==='GET'&&path==='/recovery')return reply(200,{unresolved:[...journal.latest().values()].filter(e=>e.chain==='evm'&&['awaiting_wallet','unknown'].includes(e.status)&&!e.hash).map(e=>({id:e.id,action:e.action,nonce:e.transaction.nonce}))});
   if(req.method==='GET'&&path==='/status')return reply(200,await state());
   check(req.method==='POST'&&req.headers.origin==='http://'+req.headers.host&&req.headers['content-type']?.startsWith('application/json'),'Same-origin JSON POST required');
   check(!busy,'Another operation is running');busy=true;
-  try{let size=0;const chunks=[];for await(const chunk of req){size+=chunk.length;check(size<=32768,'Request too large');chunks.push(chunk);}return reply(200,await action(path,JSON.parse(Buffer.concat(chunks).toString())));}finally{busy=false;}
+  try{let size=0;const chunks=[];for await(const chunk of req){size+=chunk.length;check(size<=65536,'Request too large');chunks.push(chunk);}return reply(200,await action(path,JSON.parse(Buffer.concat(chunks).toString())));}finally{busy=false;}
  }catch(error){let message=error.shortMessage??error.message??'Deployment request failed';if(process.env.SOLANA_RPC_URL)message=message.split(process.env.SOLANA_RPC_URL).join('[private RPC]');reply(409,{error:message});}
 });
 server.listen(port,'127.0.0.1',()=>console.log('Deployment review ready at http://localhost:8789 — wallet signatures required; no automatic transactions.'));

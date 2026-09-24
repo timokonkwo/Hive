@@ -1,5 +1,6 @@
 import {readFileSync,existsSync,openSync,writeFileSync,fsyncSync,closeSync,renameSync} from 'node:fs';
 import {dirname,join} from 'node:path';
+import {parseTransaction,recoverTransactionAddress,keccak256} from 'viem';
 
 export function requireFreshReview(directory) {
   if (existsSync(join(directory,'service.lock')) || existsSync(join(directory,'transactions.jsonl'))) throw Error('Deployment already started; preserve the review and reconcile its journal.');
@@ -16,4 +17,12 @@ export function saveJson(path,value) {
 export function verifyEvmTransaction(actual,expected) {
   if(actual.from.toLowerCase()!==expected.from.toLowerCase() || actual.nonce!==Number(BigInt(expected.nonce)) || actual.input!==expected.data || (actual.to?.toLowerCase()??null)!==(expected.to?.toLowerCase()??null) || actual.value!==0n) throw Error('Wallet transaction differs from approved plan');
   if(actual.gas>BigInt(expected.gas) || actual.maxFeePerGas===undefined || actual.maxPriorityFeePerGas===undefined || actual.maxFeePerGas>BigInt(expected.maxFeePerGas) || actual.maxPriorityFeePerGas>BigInt(expected.maxPriorityFeePerGas)) throw Error('Wallet fees exceed the reviewed ceiling; reconcile the receipt before proceeding.');
+}
+export async function verifySignedEvm(raw,expected) {
+  if(typeof raw!=='string'||!/^0x[0-9a-f]+$/i.test(raw)||raw.length>60000)throw Error('Invalid signed transaction');
+  const transaction=parseTransaction(raw);
+  if(transaction.type!=='eip1559'||transaction.chainId!==4663||(transaction.accessList?.length??0)!==0)throw Error('Unexpected transaction envelope');
+  const from=await recoverTransactionAddress({serializedTransaction:raw});
+  verifyEvmTransaction({...transaction,from,input:transaction.data??'0x',value:transaction.value??0n},expected);
+  return keccak256(raw);
 }
