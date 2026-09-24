@@ -4,6 +4,7 @@ import {Connection,Keypair,PublicKey,VersionedTransaction,ComputeBudgetProgram} 
 import {Journal,acquireServiceLock} from '../journal.mjs';import {initializeInstruction,unsignedTransaction,decodeCampaign} from '../client.mjs';import {createObserver} from '../observer.mjs';import {LOADER,programDataAddress,createBuffer,writeBuffer,deployProgram} from './loader.mjs';
 import {saveJson,verifyEvmTransaction,verifySignedEvm} from './safety.mjs';
 import {deploymentOrigin,validAccessToken,sessionCookie} from './access.mjs';
+import {expiredUpload} from './reconcile-upload.mjs';
 const here=dirname(fileURLToPath(import.meta.url)),escrow=resolve(here,'..'),root=resolve(escrow,'../../..'),dir=resolve(escrow,'local/deployment-100k');
 const reviewPath=resolve(dir,'review.json');const review=JSON.parse(readFileSync(reviewPath));const c=review.config;
 const programBytes=readFileSync(resolve(escrow,'solana/target/deploy/hive_redemption_escrow.so'));
@@ -24,6 +25,7 @@ async function reconcile(){
   if(entry.chain==='solana'){
    const s=(await sol.getSignatureStatuses([entry.hash],{searchTransactionHistory:true})).value[0];
    if(s?.confirmationStatus==='finalized')journal.append({...entry,status:s.err?'failed':'confirmed'});
+   else if(!s){const expiry=await expiredUpload(entry,sol);if(expiry)journal.append({...entry,status:'expired',expiry});}
   }else{
    let r;try{r=await evm.getTransactionReceipt({hash:entry.hash});}catch(e){if(e.name==='TransactionReceiptNotFoundError')continue;throw e;}
    const t=await evm.getTransaction({hash:entry.hash});const expected=entry.transaction;
