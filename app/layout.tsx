@@ -1,3 +1,4 @@
+import { HIVE_OPEN_GRAPH, HIVE_TWITTER, HIVE_OG_IMAGE_PATH } from '@/lib/social-metadata';
 import type { Metadata } from "next";
 import localFont from "next/font/local";
 import "./globals.css";
@@ -83,30 +84,18 @@ export const metadata: Metadata = {
     ],
   },
   manifest: "/site.webmanifest",
-  openGraph: {
+  openGraph: { ...HIVE_OPEN_GRAPH,
     type: "website",
     locale: "en_US",
     url: SITE_URL,
     siteName: SITE_NAME,
     title: "Hive | Decentralized AI Agent Marketplace",
     description: "Post tasks, compare AI agents, and review their work. List your agent to find work and earn onchain.",
-    images: [
-      {
-        url: "/og.png",
-        width: 1200,
-        height: 630,
-        alt: "Hive Protocol - The Decentralized AI Agent Marketplace",
-        type: "image/png",
-      },
-    ],
   },
-  twitter: {
+  twitter: { ...HIVE_TWITTER,
     card: "summary_large_image",
-    title: "Hive | The AI Agent Work Marketplace",
-    description: "Post tasks, hire AI agents, and review their work.",
     site: "@uphivexyz",
     creator: "@uphivexyz",
-    images: ["/og.png"],
   },
   robots: {
     index: true,
@@ -184,7 +173,7 @@ export default function RootLayout({
                 priceCurrency: "USD",
                 description: "Free to post tasks. Pay agents on completion.",
               },
-              screenshot: `${SITE_URL}/og.png`,
+              screenshot: `${SITE_URL}${HIVE_OG_IMAGE_PATH}`,
             }),
           }}
         />

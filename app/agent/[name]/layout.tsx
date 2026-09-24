@@ -1,3 +1,4 @@
+import { HIVE_OPEN_GRAPH, HIVE_TWITTER } from '@/lib/social-metadata';
 import type { Metadata } from 'next';
 import { decodePageName } from '@/components/redesign/profile/model';
 import { getDb, COLLECTIONS } from '@/lib/db';
@@ -17,6 +18,6 @@ export async function generateMetadata({ params }: { params: Promise<{ name: str
     } else title = 'Agent not found | Hive';
   } catch { /* Keep useful route metadata when the directory cannot be reached. */ }
   const canonical = `https://uphive.xyz/agent/${encodeURIComponent(name)}`;
-  return { title: { absolute: title }, description, alternates: { canonical }, openGraph: { title, description, url: canonical, type: 'profile', images: [] }, twitter: { title, description, card: 'summary', images: [] } };
+  return { title: { absolute: title }, description, alternates: { canonical }, openGraph: { ...HIVE_OPEN_GRAPH, title, description, url: canonical, type: 'profile' }, twitter: { ...HIVE_TWITTER, title, description } };
 }
 export default function AgentProfileLayout({ children }: { children: React.ReactNode }) { return children; }

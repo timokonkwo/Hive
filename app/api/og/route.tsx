@@ -1,5 +1,6 @@
 import { ImageResponse } from 'next/og';
 import { NextRequest } from 'next/server';
+import { HIVE_OG_IMAGE_PATH } from '@/lib/social-metadata';
 import { hiveWordmarkData } from '@/lib/brand-og';
 
 // Removed `export const runtime = 'edge'` — runs as serverless function on Netlify
@@ -8,7 +9,7 @@ import { hiveWordmarkData } from '@/lib/brand-og';
 /**
  * GET /api/og — Dynamic OG image generator
  * Renders images that faithfully match the actual page designs.
- * Falls back to static /og.png if generation fails.
+ * Falls back to the versioned brand image if generation fails.
  */
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url);
@@ -25,16 +26,14 @@ export async function GET(request: NextRequest) {
       response = renderDefaultOG();
     }
 
-    // CRITICAL: Do NOT cache on CDN. Netlify ignores query params in its cache key,
-    // so /api/og?name=X and /api/og?name=Y would serve the same cached image.
-    // Each request must generate fresh based on its unique query params.
+    // Keep query-specific preview images out of shared response caches.
     response.headers.set('Cache-Control', 'no-store, no-cache, must-revalidate');
     response.headers.set('Vary', '*');
     return response;
   } catch {
     // If dynamic OG generation fails, redirect to the static fallback image
     const baseUrl = new URL(request.url).origin;
-    return Response.redirect(`${baseUrl}/og.png`, 302);
+    return Response.redirect(`${baseUrl}${HIVE_OG_IMAGE_PATH}`, 302);
   }
 }
 
@@ -62,10 +61,10 @@ function renderAgentOG(params: URLSearchParams) {
 
   // Build stats array dynamically
   const stats = [
-    { value: rep, label: 'Reputation', color: '#beff00' },
-    { value: tasks, label: 'Completed', color: '#3b82f6' },
-    { value: proposals, label: 'Proposals', color: '#a855f7' },
-    { value: `$${earnings}`, label: 'Earned (USDC)', color: '#eab308' },
+    { value: rep, label: 'Reputation', color: '#ccff00' },
+    { value: tasks, label: 'Completed', color: '#ccff00' },
+    { value: proposals, label: 'Proposals', color: '#ccff00' },
+    { value: `$${earnings}`, label: 'Earned (USDC)', color: '#ccff00' },
   ];
 
   return new ImageResponse(
@@ -76,14 +75,14 @@ function renderAgentOG(params: URLSearchParams) {
           height: '100%',
           display: 'flex',
           flexDirection: 'column',
-          backgroundColor: '#09090b',
-          fontFamily: 'system-ui, -apple-system, sans-serif',
+          backgroundColor: '#11140f',
+          fontFamily: 'sans-serif',
         }}
       >
         {/* Top accent line */}
         <div style={{
           height: '3px',
-          background: 'linear-gradient(90deg, #beff00, #3b82f6, #a855f7)',
+          background: '#ccff00',
           display: 'flex',
         }} />
 
@@ -97,7 +96,7 @@ function renderAgentOG(params: URLSearchParams) {
           <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
             <img src={hiveWordmarkData} width={116} height={48} alt="Hive" />
             <span style={{
-              color: '#52525b',
+              color: '#b5bcad',
               fontSize: '12px',
               fontWeight: 600,
               textTransform: 'uppercase',
@@ -110,13 +109,13 @@ function renderAgentOG(params: URLSearchParams) {
               alignItems: 'center',
               gap: '6px',
               padding: '6px 16px',
-              backgroundColor: 'rgba(234,179,8,0.08)',
-              border: '1px solid rgba(234,179,8,0.2)',
+              backgroundColor: 'rgba(204,255,0,0.08)',
+              border: '1px solid rgba(204,255,0,0.2)',
               borderRadius: '9999px',
             }}>
               <span style={{ fontSize: '14px' }}>★</span>
-              <span style={{ color: '#eab308', fontSize: '14px', fontWeight: 700 }}>{rating}</span>
-              <span style={{ color: '#71717a', fontSize: '12px' }}>({reviews})</span>
+              <span style={{ color: '#ccff00', fontSize: '14px', fontWeight: 700 }}>{rating}</span>
+              <span style={{ color: '#b5bcad', fontSize: '12px' }}>({reviews})</span>
             </div>
           )}
         </div>
@@ -132,15 +131,15 @@ function renderAgentOG(params: URLSearchParams) {
               <div style={{
                 width: '88px',
                 height: '88px',
-                backgroundColor: 'rgba(190,255,0,0.1)',
-                border: '2px solid rgba(190,255,0,0.3)',
+                backgroundColor: 'rgba(204,255,0,0.1)',
+                border: '2px solid rgba(204,255,0,0.3)',
                 borderRadius: '16px',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
                 fontSize: '36px',
                 fontWeight: 800,
-                color: '#beff00',
+                color: '#ccff00',
                 flexShrink: 0,
               }}>
                 {name.substring(0, 2).toUpperCase()}
@@ -149,7 +148,7 @@ function renderAgentOG(params: URLSearchParams) {
               <div style={{ display: 'flex', flexDirection: 'column' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '6px' }}>
                   <span style={{
-                    color: '#fff',
+                    color: '#f1f3e9',
                     fontSize: '38px',
                     fontWeight: 800,
                     letterSpacing: '-1px',
@@ -160,10 +159,10 @@ function renderAgentOG(params: URLSearchParams) {
                   {verified && (
                     <span style={{
                       padding: '4px 12px',
-                      backgroundColor: 'rgba(190,255,0,0.1)',
-                      border: '1px solid rgba(190,255,0,0.3)',
+                      backgroundColor: 'rgba(204,255,0,0.1)',
+                      border: '1px solid rgba(204,255,0,0.3)',
                       borderRadius: '9999px',
-                      color: '#beff00',
+                      color: '#ccff00',
                       fontSize: '11px',
                       fontWeight: 700,
                       textTransform: 'uppercase',
@@ -195,7 +194,7 @@ function renderAgentOG(params: URLSearchParams) {
                   )}
                 </div>
                 {joined && (
-                  <span style={{ color: '#52525b', fontSize: '13px' }}>
+                  <span style={{ color: '#b5bcad', fontSize: '13px' }}>
                     Joined {joined}
                   </span>
                 )}
@@ -205,7 +204,7 @@ function renderAgentOG(params: URLSearchParams) {
             {/* Bio */}
             {bio && (
               <div style={{
-                color: '#a1a1aa',
+                color: '#b5bcad',
                 fontSize: '16px',
                 lineHeight: 1.6,
                 marginBottom: '20px',
@@ -223,7 +222,7 @@ function renderAgentOG(params: URLSearchParams) {
                     padding: '5px 14px',
                     backgroundColor: 'rgba(255,255,255,0.04)',
                     border: '1px solid rgba(255,255,255,0.08)',
-                    color: '#a1a1aa',
+                    color: '#b5bcad',
                     fontSize: '11px',
                     fontWeight: 600,
                     textTransform: 'uppercase',
@@ -263,7 +262,7 @@ function renderAgentOG(params: URLSearchParams) {
                 {stat.value}
               </span>
               <span style={{
-                color: '#52525b',
+                color: '#b5bcad',
                 fontSize: '10px',
                 fontWeight: 700,
                 textTransform: 'uppercase',
@@ -283,8 +282,8 @@ function renderAgentOG(params: URLSearchParams) {
           padding: '14px 56px',
           borderTop: '1px solid rgba(255,255,255,0.04)',
         }}>
-          <span style={{ color: '#3f3f46', fontSize: '13px' }}>uphive.xyz/agent/{name}</span>
-          <span style={{ color: '#beff00', fontSize: '12px', fontWeight: 700, letterSpacing: '3px', textTransform: 'uppercase' }}>Hive Protocol</span>
+          <span style={{ color: '#b5bcad', fontSize: '13px' }}>uphive.xyz/agent/{name}</span>
+          <span style={{ color: '#ccff00', fontSize: '12px', fontWeight: 700, letterSpacing: '3px', textTransform: 'uppercase' }}>Hive Protocol</span>
         </div>
       </div>
     ),
@@ -308,11 +307,11 @@ function renderTaskOG(params: URLSearchParams) {
   const desc = params.get('desc') || '';
 
   const statusColors: Record<string, string> = {
-    'Open': '#beff00',
-    'In Progress': '#3b82f6',
-    'Completed': '#22c55e',
+    'Open': '#ccff00',
+    'In Progress': '#ccff00',
+    'Completed': '#ccff00',
   };
-  const statusColor = statusColors[status] || '#71717a';
+  const statusColor = statusColors[status] || '#b5bcad';
 
   return new ImageResponse(
     (
@@ -322,8 +321,8 @@ function renderTaskOG(params: URLSearchParams) {
           height: '100%',
           display: 'flex',
           flexDirection: 'column',
-          backgroundColor: '#09090b',
-          fontFamily: 'system-ui, -apple-system, sans-serif',
+          backgroundColor: '#11140f',
+          fontFamily: 'sans-serif',
         }}
       >
         {/* Navbar mimic */}
@@ -334,7 +333,7 @@ function renderTaskOG(params: URLSearchParams) {
           borderBottom: '1px solid rgba(255,255,255,0.06)',
         }}>
           <img src={hiveWordmarkData} width={116} height={48} alt="Hive" />
-          <span style={{ color: '#71717a', fontSize: '14px', marginLeft: '24px', textTransform: 'uppercase', letterSpacing: '2px', fontWeight: 600 }}>Marketplace</span>
+          <span style={{ color: '#b5bcad', fontSize: '14px', marginLeft: '24px', textTransform: 'uppercase', letterSpacing: '2px', fontWeight: 600 }}>Marketplace</span>
         </div>
 
         {/* Main content — 2 column like actual page */}
@@ -346,9 +345,9 @@ function renderTaskOG(params: URLSearchParams) {
             <div style={{ display: 'flex', gap: '10px', marginBottom: '20px' }}>
               <span style={{
                 padding: '6px 14px',
-                backgroundColor: 'rgba(255,255,255,0.05)',
+                backgroundColor: '#252d1f',
                 border: '1px solid rgba(255,255,255,0.1)',
-                color: '#d4d4d8',
+                color: '#f1f3e9',
                 fontSize: '11px',
                 fontWeight: 700,
                 textTransform: 'uppercase',
@@ -377,7 +376,7 @@ function renderTaskOG(params: URLSearchParams) {
 
             {/* Title */}
             <div style={{
-              color: '#fff',
+              color: '#f1f3e9',
               fontSize: '40px',
               fontWeight: 700,
               lineHeight: 1.2,
@@ -394,7 +393,7 @@ function renderTaskOG(params: URLSearchParams) {
               marginBottom: '16px',
             }}>
               <span style={{
-                color: '#71717a',
+                color: '#b5bcad',
                 fontSize: '11px',
                 fontWeight: 700,
                 textTransform: 'uppercase',
@@ -405,7 +404,7 @@ function renderTaskOG(params: URLSearchParams) {
               </span>
               {desc && (
                 <span style={{
-                  color: '#a1a1aa',
+                  color: '#b5bcad',
                   fontSize: '15px',
                   lineHeight: 1.6,
                   maxWidth: '650px',
@@ -426,7 +425,7 @@ function renderTaskOG(params: URLSearchParams) {
           }}>
             {/* Budget card */}
             <div style={{
-              backgroundColor: '#0A0A0A',
+              backgroundColor: '#191e16',
               border: '1px solid rgba(255,255,255,0.1)',
               borderRadius: '2px',
               padding: '24px',
@@ -434,7 +433,7 @@ function renderTaskOG(params: URLSearchParams) {
               flexDirection: 'column',
             }}>
               <span style={{
-                color: '#71717a',
+                color: '#b5bcad',
                 fontSize: '11px',
                 fontWeight: 700,
                 textTransform: 'uppercase',
@@ -449,20 +448,20 @@ function renderTaskOG(params: URLSearchParams) {
                 gap: '8px',
                 marginBottom: '20px',
               }}>
-                <span style={{ color: '#beff00', fontSize: '14px' }}>💰</span>
+                <span style={{ color: '#ccff00', fontSize: '14px' }}>💰</span>
                 <span style={{
-                  color: '#fff',
+                  color: '#f1f3e9',
                   fontSize: '28px',
                   fontWeight: 700,
                 }}>
                   {budget}
                 </span>
-                <span style={{ color: '#71717a', fontSize: '14px' }}>USDC</span>
+                <span style={{ color: '#b5bcad', fontSize: '14px' }}>USDC</span>
               </div>
 
               {/* Status bar */}
               <div style={{
-                backgroundColor: 'rgba(255,255,255,0.05)',
+                backgroundColor: '#252d1f',
                 border: '1px solid rgba(255,255,255,0.1)',
                 borderRadius: '2px',
                 padding: '12px',
@@ -472,7 +471,7 @@ function renderTaskOG(params: URLSearchParams) {
                 marginBottom: '12px',
               }}>
                 <span style={{
-                  color: '#d4d4d8',
+                  color: '#f1f3e9',
                   fontSize: '11px',
                   fontWeight: 700,
                   textTransform: 'uppercase',
@@ -483,7 +482,7 @@ function renderTaskOG(params: URLSearchParams) {
               </div>
 
               <span style={{
-                color: '#52525b',
+                color: '#b5bcad',
                 fontSize: '12px',
                 textAlign: 'center',
               }}>
@@ -501,8 +500,8 @@ function renderTaskOG(params: URLSearchParams) {
           padding: '16px 60px',
           borderTop: '1px solid rgba(255,255,255,0.06)',
         }}>
-          <span style={{ color: '#52525b', fontSize: '14px' }}>uphive.xyz/marketplace</span>
-          <span style={{ color: '#beff00', fontSize: '14px', fontWeight: 700 }}>HIVE PROTOCOL</span>
+          <span style={{ color: '#b5bcad', fontSize: '14px' }}>uphive.xyz/marketplace</span>
+          <span style={{ color: '#ccff00', fontSize: '14px', fontWeight: 700 }}>HIVE PROTOCOL</span>
         </div>
       </div>
     ),
@@ -516,7 +515,7 @@ function renderDefaultOG() {
     <div style={{ width: '100%', height: '100%', display: 'flex', flexDirection: 'column', justifyContent: 'space-between', padding: '64px 72px', background: '#11140f', color: '#f1f3e9', fontFamily: 'sans-serif' }}>
       <img src={hiveWordmarkData} width={180} height={75} alt="Hive" />
       <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}><div style={{ fontSize: 68, letterSpacing: '-2px', lineHeight: 1.05 }}>Put AI agents to work.</div><div style={{ fontSize: 27, color: '#b5bcad' }}>Find an agent. Set the task. Review the work.</div></div>
-      <div style={{ display: 'flex', justifyContent: 'space-between', paddingTop: '24px', borderTop: '1px solid #424c37', fontSize: 22 }}><span>uphive.xyz</span><span style={{ color: '#beff00' }}>The AI agent marketplace</span></div>
+      <div style={{ display: 'flex', justifyContent: 'space-between', paddingTop: '24px', borderTop: '1px solid #424c37', fontSize: 22 }}><span>uphive.xyz</span><span style={{ color: '#ccff00' }}>The AI agent marketplace</span></div>
     </div>, { width: 1200, height: 630 }
   );
 }
