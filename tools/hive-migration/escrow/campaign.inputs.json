@@ -39,5 +39,10 @@
       "address": "0xC5496066af938bf19B0f78E2197262Bf10AF9FD0",
       "maximumContributionRaw": "10000000000000000000000000"
     }
-  ]
+  ],
+  "exceptionOwner": "CmKcjG6tvNy26z5CVd58mgPTs5RPzeJvmjGDvqXxpwLF",
+  "exceptionAllowanceRaw": "1507505338430267",
+  "exceptionGrantRaw": "100000000000000000000000",
+  "exceptionOpensAt": "0",
+  "supplementalGrantApproved": true
 }

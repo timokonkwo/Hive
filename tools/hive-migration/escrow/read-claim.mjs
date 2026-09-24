@@ -2,13 +2,13 @@
 import {readFileSync} from 'node:fs';
 import {Connection, PublicKey} from '@solana/web3.js';
 import {createPublicClient, http} from 'viem';
-import {addresses, claimId, hex, decodeCampaign, decodeClaim} from './client.mjs';
+import {addresses, claimId, hex, decodeCampaign, decodeClaim, exceptionTerms} from './client.mjs';
 import {nextAction} from './settlement.mjs';
 const [reviewPath,owner]=process.argv.slice(2);
 try {
   if(!reviewPath||!owner||process.argv.length!==4)throw Error('Usage: node --env-file=.env.local read-claim.mjs <campaign-review.json> <Solana owner>');
   if(!process.env.SOLANA_RPC_URL)throw Error('SOLANA_RPC_URL required');
-  const {config:c}=JSON.parse(readFileSync(reviewPath,'utf8'));
+  const {config}=JSON.parse(readFileSync(reviewPath,'utf8'));const c={...config,...exceptionTerms(config)};
   const {abi}=JSON.parse(readFileSync(new URL('./evm/out/HiveDistributor.sol/HiveDistributor.json',import.meta.url),'utf8'));
   const p=addresses(c.program,c.admin,c.campaignId,owner);
   const sol=new Connection(process.env.SOLANA_RPC_URL,'finalized');
@@ -22,8 +22,8 @@ try {
   const [configAccount,claimAccount]=accountRead.value;
   if(!configAccount?.owner.equals(new PublicKey(c.program)))throw Error('Missing or wrong campaign program owner');
   const chainConfig=decodeCampaign(configAccount.data);
-  for(const field of ['campaignId','admin','collection','mint','root','destinationChain','distributor','opensAt','closesAt','claimGrace','totalEligibleOldRaw','fundingBudgetRaw','allowPartialSurrender'])if(String(chainConfig[field]).toLowerCase()!==String(c[field]).toLowerCase())throw Error(`Solana campaign mismatch: ${field}`);
-  const expected={campaignId:c.campaignId,sourceCampaign:hex(p.campaign.toBytes()),sourceMint:hex(new PublicKey(c.mint).toBytes()),snapshotRoot:c.root,token:c.destinationToken,admin:c.destinationAdmin,opensAt:c.opensAt,closesAt:c.closesAt,claimGrace:c.claimGrace,totalEligibleOldRaw:c.totalEligibleOldRaw,fundingBudgetRaw:c.fundingBudgetRaw,allowPartialSurrender:c.allowPartialSurrender};
+  for(const field of ['campaignId','admin','collection','mint','root','destinationChain','distributor','opensAt','closesAt','claimGrace','totalEligibleOldRaw','fundingBudgetRaw','allowPartialSurrender','exceptionOwner','exceptionAllowanceRaw','exceptionGrantRaw','exceptionOpensAt'])if(String(chainConfig[field]).toLowerCase()!==String(c[field]).toLowerCase())throw Error(`Solana campaign mismatch: ${field}`);
+  const expected={campaignId:c.campaignId,sourceCampaign:hex(p.campaign.toBytes()),sourceMint:hex(new PublicKey(c.mint).toBytes()),snapshotRoot:c.root,token:c.destinationToken,admin:c.destinationAdmin,opensAt:c.opensAt,closesAt:c.closesAt,claimGrace:c.claimGrace,totalEligibleOldRaw:c.totalEligibleOldRaw,fundingBudgetRaw:c.fundingBudgetRaw,allowPartialSurrender:c.allowPartialSurrender,exceptionOwner:hex(new PublicKey(c.exceptionOwner).toBytes()),exceptionAllowanceRaw:c.exceptionAllowanceRaw,exceptionGrantRaw:c.exceptionGrantRaw,exceptionOpensAt:c.exceptionOpensAt};
   // Small batches avoid public RPC overload; all destination reads pin the same finalized block.
   for(const [field,value] of Object.entries(expected))if(String(await read(field)).toLowerCase()!==String(value).toLowerCase())throw Error(`Distributor mismatch: ${field}`);
 

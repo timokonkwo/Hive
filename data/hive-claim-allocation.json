@@ -1,0 +1,517 @@
+{
+  "snapshotSlot": 449032979,
+  "holdersSha256": "cce4c645194e8b7fa1f1b600c0332e099cb488dce47ffa66fcf6b50920f5daaa",
+  "method": "proportional_to_frozen_eligible_holdings",
+  "minimumSnapshotRaw": "1000000000000000",
+  "minimumCurrentRaw": "1000000000000000",
+  "totalEligibleOldRaw": "564937895383759533",
+  "budgetNewRaw": "10000000000000000000000000",
+  "allocatedNewRaw": "9999999999999999999999963",
+  "unallocatedNewRaw": "37",
+  "rows": [
+    {
+      "owner": "FbsyX35H7cyqq51djs2V2dzH9NRzUg9utNWX33rHaxtG",
+      "amountRaw": "40684376870249221",
+      "eligible": true,
+      "reviewNote": "User approved all signing wallets subject to at least 1M at snapshot and before deposit; proportional 10M total budget. Current holdings are checked before deposit.",
+      "allocationNewRaw": "720156626112194579328633"
+    },
+    {
+      "owner": "J6cApZerLEBhDjag5RaZjWe8vE37hdXW5Az7dnZDBbY",
+      "amountRaw": "39218052993290151",
+      "eligible": true,
+      "reviewNote": "User approved all signing wallets subject to at least 1M at snapshot and before deposit; proportional 10M total budget. Current holdings are checked before deposit.",
+      "allocationNewRaw": "694201138102968301380342"
+    },
+    {
+      "owner": "3WGC1csSg3KMZvEidzv2HrpdfEvkSbMNzWJbk5oysVdw",
+      "amountRaw": "30666600778468559",
+      "eligible": true,
+      "reviewNote": "User approved all signing wallets subject to at least 1M at snapshot and before deposit; proportional 10M total budget. Current holdings are checked before deposit.",
+      "allocationNewRaw": "542831363041009808027887"
+    },
+    {
+      "owner": "2s5pZMxvCHXyEzZpyhax3eqA6LnjYfospHYcSqgx3AKR",
+      "amountRaw": "30164237379878784",
+      "eligible": true,
+      "reviewNote": "User approved all signing wallets subject to at least 1M at snapshot and before deposit; proportional 10M total budget. Current holdings are checked before deposit.",
+      "allocationNewRaw": "533938998009477943541731"
+    },
+    {
+      "owner": "2qW5LsgAGnCnyfVvzhwBQBfLsQ6hz3o2uaB29U3CSHBy",
+      "amountRaw": "29606622916317674",
+      "eligible": true,
+      "reviewNote": "User approved all signing wallets subject to at least 1M at snapshot and before deposit; proportional 10M total budget. Current holdings are checked before deposit.",
+      "allocationNewRaw": "524068630520989226773883"
+    },
+    {
+      "owner": "5qDbuS8Rxss49j5X3bjkyM29KieRqmpMFEPUqKcVn2wQ",
+      "amountRaw": "27337967392312204",
+      "eligible": true,
+      "reviewNote": "User approved all signing wallets subject to at least 1M at snapshot and before deposit; proportional 10M total budget. Current holdings are checked before deposit.",
+      "allocationNewRaw": "483911021294502774423494"
+    },
+    {
+      "owner": "FAcSRC4MzaRNU1dL2v99vR3PsHRQBVY6kbnhx5msxGpx",
+      "amountRaw": "26696714024166165",
+      "eligible": true,
+      "reviewNote": "User approved all signing wallets subject to at least 1M at snapshot and before deposit; proportional 10M total budget. Current holdings are checked before deposit.",
+      "allocationNewRaw": "472560156475805513164306"
+    },
+    {
+      "owner": "6rSx8nR3Yu9zzuueTV4fYp4z7ZFv6DCwSwsz3CgkqbyR",
+      "amountRaw": "26186420682461736",
+      "eligible": true,
+      "reviewNote": "User approved all signing wallets subject to at least 1M at snapshot and before deposit; proportional 10M total budget. Current holdings are checked before deposit.",
+      "allocationNewRaw": "463527423039543652141889"
+    },
+    {
+      "owner": "EEAurpGV57sakJ1vBUzebJBcMXTu1obDaDX4kTEitN8c",
+      "amountRaw": "20435967483010493",
+      "eligible": true,
+      "reviewNote": "User approved all signing wallets subject to at least 1M at snapshot and before deposit; proportional 10M total budget. Current holdings are checked before deposit.",
+      "allocationNewRaw": "361738301678779059916911"
+    },
+    {
+      "owner": "DG3RGstAd85WS9Mphvpgu1EGyXwmWRdvgs3gW3GyHVbr",
+      "amountRaw": "14490277222569297",
+      "eligible": true,
+      "reviewNote": "User approved all signing wallets subject to at least 1M at snapshot and before deposit; proportional 10M total budget. Current holdings are checked before deposit.",
+      "allocationNewRaw": "256493277242910443647298"
+    },
+    {
+      "owner": "2uvGNj3zfWcQAcrjJuSgDge5MqZyYnDkBtA61Sy3LQC9",
+      "amountRaw": "13914216402180834",
+      "eligible": true,
+      "reviewNote": "User approved all signing wallets subject to at least 1M at snapshot and before deposit; proportional 10M total budget. Current holdings are checked before deposit.",
+      "allocationNewRaw": "246296389671805876148495"
+    },
+    {
+      "owner": "FtjDmXk6mPCxzgcwp8d23cKP7nPT1HZLFZ4p9N9euLTC",
+      "amountRaw": "12957393707759755",
+      "eligible": true,
+      "reviewNote": "User approved all signing wallets subject to at least 1M at snapshot and before deposit; proportional 10M total budget. Current holdings are checked before deposit.",
+      "allocationNewRaw": "229359613041321315523013"
+    },
+    {
+      "owner": "7XycEkwV1MHKMZ6SwZRfrYXwTSHKe5iSpCcGbZveC2TP",
+      "amountRaw": "12632323705834089",
+      "eligible": true,
+      "reviewNote": "User approved all signing wallets subject to at least 1M at snapshot and before deposit; proportional 10M total budget. Current holdings are checked before deposit.",
+      "allocationNewRaw": "223605529192779918827645"
+    },
+    {
+      "owner": "74cHFwWfF9WK98LA5TuV6s6ymohr5xiDPYTLmiwJeBi9",
+      "amountRaw": "12627615316402372",
+      "eligible": true,
+      "reviewNote": "User approved all signing wallets subject to at least 1M at snapshot and before deposit; proportional 10M total budget. Current holdings are checked before deposit.",
+      "allocationNewRaw": "223522185705465820094315"
+    },
+    {
+      "owner": "7MZTYh4C1jFvczTdGBZ6tYqTKkKWaChrpatMv8DkXbMy",
+      "amountRaw": "10099806030453807",
+      "eligible": true,
+      "reviewNote": "User approved all signing wallets subject to at least 1M at snapshot and before deposit; proportional 10M total budget. Current holdings are checked before deposit.",
+      "allocationNewRaw": "178777279998061706441083"
+    },
+    {
+      "owner": "2hdSqKAJuHmUN78J8GdD7MioetuAuLc6R4e17XbfRFaC",
+      "amountRaw": "10008409421757740",
+      "eligible": true,
+      "reviewNote": "User approved all signing wallets subject to at least 1M at snapshot and before deposit; proportional 10M total budget. Current holdings are checked before deposit.",
+      "allocationNewRaw": "177159463076186041977856"
+    },
+    {
+      "owner": "A8ZtrwVx8p7kWcAsrDWmJmQ3gZbB4uP7ikmUWQSsep4v",
+      "amountRaw": "10007255736412836",
+      "eligible": true,
+      "reviewNote": "User approved all signing wallets subject to at least 1M at snapshot and before deposit; proportional 10M total budget. Current holdings are checked before deposit.",
+      "allocationNewRaw": "177139041621822101544705"
+    },
+    {
+      "owner": "39wp66dVVGBc5SNKDbAYD6HFRrawAkVLGe2xhVrcAxF6",
+      "amountRaw": "9530141632453959",
+      "eligible": true,
+      "reviewNote": "User approved all signing wallets subject to at least 1M at snapshot and before deposit; proportional 10M total budget. Current holdings are checked before deposit.",
+      "allocationNewRaw": "168693615888170870085948"
+    },
+    {
+      "owner": "5WNHaQMzvfbEYaVLt2k7cojqaTMD8TRJrYiczkYFe3Cb",
+      "amountRaw": "9460000262088982",
+      "eligible": true,
+      "reviewNote": "User approved all signing wallets subject to at least 1M at snapshot and before deposit; proportional 10M total budget. Current holdings are checked before deposit.",
+      "allocationNewRaw": "167452039231017603492162"
+    },
+    {
+      "owner": "BA8ZeYxdeJUwhj4iY5hqsE6bSjhtbTNA6BmGSVfrramG",
+      "amountRaw": "8319068112777311",
+      "eligible": true,
+      "reviewNote": "User approved all signing wallets subject to at least 1M at snapshot and before deposit; proportional 10M total budget. Current holdings are checked before deposit.",
+      "allocationNewRaw": "147256329956874444728930"
+    },
+    {
+      "owner": "9eTYJTn6pBGzCjjugNVBQcLK7GSqBnvdefUV88FvK7fX",
+      "amountRaw": "7787923445132881",
+      "eligible": true,
+      "reviewNote": "User approved all signing wallets subject to at least 1M at snapshot and before deposit; proportional 10M total budget. Current holdings are checked before deposit.",
+      "allocationNewRaw": "137854505933658122156867"
+    },
+    {
+      "owner": "anvLNoXDX2JbgmX66YBoxR5ZqfyK5bj8cNvToCmKq9h",
+      "amountRaw": "7292049616559655",
+      "eligible": true,
+      "reviewNote": "User approved all signing wallets subject to at least 1M at snapshot and before deposit; proportional 10M total budget. Current holdings are checked before deposit.",
+      "allocationNewRaw": "129077013175159750441003"
+    },
+    {
+      "owner": "2vFejHAkY8E61k1cZeKpoW9dWsZENpRDnCkj3AZb3Ltj",
+      "amountRaw": "6852467217358790",
+      "eligible": true,
+      "reviewNote": "User approved all signing wallets subject to at least 1M at snapshot and before deposit; proportional 10M total budget. Current holdings are checked before deposit.",
+      "allocationNewRaw": "121295938427071576273760"
+    },
+    {
+      "owner": "2oUcVMJBgRUUbURh4tLyNCxZG8xX5Y9qFv3Z3XSv2LJA",
+      "amountRaw": "6384919596995593",
+      "eligible": true,
+      "reviewNote": "User approved all signing wallets subject to at least 1M at snapshot and before deposit; proportional 10M total budget. Current holdings are checked before deposit.",
+      "allocationNewRaw": "113019849600606957509091"
+    },
+    {
+      "owner": "4hPDPTCAMsRwXEGf8d4X23K8T5VvroDpu4tiYTMNsdcc",
+      "amountRaw": "6160520634049278",
+      "eligible": true,
+      "reviewNote": "User approved all signing wallets subject to at least 1M at snapshot and before deposit; proportional 10M total budget. Current holdings are checked before deposit.",
+      "allocationNewRaw": "109047749927706064775567"
+    },
+    {
+      "owner": "H2TFTTGKQ1Qzsps9ETZ1tZyvYXvsY6EK736KZ1dMtRLV",
+      "amountRaw": "6000000758862918",
+      "eligible": true,
+      "reviewNote": "User approved all signing wallets subject to at least 1M at snapshot and before deposit; proportional 10M total budget. Current holdings are checked before deposit.",
+      "allocationNewRaw": "106206377867201615193580"
+    },
+    {
+      "owner": "G1G1jvfDBRBjbLrptBqjBVvsCG64MScu85DdhippCqpm",
+      "amountRaw": "5995853144270393",
+      "eligible": true,
+      "reviewNote": "User approved all signing wallets subject to at least 1M at snapshot and before deposit; proportional 10M total budget. Current holdings are checked before deposit.",
+      "allocationNewRaw": "106132960689377005891837"
+    },
+    {
+      "owner": "6to3KWVHUhGfMSpCgXwwUFeUrKSgJXe6RCrpNzNGdF2x",
+      "amountRaw": "5978520041278748",
+      "eligible": true,
+      "reviewNote": "User approved all signing wallets subject to at least 1M at snapshot and before deposit; proportional 10M total budget. Current holdings are checked before deposit.",
+      "allocationNewRaw": "105826146380525044236623"
+    },
+    {
+      "owner": "DzuF5ShzEL7iHhAhVdw2u3yTuTdHLAHBcg2dMdhEuDp9",
+      "amountRaw": "5779324780328602",
+      "eligible": true,
+      "reviewNote": "User approved all signing wallets subject to at least 1M at snapshot and before deposit; proportional 10M total budget. Current holdings are checked before deposit.",
+      "allocationNewRaw": "102300178967508191486451"
+    },
+    {
+      "owner": "2sqAQADM819T27BxJoRa5JsRDX6Ws53GkZpq4RhrFQEJ",
+      "amountRaw": "5617504811397609",
+      "eligible": true,
+      "reviewNote": "User approved all signing wallets subject to at least 1M at snapshot and before deposit; proportional 10M total budget. Current holdings are checked before deposit.",
+      "allocationNewRaw": "99435793868663485888970"
+    },
+    {
+      "owner": "9sA76NtAytu7GwSoepAc7SsCHGifqxRqmqNzmVTPnDWz",
+      "amountRaw": "5370080462553216",
+      "eligible": true,
+      "reviewNote": "User approved all signing wallets subject to at least 1M at snapshot and before deposit; proportional 10M total budget. Current holdings are checked before deposit.",
+      "allocationNewRaw": "95056120441439793325603"
+    },
+    {
+      "owner": "4utBB6tyVnUyxAybgfGoTxG5R6osazsmLz6G4qXkGZdv",
+      "amountRaw": "5266012512848794",
+      "eligible": true,
+      "reviewNote": "User approved all signing wallets subject to at least 1M at snapshot and before deposit; proportional 10M total budget. Current holdings are checked before deposit.",
+      "allocationNewRaw": "93214007342729550959040"
+    },
+    {
+      "owner": "F8XNzQLhxauQPtPVC6ZcbUcdqWLtu1VY8WgZX7LDsJog",
+      "amountRaw": "5233025546369796",
+      "eligible": true,
+      "reviewNote": "User approved all signing wallets subject to at least 1M at snapshot and before deposit; proportional 10M total budget. Current holdings are checked before deposit.",
+      "allocationNewRaw": "92630103045486574968602"
+    },
+    {
+      "owner": "4rwZCmiSFwtQdCXKiU8hrky8YjjRKFWMXgbd3KAhFouY",
+      "amountRaw": "5164481530210915",
+      "eligible": true,
+      "reviewNote": "User approved all signing wallets subject to at least 1M at snapshot and before deposit; proportional 10M total budget. Current holdings are checked before deposit.",
+      "allocationNewRaw": "91416801252157250033861"
+    },
+    {
+      "owner": "HdK9ZEf644XNAe1SV38jC4qYMkdGfCUomaQdVEYZnVnE",
+      "amountRaw": "5135244937811290",
+      "eligible": true,
+      "reviewNote": "User approved all signing wallets subject to at least 1M at snapshot and before deposit; proportional 10M total budget. Current holdings are checked before deposit.",
+      "allocationNewRaw": "90899282554287553637965"
+    },
+    {
+      "owner": "34MgQc8x8UFaYPcc4vyC5KJLvuru6wybgL82qm4JsWtJ",
+      "amountRaw": "5081770288536468",
+      "eligible": true,
+      "reviewNote": "User approved all signing wallets subject to at least 1M at snapshot and before deposit; proportional 10M total budget. Current holdings are checked before deposit.",
+      "allocationNewRaw": "89952724539472545807277"
+    },
+    {
+      "owner": "BvLMrWBzz6ej7r9hDT8fHtTD8bQkJthdHQ7vaJwsjZrG",
+      "amountRaw": "5057710559176437",
+      "eligible": true,
+      "reviewNote": "User approved all signing wallets subject to at least 1M at snapshot and before deposit; proportional 10M total budget. Current holdings are checked before deposit.",
+      "allocationNewRaw": "89526841808704638226696"
+    },
+    {
+      "owner": "BU4My73QwHDvxaQmGKF32UyGjUMA5DpJwgDW5wET8UkW",
+      "amountRaw": "4769504180102198",
+      "eligible": true,
+      "reviewNote": "User approved all signing wallets subject to at least 1M at snapshot and before deposit; proportional 10M total budget. Current holdings are checked before deposit.",
+      "allocationNewRaw": "84425283187319152578075"
+    },
+    {
+      "owner": "5frXhGckAfTbDE86uvtgQAkED8TNs1YcLyz5hGErhpk",
+      "amountRaw": "4305867871211248",
+      "eligible": true,
+      "reviewNote": "User approved all signing wallets subject to at least 1M at snapshot and before deposit; proportional 10M total budget. Current holdings are checked before deposit.",
+      "allocationNewRaw": "76218428722794266416393"
+    },
+    {
+      "owner": "C8hn6JTLVQS3URM6MVc9WNTEbPHoxP8vgeyuNFRrLAdW",
+      "amountRaw": "4003889653360263",
+      "eligible": true,
+      "reviewNote": "User approved all signing wallets subject to at least 1M at snapshot and before deposit; proportional 10M total budget. Current holdings are checked before deposit.",
+      "allocationNewRaw": "70873093946732683890388"
+    },
+    {
+      "owner": "aY8fuA9xHPqLnT3fGCvbUHzM3cVK67WCRmrr72bXgX1",
+      "amountRaw": "3956016918483915",
+      "eligible": true,
+      "reviewNote": "User approved all signing wallets subject to at least 1M at snapshot and before deposit; proportional 10M total budget. Current holdings are checked before deposit.",
+      "allocationNewRaw": "70025695758940231293121"
+    },
+    {
+      "owner": "FJW5JE9bwEDdQhCFKHXkXLJHFYnPnmHjdGg89VPTBvUn",
+      "amountRaw": "3435614855705892",
+      "eligible": true,
+      "reviewNote": "User approved all signing wallets subject to at least 1M at snapshot and before deposit; proportional 10M total budget. Current holdings are checked before deposit.",
+      "allocationNewRaw": "60814027236960192425567"
+    },
+    {
+      "owner": "DHLnFSbc1BnJABP28WntCmBFsefVaHcfQz6qdPxstVbc",
+      "amountRaw": "3277500721995365",
+      "eligible": true,
+      "reviewNote": "User approved all signing wallets subject to at least 1M at snapshot and before deposit; proportional 10M total budget. Current holdings are checked before deposit.",
+      "allocationNewRaw": "58015239352442003982090"
+    },
+    {
+      "owner": "2t3yLVNRuiKRiKZZNbcQ1ae1DW5DydJpwrH6cmMboZt2",
+      "amountRaw": "3000000000000009",
+      "eligible": true,
+      "reviewNote": "User approved all signing wallets subject to at least 1M at snapshot and before deposit; proportional 10M total budget. Current holdings are checked before deposit.",
+      "allocationNewRaw": "53103182217261664826874"
+    },
+    {
+      "owner": "D6CZvbnsjffowaS4zagotHfdmZthxNBVqKwzp9C3tZYS",
+      "amountRaw": "2899170461950590",
+      "eligible": true,
+      "reviewNote": "User approved all signing wallets subject to at least 1M at snapshot and before deposit; proportional 10M total budget. Current holdings are checked before deposit.",
+      "allocationNewRaw": "51318392439954798364043"
+    },
+    {
+      "owner": "H1GRqX8n7Nsjw78oEqZWGQZCMPVyn7AW7zMuoTd2Um1q",
+      "amountRaw": "2856659753930331",
+      "eligible": true,
+      "reviewNote": "User approved all signing wallets subject to at least 1M at snapshot and before deposit; proportional 10M total budget. Current holdings are checked before deposit.",
+      "allocationNewRaw": "50565907815226593767634"
+    },
+    {
+      "owner": "ErMLf7JFzosrCF5pkBFU7F592mKZokyBmyyn3BcQNvre",
+      "amountRaw": "2497664250255811",
+      "eligible": true,
+      "reviewNote": "User approved all signing wallets subject to at least 1M at snapshot and before deposit; proportional 10M total budget. Current holdings are checked before deposit.",
+      "allocationNewRaw": "44211306599624724459328"
+    },
+    {
+      "owner": "JBpnoASf2VCC7ABpv9m4HJKgNQfTXxfZtRUkoNa74Dhj",
+      "amountRaw": "2183732459543600",
+      "eligible": true,
+      "reviewNote": "User approved all signing wallets subject to at least 1M at snapshot and before deposit; proportional 10M total budget. Current holdings are checked before deposit.",
+      "allocationNewRaw": "38654380904297476514232"
+    },
+    {
+      "owner": "Ct41N6Mjvh2XqNBvza5Yijo4k95Fqa5yjMfk7PG6vk8B",
+      "amountRaw": "2135891147041465",
+      "eligible": true,
+      "reviewNote": "User approved all signing wallets subject to at least 1M at snapshot and before deposit; proportional 10M total budget. Current holdings are checked before deposit.",
+      "allocationNewRaw": "37807538925859534556329"
+    },
+    {
+      "owner": "JZ4AmqcqVtz5bxZ228bHqYtNvRnoUKZpCS9tFuLdxn6",
+      "amountRaw": "2043160761011457",
+      "eligible": true,
+      "reviewNote": "User approved all signing wallets subject to at least 1M at snapshot and before deposit; proportional 10M total budget. Current holdings are checked before deposit.",
+      "allocationNewRaw": "36166112730383362702483"
+    },
+    {
+      "owner": "CGePo4dPhQ3kwapXtbMskz2SGYecCoW1KETfCEKQBcKZ",
+      "amountRaw": "2012994165958289",
+      "eligible": true,
+      "reviewNote": "User approved all signing wallets subject to at least 1M at snapshot and before deposit; proportional 10M total budget. Current holdings are checked before deposit.",
+      "allocationNewRaw": "35632131999055789423097"
+    },
+    {
+      "owner": "9mh3RrNeRK6Z83T7UVqcJRwPGVkAYZsV4vUMqdfkPKQE",
+      "amountRaw": "1843531191045754",
+      "eligible": true,
+      "reviewNote": "User approved all signing wallets subject to at least 1M at snapshot and before deposit; proportional 10M total budget. Current holdings are checked before deposit.",
+      "allocationNewRaw": "32632457587102602341326"
+    },
+    {
+      "owner": "9Pw3usSRbJer6RdgSgGWTJLQxPuoC9UCoPTMUET8DQzi",
+      "amountRaw": "1570775858243095",
+      "eligible": true,
+      "reviewNote": "User approved all signing wallets subject to at least 1M at snapshot and before deposit; proportional 10M total budget. Current holdings are checked before deposit.",
+      "allocationNewRaw": "27804398874252800606818"
+    },
+    {
+      "owner": "CtwHZPqSS3rqJr2Tze1F4QCFsWx9ghdPziUY1KDSjQhp",
+      "amountRaw": "1510227723064925",
+      "eligible": true,
+      "reviewNote": "User approved all signing wallets subject to at least 1M at snapshot and before deposit; proportional 10M total budget. Current holdings are checked before deposit.",
+      "allocationNewRaw": "26732632655825552959480"
+    },
+    {
+      "owner": "HyWyWboybEXxpGVBMc46yRiKfUu1uR4SKxRd978EWcwk",
+      "amountRaw": "1439868037713931",
+      "eligible": true,
+      "reviewNote": "User approved all signing wallets subject to at least 1M at snapshot and before deposit; proportional 10M total budget. Current holdings are checked before deposit.",
+      "allocationNewRaw": "25487191591844546482816"
+    },
+    {
+      "owner": "HQeoisMWVhKgx1MzuRbCyFdChE8ZCiJ1MgAJ6uEEsgjp",
+      "amountRaw": "1436623065398990",
+      "eligible": true,
+      "reviewNote": "User approved all signing wallets subject to at least 1M at snapshot and before deposit; proportional 10M total budget. Current holdings are checked before deposit.",
+      "allocationNewRaw": "25429752139801119545227"
+    },
+    {
+      "owner": "CZwNGHooidZw85QRCCYeJhzfSwqhVnTMKavZEoDQueK7",
+      "amountRaw": "1414289295065022",
+      "eligible": true,
+      "reviewNote": "User approved all signing wallets subject to at least 1M at snapshot and before deposit; proportional 10M total budget. Current holdings are checked before deposit.",
+      "allocationNewRaw": "25034420714586728860956"
+    },
+    {
+      "owner": "9GARV56Z4rjKuKUzp9Mw489y7KztdBmsTp8koGcNKhdY",
+      "amountRaw": "1367052138826623",
+      "eligible": true,
+      "reviewNote": "User approved all signing wallets subject to at least 1M at snapshot and before deposit; proportional 10M total budget. Current holdings are checked before deposit.",
+      "allocationNewRaw": "24198272942869077805513"
+    },
+    {
+      "owner": "2F5xRQY8pfmws9adiXQCySHYoHuroMqLtAFdpz2sMzrA",
+      "amountRaw": "1333488496135716",
+      "eligible": true,
+      "reviewNote": "User approved all signing wallets subject to at least 1M at snapshot and before deposit; proportional 10M total budget. Current holdings are checked before deposit.",
+      "allocationNewRaw": "23604160864972313902931"
+    },
+    {
+      "owner": "27kzxqqbKys3yQCtcvBZ1VdQNDu3FzXDS6tAfBNoVoeD",
+      "amountRaw": "1291199771310929",
+      "eligible": true,
+      "reviewNote": "User approved all signing wallets subject to at least 1M at snapshot and before deposit; proportional 10M total budget. Current holdings are checked before deposit.",
+      "allocationNewRaw": "22855605578270215838239"
+    },
+    {
+      "owner": "3cVg7jJCtx2T5x4vzpoHwjA9umDsnzy8RBQjF3vdiJ92",
+      "amountRaw": "1234243239425713",
+      "eligible": true,
+      "reviewNote": "User approved all signing wallets subject to at least 1M at snapshot and before deposit; proportional 10M total budget. Current holdings are checked before deposit.",
+      "allocationNewRaw": "21847414547882252430326"
+    },
+    {
+      "owner": "6N34uvQTjagKxKDTPbN4w9GKkH8xisqbfEPai3V24Ko3",
+      "amountRaw": "1228019426202079",
+      "eligible": true,
+      "reviewNote": "User approved all signing wallets subject to at least 1M at snapshot and before deposit; proportional 10M total budget. Current holdings are checked before deposit.",
+      "allocationNewRaw": "21737246451981973085522"
+    },
+    {
+      "owner": "69oHSdMY2RLKFuSCHzr4L5itZPWu65pPCR9hQSoLrPjA",
+      "amountRaw": "1213839767580746",
+      "eligible": true,
+      "reviewNote": "User approved all signing wallets subject to at least 1M at snapshot and before deposit; proportional 10M total budget. Current holdings are checked before deposit.",
+      "allocationNewRaw": "21486251453466236631722"
+    },
+    {
+      "owner": "EyLisgBNhBT1ggN9gi2Rx641aYnQU5XwFnaKgDW6nWKY",
+      "amountRaw": "1165356747058598",
+      "eligible": true,
+      "reviewNote": "User approved all signing wallets subject to at least 1M at snapshot and before deposit; proportional 10M total budget. Current holdings are checked before deposit.",
+      "allocationNewRaw": "20628050562389285196520"
+    },
+    {
+      "owner": "CdiveAsGvqBAfv34za2feYDtWs7qdua8TGKFsYQeQxHM",
+      "amountRaw": "1131205509785087",
+      "eligible": true,
+      "reviewNote": "User approved all signing wallets subject to at least 1M at snapshot and before deposit; proportional 10M total budget. Current holdings are checked before deposit.",
+      "allocationNewRaw": "20023537437095889317412"
+    },
+    {
+      "owner": "Hb6TGddh7bcr5ECazrdQUUMSnmZHu1h1GfqmvTMZqxzS",
+      "amountRaw": "1062764533496988",
+      "eligible": true,
+      "reviewNote": "User approved all signing wallets subject to at least 1M at snapshot and before deposit; proportional 10M total budget. Current holdings are checked before deposit.",
+      "allocationNewRaw": "18812059558777824257930"
+    },
+    {
+      "owner": "89yPnMHX6yqqLbNitjjpzDs5YwHe6t3waj4sAJ2SZELs",
+      "amountRaw": "1050520281399363",
+      "eligible": true,
+      "reviewNote": "User approved all signing wallets subject to at least 1M at snapshot and before deposit; proportional 10M total budget. Current holdings are checked before deposit.",
+      "allocationNewRaw": "18595323308693068662126"
+    },
+    {
+      "owner": "7sXpmvN7A5LYGhHZik9CoyQCv44FqBzMd7FRiLWzmVjR",
+      "amountRaw": "1032170837260062",
+      "eligible": true,
+      "reviewNote": "User approved all signing wallets subject to at least 1M at snapshot and before deposit; proportional 10M total budget. Current holdings are checked before deposit.",
+      "allocationNewRaw": "18270518683454814590495"
+    },
+    {
+      "owner": "EG7bKBSPNZ9WEPUwkTxCaHJ4r2i4LFunmyYqhMBdwUAT",
+      "amountRaw": "1025918685807120",
+      "eligible": true,
+      "reviewNote": "User approved all signing wallets subject to at least 1M at snapshot and before deposit; proportional 10M total budget. Current holdings are checked before deposit.",
+      "allocationNewRaw": "18159848970836316157550"
+    },
+    {
+      "owner": "3xyQLBdBySjEnd1vCVfbq11vJ3z9A94rDTrhGk6jV8U4",
+      "amountRaw": "1004973852523495",
+      "eligible": true,
+      "reviewNote": "User approved all signing wallets subject to at least 1M at snapshot and before deposit; proportional 10M total budget. Current holdings are checked before deposit.",
+      "allocationNewRaw": "17789103204712815488631"
+    },
+    {
+      "owner": "FqoZs7qEGE23L953doe8UZL9WoHyJCrutoiZa3KGwrGH",
+      "amountRaw": "1003281771277512",
+      "eligible": true,
+      "reviewNote": "User approved all signing wallets subject to at least 1M at snapshot and before deposit; proportional 10M total budget. Current holdings are checked before deposit.",
+      "allocationNewRaw": "17759151571802200109675"
+    },
+    {
+      "owner": "HzLWkSeeTKLYvVBs9rmPdDUCKw6i5WSgwVvaMtZKKrgp",
+      "amountRaw": "1000000000000000",
+      "eligible": true,
+      "reviewNote": "User approved all signing wallets subject to at least 1M at snapshot and before deposit; proportional 10M total budget. Current holdings are checked before deposit.",
+      "allocationNewRaw": "17701060739087168505775"
+    }
+  ]
+}

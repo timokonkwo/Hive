@@ -1,78 +1,49 @@
 {
-  "recordedAt": "2026-09-21T13:53:40.567994+00:00",
-  "scope": "Proportional allocation implementation; local tests and read-only remote fork. No mainnet deployment or transfer.",
-  "allocationMethod": "proportional_to_frozen_eligible_holdings_with_70_percent_cap",
-  "collection": "CmKcjG6tvNy26z5CVd58mgPTs5RPzeJvmjGDvqXxpwLF",
-  "snapshotSlot": 449032979,
+  "recordedAt": "2026-09-24T09:48:24.488217+00:00",
+  "scope": "Supplemental production exception; local tests and unsigned mainnet initial-buffer simulation. No admin signing or broadcast.",
+  "allocation": {
+    "ordinaryWallets": 72,
+    "ordinaryBudgetRaw": "10000000000000000000000000",
+    "ordinaryDenominatorRaw": "564937895383759533",
+    "supplementalOwner": "CmKcjG6tvNy26z5CVd58mgPTs5RPzeJvmjGDvqXxpwLF",
+    "supplementalAllowanceRaw": "1507505338430267",
+    "supplementalGrantRaw": "100000000000000000000000",
+    "totalFundingRequiredRaw": "10100000000000000000000000",
+    "allOrdinaryAwardsUnchanged": true
+  },
   "tests": {
-    "evmAdversarialAndBoundary": 24,
-    "evmFuzzTests": 2,
-    "evmFuzzRunsPerTest": 256,
-    "realHiveReadOnlyMainnetFork": 1,
-    "solanaNativeRuntime": 10,
-    "solanaCompiledSbfRuntime": 10,
-    "rustJavascriptInteropAndArithmetic": 2,
-    "javascriptToolingCapProportionalVerifierSigningEvidenceRecovery": 36,
-    "selectedSnapshotVerification": true
+    "javascriptIncludingCheckerAndDeployment": 67,
+    "operatorAfterDependencyInstall": 50,
+    "evmPassed": 31,
+    "evmLiveForkSkipped": 1,
+    "solanaNativeRuntime": 14,
+    "solanaCompiledSbfRuntime": 14,
+    "rustInterop": 2,
+    "typecheck": "passed",
+    "browserChecks": 8,
+    "initialBufferSimulation": "passed, no admin signature, no broadcast"
   },
   "build": {
-    "solc": "0.8.26",
-    "cargoBuildSbf": "4.3.0",
-    "platformTools": "v1.57",
-    "sbfSizeBytes": 129512,
-    "sbfSha256": "ea6e1a1ee0168961210bbf84a0a025dc0887d46730c5672e5046b0e0f5175657",
-    "evmCreationBytecodeSha256": "7a288d1c0d043ae8b46a3ce02aadbbf27b5488e948c91ac1288571c4f9c80f9e",
-    "rustSourceSha256": "c4830a44aa8128f622fa84ea0f691323594edbbc4588f53a9c7db34f9de92de2",
-    "soliditySourceSha256": "80981241d616fb6eee6ee1e46a541a8497deaf46c68b5792bdcad0f519e4a937",
+    "sbfBytes": 135872,
+    "sbfSha256": "9d935fe74859629a1ed58674d192f58c12a150cad229543ea42f483d9eaf988b",
+    "rustSourceSha256": "fdb2e24162c669a55c510c2c1850529fffa58b07fb5caabb5356e879520e7846",
+    "soliditySourceSha256": "554875e80a212b9df516ae6015ec93b9653e5cf1097fd973ce2013180e30116f",
     "cargoLockSha256": "bd4185434464a19c9eb8a23658889983815b29dcd62f03f813871053abad9ebb"
   },
   "deployment": {
     "deployed": false,
-    "depositsEnabled": false,
+    "claimsEnabled": false,
     "verifierActivated": false,
-    "budgetApproved": true,
     "financialActivationApproved": false,
     "independentReviewCompleted": false
   },
   "limitations": [
-    "One admin and its RPC observations are trusted for cross-chain truth and availability. Contracts do not verify the other chain.",
-    "Public claim interface, deployed service rehearsal, monitoring and independent security review remain pending.",
-    "V1 refunds are terminal for the same owner/campaign; this policy remains unapproved.",
-    "Unknown or failed signed transactions are not automatically retried; recovery requires reconciliation.",
-    "Fork tests exercise actual HIVE transfer code locally, not authority to spend a holder inventory.",
-    "Ordinary Solana signers and EVM externally owned accounts supported; program custody and contract-wallet claims require separate review.",
-    "Final reviewed eligibility determines the immutable denominator; the 247-candidate preview includes unresolved custody and is not executable.",
-    "Partial surrender is implemented as an explicit immutable boolean; no deployment policy has been selected."
+    "Wallet signatures required for deployment; no admin private key available.",
+    "Secure unattended operator signer, deployed settlement rehearsal and activation remain pending.",
+    "Single-admin trust model; contracts do not independently prove the other chain.",
+    "One terminal attempt, including partial deposits and refunded attempts; deployment page requires user acknowledgement.",
+    "Nine transitive dependency findings remain: three high, six moderate.",
+    "No independent security audit or machine-checked invariant proof claimed."
   ],
-  "authorityModel": "single_admin_automated_verifier",
-  "testsNote": "Local contract, runtime, arithmetic, encoding and verifier tests. The two Rust tests are distinct from the 10 runtime tests. Both native and compiled SBF runtime suites passed. EVM fork transfers occurred only inside the local test EVM. No deployed end-to-end service rehearsal.",
-  "toolingSourceSha256": {
-    "client.mjs": "fde9ec00abfa45e6b1ccd0666f5b6ecff24e2a1ad6e1ac11853709f7c31ef1ba",
-    "registration.mjs": "946b2955d9b74a23ca21865357f04da0be9c7f76c259795f2cf05f4933065f61",
-    "journal.mjs": "83b445017ede4e4483bf5837ca7327dd6daaf1ed8fafa12b94cdf7e916264473",
-    "verifier-core.mjs": "45de63ad68aa31798accbcb77d9dc2b3be727d5b10cf92e4f9b1d0bb55ead2e8",
-    "observer.mjs": "7b1ac40f34efdeacc51d5a08f8a4fc94d9a84c7634e156bd905ccf45fe3d1acb",
-    "live-adapter.mjs": "c9ce4b56ef8ba1e9b3dfc68cab17d4a482ce4f2c07453132b13fc9bb6878acb4",
-    "verifier-service.mjs": "5b103e95f2d5d2359b930b2182be802530f7abb05809f60122b457c0df193e0a",
-    "prepare-campaign.mjs": "f398f79ad03168107b620ca11f57b4eec8fa94336e314bd03a5744f2f1b82caf",
-    "export-action.mjs": "5d85bfb330de94cd726d909eb1a6c755557b63e2af17bbf68fc90167dc25e42d",
-    "read-claim.mjs": "831d066eb351d9bbef8c911513f6d3d7f0dee52ecab91160565fcad276e1970f"
-  },
-  "budget": {
-    "selectedNewHive": "7000000",
-    "candidateOwnersBeforeFinalExclusions": 247,
-    "candidateOldHive": "582229876.983614953",
-    "provisionalAllocatedNewHive": "6999999.999999999999999870",
-    "provisionalRoundingRemainderRaw": "130",
-    "grantAmountsApproved": false,
-    "fundingVerified": false
-  },
-  "pending": [
-    "Final eligible holder review and custody/staking reconciliation",
-    "Partial-surrender and terminal-attempt policies",
-    "Public pre-claim checker and wallet interface",
-    "Public admin addresses, funding sources, dates and operating terms",
-    "Independent security review and deployed rehearsal"
-  ],
-  "previousTierEvidence": "local/verification-before-proportional.json"
+  "report": "deployment/README.md"
 }

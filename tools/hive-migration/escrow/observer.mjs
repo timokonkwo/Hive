@@ -3,13 +3,13 @@ import {Connection,PublicKey} from '@solana/web3.js';
 import {TOKEN_PROGRAM_ID,unpackAccount} from '@solana/spl-token';
 import {getBase58Encoder} from '@solana/kit';
 import {createPublicClient,http,keccak256} from 'viem';
-import {addresses,claimId,hex,sha256,decodeCampaign,decodeClaim,depositInstruction} from './client.mjs';
+import {addresses,claimId,hex,sha256,decodeCampaign,decodeClaim,depositInstruction,exceptionTerms} from './client.mjs';
 const LOADER=new PublicKey('BPFLoaderUpgradeab1e11111111111111111111111');
 const same=(a,b)=>String(a).toLowerCase()===String(b).toLowerCase();
 const check=(ok,message)=>{if(!ok)throw Error(message);};
 
 export function createObserver(review,{solanaRpc,evmRpc='https://rpc.mainnet.chain.robinhood.com'},clients={}){
-  const c=review.config,d=review.deployment;
+  const c={...review.config,...exceptionTerms(review.config)},d=review.deployment;
   check(d?.solanaProgramDataAddress&&d.solanaProgramDataSha256&&d.destinationRuntimeCodeHash&&d.destinationBlock!==undefined,'Reviewed deployment fingerprints are required');
   check(c.destinationChain==='4663'&&same(c.destinationToken,'0xc65e9630D8Af1eA278cbE359f78931684b4ff9f8')&&c.mint==='6JfonM6a24xngXh5yJ1imZzbMhpfvEsiafkb4syHBAGS','Wrong migration assets');
   const sol=clients.sol??new Connection(solanaRpc,'finalized');
@@ -33,11 +33,11 @@ export function createObserver(review,{solanaRpc,evmRpc='https://rpc.mainnet.cha
       check(programData?.owner.equals(LOADER)&&programData.data.readUInt32LE(0)===3&&sha256(programData.data).toString('hex')===d.solanaProgramDataSha256,'Solana code/upgrade authority fingerprint changed');
       check(campaignAccount?.owner.equals(new PublicKey(c.program)),'Wrong campaign program owner');
       const chain=decodeCampaign(campaignAccount.data);
-      for(const f of ['campaignId','admin','collection','mint','root','destinationChain','distributor','opensAt','closesAt','claimGrace','totalEligibleOldRaw','fundingBudgetRaw','allowPartialSurrender','minimumCurrentHoldingRaw'])check(['admin','collection','mint'].includes(f)?chain[f]===c[f]:same(chain[f],f==='minimumCurrentHoldingRaw'?(c[f]??'0'):c[f]),`Source configuration mismatch: ${f}`);
+      for(const f of ['campaignId','admin','collection','mint','root','destinationChain','distributor','opensAt','closesAt','claimGrace','totalEligibleOldRaw','fundingBudgetRaw','allowPartialSurrender','minimumCurrentHoldingRaw','exceptionOwner','exceptionAllowanceRaw','exceptionGrantRaw','exceptionOpensAt'])check(['admin','collection','mint','exceptionOwner'].includes(f)?chain[f]===c[f]:same(chain[f],f==='minimumCurrentHoldingRaw'?(c[f]??'0'):c[f]),`Source configuration mismatch: ${f}`);
       check(vault,'Missing source vault');
       const vaultToken=unpackAccount(p.vault,vault,TOKEN_PROGRAM_ID);
       check(vaultToken.owner.equals(p.campaign)&&vaultToken.mint.equals(new PublicKey(c.mint))&&!vaultToken.isFrozen,'Invalid source vault');
-      const fields={campaignId:c.campaignId,sourceCampaign:hex(p.campaign.toBytes()),sourceMint:hex(new PublicKey(c.mint).toBytes()),snapshotRoot:c.root,token:c.destinationToken,admin:c.destinationAdmin,opensAt:c.opensAt,closesAt:c.closesAt,claimGrace:c.claimGrace,totalEligibleOldRaw:c.totalEligibleOldRaw,fundingBudgetRaw:c.fundingBudgetRaw,allowPartialSurrender:c.allowPartialSurrender};
+      const fields={campaignId:c.campaignId,sourceCampaign:hex(p.campaign.toBytes()),sourceMint:hex(new PublicKey(c.mint).toBytes()),snapshotRoot:c.root,token:c.destinationToken,admin:c.destinationAdmin,opensAt:c.opensAt,closesAt:c.closesAt,claimGrace:c.claimGrace,totalEligibleOldRaw:c.totalEligibleOldRaw,fundingBudgetRaw:c.fundingBudgetRaw,allowPartialSurrender:c.allowPartialSurrender,exceptionOwner:hex(new PublicKey(c.exceptionOwner).toBytes()),exceptionAllowanceRaw:c.exceptionAllowanceRaw,exceptionGrantRaw:c.exceptionGrantRaw,exceptionOpensAt:c.exceptionOpensAt};
       for(const [f,value] of Object.entries(fields))check(same(await readAt(block.number,f),value),`Destination configuration mismatch: ${f}`);
 
       const reserved=await readAt(block.number,'reserved');

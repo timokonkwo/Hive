@@ -4,7 +4,7 @@ const draft=JSON.parse(readFileSync(new URL('./campaign.inputs.json',import.meta
 const owner=Keypair.fromSeed(Buffer.alloc(32,42)).publicKey.toBase58();
 const snapshot=[{owner,amountRaw:'2000000000000000'}];
 const reviewed=[{...snapshot[0],eligible:true,reviewNote:'Test fixture only'}];
-const example=()=>({...draft,totalEligibleOldRaw:null,allowPartialSurrender:false,classificationsApproved:true,grantAmountsApproved:true,terminalAttemptPolicyApproved:true,campaignId:`0x${'12'.repeat(32)}`,program:owner,admin:owner,distributor:`0x${'11'.repeat(20)}`,destinationAdmin:`0x${'22'.repeat(20)}`,opensAt:'100',closesAt:null,claimGrace:'3600',fundingBudgetRaw:'600000000000000000000'});
+const example=()=>({...draft,exceptionOwner:'11111111111111111111111111111111',exceptionAllowanceRaw:'0',exceptionGrantRaw:'0',exceptionOpensAt:'0',totalEligibleOldRaw:null,allowPartialSurrender:false,classificationsApproved:true,grantAmountsApproved:true,terminalAttemptPolicyApproved:true,campaignId:`0x${'12'.repeat(32)}`,program:owner,admin:owner,distributor:`0x${'11'.repeat(20)}`,destinationAdmin:`0x${'22'.repeat(20)}`,opensAt:'100',closesAt:null,claimGrace:'3600',fundingBudgetRaw:'600000000000000000000'});
 test('claim window derives seven days from opening and rejects conflicting deadlines',()=>{
  const result=validateCampaign(example(),snapshot,reviewed);
  assert.equal(result.config.closesAt,'604900');
@@ -43,4 +43,14 @@ test('proportional preparation rejects stale tiers, denominator mismatch and und
 test('high budgets never override the 70 percent per-owner ceiling',()=>{
   const r=validateCampaign({...example(),fundingBudgetRaw:'7000000000000000000000000'},snapshot,reviewed);
   assert.equal(r.maximumGrantLiabilityRaw,'1400000000000000000000000');
+});
+
+test('supplemental production exception adds liability without changing ordinary proofs or denominator',()=>{
+ const c={...example(),exceptionOwner:draft.exceptionOwner,exceptionAllowanceRaw:draft.exceptionAllowanceRaw,exceptionGrantRaw:draft.exceptionGrantRaw,exceptionOpensAt:'0',supplementalGrantApproved:true};
+ const original=validateCampaign(example(),snapshot,reviewed),result=validateCampaign(c,snapshot,reviewed);
+ assert.equal(result.config.root,original.config.root);assert.equal(result.config.totalEligibleOldRaw,original.config.totalEligibleOldRaw);
+ assert.equal(result.ordinaryGrantLiabilityRaw,original.maximumGrantLiabilityRaw);
+ assert.equal(BigInt(result.maximumGrantLiabilityRaw)-BigInt(original.maximumGrantLiabilityRaw),100000000000000000000000n);
+ assert.throws(()=>validateCampaign({...c,supplementalGrantApproved:false},snapshot,reviewed),/explicitly approved/);
+ assert.throws(()=>validateCampaign({...c,exceptionOwner:owner},snapshot,reviewed),/separate/);
 });

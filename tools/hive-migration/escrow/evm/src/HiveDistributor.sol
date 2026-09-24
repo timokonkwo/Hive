@@ -39,6 +39,12 @@ contract HiveDistributor {
     uint64 public immutable totalEligibleOldRaw;
     uint128 public immutable fundingBudgetRaw;
     bool public immutable allowPartialSurrender;
+    struct ExceptionTerms { bytes32 owner; uint64 allowance; uint128 grant; uint64 opensAt; }
+    bytes32 public immutable exceptionOwner;
+    uint64 public immutable exceptionAllowanceRaw;
+    uint128 public immutable exceptionGrantRaw;
+    uint64 public immutable exceptionOpensAt;
+    uint256 public exceptionAllocated;
     // Lifetime allocations include cancelled claims: unused shares are not redistributed.
     uint256 public allocated;
     uint256 public committedOldRaw;
@@ -65,12 +71,20 @@ contract HiveDistributor {
         address token_, address admin_,
         bytes32 campaignId_, bytes32 sourceCampaign_, bytes32 sourceMint_, bytes32 root_,
         uint64 opensAt_, uint64 closesAt_, uint64 claimGrace_,
-        uint64 totalEligibleOldRaw_, uint128 fundingBudgetRaw_, bool allowPartialSurrender_
+        uint64 totalEligibleOldRaw_, uint128 fundingBudgetRaw_, bool allowPartialSurrender_, ExceptionTerms memory extra
     ) {
         if (token_.code.length == 0 || admin_ == address(0) || campaignId_ == 0 ||
             sourceCampaign_ == 0 || sourceMint_ == 0 || root_ == 0 ||
             opensAt_ >= closesAt_ || claimGrace_ < 1 hours ||
             uint256(closesAt_) + claimGrace_ > type(uint64).max || totalEligibleOldRaw_ == 0 || fundingBudgetRaw_ == 0) revert Invalid();
+        if (extra.owner == 0) {
+            if (extra.allowance != 0 || extra.grant != 0 || extra.opensAt != 0) revert Invalid();
+        } else if (extra.allowance == 0 || extra.grant == 0 || extra.opensAt > opensAt_ ||
+            uint256(extra.grant) > uint256(extra.allowance) * 700_000_000) revert Invalid();
+        exceptionOwner = extra.owner;
+        exceptionAllowanceRaw = extra.allowance;
+        exceptionGrantRaw = extra.grant;
+        exceptionOpensAt = extra.opensAt;
         token = IHiveToken(token_);
         if (token.decimals() != 18) revert Invalid();
         admin = admin_;
@@ -124,26 +138,36 @@ contract HiveDistributor {
 
     /// The verifier validates both wallet signatures before reserving these exact terms.
     function reserve(Quote calldata q, bytes32[] calldata proof) external onlyAdmin nonReentrant {
-        if (paused || block.timestamp < opensAt || block.timestamp >= closesAt ||
+        bool extra = exceptionOwner != 0 && q.sourceOwner == exceptionOwner;
+        if (paused || block.timestamp < (extra ? exceptionOpensAt : opensAt) || block.timestamp >= closesAt ||
             q.sourceOwner == 0 || q.recipient == address(0) || q.recipient == address(this) ||
-            q.depositAmount == 0 || q.depositAmount > q.snapshotAmount || q.snapshotAmount > totalEligibleOldRaw ||
+            q.depositAmount == 0 || q.depositAmount > q.snapshotAmount || (!extra && q.snapshotAmount > totalEligibleOldRaw) ||
             (!allowPartialSurrender && q.depositAmount != q.snapshotAmount) ||
             q.depositDeadline <= block.timestamp || q.depositDeadline > closesAt ||
             uint256(q.claimDeadline) != uint256(q.depositDeadline) + claimGrace || proof.length > 32) revert Invalid();
         bytes32 id = claimId(q.sourceOwner);
         if (records[id].status != Status.None) revert WrongState();
+        if (extra) {
+            if (q.snapshotAmount != exceptionAllowanceRaw || proof.length != 0) revert Invalid();
+        } else {
         bytes32 h = leaf(q.sourceOwner, q.snapshotAmount);
         for (uint256 i; i < proof.length; ++i) {
             h = h < proof[i] ? sha256(abi.encodePacked(h, proof[i])) : sha256(abi.encodePacked(proof[i], h));
         }
         if (h != snapshotRoot) revert Invalid();
-        uint128 grant = grantFor(q.depositAmount);
-        if (grant == 0 || allocated + grant > fundingBudgetRaw ||
-            committedOldRaw + q.depositAmount > totalEligibleOldRaw) revert Invalid();
-        if (token.balanceOf(address(this)) < reserved + grant) revert InsufficientReserve();
+        }
+        uint128 grant = extra ? uint128(uint256(q.depositAmount) * exceptionGrantRaw / exceptionAllowanceRaw) : grantFor(q.depositAmount);
+        if (grant == 0) revert Invalid();
+        if (extra) {
+            if (exceptionAllocated + grant > exceptionGrantRaw) revert Invalid();
+        } else if (allocated + grant > fundingBudgetRaw || committedOldRaw + q.depositAmount > totalEligibleOldRaw) revert Invalid();
+        // The supplemental award cannot consume inventory needed by ordinary holders,
+        // and ordinary reservations cannot consume the supplemental award.
+        uint256 otherUnallocated = extra ? fundingBudgetRaw - allocated : exceptionGrantRaw - exceptionAllocated;
+        if (token.balanceOf(address(this)) < reserved + grant + otherUnallocated) revert InsufficientReserve();
         reserved += grant;
-        allocated += grant;
-        committedOldRaw += q.depositAmount;
+        if (extra) exceptionAllocated += grant;
+        else { allocated += grant; committedOldRaw += q.depositAmount; }
         records[id] = Claim(q, grant, Status.Reserved, 0);
         emit Reserved(id, q.sourceOwner, q.recipient, q.depositAmount, grant, q.depositDeadline, q.claimDeadline);
     }

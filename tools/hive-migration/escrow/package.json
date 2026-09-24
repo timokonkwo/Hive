@@ -8,5 +8,8 @@
     "@solana/spl-token": "0.4.14",
     "@solana/kit": "6.8.0",
     "viem": "2.45.1"
+  },
+  "overrides": {
+    "ws": "8.21.0"
   }
 }

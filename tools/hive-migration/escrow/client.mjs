@@ -69,29 +69,46 @@ export function addresses(program, admin, campaignId, owner) {
 }
 const meta = (pubkey, isWritable = false, isSigner = false) => ({pubkey: pk(pubkey), isWritable, isSigner});
 const ix = (programId, keys, data) => new TransactionInstruction({programId: pk(programId), keys, data: Buffer.concat(data)});
+export const NO_EXCEPTION_OWNER = '11111111111111111111111111111111';
+export function exceptionTerms(c) {
+  return { exceptionOwner:c.exceptionOwner??NO_EXCEPTION_OWNER, exceptionAllowanceRaw:c.exceptionAllowanceRaw??'0', exceptionGrantRaw:c.exceptionGrantRaw??'0', exceptionOpensAt:c.exceptionOpensAt??'0' };
+}
+export const isException = (c,owner) => exceptionTerms(c).exceptionOwner!==NO_EXCEPTION_OWNER && owner===c.exceptionOwner;
+export const openingFor = (c,owner) => isException(c,owner)?c.exceptionOpensAt:c.opensAt;
+export function reviewedHolder(review,owner) {
+  return isException(review.config,owner)?{owner,amountRaw:review.config.exceptionAllowanceRaw,proof:[],basis:'supplemental_exception'}:review.tree.holders.find(h=>h.owner===owner);
+}
 export function validateAllocationConfig(c) {
   integer(c.totalEligibleOldRaw, 8); integer(c.fundingBudgetRaw, 16);
   integer(c.minimumCurrentHoldingRaw ?? '0', 8);
   if (BigInt(c.totalEligibleOldRaw) === 0n || BigInt(c.fundingBudgetRaw) === 0n || typeof c.allowPartialSurrender !== 'boolean') throw Error('Explicit positive allocation terms and partial-surrender policy required');
+  const e=exceptionTerms(c);
+  pk(e.exceptionOwner); integer(e.exceptionAllowanceRaw,8);integer(e.exceptionGrantRaw,16);integer(e.exceptionOpensAt,8);
+  if(e.exceptionOwner===NO_EXCEPTION_OWNER) {
+    if([e.exceptionAllowanceRaw,e.exceptionGrantRaw,e.exceptionOpensAt].some(v=>v!=='0'))throw Error('Incomplete supplemental exception');
+  } else if(!PublicKey.isOnCurve(pk(e.exceptionOwner).toBytes()) || BigInt(e.exceptionAllowanceRaw)<=0n || BigInt(e.exceptionAllowanceRaw)<BigInt(c.minimumCurrentHoldingRaw??'0') || BigInt(e.exceptionGrantRaw)<=0n || BigInt(e.exceptionGrantRaw)>BigInt(e.exceptionAllowanceRaw)*700000000n || BigInt(e.exceptionOpensAt)>BigInt(c.opensAt))throw Error('Invalid supplemental exception');
   if ('minimums' in c || 'grants' in c) throw Error('Legacy tier configuration is incompatible');
 }
-export function grantForDeposit(c, amount, snapshotAmount) {
+export function grantForDeposit(c, amount, snapshotAmount, owner) {
   validateAllocationConfig(c); integer(amount,8); integer(snapshotAmount,8);
-  const a=BigInt(amount), cap=BigInt(snapshotAmount);
+  const a=BigInt(amount), cap=BigInt(snapshotAmount), extra=isException(c,owner);
+  if(exceptionTerms(c).exceptionOwner!==NO_EXCEPTION_OWNER && !owner)throw Error('Owner required for supplemental allocation');
+  if(extra && snapshotAmount!==c.exceptionAllowanceRaw)throw Error('Supplemental allowance mismatch');
   if(cap<BigInt(c.minimumCurrentHoldingRaw??'0'))throw Error('Snapshot holding is below the minimum');
-  if(a<=0n || a>cap || cap>BigInt(c.totalEligibleOldRaw))throw Error('Deposit exceeds snapshot cap or eligible total');
+  if(a<=0n || a>cap || (!extra && cap>BigInt(c.totalEligibleOldRaw)))throw Error('Deposit exceeds snapshot cap or eligible total');
   if(!c.allowPartialSurrender && a!==cap)throw Error('Full snapshot allowance must be surrendered');
-  const grant=proportionalQuote(a,BigInt(c.totalEligibleOldRaw),BigInt(c.fundingBudgetRaw));
+  const grant=proportionalQuote(a,BigInt(extra?c.exceptionAllowanceRaw:c.totalEligibleOldRaw),BigInt(extra?c.exceptionGrantRaw:c.fundingBudgetRaw));
   if(grant===0n)throw Error('Deposit would produce zero allocation');
   return grant.toString();
 }
 export function initializeInstruction(c) {
   validateAllocationConfig(c);
+  const extra=exceptionTerms(c);
   const {campaign, vault} = addresses(c.program, c.admin, c.campaignId);
   return ix(c.program, [meta(c.admin, true, true), meta(campaign, true), meta(vault, true), meta(c.mint), meta(TOKEN_PROGRAM_ID), meta(SystemProgram.programId)], [
     Buffer.from([0]), bytes(c.campaignId, 32), keyBytes(c.collection), bytes(c.root, 32),
     integer(c.destinationChain, 8), bytes(c.distributor, 20), integer(c.opensAt, 8), integer(c.closesAt, 8), integer(c.claimGrace, 8),
-    integer(c.totalEligibleOldRaw,8), integer(c.fundingBudgetRaw,16), Buffer.from([Number(c.allowPartialSurrender)]), integer(c.minimumCurrentHoldingRaw ?? '0',8),
+    integer(c.totalEligibleOldRaw,8), integer(c.fundingBudgetRaw,16), Buffer.from([Number(c.allowPartialSurrender)]), integer(c.minimumCurrentHoldingRaw ?? '0',8), keyBytes(extra.exceptionOwner), integer(extra.exceptionAllowanceRaw,8), integer(extra.exceptionGrantRaw,16), integer(extra.exceptionOpensAt,8),
   ]);
 }
 export function pauseInstruction(c, paused) {
@@ -100,8 +117,8 @@ export function pauseInstruction(c, paused) {
 }
 export function depositInstruction(c, q) {
   const {campaign, vault, claim} = addresses(c.program, c.admin, c.campaignId, q.owner);
-  if (q.proof.length > 32 || !verifyProof(snapshotLeaf(c.campaignId, c.mint, q.owner, q.snapshotAmount), q.proof, c.root)) throw Error('Invalid snapshot proof');
-  grantForDeposit(c,q.amount,q.snapshotAmount);
+  if (isException(c,q.owner) ? q.proof.length!==0 || q.snapshotAmount!==c.exceptionAllowanceRaw : q.proof.length > 32 || !verifyProof(snapshotLeaf(c.campaignId, c.mint, q.owner, q.snapshotAmount), q.proof, c.root)) throw Error('Invalid snapshot proof or supplemental allowance');
+  grantForDeposit(c,q.amount,q.snapshotAmount,q.owner);
   return ix(c.program, [meta(q.owner, true, true), meta(campaign), meta(claim, true), meta(q.sourceTokenAccount, true), meta(vault, true), meta(c.mint), meta(TOKEN_PROGRAM_ID), meta(SystemProgram.programId), meta(c.admin, false, true)], [
     Buffer.from([2]), integer(q.snapshotAmount, 8), integer(q.amount, 8), bytes(q.recipient, 20), integer(q.depositDeadline, 8), integer(BigInt(q.proof.length), 4), ...q.proof.map(p => bytes(p, 32)),
   ]);
@@ -169,6 +186,6 @@ export function decodeClaim(data) {
 export function decodeCampaign(data) {
   const r = reader(data);
   if (r.take(1)[0] !== 1) throw Error('Wrong account tag');
-  const value = {campaignId: hex(r.take(32)), admin: r.key(), collection: r.key(), mint: r.key(), root: hex(r.take(32)), destinationChain: r.num(8), distributor: hex(r.take(20)), opensAt: r.num(8), closesAt: r.num(8), claimGrace: r.num(8), totalEligibleOldRaw: r.num(8), fundingBudgetRaw: r.num(16), allowPartialSurrender: r.take(1)[0], minimumCurrentHoldingRaw: r.num(8), paused: r.take(1)[0], bump: r.take(1)[0], vaultBump: r.take(1)[0]};
+  const value = {campaignId: hex(r.take(32)), admin: r.key(), collection: r.key(), mint: r.key(), root: hex(r.take(32)), destinationChain: r.num(8), distributor: hex(r.take(20)), opensAt: r.num(8), closesAt: r.num(8), claimGrace: r.num(8), totalEligibleOldRaw: r.num(8), fundingBudgetRaw: r.num(16), allowPartialSurrender: r.take(1)[0], minimumCurrentHoldingRaw: r.num(8), exceptionOwner:r.key(), exceptionAllowanceRaw:r.num(8), exceptionGrantRaw:r.num(16), exceptionOpensAt:r.num(8), paused: r.take(1)[0], bump: r.take(1)[0], vaultBump: r.take(1)[0]};
   r.done(); if (value.paused > 1 || value.allowPartialSurrender > 1) throw Error('Invalid boolean flag'); value.paused = Boolean(value.paused); value.allowPartialSurrender=Boolean(value.allowPartialSurrender); validateAllocationConfig(value); return value;
 }

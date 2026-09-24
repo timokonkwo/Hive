@@ -54,7 +54,7 @@ test('proportional campaign decoding preserves exact terms and rejects old layou
   const {PublicKey}=await import('@solana/web3.js');
   const c=f.config;
   // Account layout is independently assembled in Borsh field order.
-  const payload=Buffer.concat([Buffer.from([1]),Buffer.from(c.campaignId.slice(2),'hex'),new PublicKey(c.admin).toBuffer(),new PublicKey(c.collection).toBuffer(),new PublicKey(c.mint).toBuffer(),Buffer.from(c.root.slice(2),'hex'),integer(c.destinationChain,8),Buffer.from(c.distributor.slice(2),'hex'),integer(c.opensAt,8),integer(c.closesAt,8),integer(c.claimGrace,8),integer(c.totalEligibleOldRaw,8),integer(c.fundingBudgetRaw,16),Buffer.from([1]),integer(c.minimumCurrentHoldingRaw??'0',8),Buffer.from([1,254,253])]);
+  const payload=Buffer.concat([Buffer.from([1]),Buffer.from(c.campaignId.slice(2),'hex'),new PublicKey(c.admin).toBuffer(),new PublicKey(c.collection).toBuffer(),new PublicKey(c.mint).toBuffer(),Buffer.from(c.root.slice(2),'hex'),integer(c.destinationChain,8),Buffer.from(c.distributor.slice(2),'hex'),integer(c.opensAt,8),integer(c.closesAt,8),integer(c.claimGrace,8),integer(c.totalEligibleOldRaw,8),integer(c.fundingBudgetRaw,16),Buffer.from([1]),integer(c.minimumCurrentHoldingRaw??'0',8),Buffer.alloc(64),Buffer.from([1,254,253])]);
   const decoded=decodeCampaign(payload);
   assert.equal(decoded.totalEligibleOldRaw,c.totalEligibleOldRaw);assert.equal(decoded.fundingBudgetRaw,c.fundingBudgetRaw);
   assert.equal(decoded.allowPartialSurrender,true);assert.equal(decoded.paused,true);
@@ -62,7 +62,7 @@ test('proportional campaign decoding preserves exact terms and rejects old layou
   assert.throws(()=>decodeCampaign(payload.subarray(0,payload.length-8)),/Truncated/);
   assert.equal(grantForDeposit(c,f.quote.amount,f.quote.snapshotAmount),f.grantRaw);
   assert.throws(()=>decodeCampaign(Buffer.concat([payload,Buffer.alloc(119)])),/length/);
-  const invalid=Buffer.from(payload);invalid[invalid.length-12]=2;
+  const invalid=Buffer.from(payload);invalid[invalid.length-76]=2;
   assert.throws(()=>decodeCampaign(invalid),/boolean/);
   assert.throws(()=>grantForDeposit({...c,allowPartialSurrender:false},'1',f.quote.snapshotAmount),/Full snapshot/);
   assert.throws(()=>grantForDeposit({...c,fundingBudgetRaw:'1'},'1',f.quote.snapshotAmount),/zero allocation/);

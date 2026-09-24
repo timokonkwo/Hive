@@ -22,7 +22,7 @@ contract HiveTokenForkTest {
         uint64 amount=2000e9;
         bytes32 root=sha256(abi.encodePacked("HIVE_SNAPSHOT_V1",cid,mint,owner,amount));
         HiveDistributor d=new HiveDistributor(address(token),address(this),cid,source,mint,root,uint64(block.timestamp),uint64(block.timestamp+10000),3600,
-            amount, 1000 ether, false);
+            amount, 1000 ether, false,HiveDistributor.ExceptionTerms(bytes32(0),0,0,0));
         vm.prank(holder);require(token.transfer(address(d),1000 ether));
         d.setPaused(false);
         address recipient=address(0x4567);uint256 beforeBalance=token.balanceOf(recipient);

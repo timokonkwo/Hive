@@ -25,7 +25,7 @@ contract HiveDistributorTest {
     TestToken token;HiveDistributor d;bytes32 id;
     function make(bytes32 root) internal returns(HiveDistributor){
         return new HiveDistributor(address(token),address(this),CID,SOURCE,MINT,root,100,10000,3600,
-            20000e9, 6000 ether, true);
+            20000e9, 6000 ether, true,HiveDistributor.ExceptionTerms(bytes32(0),0,0,0));
     }
     function leaf(bytes32 owner,uint64 amount) internal pure returns(bytes32){return sha256(abi.encodePacked("HIVE_SNAPSHOT_V1",CID,MINT,owner,amount));}
     function quote() internal pure returns(HiveDistributor.Quote memory){return HiveDistributor.Quote(OWNER,RECIPIENT,CAP,CAP,1000,4600);}
@@ -62,6 +62,16 @@ contract HiveDistributorTest {
         reserve();vm.expectRevert(HiveDistributor.InsufficientReserve.selector);d.withdrawSurplus(address(100),999401 ether);
         d.withdrawSurplus(address(100),999400 ether);require(token.balanceOf(address(d))==d.reserved());
     }
+    function testAdminRecoversAllUnclaimedInventoryAfterExpiredClaimsAreCancelled() public {
+        ready();
+        vm.expectRevert(HiveDistributor.Unauthorized.selector);
+        vm.prank(address(99));d.withdrawSurplus(address(100),1 ether);
+        vm.warp(4601);d.cancelExpired(id);
+        uint256 remaining=token.balanceOf(address(d));
+        d.withdrawSurplus(address(100),remaining);
+        require(token.balanceOf(address(d))==0&&token.balanceOf(address(100))==remaining);
+        vm.expectRevert(HiveDistributor.WrongState.selector);d.claim(id);
+    }
     function testCancellationBlocksAllFutureClaimsAndReservations() public {
         ready();d.cancel(id);status(HiveDistributor.Status.Cancelled);require(d.reserved()==0);
         vm.expectRevert(HiveDistributor.WrongState.selector);d.claim(id);
@@ -81,19 +91,19 @@ contract HiveDistributorTest {
     function testProportionalQuotesAndCeiling() public {
         require(d.grantFor(1)==300000000);require(d.grantFor(CAP)==600 ether);
         require(d.grantFor(CAP/2)==300 ether);
-        HiveDistributor capped=new HiveDistributor(address(token),address(this),CID,SOURCE,MINT,leaf(OWNER,CAP),100,10000,3600,CAP,type(uint128).max,true);
+        HiveDistributor capped=new HiveDistributor(address(token),address(this),CID,SOURCE,MINT,leaf(OWNER,CAP),100,10000,3600,CAP,type(uint128).max,true,HiveDistributor.ExceptionTerms(bytes32(0),0,0,0));
         require(capped.grantFor(CAP)==1400 ether);require(capped.grantFor(1)==700000000);
         vm.expectRevert(HiveDistributor.Invalid.selector);capped.grantFor(CAP+1);
     }
     function testPartialSurrenderMustBeExplicitlyEnabled() public {
-        d=new HiveDistributor(address(token),address(this),CID,SOURCE,MINT,leaf(OWNER,CAP),100,10000,3600,CAP,600 ether,false);
+        d=new HiveDistributor(address(token),address(this),CID,SOURCE,MINT,leaf(OWNER,CAP),100,10000,3600,CAP,600 ether,false,HiveDistributor.ExceptionTerms(bytes32(0),0,0,0));
         d.setPaused(false);token.mint(address(d),600 ether);
         HiveDistributor.Quote memory q=quote();q.depositAmount=CAP/2;
         vm.expectRevert(HiveDistributor.Invalid.selector);d.reserve(q,new bytes32[](0));
         reserve();require(d.reserved()==600 ether);
     }
     function testZeroGrantCannotTakeDeposit() public {
-        d=new HiveDistributor(address(token),address(this),CID,SOURCE,MINT,leaf(OWNER,CAP),100,10000,3600,CAP,1,true);
+        d=new HiveDistributor(address(token),address(this),CID,SOURCE,MINT,leaf(OWNER,CAP),100,10000,3600,CAP,1,true,HiveDistributor.ExceptionTerms(bytes32(0),0,0,0));
         d.setPaused(false);token.mint(address(d),1);
         HiveDistributor.Quote memory q=quote();q.depositAmount=1;
         vm.expectRevert(HiveDistributor.Invalid.selector);d.reserve(q,new bytes32[](0));
@@ -101,7 +111,7 @@ contract HiveDistributorTest {
     }
     function testFuzzExactRateAndCap(uint64 a, uint64 t, uint128 b) public {
         if(t==0)t=1;if(b==0)b=1;uint64 amount=uint64(uint256(a)%t+1);
-        HiveDistributor f=new HiveDistributor(address(token),address(this),CID,SOURCE,MINT,leaf(OWNER,t),100,10000,3600,t,b,true);
+        HiveDistributor f=new HiveDistributor(address(token),address(this),CID,SOURCE,MINT,leaf(OWNER,t),100,10000,3600,t,b,true,HiveDistributor.ExceptionTerms(bytes32(0),0,0,0));
         uint256 share=uint256(amount)*b/t;uint256 cap=uint256(amount)*700000000;
         require(f.grantFor(amount)==(share<cap?share:cap));
     }
@@ -109,7 +119,7 @@ contract HiveDistributorTest {
         bytes32 owner2=bytes32(uint256(123));bytes32 own=leaf(OWNER,CAP);bytes32 other=leaf(owner2,CAP);
         bytes32 root=own<other?sha256(abi.encodePacked(own,other)):sha256(abi.encodePacked(other,own));
         // Deliberately inconsistent root/denominator: lifetime bounds still prevent overspend.
-        d=new HiveDistributor(address(token),address(this),CID,SOURCE,MINT,root,100,10000,3600,CAP,600 ether,true);
+        d=new HiveDistributor(address(token),address(this),CID,SOURCE,MINT,root,100,10000,3600,CAP,600 ether,true,HiveDistributor.ExceptionTerms(bytes32(0),0,0,0));
         d.setPaused(false);token.mint(address(d),1200 ether);
         bytes32[] memory proof=new bytes32[](1);proof[0]=other;d.reserve(quote(),proof);d.cancel(d.claimId(OWNER));
         require(d.reserved()==0 && d.allocated()==600 ether && d.committedOldRaw()==CAP);
@@ -131,7 +141,7 @@ contract HiveDistributorTest {
         bytes32 owner=0x0505050505050505050505050505050505050505050505050505050505050505;
         bytes32 root=0x0bd8350e643c9a2313f14fd708478c38c5bf4b6f05048ea0cc1726cbebd23ae9;
         d=new HiveDistributor(address(token),address(this),cid,source,mint,root,100,10000,3600,
-            102000000000001, 30600 ether, true);
+            102000000000001, 30600 ether, true,HiveDistributor.ExceptionTerms(bytes32(0),0,0,0));
         require(d.leaf(owner,CAP)==0x9b46561823338928857c0e1cf44a50f947cfbe963b97248ecf861f269840d0ee);
         require(d.claimId(owner)==0x23e428c4e27a1655ebcf826dd4c1831780a011937ba7cc1f255ae3e0f2bdd9fb);
         bytes32[] memory proof=new bytes32[](2);proof[0]=0x2079a658c46bb9e6ffd1ae813f95527f1efb2109f4272d618a4f06dfabc0fba5;proof[1]=0x53b15e51c340495f565ddc5aaaf1fa8a2a240a35b77cb0b6527bc86456d48a1a;

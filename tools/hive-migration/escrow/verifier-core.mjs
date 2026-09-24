@@ -1,7 +1,7 @@
 import {PublicKey} from '@solana/web3.js';
 import {authenticateRegistration} from './registration.mjs';
 import {nextAction} from './settlement.mjs';
-import {hex,depositFromAccounts} from './client.mjs';
+import {hex,depositFromAccounts,openingFor} from './client.mjs';
 import {submitOnce,reconcileJournal} from './journal.mjs';
 
 export function assertReservation(q,destination){
@@ -20,7 +20,7 @@ export async function processRegistration({review,request,observer,adapter,journ
   assertReservation(q,observed.destination);
   let action=nextAction(observed.source,observed.destination,observed.destinationTimestamp);
   const now=BigInt(observed.destinationTimestamp);
-  if(action==='reserve'&&(now<BigInt(review.config.opensAt)||now>=BigInt(q.depositDeadline)||now>=BigInt(review.config.closesAt)))action='request_window_closed';
+  if(action==='reserve'&&(now<BigInt(openingFor(review.config,q.owner))||now>=BigInt(q.depositDeadline)||now>=BigInt(review.config.closesAt)))action='request_window_closed';
   if((observed.destinationPaused&&['reserve','deposit','confirm_deposit','claim'].includes(action))||(observed.sourcePaused&&action==='deposit'))action='paused';
   if(['reserve','deposit'].includes(action)&&BigInt(review.config.minimumCurrentHoldingRaw??'0')>0n){
     const accounts=await observer.spendable(q.owner,observed.sourceSlot);

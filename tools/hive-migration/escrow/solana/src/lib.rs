@@ -29,6 +29,10 @@ pub struct Campaign {
     pub funding_budget_raw: u128,
     pub allow_partial_surrender: bool,
     pub minimum_current_holding_raw: u64,
+    pub exception_owner: Pubkey,
+    pub exception_allowance_raw: u64,
+    pub exception_grant_raw: u128,
+    pub exception_opens_at: u64,
     pub paused: bool,
     pub bump: u8,
     pub vault_bump: u8,
@@ -54,7 +58,7 @@ pub enum Instruction {
     Initialize {
         id: [u8; 32], collection: Pubkey, root: [u8; 32],
         destination_chain: u64, distributor: [u8; 20], opens_at: u64, closes_at: u64,
-        claim_grace: u64, total_eligible_old_raw: u64, funding_budget_raw: u128, allow_partial_surrender: bool, minimum_current_holding_raw: u64,
+        claim_grace: u64, total_eligible_old_raw: u64, funding_budget_raw: u128, allow_partial_surrender: bool, minimum_current_holding_raw: u64, exception_owner: Pubkey, exception_allowance_raw: u64, exception_grant_raw: u128, exception_opens_at: u64,
     },
     Pause { paused: bool },
     Deposit { snapshot_amount: u64, amount: u64, recipient: [u8; 20], deposit_deadline: u64, proof: Vec<[u8; 32]> },
@@ -144,7 +148,7 @@ pub fn process_instruction(program: &Pubkey, accounts: &[AccountInfo], bytes: &[
     let instruction = Instruction::try_from_slice(bytes).map_err(|_| ProgramError::InvalidInstructionData)?;
     let iter = &mut accounts.iter();
     match instruction {
-        Instruction::Initialize { id, collection, root, destination_chain, distributor, opens_at, closes_at, claim_grace, total_eligible_old_raw, funding_budget_raw, allow_partial_surrender, minimum_current_holding_raw } => {
+        Instruction::Initialize { id, collection, root, destination_chain, distributor, opens_at, closes_at, claim_grace, total_eligible_old_raw, funding_budget_raw, allow_partial_surrender, minimum_current_holding_raw, exception_owner, exception_allowance_raw, exception_grant_raw, exception_opens_at } => {
             let admin = next_account_info(iter)?;
             let config = next_account_info(iter)?;
             let vault = next_account_info(iter)?;
@@ -157,11 +161,16 @@ pub fn process_instruction(program: &Pubkey, accounts: &[AccountInfo], bytes: &[
             require(m.decimals == 9 && m.mint_authority.is_none() && m.freeze_authority.is_none(), Error::Invalid)?;
             require(id != [0; 32] && root != [0; 32] && collection != Pubkey::default() && destination_chain == 4663 && distributor != [0; 20], Error::Invalid)?;
             require(opens_at < closes_at && claim_grace >= 3600 && closes_at.checked_add(claim_grace).is_some() && total_eligible_old_raw > 0 && funding_budget_raw > 0, Error::Invalid)?;
+            if exception_owner == Pubkey::default() {
+                require(exception_allowance_raw == 0 && exception_grant_raw == 0 && exception_opens_at == 0, Error::Invalid)?;
+            } else {
+                require(exception_allowance_raw >= minimum_current_holding_raw && exception_allowance_raw > 0 && exception_grant_raw > 0 && exception_opens_at <= opens_at && exception_grant_raw <= u128::from(exception_allowance_raw) * 700_000_000, Error::Invalid)?;
+            }
             let (expected, bump) = Pubkey::find_program_address(&[b"campaign", admin.key.as_ref(), &id], program);
             key(config, &expected)?;
             let (expected_vault, vault_bump) = Pubkey::find_program_address(&[b"vault", config.key.as_ref()], program);
             key(vault, &expected_vault)?;
-            let c = Campaign { tag: 1, id, admin: *admin.key, collection, mint: *mint.key, root, destination_chain, distributor, opens_at, closes_at, claim_grace, total_eligible_old_raw, funding_budget_raw, allow_partial_surrender, minimum_current_holding_raw, paused: true, bump, vault_bump };
+            let c = Campaign { tag: 1, id, admin: *admin.key, collection, mint: *mint.key, root, destination_chain, distributor, opens_at, closes_at, claim_grace, total_eligible_old_raw, funding_budget_raw, allow_partial_surrender, minimum_current_holding_raw, exception_owner, exception_allowance_raw, exception_grant_raw, exception_opens_at, paused: true, bump, vault_bump };
             create(admin, config, system, program, borsh::to_vec(&c)?.len(), &[b"campaign", admin.key.as_ref(), &id, &[bump]])?;
             create(admin, vault, system, &spl_token::id(), TokenAccount::LEN, &[b"vault", config.key.as_ref(), &[vault_bump]])?;
             invoke(&spl_token::instruction::initialize_account3(&spl_token::id(), vault.key, mint.key, config.key)?, &[vault.clone(), mint.clone(), token_program.clone()])?;
@@ -189,9 +198,15 @@ pub fn process_instruction(program: &Pubkey, accounts: &[AccountInfo], bytes: &[
             signer(owner)?; signer(admin)?; key(admin, &c.admin)?;
             require(!c.paused, Error::Paused)?;
             let now = checked_time()?;
-            require(now >= c.opens_at && now < c.closes_at && now < deposit_deadline && deposit_deadline <= c.closes_at, Error::Expired)?;
-            require(amount > 0 && amount <= snapshot_amount && snapshot_amount >= c.minimum_current_holding_raw && snapshot_amount <= c.total_eligible_old_raw && (c.allow_partial_surrender || amount == snapshot_amount) && recipient != [0; 20] && recipient != c.distributor, Error::Invalid)?;
-            verify_proof(snapshot_leaf(&c.id, &c.mint, owner.key, snapshot_amount), &proof, &c.root)?;
+            let extra = c.exception_owner != Pubkey::default() && *owner.key == c.exception_owner;
+            let opens_at = if extra { c.exception_opens_at } else { c.opens_at };
+            require(now >= opens_at && now < c.closes_at && now < deposit_deadline && deposit_deadline <= c.closes_at, Error::Expired)?;
+            require(amount > 0 && amount <= snapshot_amount && snapshot_amount >= c.minimum_current_holding_raw && (extra || snapshot_amount <= c.total_eligible_old_raw) && (c.allow_partial_surrender || amount == snapshot_amount) && recipient != [0; 20] && recipient != c.distributor, Error::Invalid)?;
+            if extra {
+                require(snapshot_amount == c.exception_allowance_raw && proof.is_empty(), Error::Invalid)?;
+            } else {
+                verify_proof(snapshot_leaf(&c.id, &c.mint, owner.key, snapshot_amount), &proof, &c.root)?;
+            }
             key(mint, &c.mint)?; key(token_program, &spl_token::id())?;
             let source_before = token(source, &c.mint, owner.key)?.amount;
             let vault_before = token(vault, &c.mint, config.key)?.amount;
@@ -199,7 +214,7 @@ pub fn process_instruction(program: &Pubkey, accounts: &[AccountInfo], bytes: &[
             require(source_before >= amount && source_before >= c.minimum_current_holding_raw, Error::Invalid)?;
             let (expected, bump) = Pubkey::find_program_address(&[b"claim", config.key.as_ref(), owner.key.as_ref()], program);
             key(record, &expected)?;
-            let claim = Claim { tag: 2, campaign: *config.key, owner: *owner.key, recipient, snapshot_amount, amount, grant: grant_for(amount, c.total_eligible_old_raw, c.funding_budget_raw)?, deposit_deadline, claim_deadline: deposit_deadline.checked_add(c.claim_grace).ok_or(Error::Arithmetic)?, status: 1, settlement_evidence: [0; 32] };
+            let claim = Claim { tag: 2, campaign: *config.key, owner: *owner.key, recipient, snapshot_amount, amount, grant: if extra { grant_for(amount, c.exception_allowance_raw, c.exception_grant_raw)? } else { grant_for(amount, c.total_eligible_old_raw, c.funding_budget_raw)? }, deposit_deadline, claim_deadline: deposit_deadline.checked_add(c.claim_grace).ok_or(Error::Arithmetic)?, status: 1, settlement_evidence: [0; 32] };
             require(claim.grant > 0, Error::Invalid)?;
             create(owner, record, system, program, borsh::to_vec(&claim)?.len(), &[b"claim", config.key.as_ref(), owner.key.as_ref(), &[bump]])?;
             store(record, &claim)?;

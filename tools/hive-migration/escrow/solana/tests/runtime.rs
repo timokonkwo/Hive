@@ -62,10 +62,14 @@ impl Fixture {
 async fn fixture() -> Fixture { fixture_with_policy(true, 1000 * 10u128.pow(18)).await }
 async fn fixture_with_policy(allow_partial_surrender: bool, funding_budget_raw: u128) -> Fixture { fixture_with_minimum(allow_partial_surrender, funding_budget_raw, 0).await }
 async fn fixture_with_minimum(allow_partial_surrender: bool, funding_budget_raw: u128, minimum_current_holding_raw: u64) -> Fixture {
-    let program = Pubkey::new_unique(); let admin = Keypair::new(); let owner = Keypair::new();
+    fixture_with_exception(allow_partial_surrender, funding_budget_raw, minimum_current_holding_raw, false).await
+}
+async fn fixture_with_exception(allow_partial_surrender: bool, funding_budget_raw: u128, minimum_current_holding_raw: u64, extra: bool) -> Fixture {
+    let program = Pubkey::new_unique(); let admin = Keypair::new();
+    let owner = if extra { Keypair::from_bytes(&admin.to_bytes()).unwrap() } else { Keypair::new() };
     let a = Keypair::new(); let b = Keypair::new(); let c = Keypair::new();
-    let mint = Pubkey::new_unique(); let source = Pubkey::new_unique(); let collection = Pubkey::new_unique();
-    let collector_token = Pubkey::new_unique(); let refund_token = Pubkey::new_unique();
+    let mint = Pubkey::new_unique(); let source = Pubkey::new_unique(); let collection = if extra { admin.pubkey() } else { Pubkey::new_unique() };
+    let collector_token = if extra { source } else { Pubkey::new_unique() }; let refund_token = Pubkey::new_unique();
     let config = Pubkey::find_program_address(&[b"campaign", admin.pubkey().as_ref(), &CAMPAIGN], &program).0;
     let vault = Pubkey::find_program_address(&[b"vault", config.as_ref()], &program).0;
     let record = Pubkey::find_program_address(&[b"claim", config.as_ref(), owner.pubkey().as_ref()], &program).0;
@@ -83,14 +87,14 @@ async fn fixture_with_minimum(allow_partial_surrender: bool, funding_budget_raw:
     Mint::pack(Mint { mint_authority: COption::None, supply: CAP, decimals: 9, is_initialized: true, freeze_authority: COption::None }, &mut mint_data).unwrap();
     pt.add_account(mint, Account { lamports: 10_000_000, owner: spl_token::id(), data: mint_data, executable: false, rent_epoch: 0 });
     pt.add_account(source, token_account(mint, owner.pubkey(), CAP));
-    pt.add_account(collector_token, token_account(mint, collection, 0));
+    if !extra { pt.add_account(collector_token, token_account(mint, collection, 0)); }
     pt.add_account(refund_token, token_account(mint, owner.pubkey(), 0));
     let mut ctx = pt.start_with_context().await;
     ctx.set_sysvar(&Clock { unix_timestamp: 100, ..Clock::default() });
     let init = EscrowIx::Initialize { id: CAMPAIGN, collection,
-        root: snapshot_leaf(&CAMPAIGN, &mint, &owner.pubkey(), CAP), 
-        destination_chain: 4663, distributor: [7; 20], opens_at: 100, closes_at: 10000, claim_grace: 3600,
-        total_eligible_old_raw: CAP, funding_budget_raw, allow_partial_surrender, minimum_current_holding_raw, };
+        root: snapshot_leaf(&CAMPAIGN, &mint, &if extra { a.pubkey() } else { owner.pubkey() }, CAP),
+        destination_chain: 4663, distributor: [7; 20], opens_at: if extra { 200 } else { 100 }, closes_at: 10000, claim_grace: 3600,
+        total_eligible_old_raw: CAP, funding_budget_raw, allow_partial_surrender, minimum_current_holding_raw, exception_owner: if extra { owner.pubkey() } else { Pubkey::default() }, exception_allowance_raw: if extra { CAP } else { 0 }, exception_grant_raw: if extra { 100 * 10u128.pow(18) } else { 0 }, exception_opens_at: if extra { 100 } else { 0 }, };
 
     let ix = Instruction { program_id: program, accounts: vec![AccountMeta::new(admin.pubkey(), true), rw(config), rw(vault), ro(mint), ro(spl_token::id()), ro(system_program::id())], data: borsh::to_vec(&init).unwrap() };
     send(&mut ctx, ix, &[&admin]).await.unwrap();
@@ -235,4 +239,32 @@ async fn buying_more_cannot_repair_a_below_minimum_snapshot() {
     let ix = f.deposit(1, CAP, vec![sig(f.admin.pubkey())]);
     assert!(send(&mut f.ctx, ix, &[&f.owner, &f.admin]).await.is_err());
     assert_eq!(f.balance(f.source).await, CAP + 100);
+}
+
+#[tokio::test]
+async fn supplemental_admin_owner_deposit_release_is_exact_and_terminal() {
+    let mut f = fixture_with_exception(true, 1000 * 10u128.pow(18), 0, true).await;
+    assert_eq!(f.admin.pubkey(), f.owner.pubkey());
+    let ix = f.deposit(CAP, CAP + 1, vec![sig(f.admin.pubkey())]);
+    assert!(send(&mut f.ctx, ix, &[&f.owner]).await.is_err());
+    let ix = f.deposit(CAP, CAP, vec![sig(f.admin.pubkey())]);
+    send(&mut f.ctx, ix, &[&f.owner]).await.unwrap();
+    assert_eq!(f.state().await.grant, 100 * 10u128.pow(18));
+    assert_eq!(f.balance(f.vault).await, CAP);
+    let ix = f.settle(true, f.collector_token); send(&mut f.ctx, ix, &[&f.admin]).await.unwrap();
+    assert_eq!(f.balance(f.source).await, CAP);
+    assert_eq!(f.balance(f.vault).await, 0);
+    let ix = f.deposit(CAP, CAP, vec![sig(f.admin.pubkey())]);
+    assert!(send(&mut f.ctx, ix, &[&f.owner]).await.is_err());
+}
+#[tokio::test]
+async fn supplemental_partial_refund_preserves_amount_and_consumes_attempt() {
+    let mut f = fixture_with_exception(true, 1000 * 10u128.pow(18), 0, true).await;
+    let ix = f.deposit(CAP / 2, CAP, vec![sig(f.admin.pubkey())]);
+    send(&mut f.ctx, ix, &[&f.owner]).await.unwrap();
+    assert_eq!(f.state().await.grant, 50 * 10u128.pow(18));
+    let ix = f.settle(false, f.refund_token);send(&mut f.ctx, ix, &[&f.admin]).await.unwrap();
+    assert_eq!(f.balance(f.refund_token).await, CAP / 2);
+    assert_eq!(f.balance(f.vault).await, 0);
+    assert_eq!(f.state().await.status, 3);
 }

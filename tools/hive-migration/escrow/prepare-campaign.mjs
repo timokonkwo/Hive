@@ -4,7 +4,7 @@ import {resolve, dirname} from 'node:path';
 import {pathToFileURL} from 'node:url';
 import {PublicKey} from '@solana/web3.js';
 import {getAddress, zeroAddress} from 'viem';
-import {addresses, bytes, hex, integer, sha256, snapshotTree, initializeInstruction, serializeInstruction, validateAllocationConfig, grantForDeposit} from './client.mjs';
+import {addresses, bytes, hex, integer, sha256, snapshotTree, initializeInstruction, serializeInstruction, validateAllocationConfig, grantForDeposit,exceptionTerms,NO_EXCEPTION_OWNER} from './client.mjs';
 const SOL_MINT='6JfonM6a24xngXh5yJ1imZzbMhpfvEsiafkb4syHBAGS';
 const RH_TOKEN='0xc65e9630D8Af1eA278cbE359f78931684b4ff9f8';
 const SNAPSHOT_HASH='cce4c645194e8b7fa1f1b600c0332e099cb488dce47ffa66fcf6b50920f5daaa';
@@ -48,12 +48,14 @@ export function validateCampaign(c, snapshot, reviewed) {
   }
   if(c.totalEligibleOldRaw!=null && c.totalEligibleOldRaw!==total.toString())fail('Eligible denominator must equal reviewed allowances');
   c={...c,totalEligibleOldRaw:total.toString()};
+  c={...c,...exceptionTerms(c)};
   validateAllocationConfig(c);
-  const budget=reviewed.reduce((sum,h)=>sum+BigInt(grantForDeposit(c,h.amountRaw,h.amountRaw)),0n);
+  if(c.exceptionOwner!==NO_EXCEPTION_OWNER && (c.supplementalGrantApproved!==true || source.has(c.exceptionOwner) || owners.has(c.exceptionOwner)))fail('Supplemental exception must be explicitly approved and separate from the frozen population');
+  const budget=reviewed.reduce((sum,h)=>sum+BigInt(grantForDeposit(c,h.amountRaw,h.amountRaw,h.owner)),0n);
   if(BigInt(c.fundingBudgetRaw)<budget)fail('Approved budget cannot cover every selected maximum allocation');
   const tree=snapshotTree(c.campaignId,c.mint,reviewed);
   const sourceCampaign=addresses(c.program,c.admin,c.campaignId).campaign;
-  return {config:{...c,root:tree.root},tree,maximumGrantLiabilityRaw:budget.toString(),sourceCampaign:sourceCampaign.toBase58()};
+  return {config:{...c,root:tree.root},tree,ordinaryGrantLiabilityRaw:budget.toString(),maximumGrantLiabilityRaw:(budget+BigInt(c.exceptionGrantRaw)).toString(),totalFundingRequiredRaw:(BigInt(c.fundingBudgetRaw)+BigInt(c.exceptionGrantRaw)).toString(),sourceCampaign:sourceCampaign.toBase58()};
 }
 export function prepare(configPath, outputDirectory) {
   const base=dirname(resolve(configPath)), c=JSON.parse(readFileSync(configPath,'utf8'));
@@ -64,7 +66,7 @@ export function prepare(configPath, outputDirectory) {
   const result=validateCampaign(c,JSON.parse(snapshotBytes),JSON.parse(readFileSync(resolve(base,c.reviewedHoldersFile),'utf8')));
   const config=result.config;
   const artifact=JSON.parse(readFileSync(new URL('./evm/out/HiveDistributor.sol/HiveDistributor.json',import.meta.url),'utf8'));
-  const constructorArguments=[config.destinationToken,config.destinationAdmin,config.campaignId,hex(new PublicKey(result.sourceCampaign).toBytes()),hex(new PublicKey(config.mint).toBytes()),config.root,config.opensAt,config.closesAt,config.claimGrace,config.totalEligibleOldRaw,config.fundingBudgetRaw,config.allowPartialSurrender];
+  const constructorArguments=[config.destinationToken,config.destinationAdmin,config.campaignId,hex(new PublicKey(result.sourceCampaign).toBytes()),hex(new PublicKey(config.mint).toBytes()),config.root,config.opensAt,config.closesAt,config.claimGrace,config.totalEligibleOldRaw,config.fundingBudgetRaw,config.allowPartialSurrender,[hex(new PublicKey(config.exceptionOwner).toBytes()),config.exceptionAllowanceRaw,config.exceptionGrantRaw,config.exceptionOpensAt]];
   const output={...result,createdAt:new Date().toISOString(),mode:'unsigned_review_only',depositsEnabled:false,solanaInitialize:serializeInstruction(initializeInstruction(config)),evmDeployment:{constructorArguments,bytecode:artifact.bytecode.object,abi:artifact.abi}};
   mkdirSync(outputDirectory,{recursive:true});
   const path=resolve(outputDirectory,'campaign-review.json');

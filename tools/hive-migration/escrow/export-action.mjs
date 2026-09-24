@@ -3,7 +3,7 @@ import {readFileSync,writeFileSync} from 'node:fs';
 import {PublicKey} from '@solana/web3.js';
 import {encodeFunctionData} from 'viem';
 import {resolve} from 'node:path';import {pathToFileURL} from 'node:url';
-import {addresses,claimId,hex,integer,grantForDeposit,depositEvidence,depositInstruction,settlementInstructions,serializeInstruction} from './client.mjs';
+import {addresses,claimId,hex,integer,grantForDeposit,reviewedHolder,depositEvidence,depositInstruction,settlementInstructions,serializeInstruction} from './client.mjs';
 export function exportAction(review,request,abi) {
   const c=review.config;
   const owner=new PublicKey(request.owner).toBase58();
@@ -17,11 +17,11 @@ export function exportAction(review,request,abi) {
   if(request.action==='confirm_deposit')return evm('confirmDeposit',[id,depositEvidence(request.depositSignature)]);
   if(request.action==='release'||request.action==='refund')return {...result,chain:'solana',instructions:settlementInstructions(c,owner,request.action==='release',request.destinationTransactionHash,request.feePayer).map(serializeInstruction)};
   if(request.action==='reserve'||request.action==='deposit'){
-    const h=review.tree.holders.find(h=>h.owner===owner);
+    const h=reviewedHolder(review,owner);
     if(!h)throw Error('Owner absent from reviewed eligibility tree');
     integer(request.amount,8);integer(request.depositDeadline,8);
     if(BigInt(request.amount)<=0n||BigInt(request.amount)>BigInt(h.amountRaw))throw Error('Deposit exceeds reviewed allowance');
-    result.grantRaw=grantForDeposit(c,request.amount,h.amountRaw);
+    result.grantRaw=grantForDeposit(c,request.amount,h.amountRaw,owner);
     const q={owner,snapshotAmount:h.amountRaw,amount:request.amount,recipient:request.recipient,depositDeadline:request.depositDeadline,sourceTokenAccount:request.sourceTokenAccount,proof:h.proof};
     if(request.action==='deposit')return {...result,chain:'solana',instructions:[serializeInstruction(depositInstruction(c,q))]};
     const claimDeadline=BigInt(request.depositDeadline)+BigInt(c.claimGrace);

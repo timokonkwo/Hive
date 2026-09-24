@@ -3,6 +3,7 @@ import {readFileSync,mkdirSync,writeFileSync,linkSync,unlinkSync,openSync,fsyncS
 import {resolve,dirname,join} from 'node:path';
 import {pathToFileURL} from 'node:url';
 import {randomUUID} from 'node:crypto';
+import {openingFor} from './client.mjs';
 import {authenticateRegistration} from './registration.mjs';
 
 export async function acceptRegistration(review, input, directory, now = BigInt(Math.floor(Date.now()/1000))) {
@@ -19,7 +20,7 @@ export async function acceptRegistration(review, input, directory, now = BigInt(
     request[field]=input[field];
   }
   const terms=await authenticateRegistration(review,request);
-  if(now<BigInt(c.opensAt)||now>=BigInt(c.closesAt)||now>=BigInt(terms.depositDeadline))throw Error('Registration window closed or request expired');
+  if(now<BigInt(openingFor(c,terms.owner))||now>=BigInt(c.closesAt)||now>=BigInt(terms.depositDeadline))throw Error('Registration window closed or request expired');
   mkdirSync(directory,{recursive:true,mode:0o700});
   const path=join(directory,`${terms.claimId.slice(2)}.json`);
   const payload=JSON.stringify(request,null,2)+'\n';
