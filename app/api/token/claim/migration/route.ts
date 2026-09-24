@@ -22,7 +22,11 @@ async function forward(action: string, input: unknown) {
 export async function GET() { return forward('availability', {}); }
 export async function POST(request: Request) {
   const origin = request.headers.get('origin');
-  if (origin !== new URL(request.url).origin) return NextResponse.json({ error: 'Same-origin request required.' }, { status: 403, headers });
+  const url = new URL(request.url);
+  // Netlify can retain the immutable deploy origin after promotion to the custom domain.
+  const hiveDeploy = url.protocol === 'https:' && (url.hostname === 'hive-protocol.netlify.app' || url.hostname.endsWith('--hive-protocol.netlify.app'));
+  const publicHiveOrigin = hiveDeploy && origin === 'https://uphive.xyz';
+  if (origin !== url.origin && !publicHiveOrigin) return NextResponse.json({ error: 'Same-origin request required.' }, { status: 403, headers });
   const rate = checkRateLimit(`claim-migration:${getClientIp(request)}`, { maxRequests: 30, windowSeconds: 60 });
   if (!rate.allowed) return NextResponse.json({ error: 'Please wait before retrying.' }, { status: 429, headers });
   try {

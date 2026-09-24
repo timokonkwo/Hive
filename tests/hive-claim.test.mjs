@@ -78,6 +78,10 @@ test('migration proxy defaults closed and rejects cross-origin, oversized and un
   assert.equal((await route.POST(req({action:'execute',input:{}}))).status,400);
   assert.equal((await route.POST(req({action:'quote',input:'x'.repeat(17000)}))).status,400);
   assert.equal((await route.POST(req({action:'quote',input:{}}))).status,503);
+  const promoted=(host,origin)=>new Request('https://'+host+'/api/token/claim/migration',{method:'POST',headers:{origin,'content-type':'application/json'},body:JSON.stringify({action:'quote',input:{}})});
+  assert.equal((await route.POST(promoted('verified--hive-protocol.netlify.app','https://uphive.xyz'))).status,503);
+  assert.equal((await route.POST(promoted('verified--hive-protocol.netlify.app','https://evil.invalid'))).status,403);
+  assert.equal((await route.POST(promoted('hive-protocol.netlify.app.evil.invalid','https://uphive.xyz'))).status,403);
  }finally{if(old===undefined)delete process.env.HIVE_CLAIM_UI_ENABLED;else process.env.HIVE_CLAIM_UI_ENABLED=old;}
 });
 const fmt=load('../lib/hive-claim-format.ts');
