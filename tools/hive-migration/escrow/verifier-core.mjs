@@ -18,8 +18,8 @@ export async function processRegistration({review,request,observer,adapter,journ
   const observed=await observer.read(q.owner);
   if(!observed.finalized||!observed.deploymentVerified)throw Error('Finality or reviewed deployment verification missing');
   assertReservation(q,observed.destination);
-  let action=nextAction(observed.source,observed.destination,observed.destinationTimestamp);
-  const now=BigInt(observed.destinationTimestamp);
+  const now=BigInt(observed.destinationCurrentTimestamp??observed.destinationTimestamp);
+  let action=nextAction(observed.source,observed.destination,now);
   if(action==='reserve'&&(now<BigInt(openingFor(review.config,q.owner))||now>=BigInt(q.depositDeadline)||now>=BigInt(review.config.closesAt)))action='request_window_closed';
   if((observed.destinationPaused&&['reserve','deposit','confirm_deposit','claim'].includes(action))||(observed.sourcePaused&&action==='deposit'))action='paused';
   if(['reserve','deposit'].includes(action)&&BigInt(review.config.minimumCurrentHoldingRaw??'0')>0n){

@@ -52,7 +52,7 @@ export function createGateway({review,observer,requestsDirectory,stateDirectory,
     const q=await registered(input.request),observed=await observer.read(q.owner);
     if(!observed.finalized||!observed.deploymentVerified)throw Error('Finalized deployment verification unavailable');
     assertReservation(q,observed.destination);
-    let state=nextAction(observed.source,observed.destination,observed.destinationTimestamp);
+    let state=nextAction(observed.source,observed.destination,observed.destinationCurrentTimestamp??observed.destinationTimestamp);
     mkdirSync(packets,{recursive:true,mode:0o700});
     const receiptPath=join(packets,q.claimId.slice(2)+'.submission.json');
     const receipt=existsSync(receiptPath)?JSON.parse(readFileSync(receiptPath,'utf8')):null;

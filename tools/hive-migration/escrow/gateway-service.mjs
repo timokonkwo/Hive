@@ -5,6 +5,7 @@ import {readFileSync} from 'node:fs';
 import {resolve,dirname} from 'node:path';
 import {createObserver} from './observer.mjs';
 import {createGateway} from './gateway.mjs';
+import {operatorReady} from './operator-health.mjs';
 
 const path=resolve(process.argv[2]??''),settings=JSON.parse(readFileSync(path,'utf8'));
 const secret=process.env.HIVE_CLAIM_GATEWAY_TOKEN;
@@ -15,10 +16,12 @@ const observer=createObserver(review,{solanaRpc:process.env.SOLANA_RPC_URL,evmRp
 const handle=createGateway({review,observer,executionEnabled:settings.executionEnabled,requestsDirectory:resolve(base,settings.requestsDirectory),stateDirectory:resolve(base,settings.stateDirectory)});
 createServer(async(req,res)=>{
   const reply=(status,data)=>{res.writeHead(status,{'Content-Type':'application/json','Cache-Control':'no-store'});res.end(JSON.stringify(data));};
-  if(req.method==='GET'&&req.url==='/healthz')return reply(200,{mode:'configured'});
+  const healthy=!settings.operatorHealthFile||operatorReady(resolve(base,settings.operatorHealthFile));
+  if(req.method==='GET'&&req.url==='/healthz')return reply(200,{mode:'configured',claimsEnabled:settings.executionEnabled===true&&healthy});
   const token=Buffer.from(req.headers.authorization??''),expected=Buffer.from('Bearer '+secret);
   if(token.length!==expected.length||!timingSafeEqual(token,expected))return reply(401,{error:'Unauthorized'});
   const action=req.url?.slice(1);
+  if(!healthy)return reply(action==='availability'?200:503,action==='availability'?{enabled:false}:{code:'SERVICE_UNAVAILABLE',error:'Claim service temporarily unavailable.',recovery:'check_status'});
   // A separate local gateway follows the memory-only operator's readiness.
   if(settings.operatorReadinessUrl){
     try{

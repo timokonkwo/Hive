@@ -22,7 +22,8 @@ export function createObserver(review,{solanaRpc,evmRpc='https://rpc.mainnet.cha
     async read(owner){
       check(await sol.getGenesisHash()==='5eykt4UsFv8P8NJdTREpY1vzqKqZKvdpKuc147dw2N9d','Wrong Solana cluster');
       check(await evm.getChainId()===4663,'Wrong destination chain');
-      const block=await evm.getBlock({blockTag:'finalized'});
+      const [block,head]=await Promise.all([evm.getBlock({blockTag:'finalized'}),evm.getBlock({blockTag:'latest'})]);
+      check(head.number>=block.number&&head.timestamp>=block.timestamp,'Inconsistent destination clock');
       check(block.number!==null&&block.hash,'Finalized destination block unavailable');
       const code=await evm.getBytecode({address:c.distributor,blockNumber:block.number});
       check(code&&same(keccak256(code),d.destinationRuntimeCodeHash),'Distributor code fingerprint changed');
@@ -38,7 +39,8 @@ export function createObserver(review,{solanaRpc,evmRpc='https://rpc.mainnet.cha
       const vaultToken=unpackAccount(p.vault,vault,TOKEN_PROGRAM_ID);
       check(vaultToken.owner.equals(p.campaign)&&vaultToken.mint.equals(new PublicKey(c.mint))&&!vaultToken.isFrozen,'Invalid source vault');
       const fields={campaignId:c.campaignId,sourceCampaign:hex(p.campaign.toBytes()),sourceMint:hex(new PublicKey(c.mint).toBytes()),snapshotRoot:c.root,token:c.destinationToken,admin:c.destinationAdmin,opensAt:c.opensAt,closesAt:c.closesAt,claimGrace:c.claimGrace,totalEligibleOldRaw:c.totalEligibleOldRaw,fundingBudgetRaw:c.fundingBudgetRaw,allowPartialSurrender:c.allowPartialSurrender,exceptionOwner:hex(new PublicKey(c.exceptionOwner).toBytes()),exceptionAllowanceRaw:c.exceptionAllowanceRaw,exceptionGrantRaw:c.exceptionGrantRaw,exceptionOpensAt:c.exceptionOpensAt};
-      for(const [f,value] of Object.entries(fields))check(same(await readAt(block.number,f),value),`Destination configuration mismatch: ${f}`);
+      const entries=Object.entries(fields);
+      for(let i=0;i<entries.length;i+=4)await Promise.all(entries.slice(i,i+4).map(async([f,value])=>check(same(await readAt(block.number,f),value),`Destination configuration mismatch: ${f}`)));
 
       const reserved=await readAt(block.number,'reserved');
       const balance=await evm.readContract({address:c.destinationToken,abi:[{type:'function',name:'balanceOf',stateMutability:'view',inputs:[{type:'address'}],outputs:[{type:'uint256'}]}],functionName:'balanceOf',args:[c.distributor],blockNumber:block.number});
@@ -52,7 +54,7 @@ export function createObserver(review,{solanaRpc,evmRpc='https://rpc.mainnet.cha
         if(source.status===1)check(vaultToken.amount>=BigInt(source.amount),'Source escrow has insufficient locked tokens');
       }
       if(Number(destination.status)!==0)check(same(destination.quote.sourceOwner,hex(new PublicKey(owner).toBytes())),'Wrong destination owner');
-      return {finalized:true,deploymentVerified:true,source,destination,sourceSlot:accounts.context.slot,destinationBlock:block.number.toString(),destinationBlockHash:block.hash,destinationTimestamp:block.timestamp.toString(),sourcePaused:chain.paused,destinationPaused:await readAt(block.number,'paused'),availableInventoryRaw:(balance-reserved).toString()};
+      return {finalized:true,deploymentVerified:true,source,destination,sourceSlot:accounts.context.slot,destinationBlock:block.number.toString(),destinationBlockHash:block.hash,destinationTimestamp:block.timestamp.toString(),destinationCurrentTimestamp:head.timestamp.toString(),sourcePaused:chain.paused,destinationPaused:await readAt(block.number,'paused'),availableInventoryRaw:(balance-reserved).toString()};
     },
     async spendable(owner,minContextSlot){
       const accounts=await sol.getTokenAccountsByOwner(new PublicKey(owner),{mint:new PublicKey(c.mint)},{commitment:'finalized',minContextSlot});

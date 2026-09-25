@@ -55,7 +55,7 @@ test('post-snapshot buying cannot qualify a below-minimum snapshot wallet',async
 test('fresh partial quote signs the same terms accepted by durable intake',async()=>{
  const f=await fixture(),input={...await f.signed(),amount:'1000000000000'};
  const quote=await quoteRegistration(f.review,input,quoteObserver(f,input),100n);
- assert.equal(quote.expiresAt,'700');assert.equal(quote.oldAmountRaw,input.amount);assert.equal(quote.reserved,false);assert.equal(quote.transactionSubmitted,false);
+ assert.equal(quote.expiresAt,'3700');assert.equal(quote.oldAmountRaw,input.amount);assert.equal(quote.reserved,false);assert.equal(quote.transactionSubmitted,false);
  assert.equal(quote.message,registrationMessage(f.review,quote.request));
  assert.notEqual(quote.request.nonce,input.nonce);
  const accepted=await acceptRegistration(f.review,await f.signed(quote.request),f.dir,101n);
@@ -109,4 +109,12 @@ test('paid status exposes only verified finalized payout evidence',async()=>{
  assert.equal((await handle('status',{request})).state,'claim');
  observer.settlementEvidence=async()=>{throw Error('Noncanonical payout');};
  await assert.rejects(handle('status',{request}),/Noncanonical/);
+});
+
+test('fresh quotes retain finalized state while allowing a lagging finality timestamp',async()=>{
+ const f=await fixture(),input=await f.signed();
+ const q=await quoteRegistration(f.review,input,quoteObserver(f,input,{destinationTimestamp:'100',destinationCurrentTimestamp:'2000'}),2000n);
+ assert.equal(q.expiresAt,'5600');
+ await assert.rejects(quoteRegistration(f.review,input,quoteObserver(f,input,{finalized:false,destinationTimestamp:'100',destinationCurrentTimestamp:'2000'}),2000n),/Verified active/);
+ await assert.rejects(quoteRegistration(f.review,input,quoteObserver(f,input,{destinationTimestamp:'100',destinationCurrentTimestamp:'1000'}),2000n),/Fresh open/);
 });

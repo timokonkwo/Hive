@@ -13,12 +13,14 @@ export async function quoteRegistration(review,input,observer,now=BigInt(Math.fl
   if(!c||['classificationsApproved','grantAmountsApproved','terminalAttemptPolicyApproved'].some(k=>c[k]!==true)||review.financialActivationApproved!==true)throw Error('Approved and activated campaign required');
   if(!input||['owner','recipient','amount'].some(k=>typeof input[k]!=='string'||input[k].length>64))throw Error('Owner, recipient and exact raw amount required');
   if(now<BigInt(openingFor(c,input.owner))||now>=BigInt(c.closesAt))throw Error('Campaign is not open');
-  const deadline=now+600n<BigInt(c.closesAt)?now+600n:BigInt(c.closesAt);
+  const deadline=now+3600n<BigInt(c.closesAt)?now+3600n:BigInt(c.closesAt);
   const request={owner:input.owner,recipient:input.recipient,amount:input.amount,depositDeadline:deadline.toString(),nonce:'0x'+randomBytes(32).toString('hex')};
   const terms=registrationTerms(review,request);
   const observed=await observer.read(terms.owner);
   if(!observed.finalized||!observed.deploymentVerified||observed.sourcePaused!==false||observed.destinationPaused!==false)throw Error('Verified active deployments required');
-  const chainTime=BigInt(observed.destinationTimestamp);
+  // Finalized L2 state can trail its current clock by more than ten minutes.
+  // Keep state/evidence finalized; use the current block only for time checks.
+  const chainTime=BigInt(observed.destinationCurrentTimestamp??observed.destinationTimestamp);
   if(chainTime<now-120n||chainTime>now+120n||chainTime<BigInt(openingFor(c,input.owner))||chainTime>=deadline)throw Error('Fresh open campaign state required');
   if(observed.source!==null||Number(observed.destination.status)!==0)throw Error('An attempt already exists; resume its status instead');
   if(!Number.isSafeInteger(c.snapshotSlot)||!Number.isSafeInteger(observed.sourceSlot)||observed.sourceSlot<c.snapshotSlot)throw Error('Fresh source snapshot required');
