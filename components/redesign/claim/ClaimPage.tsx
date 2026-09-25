@@ -6,6 +6,7 @@ import { migrationReview } from '@/lib/hive-claim-review';
 import { isReimbursementLookup, supplementalClaim, type ReimbursementLookup } from '@/lib/hive-reimbursement';
 import styles from './claim.module.css';
 import LiveMigration from './LiveMigration';
+import ClaimCountdown from './ClaimCountdown';
 import { type ClaimSchedule } from '@/lib/hive-claim-schedule';
 
 const reasons: Record<string, string> = {
@@ -28,12 +29,12 @@ export default function ClaimPage({ schedule = null }: { schedule?: ClaimSchedul
   useEffect(() => {
     try { const r = result && JSON.parse(localStorage.getItem('hive-migration-v5:' + result.owner) || 'null'); setSavedClaim(!!r?.solanaSignature && !!r?.evmSignature); } catch { setSavedClaim(false); }
   }, [result]);
-  const [migrationEnabled, setMigrationEnabled] = useState(false);
+  const [migrationEnabled, setMigrationEnabled] = useState<boolean | null>(null);
   const [localTestOwner, setLocalTestOwner] = useState<string | null>(null);
   function availability(v: { enabled?: boolean; localTestOwner?: string }) { setMigrationEnabled(v.enabled === true); setLocalTestOwner(v.enabled === true && v.localTestOwner === supplementalClaim.owner ? v.localTestOwner : null); }
   useEffect(() => {
     const abort = new AbortController();
-    fetch('/api/token/claim/migration', { cache: 'no-store', signal: abort.signal }).then(r => r.ok ? r.json() : { enabled: false }).then(availability).catch(() => {});
+    fetch('/api/token/claim/migration', { cache: 'no-store', signal: abort.signal }).then(r => r.ok ? r.json() : { enabled: false }).then(availability).catch(() => { if (!abort.signal.aborted) setMigrationEnabled(false); });
     const timer = setInterval(() => { fetch('/api/token/claim/migration', { cache: 'no-store', signal: abort.signal }).then(r => r.ok ? r.json() : { enabled: false }).then(availability).catch(() => setMigrationEnabled(false)); }, 30000);
     return () => { abort.abort(); clearInterval(timer); };
   }, []);
@@ -72,7 +73,7 @@ export default function ClaimPage({ schedule = null }: { schedule?: ClaimSchedul
   }, []);
   const preview = result ? migrationReview(result) : null;
   const localTest = !!result && result.owner === localTestOwner;
-  const claimReady = (windowOpen || localTest) && migrationEnabled;
+  const claimReady = (windowOpen || localTest) && migrationEnabled === true;
   return <section className={styles.main} aria-label="HIVE migration">
     {restoring ? <div className={styles.flowState} role="status" aria-busy="true"><LoaderCircle className={styles.stateIcon + ' ' + styles.spinner} aria-hidden="true" /><h2>Loading your claim</h2></div> : reviewOpen && result ? <>
       <LiveMigration key={result.owner} result={result} canStart={claimReady} onBack={() => setReviewOpen(false)} />
@@ -96,19 +97,10 @@ export default function ClaimPage({ schedule = null }: { schedule?: ClaimSchedul
     </>}
     {!reviewOpen && <section className={styles.faq} aria-labelledby="claim-faq-title"><h2 id="claim-faq-title">How it works</h2>
       {[
-        ['How do I claim?', 'When claims open, connect your Solana and Robinhood wallets, deposit your eligible HIVE on Solana, and receive your allocation of HIVE on Robinhood. Each wallet can claim once.'],
+        ['How do I claim?', 'Connect your Solana and Robinhood wallets, deposit your eligible HIVE on Solana, and receive your allocation of HIVE on Robinhood. Each wallet can claim once.'],
         ['Who is eligible?', 'Your wallet needed at least 1M HIVE on Solana at the snapshot and must still hold at least 1M when you deposit.'],
         ['How much will I receive?', 'Your allocation is proportional to the HIVE you deposit. You can deposit all or part of your eligible balance, up to your snapshot holding; a smaller deposit receives proportionally less. Your estimate appears above before you connect a wallet.'],
       ].map(([question, answer]) => <details key={question}><summary>{question}<ChevronDown size={16} aria-hidden="true" /></summary><p>{answer}</p></details>)}
     </section>}
   </section>;
-}
-
-function ClaimCountdown({ schedule, now, enabled }: { schedule: ClaimSchedule; now: number | null; enabled: boolean }) {
-  if (!schedule) return <aside className={styles.countdown}><span>Claims start soon</span></aside>;
-  const started = now !== null && now >= schedule.opensAt;
-  const closed = now !== null && now >= schedule.closesAt;
-  const remaining = now === null ? null : Math.max(0, Math.floor(((started ? schedule.closesAt : schedule.opensAt) - now) / 1000));
-  const values = remaining === null ? ['--', '--', '--', '--'] : [Math.floor(remaining / 86400), Math.floor(remaining / 3600) % 24, Math.floor(remaining / 60) % 60, remaining % 60].map(n => String(n).padStart(2, '0'));
-  return <aside className={styles.countdown} aria-label="Claim schedule" data-opens-at={new Date(schedule.opensAt).toISOString()}><span>{closed ? 'Claims closed' : started ? enabled ? 'Claims close in' : 'Claims opening soon' : 'Claims start in'}</span>{!closed && (!started || enabled) && <div className={styles.clock} role="timer" aria-label={started ? 'Time until claims close' : 'Time until claims open'}>{['Days', 'Hours', 'Minutes', 'Seconds'].map((label, i) => <div key={label}><strong>{values[i]}</strong><span>{label}</span></div>)}</div>}</aside>;
 }
