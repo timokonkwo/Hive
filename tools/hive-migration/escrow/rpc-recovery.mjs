@@ -30,3 +30,14 @@ export async function recoverableCycle(work,{unready,wait,log,attempt=0,operatio
     await wait(delay);return next;
   }
 }
+
+// Coalesce read-only RPC calls for a brief window; never cache signing or sends.
+export function cachedReads(client,ttl=10000,now=Date.now) {
+ const reads=new Set(['getChainId','getGenesisHash','getBytecode','readContract']);
+ const cache=new Map();
+ return new Proxy(client,{get(target,key){const fn=Reflect.get(target,key);if(typeof fn!=='function')return fn;if(!reads.has(key))return fn.bind(target);return (...args)=>{
+  const id=String(key)+JSON.stringify(args,(_,v)=>typeof v==='bigint'?String(v):v);const saved=cache.get(id);if(saved&&now()-saved.at<ttl)return saved.promise;
+  for(const [k,v]of cache)if(now()-v.at>=ttl)cache.delete(k);
+  const entry={at:now()};entry.promise=Promise.resolve().then(()=>fn.apply(target,args)).catch(e=>{if(cache.get(id)===entry)cache.delete(id);throw e;});cache.set(id,entry);return entry.promise;
+ };}});
+}

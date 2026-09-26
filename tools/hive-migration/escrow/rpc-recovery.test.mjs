@@ -28,3 +28,13 @@ test('recovery cannot rebroadcast an unknown submitted payment',async()=>{
  assert.equal(await recoverableCycle(work,options),1);assert.equal(ready,false);
  assert.equal(await recoverableCycle(work,options),0);assert.equal(sends,1);assert.equal(journal.latest().get('claim').status,'confirmed');
 });
+
+import {cachedReads} from './rpc-recovery.mjs';
+test('read cache coalesces matching checkpoints, expires, evicts failures and never caches sends',async()=>{
+ let time=0,reads=0,sends=0,fail=false;
+ const client=cachedReads({readContract:async()=>{reads++;if(fail)throw Error('network');return reads;},sendRawTransaction:async()=>++sends},10000,()=>time);
+ assert.deepEqual(await Promise.all([client.readContract({blockNumber:1n}),client.readContract({blockNumber:1n})]),[1,1]);
+ assert.equal(await client.readContract({blockNumber:2n}),2);time=10000;assert.equal(await client.readContract({blockNumber:1n}),3);
+ fail=true;await assert.rejects(client.readContract({blockNumber:3n}));fail=false;assert.equal(await client.readContract({blockNumber:3n}),5);
+ await client.sendRawTransaction('same');await client.sendRawTransaction('same');assert.equal(sends,2);
+});
