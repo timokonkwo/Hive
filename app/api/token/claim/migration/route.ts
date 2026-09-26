@@ -20,6 +20,8 @@ async function forward(action: string, input: unknown, localOwner: string | null
     if (url.username || url.password || url.search || url.hash) throw Error();
     const response = await fetch(new URL(action, url.href.replace(/\/?$/, '/')), { method: 'POST', headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' }, body: JSON.stringify(input), cache: 'no-store', redirect: 'error', signal: AbortSignal.timeout(30000) });
     if (!response.ok) {
+      if(action === 'availability') return NextResponse.json({enabled:false},{headers});
+      if(response.status === 429 || response.status >= 500) return NextResponse.json({code:'SERVICE_UNAVAILABLE',error:'Claim service temporarily unavailable. Try again.',recovery:'check_status'},{status:503,headers});
       const issue = await response.json().catch(() => ({}));
       const safeCodes = ['REGISTRATION_NOT_FOUND', 'CLAIM_WINDOW', 'SERVICE_UNAVAILABLE', 'BALANCE_CHANGED', 'CLAIM_EXISTS', 'AUTHORIZATION_REQUIRED', 'CLAIM_UNVERIFIED'];
       return NextResponse.json(safeCodes.includes(issue.code) ? { code: issue.code, error: issue.error, recovery: issue.recovery } : { code: 'CLAIM_UNVERIFIED', error: 'Your claim could not be verified. Check its status to continue.', recovery: 'check_status' }, { status: response.status === 503 ? 503 : 409, headers });

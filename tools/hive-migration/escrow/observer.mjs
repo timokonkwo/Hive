@@ -4,6 +4,7 @@ import {TOKEN_PROGRAM_ID,unpackAccount} from '@solana/spl-token';
 import {getBase58Encoder} from '@solana/kit';
 import {createPublicClient,http,keccak256} from 'viem';
 import {addresses,claimId,hex,sha256,decodeCampaign,decodeClaim,depositInstruction,exceptionTerms} from './client.mjs';
+import {rpcClient} from './rpc-recovery.mjs';
 const LOADER=new PublicKey('BPFLoaderUpgradeab1e11111111111111111111111');
 const same=(a,b)=>String(a).toLowerCase()===String(b).toLowerCase();
 const check=(ok,message)=>{if(!ok)throw Error(message);};
@@ -12,8 +13,8 @@ export function createObserver(review,{solanaRpc,evmRpc='https://rpc.mainnet.cha
   const c={...review.config,...exceptionTerms(review.config)},d=review.deployment;
   check(d?.solanaProgramDataAddress&&d.solanaProgramDataSha256&&d.destinationRuntimeCodeHash&&d.destinationBlock!==undefined,'Reviewed deployment fingerprints are required');
   check(c.destinationChain==='4663'&&same(c.destinationToken,'0xc65e9630D8Af1eA278cbE359f78931684b4ff9f8')&&c.mint==='6JfonM6a24xngXh5yJ1imZzbMhpfvEsiafkb4syHBAGS','Wrong migration assets');
-  const sol=clients.sol??new Connection(solanaRpc,'finalized');
-  const evm=clients.evm??createPublicClient({transport:http(evmRpc,{retryCount:0,timeout:20000})});
+  const sol=rpcClient(clients.sol??new Connection(solanaRpc,{commitment:'finalized',disableRetryOnRateLimit:true,fetch:async(url,options)=>{const response=await fetch(url,{...options,signal:AbortSignal.timeout(20000)});if(!response.ok){const e=new Error('Solana RPC HTTP error');e.status=response.status;throw e;}return response;}}),'solana');
+  const evm=rpcClient(clients.evm??createPublicClient({transport:http(evmRpc,{retryCount:0,timeout:20000})}),'evm');
   const abi=review.evmDeployment?.abi ?? JSON.parse(readFileSync(new URL('./evm/out/HiveDistributor.sol/HiveDistributor.json',import.meta.url),'utf8')).abi;
   check(Array.isArray(abi)&&abi.length>0,'Reviewed distributor ABI is required');
   const readAt=(blockNumber,functionName,args=[])=>evm.readContract({address:c.distributor,abi,functionName,args,blockNumber});

@@ -6,6 +6,7 @@ import {loadSignerFromFd,createLiveAdapter} from './live-adapter.mjs';
 import {Journal,acquireServiceLock,reconcileJournal} from './journal.mjs';
 import {processRegistration} from './verifier-core.mjs';
 import {writeOperatorHealth} from './operator-health.mjs';
+import {recoverableCycle} from './rpc-recovery.mjs';
 let release,health;
 try {
   const args=process.argv.slice(2),path=args[0],execute=args.includes('--execute'),once=args.includes('--once');
@@ -25,10 +26,18 @@ try {
   if(!Number.isInteger(poll)||poll<1000||poll>60000)throw Error('pollMilliseconds must be 1000–60000');
   let stopping=false;process.on('SIGINT',()=>{stopping=true;});process.on('SIGTERM',()=>{stopping=true;});
   const completed=new Set();
+  let retries=0,operation='reconcile';
+  const shutdown=new AbortController();
+  const stop=()=>{stopping=true;shutdown.abort();};
+  process.on('SIGINT',stop);process.on('SIGTERM',stop);
+  const wait=ms=>delay(ms,undefined,{signal:shutdown.signal}).catch(e=>{if(e.name!=='AbortError')throw e;});
   do {
+    retries=await recoverableCycle(async()=>{
+    operation='reconcile';
     if(execute){
       await reconcileJournal(journal,adapter);
       if([...journal.latest().values()].some(e=>e.status==='failed'))throw Error('Failed transaction requires receipt reconciliation');
+      operation='verify_deployment';
       const observed=await observer.read(review.config.exceptionOwner);
       if(!observed.finalized||!observed.deploymentVerified||observed.sourcePaused||observed.destinationPaused)throw Error('Verified active deployments required');
       if(health)writeOperatorHealth(health,true);
@@ -37,7 +46,8 @@ try {
       if(stopping)break;
       if(completed.has(file))continue;
       const request=JSON.parse(readFileSync(join(requests,file),'utf8'));
-      // Any verification/RPC/journal error stops the process; never continue signing through it.
+      operation='process_claim';
+      // Transport errors suspend this cycle; integrity failures remain fatal.
       const result=await processRegistration({review,request,observer,adapter,journal,execute});
       const output=join(state,`${result.claimId.slice(2)}.json`),temp=output+'.tmp';
       writeFileSync(temp,JSON.stringify(result,(_,v)=>typeof v==='bigint'?v.toString():v,2)+'\n',{mode:0o600});renameSync(temp,output);
@@ -45,8 +55,9 @@ try {
       if(['complete','refunded','cancelled_without_observed_deposit','request_window_closed'].includes(result.action))completed.add(file);
       console.log(JSON.stringify({claimId:result.claimId,action:result.action,mode:result.mode,transactionStatus:result.transaction?.status}));
     }
-    if(once||stopping)break;
-    await delay(poll);
+    },{unready:()=>{if(health)writeOperatorHealth(health,false);},wait:once?async()=>{}:wait,log:value=>console.error(JSON.stringify({...value,operation})),attempt:retries});
+    if(once||stopping){if(once&&retries)process.exitCode=1;break;}
+    if(!retries)await wait(poll);
   }while(true);
 }catch(error){
   let message=error.shortMessage||error.message;

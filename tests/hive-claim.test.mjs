@@ -166,3 +166,21 @@ test('local early-claim gate rejects production, remote hosts and other wallet s
   process.env.HIVE_LOCAL_CLAIM_TEST_OWNER=owner;assert.equal(gate.localClaimTestOwner('http://localhost:3000'),null);
  }finally{if(priorNode===undefined)delete process.env.NODE_ENV;else process.env.NODE_ENV=priorNode;if(priorWallet===undefined)delete process.env.HIVE_LOCAL_CLAIM_TEST_OWNER;else process.env.HIVE_LOCAL_CLAIM_TEST_OWNER=priorWallet;}
 });
+
+test('upstream outages report service unavailability instead of claim verification errors',async()=>{
+ const saved={enabled:process.env.HIVE_CLAIM_UI_ENABLED,url:process.env.HIVE_CLAIM_GATEWAY_URL,token:process.env.HIVE_CLAIM_GATEWAY_TOKEN,fetch:globalThis.fetch};
+ try{
+  process.env.HIVE_CLAIM_UI_ENABLED='true';process.env.HIVE_CLAIM_GATEWAY_URL='https://gateway.invalid';process.env.HIVE_CLAIM_GATEWAY_TOKEN='test';
+  const route=load('../app/api/token/claim/migration/route.ts',{'@/lib/hive-local-claim-test':{localClaimTestOwner:()=>null},'@/lib/hive-claim-schedule':load('../lib/hive-claim-schedule.ts'),'next/server':{NextResponse:{json:(data,init)=>Response.json(data,init)}},'@/lib/rate-limit':{getClientIp:()=> 'test',checkRateLimit:()=>({allowed:true})}});
+  for(const status of [429,500,502,503,504]){
+   globalThis.fetch=async()=>new Response('Upstream unavailable',{status});
+   const availability=await route.GET(new Request('https://hive.test/api/token/claim/migration'));
+   assert.equal(availability.status,200);assert.deepEqual(await availability.json(),{enabled:false});
+   const response=await route.POST(new Request('https://hive.test/api/token/claim/migration',{method:'POST',headers:{origin:'https://hive.test','content-type':'application/json'},body:JSON.stringify({action:'status',input:{}})}));
+   assert.equal(response.status,503);assert.equal((await response.json()).code,'SERVICE_UNAVAILABLE');
+  }
+ }finally{
+  globalThis.fetch=saved.fetch;
+  for(const [key,value]of [['HIVE_CLAIM_UI_ENABLED',saved.enabled],['HIVE_CLAIM_GATEWAY_URL',saved.url],['HIVE_CLAIM_GATEWAY_TOKEN',saved.token]])if(value===undefined)delete process.env[key];else process.env[key]=value;
+ }
+});
