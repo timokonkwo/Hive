@@ -19,6 +19,14 @@ async function fixture(minimumCurrentHoldingRaw='0'){
 function destination(q,status){return {status,grant:BigInt(q.grant),quote:{sourceOwner:hex(new PublicKey(q.owner).toBytes()),recipient:q.recipient,snapshotAmount:BigInt(q.snapshotAmount),depositAmount:BigInt(q.amount),depositDeadline:BigInt(q.depositDeadline),claimDeadline:BigInt(q.claimDeadline)}};}
 function source(q,status=1){return {...q,status};}
 const tempJournal=()=>new Journal(mkdtempSync(join(tmpdir(),'hive-verifier-test-')));
+test('existing reservation reconciles without holdings reads or another broadcast',async()=>{
+ const {review,request,q}=await fixture('1000000000000'),journal=tempJournal();
+ journal.append({id:q.claimId+':reserve',chain:'evm',status:'submitted',hash:'pending'});
+ const observer={read:async()=>({finalized:true,deploymentVerified:true,source:null,destination:destination(q,0),destinationTimestamp:'100'}),spendable:async()=>{throw Error('MUST NOT RECHECK');}};
+ const adapter={lookup:async()=>({status:'pending'}),prepare:async()=>{throw Error('MUST NOT SIGN');},broadcast:async()=>{throw Error('MUST NOT SEND');}};
+ const result=await processRegistration({review,request,observer,adapter,journal,execute:true});
+ assert.deepEqual(result.transaction,{status:'submitted',hash:'pending'});
+});
 test('current holding minimum blocks reservation and deposit but never blocks settlement',async()=>{
  const {review,request,q}=await fixture('1000000000000');
  let state=0;

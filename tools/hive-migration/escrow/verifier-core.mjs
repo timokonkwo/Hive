@@ -22,6 +22,12 @@ export async function processRegistration({review,request,observer,adapter,journ
   let action=nextAction(observed.source,observed.destination,now);
   if(action==='reserve'&&(now<BigInt(openingFor(review.config,q.owner))||now>=BigInt(q.depositDeadline)||now>=BigInt(review.config.closesAt)))action='request_window_closed';
   if((observed.destinationPaused&&['reserve','deposit','confirm_deposit','claim'].includes(action))||(observed.sourcePaused&&action==='deposit'))action='paused';
+  // An already signed reservation only needs receipt reconciliation. Rechecking
+  // holdings cannot change it and adds unnecessary RPC load while finality lags.
+  if(execute&&action==='reserve'){
+    const pending=journal.latest().get(`${q.claimId}:reserve`);
+    if(pending)return {claimId:q.claimId,action,mode:'execute',sourceSlot:observed.sourceSlot,destinationBlock:observed.destinationBlock,transaction:{status:pending.status,hash:pending.hash}};
+  }
   if(['reserve','deposit'].includes(action)&&BigInt(review.config.minimumCurrentHoldingRaw??'0')>0n){
     const accounts=await observer.spendable(q.owner,observed.sourceSlot);
     if(accounts.reduce((n,a)=>n+BigInt(a.amountRaw),0n)<BigInt(review.config.minimumCurrentHoldingRaw))action='below_minimum';

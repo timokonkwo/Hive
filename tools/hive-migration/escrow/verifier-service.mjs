@@ -53,7 +53,7 @@ try {
       writeFileSync(temp,JSON.stringify(result,(_,v)=>typeof v==='bigint'?v.toString():v,2)+'\n',{mode:0o600});renameSync(temp,output);
       if(execute&&health)writeOperatorHealth(health,true);
       if(['complete','refunded','cancelled_without_observed_deposit','request_window_closed'].includes(result.action))completed.add(file);
-      console.log(JSON.stringify({claimId:result.claimId,action:result.action,mode:result.mode,transactionStatus:result.transaction?.status}));
+      console.log(JSON.stringify({claimId:result.claimId,action:result.action,mode:result.mode,transactionStatus:result.transaction?.status,transactionHash:result.transaction?.hash}));
     }
     },{unready:()=>{if(health)writeOperatorHealth(health,false);},wait:once?async()=>{}:wait,log:value=>console.error(JSON.stringify({...value,operation})),attempt:retries});
     if(once||stopping){if(once&&retries)process.exitCode=1;break;}
