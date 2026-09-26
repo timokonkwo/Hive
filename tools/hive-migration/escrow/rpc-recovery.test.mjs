@@ -2,6 +2,18 @@ import test from 'node:test';import assert from 'node:assert/strict';
 import {mkdtempSync} from 'node:fs';import {tmpdir} from 'node:os';import {join} from 'node:path';
 import {transientRpc,recoverableCycle,rpcClient,rpcDiagnostic} from './rpc-recovery.mjs';
 import {Journal,submitOnce,reconcileJournal} from './journal.mjs';
+import {SolanaJSONRPCError} from '@solana/web3.js';
+import {LimitExceededRpcError} from 'viem';
+test('provider JSON-RPC limits and context lag recover without weakening finality',async()=>{
+ const errors=[new LimitExceededRpcError(Error('rate limit')),new SolanaJSONRPCError({code:-32016,message:'Minimum context slot has not been reached'},'failed to get token accounts owned by account'),{cause:{code:-32005}}];
+ for(const error of errors){
+  assert.equal(transientRpc(error),true);
+  let ready=true,waited=0;
+  assert.equal(await recoverableCycle(async()=>{throw error;},{unready:()=>{ready=false;},wait:async ms=>{waited=ms;},log:()=>{}}),1);
+  assert.equal(ready,false);assert.equal(waited,5000);
+ }
+ for(const code of [-32002,-32602,-32603,3])assert.equal(transientRpc({code}),false);
+});
 test('transport failures are retryable but integrity and authorization failures are not',()=>{
  for(const error of [{name:'TimeoutError'},{status:429},{status:502},{cause:{code:'ECONNRESET'}},{name:'TypeError',message:'fetch failed'}])assert.equal(transientRpc(error),true);
  for(const error of [Error('Contract mismatch'),Error('Incomplete transaction journal'),Error('Fee budget exhausted'),{name:'HttpRequestError',status:401},{name:'HttpRequestError',status:403},Error('Failed transaction')])assert.equal(transientRpc(error),false);

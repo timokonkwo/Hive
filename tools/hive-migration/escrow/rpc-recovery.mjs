@@ -3,6 +3,10 @@ export function transientRpc(error) {
   for(let e=error,i=0;e&&i<8;e=e.cause,i++) {
     const status=Number(e.status??e.statusCode);
     if([408,429,500,502,503,504].includes(status))return true;
+    // Providers also return transient failures inside successful HTTP responses.
+    // -32005 is EVM rate limiting / Solana node unhealthy; -32016 is Solana
+    // minimum-context-slot lag. Keep the requested finality and retry later.
+    if([-32005,-32016].includes(e.code))return true;
     if(['TimeoutError','HttpRequestError','SocketClosedError'].includes(e.name)&&!Number.isFinite(status))return true;
     if(['ECONNRESET','ECONNREFUSED','ETIMEDOUT','EAI_AGAIN','ENOTFOUND','UND_ERR_CONNECT_TIMEOUT','UND_ERR_SOCKET'].includes(e.code))return true;
     if(e.name==='TypeError'&&e.message==='fetch failed')return true;
