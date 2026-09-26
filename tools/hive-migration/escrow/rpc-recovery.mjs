@@ -22,8 +22,15 @@ export function rpcDiagnostic(error,operation,attempt) {
   }
   return {event:'rpc_retry',operation,chain,method,status,attempt};
 }
-export function rpcClient(client,chain) {
-  return new Proxy(client,{get(target,key){const value=Reflect.get(target,key);if(typeof value!=='function')return value;return async(...args)=>{try{return await value.apply(target,args);}catch(e){e.rpcChain=chain;e.rpcMethod=String(key);throw e;}};}});
+export function rpcClient(client,chain,{wait=ms=>new Promise(resolve=>setTimeout(resolve,ms))}={}) {
+  return new Proxy(client,{get(target,key){const value=Reflect.get(target,key);if(typeof value!=='function')return value;return async(...args)=>{
+    for(let attempt=0;;attempt++)try{return await value.apply(target,args);}catch(e){
+      // Keep the same minimum slot and finalized commitment. A load-balanced
+      // Solana node can need a moment to reach the checkpoint just observed.
+      if(chain==='solana'&&key==='getTokenAccountsByOwner'&&e.code===-32016&&attempt<3){await wait(300*(attempt+1));continue;}
+      e.rpcChain=chain;e.rpcMethod=String(key);throw e;
+    }
+  };}});
 }
 export async function recoverableCycle(work,{unready,wait,log,attempt=0,operation='cycle'}) {
   try {await work();return 0;}catch(error){

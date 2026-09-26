@@ -6,6 +6,7 @@ import {resolve,dirname} from 'node:path';
 import {createObserver} from './observer.mjs';
 import {createGateway} from './gateway.mjs';
 import {operatorReady} from './operator-health.mjs';
+import {transientRpc,rpcDiagnostic} from './rpc-recovery.mjs';
 
 const path=resolve(process.argv[2]??''),settings=JSON.parse(readFileSync(path,'utf8'));
 const secret=process.env.HIVE_CLAIM_GATEWAY_TOKEN;
@@ -36,5 +37,12 @@ createServer(async(req,res)=>{
     const input=JSON.parse(Buffer.concat(chunks).toString()||'{}');
     if(settings.onlyOwner&&action!=='availability'&&(input.owner??input.request?.owner)!==settings.onlyOwner)return reply(403,{error:'This local test is limited to the configured wallet.'});
     reply(200,await handle(action,input));
-  }catch(error){reply(409,publicClaimError(error));}
+  }catch(error){
+    if(transientRpc(error)){
+      console.error(JSON.stringify(rpcDiagnostic(error,action,0)));
+      return reply(503,{code:'SERVICE_UNAVAILABLE',error:'Connection interrupted. Please try again.',recovery:'check_status'});
+    }
+    console.error(JSON.stringify({event:'gateway_error',action,name:error.name??'Error',code:publicClaimError(error).code}));
+    reply(409,publicClaimError(error));
+  }
 }).listen(Number(process.env.HIVE_CLAIM_GATEWAY_PORT??8788),process.env.HIVE_CLAIM_GATEWAY_HOST??'127.0.0.1');

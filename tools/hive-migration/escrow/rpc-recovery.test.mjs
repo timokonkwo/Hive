@@ -18,6 +18,14 @@ test('transport failures are retryable but integrity and authorization failures 
  for(const error of [{name:'TimeoutError'},{status:429},{status:502},{cause:{code:'ECONNRESET'}},{name:'TypeError',message:'fetch failed'}])assert.equal(transientRpc(error),true);
  for(const error of [Error('Contract mismatch'),Error('Incomplete transaction journal'),Error('Fee budget exhausted'),{name:'HttpRequestError',status:401},{name:'HttpRequestError',status:403},Error('Failed transaction')])assert.equal(transientRpc(error),false);
 });
+test('lagging Solana reads retry the same checkpoint; sends and other failures do not retry',async()=>{
+ let reads=0,sends=0;const waits=[],args={commitment:'finalized',minContextSlot:123};
+ const client=rpcClient({getTokenAccountsByOwner:async(owner,filter,options)=>{assert.equal(options,args);if(++reads<3)throw {code:-32016};return 'ready';},sendRawTransaction:async()=>{sends++;throw {code:-32016};}},'solana',{wait:async ms=>waits.push(ms)});
+ assert.equal(await client.getTokenAccountsByOwner('owner',{},args),'ready');assert.deepEqual(waits,[300,600]);
+ await assert.rejects(client.sendRawTransaction('bytes'));assert.equal(sends,1);
+ let failures=0;const failing=rpcClient({getTokenAccountsByOwner:async()=>{failures++;throw {code:-32016};}},'solana',{wait:async()=>{}});
+ await assert.rejects(failing.getTokenAccountsByOwner());assert.equal(failures,4);
+});
 test('retry suspends readiness, caps backoff and resets after successful verification',async()=>{
  let attempt=0,ready=true;const waits=[];
  const options={unready:()=>{ready=false;},wait:async n=>waits.push(n),log:()=>{}};
