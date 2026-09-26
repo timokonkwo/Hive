@@ -7,6 +7,8 @@ import {Journal,acquireServiceLock,reconcileJournal} from './journal.mjs';
 import {processRegistration} from './verifier-core.mjs';
 import {writeOperatorHealth} from './operator-health.mjs';
 import {recoverableCycle} from './rpc-recovery.mjs';
+import {recoverReservation} from './recover-reservation.mjs';
+import {createPublicClient,http} from 'viem';
 let release,health;
 try {
   const args=process.argv.slice(2),path=args[0],execute=args.includes('--execute'),once=args.includes('--once');
@@ -37,6 +39,15 @@ try {
     if(execute){
       await reconcileJournal(journal,adapter);
       if([...journal.latest().values()].some(e=>e.status==='failed'))throw Error('Failed transaction requires receipt reconciliation');
+      const recoveryHash=process.env.HIVE_RECOVER_RESERVATION_HASH;
+      if(recoveryHash){
+        const entry=[...journal.latest().values()].find(e=>e.hash===recoveryHash);
+        if(!entry)throw Error('Recovery hash missing from journal');
+        if(!entry.recoveryAttempted&&['prepared','submitted'].includes(entry.status)){
+          const request=JSON.parse(readFileSync(join(requests,entry.id.split(':')[0].slice(2)+'.json'),'utf8'));
+          await recoverReservation({hash:recoveryHash,review,request,journal,observer,transport:createPublicClient({transport:http('https://rpc.mainnet.chain.robinhood.com',{retryCount:0,timeout:20000})}),log:value=>console.log(JSON.stringify(value))});
+        }
+      }
       operation='verify_deployment';
       const observed=await observer.read(review.config.exceptionOwner);
       if(!observed.finalized||!observed.deploymentVerified||observed.sourcePaused||observed.destinationPaused)throw Error('Verified active deployments required');

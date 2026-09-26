@@ -91,3 +91,23 @@ test('one process owns the signer loop and partial journals fail closed',()=>{
   assert.throws(()=>acquireServiceLock(dir),/already running/);release();assert.equal(existsSync(join(dir,'service.lock')),false);
   const journal=new Journal(dir);writeFileSync(journal.path,'{"incomplete":');assert.throws(()=>journal.entries(),/Incomplete/);
 });
+
+import {recoverReservation} from './recover-reservation.mjs';
+import {encodeFunctionData,keccak256,parseAbi} from 'viem';
+const recoveryAbi=parseAbi(['function reserve((bytes32 sourceOwner,address recipient,uint64 snapshotAmount,uint64 depositAmount,uint64 depositDeadline,uint64 claimDeadline) q, bytes32[] proof)']);
+test('explicit reservation recovery sends the identical transaction once and cannot recover payouts',async()=>{
+ const {review,request,q}=await fixture();const signer=privateKeyToAccount(`0x${'11'.repeat(32)}`);review.config.destinationAdmin=signer.address;
+ const data=encodeFunctionData({abi:recoveryAbi,functionName:'reserve',args:[destination(q,0).quote,q.proof]});
+ const raw=await signer.signTransaction({chainId:4663,type:'eip1559',to:review.config.distributor,data,value:0n,nonce:11,gas:200000n,maxFeePerGas:1n,maxPriorityFeePerGas:1n});
+ const hash=keccak256(raw),journal=tempJournal();journal.append({id:q.claimId+':reserve',chain:'evm',status:'submitted',hash,raw,nonce:11});
+ let sends=0,now='100',finalized='90';const logs=[];
+ const transport={getChainId:async()=>4663,getTransactionReceipt:async()=>{throw {name:'TransactionReceiptNotFoundError'};},getTransaction:async()=>{throw {name:'TransactionNotFoundError'};},getTransactionCount:async()=>11,call:async()=>{},sendRawTransaction:async args=>{sends++;assert.equal(args.serializedTransaction,raw);return hash;}};
+ const observer={abi:recoveryAbi,evm:transport,read:async()=>({finalized:true,deploymentVerified:true,source:null,destination:{status:0},destinationCurrentTimestamp:now,destinationTimestamp:finalized,destinationBlock:'50'})};
+ const run=()=>recoverReservation({hash,review,request,journal,observer,transport,log:e=>logs.push(e)});
+ await run();await run();assert.equal(sends,1);assert.equal(logs[0].event,'reservation_rebroadcast');
+ journal.append({id:q.claimId+':reserve',chain:'evm',status:'submitted',hash,raw,nonce:11});
+ now='1001';finalized='999';await run();assert.equal(journal.latest().get(q.claimId+':reserve').status,'submitted');
+ finalized='1001';await run();assert.equal(journal.latest().get(q.claimId+':reserve').status,'expired');assert.equal(sends,1);
+ journal.append({id:q.claimId+':reserve',chain:'evm',status:'submitted',hash,raw,nonce:12});
+ await assert.rejects(run(),/terms differ/);assert.equal(sends,1);
+});
