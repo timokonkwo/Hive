@@ -7,6 +7,7 @@ import { isReimbursementLookup, supplementalClaim, type ReimbursementLookup } fr
 import styles from './claim.module.css';
 import LiveMigration from './LiveMigration';
 import ClaimCountdown from './ClaimCountdown';
+import Link from 'next/link';
 import { type ClaimSchedule } from '@/lib/hive-claim-schedule';
 
 const reasons: Record<string, string> = {
@@ -20,6 +21,7 @@ const reasons: Record<string, string> = {
 export default function ClaimPage({ schedule = null }: { schedule?: ClaimSchedule }) {
   const [now, setNow] = useState<number | null>(null);
   useEffect(() => { const tick = () => setNow(Date.now()); tick(); const timer = setInterval(tick, 1000); return () => clearInterval(timer); }, []);
+  const windowClosed = !!schedule && now !== null && now >= schedule.closesAt;
   const windowOpen = !!schedule && now !== null && now >= schedule.opensAt && now < schedule.closesAt;
   const [address, setAddress] = useState(''), [result, setResult] = useState<ReimbursementLookup | null>(null);
   const [restoring, setRestoring] = useState(false);
@@ -77,7 +79,7 @@ export default function ClaimPage({ schedule = null }: { schedule?: ClaimSchedul
   return <section className={styles.main} aria-label="HIVE migration">
     {restoring ? <div className={styles.flowState} role="status" aria-busy="true"><LoaderCircle className={styles.stateIcon + ' ' + styles.spinner} aria-hidden="true" /><h2>Loading your claim</h2></div> : reviewOpen && result ? <>
       <LiveMigration key={result.owner} result={result} canStart={claimReady} onBack={() => setReviewOpen(false)} />
-    </> : <>
+    </> : windowClosed ? <div className={styles.flowState}><Check className={styles.stateIcon} aria-hidden="true" /><h1>Claims closed</h1><p>The HIVE migration claim window has ended.</p><Link className={styles.primary} href="/token">Back to Token<ArrowRight size={16} aria-hidden="true" /></Link></div> : <>
       <div className={styles.intro}><header className={styles.heading}><span className={styles.label}>SOLANA → ROBINHOOD</span><h1>Claim HIVE</h1><p>HIVE has migrated to Robinhood Chain. Check your Solana wallet to see your allocation.</p></header>{localTestOwner ? <aside className={styles.countdown}><span>Local claim test</span></aside> : <ClaimCountdown schedule={schedule} now={now} enabled={migrationEnabled} />}</div>
       <section className={styles.checker} aria-label="Wallet checker">
         <div className={styles.checkerTitle}><Wallet size={20} aria-hidden="true" /><h2>Check your allocation</h2></div>
@@ -95,7 +97,7 @@ export default function ClaimPage({ schedule = null }: { schedule?: ClaimSchedul
         </div>
       </section>
     </>}
-    {!reviewOpen && <section className={styles.faq} aria-labelledby="claim-faq-title"><h2 id="claim-faq-title">How it works</h2>
+    {!reviewOpen && !windowClosed && <section className={styles.faq} aria-labelledby="claim-faq-title"><h2 id="claim-faq-title">How it works</h2>
       {[
         ['How do I claim?', 'Connect your Solana and Robinhood wallets, deposit your eligible HIVE on Solana, and receive your allocation of HIVE on Robinhood. Each wallet can claim once.'],
         ['Who is eligible?', 'Your wallet needed at least 1M HIVE on Solana at the snapshot and must still hold at least 1M when you deposit.'],

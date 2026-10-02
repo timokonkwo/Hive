@@ -40,6 +40,16 @@ settings.operatorHealthFile=resolve(dir,'operator-health.json');
 writeOperatorHealth(settings.operatorHealthFile,false);
 const runtime=resolve(dir,'runtime-settings.json');
 writeFileSync(runtime,JSON.stringify(settings),{mode:0o600});
+// Run the explicitly selected closeout before either journal user starts.
+if(execute&&process.env.HIVE_RETURN_SURPLUS==='2026-10-02-return-10m'){
+ const signerFd=openSync(process.env.HIVE_OPERATOR_SIGNER??'/etc/secrets/escrow-signer.json','r');
+ try{
+  await new Promise((resolveReturn,reject)=>{
+   const child=spawn(process.execPath,[resolve(root,'tools/hive-migration/escrow/return-surplus.mjs'),runtime],{cwd:root,env:{...process.env,HIVE_ESCROW_SIGNER_FD:'3'},stdio:['ignore','inherit','inherit',signerFd]});
+   child.on('error',reject);child.on('exit',code=>code===0?resolveReturn():reject(Error('Surplus return stopped for reconciliation')));
+  });
+ }finally{closeSync(signerFd);}
+}
 const children=[];let stopping=false;
 function stop(code){if(stopping)return;stopping=true;process.exitCode=code;for(const c of children)c.kill('SIGTERM');const timer=setTimeout(()=>{for(const c of children)c.kill('SIGKILL');},15000);timer.unref();}
 function launch(script,args,env,stdio){const child=spawn(process.execPath,[resolve(root,'tools/hive-migration/escrow',script),...args],{cwd:root,env,stdio});children.push(child);child.on('error',()=>stop(1));child.on('exit',(code)=>stop(code||1));return child;}
