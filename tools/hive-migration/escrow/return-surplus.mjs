@@ -1,7 +1,7 @@
 // One explicitly authorized campaign closeout. No arbitrary recipient or amount.
 import {readFileSync,writeFileSync,renameSync} from 'node:fs';
 import {join} from 'node:path';
-import {createPublicClient,http,encodeFunctionData,keccak256,getAddress,decodeEventLog} from 'viem';
+import {createPublicClient,http,encodeFunctionData,keccak256,getAddress,decodeEventLog,decodeFunctionData,parseTransaction,recoverTransactionAddress} from 'viem';
 import {loadSignerFromFd} from './live-adapter.mjs';
 import {Journal,acquireServiceLock,submitOnce} from './journal.mjs';
 export const RETURN={id:'2026-10-02-return-10m',recipient:getAddress('0xd9dba9f0e6d3f1ac8b7f36e15ccba4ac6f740e95'),amount:10000000n*10n**18n,distributor:'0x8c7B252B62816B20ddA150d77ef02B7aD1dc3ed0',token:'0xc65e9630D8Af1eA278cbE359f78931684b4ff9f8'};
@@ -11,6 +11,30 @@ export function validateReturn({chainId,codeHash,expectedHash,admin,signer,token
  check(admin.toLowerCase()===signer.toLowerCase()&&token.toLowerCase()===RETURN.token.toLowerCase(),'Return authority or token mismatch');
  check(BigInt(closesAt)===BigInt(expectedClose)&&BigInt(finalizedTime)>=BigInt(closesAt),'Campaign has not closed at finality');
  check(BigInt(reserved)===0n&&BigInt(balance)>=RETURN.amount,'Outstanding claims or insufficient surplus');
+}
+export async function reconcileForReturn(journal,c,abi,admin){
+ const finalized=await c.getBlock({blockTag:'finalized'});
+ for(const entry of journal.latest().values()){
+  if(entry.chain!=='evm'||!['prepared','submitted'].includes(entry.status)||entry.id===RETURN.id+':withdrawSurplus')continue;
+  console.log(JSON.stringify({event:'closeout_reconcile',id:entry.id,hash:entry.hash}));
+  let receipt;
+  try{receipt=await c.getTransactionReceipt({hash:entry.hash});}catch(e){if(e.name!=='TransactionReceiptNotFoundError')throw e;}
+  if(receipt){
+   check(receipt.blockNumber<=finalized.number,'Prior transaction awaiting finality');
+   check((await c.getBlock({blockNumber:receipt.blockNumber})).hash===receipt.blockHash,'Prior receipt is not canonical');
+   check(receipt.status==='success','Prior transaction reverted; investigate before closeout');
+   journal.append({...entry,status:'confirmed',evidence:{block:String(receipt.blockNumber),blockHash:receipt.blockHash}});continue;
+  }
+  // An absent, expired reservation can never execute successfully after its
+  // deadline. Other unknown transaction types still require manual review.
+  check(entry.id.endsWith(':reserve')&&keccak256(entry.raw)===entry.hash,'Unknown non-reservation transaction');
+  const tx=parseTransaction(entry.raw);
+  check(tx.chainId===4663&&tx.to.toLowerCase()===RETURN.distributor.toLowerCase()&&BigInt(tx.value??0)===0n,'Stale reservation target mismatch');
+  check((await recoverTransactionAddress({serializedTransaction:entry.raw})).toLowerCase()===admin.toLowerCase(),'Stale reservation signer mismatch');
+  const call=decodeFunctionData({abi,data:tx.data});
+  check(call.functionName==='reserve'&&BigInt(call.args[0].depositDeadline)<finalized.timestamp,'Unknown or unexpired reservation');
+  journal.append({...entry,status:'expired',evidence:{block:String(finalized.number),reason:'finalized_reservation_expiry_at_closeout'}});
+ }
 }
 export async function returnSurplus(settings){
  check(process.env.HIVE_RETURN_SURPLUS===RETURN.id,'Return not selected');
@@ -22,6 +46,8 @@ export async function returnSurplus(settings){
  const signers=loadSignerFromFd(process.env.HIVE_ESCROW_SIGNER_FD);
  const c=createPublicClient({transport:http('https://rpc.mainnet.chain.robinhood.com',{retryCount:0,timeout:20000})});
  const abi=review.evmDeployment.abi;
+ check(await c.getChainId()===4663,'Wrong closeout chain');
+ await reconcileForReturn(journal,c,abi,signers.evm.address);
  const adapter={prepare:async()=>{
    check(![...journal.latest().values()].some(e=>e.chain==='evm'&&['prepared','submitted','failed'].includes(e.status)),'Unreconciled EVM journal entry');
    const [head,finalized,chainId]=await Promise.all([c.getBlock({blockTag:'latest'}),c.getBlock({blockTag:'finalized'}),c.getChainId()]);
