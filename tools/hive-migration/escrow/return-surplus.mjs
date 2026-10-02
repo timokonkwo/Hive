@@ -1,6 +1,7 @@
 // One explicitly authorized campaign closeout. No arbitrary recipient or amount.
-import {readFileSync} from 'node:fs';
-import {createPublicClient,http,encodeFunctionData,keccak256,getAddress} from 'viem';
+import {readFileSync,writeFileSync,renameSync} from 'node:fs';
+import {join} from 'node:path';
+import {createPublicClient,http,encodeFunctionData,keccak256,getAddress,decodeEventLog} from 'viem';
 import {loadSignerFromFd} from './live-adapter.mjs';
 import {Journal,acquireServiceLock,submitOnce} from './journal.mjs';
 export const RETURN={id:'2026-10-02-return-10m',recipient:getAddress('0xd9dba9f0e6d3f1ac8b7f36e15ccba4ac6f740e95'),amount:10000000n*10n**18n,distributor:'0x8c7B252B62816B20ddA150d77ef02B7aD1dc3ed0',token:'0xc65e9630D8Af1eA278cbE359f78931684b4ff9f8'};
@@ -38,6 +39,20 @@ export async function returnSurplus(settings){
  },broadcast:async entry=>{const hash=await c.sendRawTransaction({serializedTransaction:entry.raw});check(hash.toLowerCase()===entry.hash.toLowerCase(),'Return hash mismatch');}};
  const result=await submitOnce(journal,id,'evm',{},adapter);
  console.log(JSON.stringify({event:'surplus_return',recipient:RETURN.recipient,amountRaw:String(RETURN.amount),...result}));
+ check(result.hash,'Return is blocked by an unreconciled transaction');
+ const receipt=await c.waitForTransactionReceipt({hash:result.hash,timeout:60000,pollingInterval:2000});
+ check(receipt.status==='success','Return transaction reverted');
+ const match=receipt.logs.some(log=>{
+  if(log.address.toLowerCase()!==RETURN.distributor.toLowerCase())return false;
+  try{const event=decodeEventLog({abi,data:log.data,topics:log.topics});return event.eventName==='SurplusWithdrawn'&&event.args.recipient.toLowerCase()===RETURN.recipient.toLowerCase()&&event.args.amount===RETURN.amount;}catch{return false;}
+ });
+ check(match,'Return receipt does not prove the requested transfer');
+ const reserved=await c.readContract({address:RETURN.distributor,abi,functionName:'reserved'});
+ check(reserved===0n,'Outstanding liabilities remain');
+ const evidence={campaignId:review.config.campaignId,hash:result.hash,recipient:RETURN.recipient,amountRaw:String(RETURN.amount),block:String(receipt.blockNumber),blockHash:receipt.blockHash};
+ const path=join(settings.stateDirectory,'surplus-return-receipt.json');
+ writeFileSync(path+'.tmp',JSON.stringify(evidence),{mode:0o600});renameSync(path+'.tmp',path);
+ console.log(JSON.stringify({event:'surplus_return_mined',...evidence}));
  }finally{release();}
 }
 if(process.argv[1]?.endsWith('/return-surplus.mjs')){

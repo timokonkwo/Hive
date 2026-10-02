@@ -50,6 +50,17 @@ if(execute&&process.env.HIVE_RETURN_SURPLUS==='2026-10-02-return-10m'){
   });
  }finally{closeSync(signerFd);}
 }
+const closedReceipt=resolve(settings.stateDirectory,'surplus-return-receipt.json');
+if(existsSync(closedReceipt)){
+ const receipt=JSON.parse(readFileSync(closedReceipt,'utf8'));
+ if(receipt.campaignId!==review.config.campaignId)throw Error('Closeout campaign mismatch');
+ createServer((req,res)=>{
+  const health=req.method==='GET'&&req.url==='/healthz';
+  res.writeHead(health||req.url==='/availability'?200:410,{'Content-Type':'application/json','Cache-Control':'no-store'});
+  res.end(JSON.stringify(health?{mode:'closed',claimsEnabled:false}:req.url==='/availability'?{enabled:false}:{code:'CLAIM_WINDOW',error:'The claim window has ended.'}));
+ }).listen(Number(process.env.PORT??10000),'0.0.0.0');
+ console.log(JSON.stringify({event:'campaign_closed',returnTransaction:receipt.hash}));
+}else{
 const children=[];let stopping=false;
 function stop(code){if(stopping)return;stopping=true;process.exitCode=code;for(const c of children)c.kill('SIGTERM');const timer=setTimeout(()=>{for(const c of children)c.kill('SIGKILL');},15000);timer.unref();}
 function launch(script,args,env,stdio){const child=spawn(process.execPath,[resolve(root,'tools/hive-migration/escrow',script),...args],{cwd:root,env,stdio});children.push(child);child.on('error',()=>stop(1));child.on('exit',(code)=>stop(code||1));return child;}
@@ -61,5 +72,5 @@ try {
 }finally{if(fd!==undefined)closeSync(fd);}
 launch('gateway-service.mjs',[runtime],{...env,HIVE_CLAIM_GATEWAY_HOST:'0.0.0.0',HIVE_CLAIM_GATEWAY_PORT:process.env.PORT??'10000'},['ignore','inherit','inherit']);
 process.on('SIGTERM',()=>stop(0));process.on('SIGINT',()=>stop(0));
-
+}
 }
