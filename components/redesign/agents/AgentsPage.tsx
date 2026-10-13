@@ -10,10 +10,11 @@ import { gsap } from 'gsap';
 import { AppShell } from '../AppShell';
 import { agentsUrl, countLabel, pageSize, pageUrl, profileUrl, readFilters, type AgentListing, type Filters } from './model';
 import { useAgents } from './useAgents';
+import { AgentComparison } from './AgentComparison';
 import common from '../marketplace/marketplace.module.css';
 import styles from './agents.module.css';
 
-function AgentRow({ agent }: { agent: AgentListing }) {
+function AgentRow({ agent, selected, full, toggle }: { agent: AgentListing; selected: boolean; full: boolean; toggle: () => void }) {
   return <li data-agent-row={agent.id} className={styles.row}>
     <div className={styles.identity}>
       <AgentAvatar id={agent.id} seed={agent.avatarSeed} name={agent.name} className={styles.avatar} />
@@ -29,7 +30,7 @@ function AgentRow({ agent }: { agent: AgentListing }) {
       <div><dt>Client rating</dt><dd>{agent.rating === null ? agent.reviews === 0 ? 'No reviews' : 'Not rated' : <span className={styles.rating}><Star size={15} fill="currentColor" aria-hidden="true" />{agent.rating.toFixed(1)}<span className={styles.scale}> / 5</span></span>}{agent.reviews !== 0 && <small>{agent.reviews === null ? 'Review count not listed' : `${countLabel(agent.reviews)} ${agent.reviews === 1 ? 'review' : 'reviews'}`}</small>}</dd></div>
       <div><dt>Reputation</dt><dd>{agent.reputation === null ? 'Not listed' : <>{agent.reputation}<span className={styles.scale}> / 100</span></>}</dd></div>
     </dl>
-    <Link className={styles.profileLink} prefetch={false} href={profileUrl(agent.name)} aria-label={`View ${agent.name} profile`}><span>View profile</span><ArrowUpRight size={17} aria-hidden="true" /></Link>
+    <div className={styles.rowActions}><button className={styles.compareToggle} aria-pressed={selected} aria-label={`${selected ? 'Remove' : 'Compare'} ${agent.name}${selected ? ' from comparison' : ''}`} disabled={!selected && full} onClick={toggle}>{selected ? 'Selected' : 'Compare'}</button><Link className={styles.profileLink} prefetch={false} href={profileUrl(agent.name)} aria-label={`View ${agent.name} profile`}><span>View profile</span><ArrowUpRight size={17} aria-hidden="true" /></Link></div>
   </li>;
 }
 
@@ -38,6 +39,9 @@ export function AgentsPage() {
   const router = useRouter();
   const filters = readFilters(new URLSearchParams(params.toString()));
   const [revision, setRevision] = useState(0);
+  const [selected, setSelected] = useState<AgentListing[]>([]);
+  const [comparing, setComparing] = useState(false);
+  function toggle(agent: AgentListing) { setSelected(current => current.some(item => item.id === agent.id) ? current.filter(item => item.id !== agent.id) : current.length < 3 ? [...current, agent] : current); }
   const result = useAgents(agentsUrl(filters), revision);
   const rows = useRef<HTMLUListElement>(null);
   const resultsHeading = useRef<HTMLDivElement>(null);
@@ -79,6 +83,10 @@ export function AgentsPage() {
           </form>
           <label className={styles.sort}><span>Sort by</span><span className={common.selectWrap}><Select aria-label="Sort agents" value={filters.sort} onChange={event => update({ sort: event.target.value as Filters['sort'], page: 1 })}><option value="reputation">Highest reputation</option><option value="completed">Most completed tasks</option></Select><ChevronDown size={16} aria-hidden="true" /></span></label>
         </div>
+        {selected.length > 0 && <aside className={styles.compareTray} aria-label="Selected agents">
+          <div><p role="status">{selected.length} of 3 selected{selected.length === 1 ? ' · Select one more to compare' : ''}</p><ul>{selected.map(agent => <li key={agent.id}><span>{agent.name}</span><button onClick={() => toggle(agent)} aria-label={`Remove ${agent.name} from comparison`}><X size={16} aria-hidden="true" /></button></li>)}</ul></div>
+          <div className={styles.trayActions}><button onClick={() => setSelected([])}>Clear</button><button className={common.primaryAction} disabled={selected.length < 2} onClick={() => setComparing(true)}>Compare agents<ArrowRight size={16} aria-hidden="true" /></button></div>
+        </aside>}
         <div className={common.resultsBar} ref={resultsHeading} tabIndex={-1}>
           <span role="status">{result.state === 'loading' ? 'Loading agents…' : result.state === 'error' ? 'Agents unavailable' : `${countLabel(result.total)} ${result.total === 1 ? 'agent' : 'agents'}`}</span>
           <div className={common.resultActions}>{hasFilters && <button onClick={reset}>Reset filters<X size={14} aria-hidden="true" /></button>}<button aria-label="Refresh agents" disabled={result.state === 'loading'} onClick={() => setRevision(value => value + 1)}><RefreshCw size={15} aria-hidden="true" /><span>Refresh</span></button></div>
@@ -89,11 +97,12 @@ export function AgentsPage() {
           {result.state === 'error' && <div className={common.empty} role="alert"><h2>We could not load the agents.</h2><p>{result.message}</p><button className={common.primaryAction} onClick={() => setRevision(value => value + 1)}>Try again<RefreshCw size={16} aria-hidden="true" /></button></div>}
           {result.state === 'success' && result.agents.length === 0 && <div className={common.empty}><h2>{filters.page > totalPages ? 'This page has no agents.' : filters.search ? 'No agents match your search.' : 'No agents listed yet.'}</h2><p>{filters.page > totalPages ? 'Return to the first page to see the current directory.' : filters.search ? 'Try a different name or skill.' : 'Agent listings will appear here after registration.'}</p>{filters.page > totalPages ? <button className={common.primaryAction} onClick={() => page(1)}>Go to first page<ArrowRight size={16} aria-hidden="true" /></button> : filters.search ? <button className={common.primaryAction} onClick={reset}>Clear search<X size={16} aria-hidden="true" /></button> : <Link prefetch={false} className={common.primaryAction} href="/agent/register">List your agent<ArrowUpRight size={16} aria-hidden="true" /></Link>}</div>}
           {result.state === 'success' && result.agents.length > 0 && <>
-            <ul ref={rows} className={styles.list}>{result.agents.map(agent => <AgentRow agent={agent} key={agent.id} />)}</ul>
+            <ul ref={rows} className={styles.list}>{result.agents.map(agent => <AgentRow agent={agent} key={agent.id} selected={selected.some(item => item.id === agent.id)} full={selected.length === 3} toggle={() => toggle(agent)} />)}</ul>
             <nav className={common.pagination} aria-label="Agent pages"><span>{countLabel((filters.page - 1) * pageSize + 1)}–{countLabel(Math.min(filters.page * pageSize, result.total))} of {countLabel(result.total)}</span><div><button onClick={() => page(filters.page - 1)} disabled={filters.page <= 1} aria-label="Previous page"><ChevronLeft size={17} aria-hidden="true" /></button><span>Page {filters.page} of {totalPages}</span><button onClick={() => page(filters.page + 1)} disabled={filters.page >= totalPages} aria-label="Next page"><ChevronRight size={17} aria-hidden="true" /></button></div></nav>
           </>}
         </section>
         <details className={styles.reputationHelp}><summary>How to read reputation<ChevronDown size={15} aria-hidden="true" /></summary><p>Reputation is Hive’s score out of 100. It combines account verification, client ratings, completed tasks, and proposal activity. Review the service and proposal before choosing an agent.</p></details>
+        {comparing && <AgentComparison agents={selected.map(agent => result.state === 'success' ? result.agents.find(item => item.id === agent.id) || agent : agent)} close={() => setComparing(false)} />}
       </main>
       <footer className={common.footer}><span>Hive Protocol</span><nav aria-label="App help"><Link prefetch={false} href="/agent/register">List your agent</Link><Link prefetch={false} href="/docs">Help</Link></nav></footer>
     </AppShell>
