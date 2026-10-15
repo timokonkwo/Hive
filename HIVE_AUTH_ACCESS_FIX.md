@@ -27,3 +27,27 @@ Implemented the corrections above using the existing Privy integration. No new l
 Evidence: `/private/tmp/hive-auth-build.log`, `/private/tmp/hive-auth-types.log`, `/private/tmp/hive-auth-lint.log`, `/private/tmp/hive-auth-targeted-tests.log`, `/private/tmp/hive-auth-tests.log`, `/private/tmp/hive-redesign-qa/auth-access-results.json`, `/private/tmp/hive-dashboard-auth-browser.log`.
 
 Local review: http://localhost:3100/dashboard . Changes are unpushed on `main_redesign`. No real user login, wallet connection or account write was performed; an actual account login and server-verified session still need confirmation.
+
+## Localhost cookie configuration — October 15
+
+The configured app's public Privy configuration returns `custom_api_url: https://privy.uphive.xyz`. The installed React SDK enables server cookies for that custom API URL. Privy's production HTTP-only cookies cannot be sent to localhost. A successful wallet prompt or authenticated account menu does not establish a usable localhost API session.
+
+Use a Web app client on the existing Hive Privy app, with HTTP-only cookies disabled and `http://localhost:3000` in its allowed origins. Set its public ID in `.env.local`:
+
+```dotenv
+NEXT_PUBLIC_PRIVY_CLIENT_ID=<local-development-client-id>
+```
+
+`AuthenticatedFrame` passes this optional ID to Privy. Keep the production environment's client settings unchanged. A separate app client preserves the existing app's users; a separate development app would have different user IDs. Restart/rebuild after setting the ID, sign out of the stale local session, and sign in again.
+
+The request adapter must allow a null JavaScript access token to use the existing same-origin cookie transport. The API still verifies the JWT signature, issuer, audience and expiry. No credential from a connected wallet or UI flag grants backend access. Provider errors remain errors; writes are never replayed. The session-error screen does not claim expiry when the underlying problem may be missing or invalid credentials.
+
+References:
+- https://docs.privy.io/recipes/react/cookies
+- https://docs.privy.io/basics/get-started/dashboard/app-clients
+
+The supplied local client ID is configured only in `.env.local`. Its public configuration was verified to return no custom cookie API domain and to allow `http://localhost:3000`. Acceptance confirmed: after the local client was configured and the user signed in again, the user reported that tasks or the authenticated empty task list is visible.
+
+Local validation after client configuration: 55 focused tests, scoped lint and production build passed. The browser lifecycle suite covers bearer refresh, cookie-only sessions, one bounded retry on cookie rejection, provider outages, account switches and logout. A separate Chrome check against the running Next app verified that the real Privy configuration request sends the configured `privy-client-id`, receives no custom API cookie domain, permits localhost, and renders the signed-out gate. This does not substitute for the user's fresh authenticated wallet test.
+
+User acceptance — October 15: confirmed “Tasks or empty task list is visible” after refreshing and signing in with the corrected local client. No live deployment or push was performed.

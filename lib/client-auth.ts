@@ -26,7 +26,8 @@ function getJWKS() {
     // JWKS URL from Privy dashboard (Settings > App settings > JWKS Endpoint)
     // Format: https://auth.privy.io/api/v1/apps/<APP_ID>/jwks.json
     cachedJWKS = createRemoteJWKSet(
-      new URL(`https://auth.privy.io/api/v1/apps/${PRIVY_APP_ID}/jwks.json`)
+      new URL(`https://auth.privy.io/api/v1/apps/${PRIVY_APP_ID}/jwks.json`),
+      { timeoutDuration: 8000 }
     );
   }
   return cachedJWKS;
@@ -43,67 +44,47 @@ export interface VerifiedClient {
   expiresAt: number;
 }
 
-/**
- * Extract and verify the Privy access token from a request.
- *
- * Returns the verified client identity or null if not authenticated.
- * Does NOT throw — callers should check the return value and respond 401.
- */
-export async function authenticateClient(req: NextRequest): Promise<VerifiedClient | null> {
-  try {
-    if (!PRIVY_APP_ID) {
-      logger.error('NEXT_PUBLIC_PRIVY_APP_ID is not set', { tag: 'AUTH' });
-      return null;
-    }
+export type ClientAuthentication =
+  | { ok: true; client: VerifiedClient }
+  | { ok: false; status: 401 | 503; code: 'AUTH_REQUIRED' | 'AUTH_EXPIRED' | 'AUTH_INVALID' | 'AUTH_UNAVAILABLE'; requestId: string };
 
-    // Extract token from Authorization header or privy-token cookie
-    let token: string | null = null;
-
-    const authHeader = req.headers.get('authorization');
-    if (authHeader?.startsWith('Bearer ')) {
-      token = authHeader.slice(7);
-    }
-
-    if (!token) {
-      // Fall back to cookie (Privy stores token as "privy-token" cookie)
-      const cookie = req.cookies.get('privy-token');
-      token = cookie?.value || null;
-    }
-
-    if (!token) {
-      return null;
-    }
-
-    // Verify the JWT against Privy's JWKS
-    const jwks = getJWKS();
-    const { payload } = await jwtVerify(token, jwks, {
-      issuer: 'privy.io',
-      audience: PRIVY_APP_ID,
-      algorithms: ['ES256'],
-      requiredClaims: ['sub', 'exp', 'iat', 'sid'],
-    });
-
-    const userId = payload.sub;
-    if (!userId) {
-      return null;
-    }
-
-    return {
-      userId,
-      // The userId (did:privy:...) is the canonical identity
-      // The frontend can also send a wallet address in the body,
-      // but we only trust it if the Privy token is valid
-      address: userId,
-      sessionId: (payload as any).sid || '',
-      expiresAt: payload.exp || 0,
-    };
-  } catch (error: any) {
-    // JWT verification failed — invalid, expired, or tampered token
-    if (error?.code !== 'ERR_JWT_EXPIRED') {
-      logger.error('Client auth verification failed', { tag: 'AUTH', reason: error?.code || error?.name || 'verification_failed' });
-    }
-    return null;
+/** Shared by the HTTP adapter and tests using real signed JWTs. */
+export async function verifyClientToken(token: string, keys: Parameters<typeof jwtVerify>[1], appId: string): Promise<VerifiedClient> {
+  const { payload } = await jwtVerify(token, keys, {
+    issuer: 'privy.io', audience: appId, algorithms: ['ES256'],
+    requiredClaims: ['sub', 'exp', 'iat', 'sid'],
+  });
+  if (!payload.sub || typeof payload.sid !== 'string' || !payload.sid) {
+    throw Object.assign(new Error('Invalid session claims'), { code: 'ERR_JWT_CLAIM_VALIDATION_FAILED' });
   }
+  return { userId: payload.sub, address: payload.sub, sessionId: payload.sid, expiresAt: payload.exp! };
+}
+
+export async function authenticateClientResult(req: NextRequest): Promise<ClientAuthentication> {
+  const requestId = crypto.randomUUID();
+  const fail = (code: Extract<ClientAuthentication, {ok:false}>['code'], status: 401 | 503, reason: string): ClientAuthentication => {
+    // Never log JWTs, cookies, wallet addresses or provider error payloads.
+    if (code !== 'AUTH_REQUIRED') logger.warn('Client session verification failed', { tag:'AUTH', requestId, reason });
+    return { ok:false, status, code, requestId };
+  };
+  if (!PRIVY_APP_ID) return fail('AUTH_UNAVAILABLE',503,'configuration_missing');
+  const authorization = req.headers.get('authorization');
+  // An explicitly supplied invalid bearer cannot fall back to a different cookie identity.
+  const token = authorization ? /^Bearer ([^\s]+)$/i.exec(authorization)?.[1] : req.cookies.get('privy-token')?.value;
+  if (!token) return fail(authorization ? 'AUTH_INVALID' : 'AUTH_REQUIRED',401,'credential_missing');
+  try { return { ok:true, client:await verifyClientToken(token,getJWKS(),PRIVY_APP_ID) }; }
+  catch (error) {
+    const code = error && typeof error === 'object' && 'code' in error ? String(error.code) : '';
+    if (code === 'ERR_JWT_EXPIRED') return fail('AUTH_EXPIRED',401,'expired');
+    if (/^ERR_(JWT_|JWS_|JOSE_ALG_NOT_ALLOWED)/.test(code) || code === 'ERR_JWKS_NO_MATCHING_KEY') return fail('AUTH_INVALID',401,'invalid_credential');
+    return fail('AUTH_UNAVAILABLE',503,'verification_unavailable');
+  }
+}
+
+/** Compatibility adapter for existing routes. */
+export async function authenticateClient(req: NextRequest): Promise<VerifiedClient | null> {
+  const result = await authenticateClientResult(req);
+  return result.ok ? result.client : null;
 }
 
 /**

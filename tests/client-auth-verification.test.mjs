@@ -1,0 +1,14 @@
+import {test} from 'node:test';
+import assert from 'node:assert/strict';
+import * as jose from 'jose';
+import {loadTypeScript} from './helpers/load-typescript.mjs';
+const keys=await jose.generateKeyPair('ES256'),jwk=await jose.exportJWK(keys.publicKey);
+const local=jose.createLocalJWKSet({keys:[{...jwk,kid:'test',alg:'ES256'}]});
+const app='test-app',subject='did:privy:test-user';
+const jwt=async(patch={})=>new jose.SignJWT({sub:subject,sid:'session',iss:'privy.io',aud:app,iat:Math.floor(Date.now()/1000),exp:Math.floor(Date.now()/1000)+600,...patch}).setProtectedHeader({alg:'ES256',kid:'test'}).sign(keys.privateKey);
+function fixture(keyset=local){const previous=process.env.NEXT_PUBLIC_PRIVY_APP_ID;process.env.NEXT_PUBLIC_PRIVY_APP_ID=app;const logs=[];try{return {...loadTypeScript(new URL('../lib/client-auth.ts',import.meta.url),{'jose':{...jose,createRemoteJWKSet:()=>keyset},'@/lib/logger':{logger:{warn:(...args)=>logs.push(args),error:(...args)=>logs.push(args)}}}),logs};}finally{if(previous===undefined)delete process.env.NEXT_PUBLIC_PRIVY_APP_ID;else process.env.NEXT_PUBLIC_PRIVY_APP_ID=previous;}}
+const req=(token,cookie)=>({headers:new Headers(token?{authorization:'Bearer '+token}:{}),cookies:{get:()=>cookie?{value:cookie}:undefined}});
+test('real signed access tokens verify and preserve canonical identity',async()=>{const f=fixture();const result=await f.authenticateClientResult(req(await jwt()));assert.equal(result.ok,true);assert.equal(result.client.userId,subject);assert.equal(result.client.sessionId,'session');});
+test('expired, tampered and invalid claims cannot authorize access',async()=>{const f=fixture();for(const patch of [{exp:1},{aud:'another-app'},{iss:'attacker'},{sid:42},{sid:''},{sub:''}]){const token=await jwt(patch),r=await f.authenticateClientResult(req(token));assert.equal(r.ok,false);assert.equal(r.status,401);assert.equal(JSON.stringify(f.logs).includes(token),false);}const parts=(await jwt()).split('.');parts[2]='A'.repeat(parts[2].length);assert.equal((await f.authenticateClientResult(req(parts.join('.')))).status,401);});
+test('verification transport failures are 503 and compatibility callers still fail closed',async()=>{const f=fixture(async()=>{throw Error('secret-provider-url');});const token=await jwt();const r=await f.authenticateClientResult(req(token));assert.equal(r.status,503);assert.equal(r.code,'AUTH_UNAVAILABLE');assert.equal(typeof r.requestId,'string');assert.equal(await f.authenticateClient(req(token)),null);assert.equal(JSON.stringify(f.logs).includes('secret-provider-url'),false);});
+test('cookie verification remains supported; invalid explicit bearer never falls back',async()=>{const f=fixture(),token=await jwt();assert.equal((await f.authenticateClientResult(req(null,token))).ok,true);assert.equal((await f.authenticateClientResult(req('invalid',token))).status,401);assert.equal((await f.authenticateClientResult(req(null))).code,'AUTH_REQUIRED');});

@@ -123,3 +123,5 @@
 .actions .primary { max-width:100%; }.sectionHeading { gap:12px; }.sectionHeading h2 { font-size:17px; }
 }
 @media(prefers-reduced-motion:no-preference) { .row,.secondary,.iconButton { transition:background-color .16s cubic-bezier(.23,1,.32,1); } }
+
+.recoveryActions{display:flex;justify-content:center;flex-wrap:wrap;gap:12px;margin-top:16px}.recoveryActions button{display:inline-flex;align-items:center;justify-content:center;gap:8px;min-height:44px}.spinner{animation:sessionSpin 1s linear infinite}@keyframes sessionSpin{to{transform:rotate(360deg)}}@media(prefers-reduced-motion:reduce){.spinner{animation-duration:2s}}

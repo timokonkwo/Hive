@@ -1,4 +1,5 @@
 "use client";
+import { LaunchDialog } from "../tokenization/LaunchDialog";
 import AnalyticsPage from '../analytics/AnalyticsPage';
 import { Select } from '@/components/redesign/Select';
 
@@ -119,7 +120,6 @@ function AdminWorkspace() {
   // Token management state
   const [tokenStats, setTokenStats] = useState<any>(null);
   const [tokenStatsLoading, setTokenStatsLoading] = useState(false);
-  const [launchingTokenFor, setLaunchingTokenFor] = useState<string | null>(null);
   const [claimingFees, setClaimingFees] = useState(false);
   const [tokenLaunchModal, setTokenLaunchModal] = useState<{ id: string; name: string } | null>(null);
 
@@ -672,7 +672,7 @@ function AdminWorkspace() {
 
       {activeTab==='tasks'&&<TasksPanel tasks={tasks} total={tasksTotal} loading={tasksLoading} search={tasksSearch} onSearch={setTasksSearch} status={tasksStatusFilter} onStatus={setTasksStatusFilter} page={tasksPage} onPage={setTasksPage} sort={tasksSort} order={tasksOrder} onSort={toggleTasksSort} selected={selectedTasks} onSelect={toggleTaskSelection} onSelectAll={toggleSelectAllTasks} onBulkDelete={()=>setConfirmation({title:`Delete ${selectedTasks.size} tasks?`,description:tasks.filter(t=>selectedTasks.has(t.id)).map(t=>t.title).join(', ')+'. This permanently removes these tasks and associated records.',run:handleBulkDelete})} bulkDeleting={bulkDeleting} changing={changingTaskStatus} onChangeStatus={handleChangeTaskStatus} onDelete={task=>{setDeleteType('task');setDeleteModal({id:task.id,name:task.title});}}/>}
 
-      {activeTab==='agents'&&<AgentsPanel agents={agents} total={agentsTotal} loading={agentsLoading} search={agentsSearch} onSearch={setAgentsSearch} verified={agentsVerifiedFilter} onVerified={setAgentsVerifiedFilter} page={agentsPage} onPage={setAgentsPage} sort={agentsSort} order={agentsOrder} onSort={toggleSort} editing={editingRepAgent} value={repInputValue} onValue={setRepInputValue} onEdit={agent=>{setEditingRepAgent(agent?.id||null);setRepInputValue(String(agent?.reputation||0));}} onSave={handleSetReputation} onToggle={handleToggleVerified} launching={launchingTokenFor} onLaunch={agent=>setTokenLaunchModal({id:agent.id,name:agent.name})} onDelete={agent=>{setDeleteType('agent');setDeleteModal({id:agent.id,name:agent.name});}}/>}
+      {activeTab==='agents'&&<AgentsPanel agents={agents} total={agentsTotal} loading={agentsLoading} search={agentsSearch} onSearch={setAgentsSearch} verified={agentsVerifiedFilter} onVerified={setAgentsVerifiedFilter} page={agentsPage} onPage={setAgentsPage} sort={agentsSort} order={agentsOrder} onSort={toggleSort} editing={editingRepAgent} value={repInputValue} onValue={setRepInputValue} onEdit={agent=>{setEditingRepAgent(agent?.id||null);setRepInputValue(String(agent?.reputation||0));}} onSave={handleSetReputation} onToggle={handleToggleVerified} onLaunch={agent=>setTokenLaunchModal({id:agent.id,name:agent.name})} onDelete={agent=>{setDeleteType('agent');setDeleteModal({id:agent.id,name:agent.name});}}/>}
 
       {/* ── Stakers Tab ── */}
       {activeTab === "stakers" && (
@@ -1367,62 +1367,7 @@ function AdminWorkspace() {
       )}
 
       {/* Token Launch Confirmation Modal */}
-      {tokenLaunchModal && (
-        <ConfirmDialog label="Launch agent token" onClose={()=>{if(!(launchingTokenFor===tokenLaunchModal.id))setTokenLaunchModal(null);}}>
-          <div >
-            <div className="flex items-center gap-3 mb-4">
-              <div className="w-10 h-10 rounded-full bg-[var(--soft)] flex items-center justify-center">
-                <svg className="text-[var(--accent-text)]" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><path d="M16 8h-6a2 2 0 1 0 0 4h4a2 2 0 1 1 0 4H8"/><path d="M12 18V6"/></svg>
-              </div>
-              <h3 className="text-lg font-semibold  ">Launch Token</h3>
-            </div>
-            <p className="text-[var(--muted)] text-sm mb-2">
-              Launch a token for <span className="text-[var(--ink)] font-semibold">{tokenLaunchModal.name}</span>?
-            </p>
-            <p className="text-[var(--muted)] text-xs mb-6 ">
-              This will create a new token on Solana via Bags with a 10% fee config. The launch uses SOL from the agent wallet and cannot be reversed.
-            </p>
-            <div className="flex items-center gap-3 justify-end">
-              <button
-                onClick={() => setTokenLaunchModal(null)}
-                disabled={launchingTokenFor === tokenLaunchModal.id}
-                className="px-4 py-2 border border-[var(--rule)] text-[var(--muted)] hover:text-[var(--ink)] hover:border-[var(--rule)] text-xs    rounded transition-colors disabled:opacity-50"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={async () => {
-                  const { id, name } = tokenLaunchModal;
-                  setLaunchingTokenFor(id);
-                  try {
-                    const res = await authFetch('/api/admin/token-stats', {
-                      method: 'POST',
-                      headers: { 'Content-Type': 'application/json' },
-                      body: JSON.stringify({ action: 'launch', agentId: id, adminAddress: user?.wallet?.address }),
-                    });
-                    const data = await res.json();
-                    if (res.ok) {
-                      toast.success(`Token launched for ${name}! ${data.mintAddress ? `Mint: ${data.mintAddress.slice(0, 8)}...` : ''}`);
-                      setTokenLaunchModal(null);
-                    } else {
-                      toast.error(data.error || 'Launch failed');
-                    }
-                  } catch (err: any) {
-                    toast.error(err.message);
-                  } finally {
-                    setLaunchingTokenFor(null);
-                  }
-                }}
-                disabled={launchingTokenFor === tokenLaunchModal.id}
-                className="px-4 py-2 bg-[var(--accent)] text-[var(--accent-ink)] hover:bg-[var(--accent)] text-[var(--accent-ink)] text-xs font-semibold    rounded transition-colors disabled:opacity-50 flex items-center gap-2"
-              >
-                {launchingTokenFor === tokenLaunchModal.id ? <Loader2 size={12} className="animate-spin" /> : null}
-                Launch
-              </button>
-            </div>
-          </div>
-        </ConfirmDialog>
-      )}
+      {tokenLaunchModal && <LaunchDialog agentId={tokenLaunchModal.id} role="admin" request={authFetch} close={() => setTokenLaunchModal(null)} />}
 
       {/* Delete Confirmation Modal */}
       {deleteModal && (

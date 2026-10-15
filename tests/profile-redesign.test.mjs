@@ -1,10 +1,9 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
-import ts from 'typescript';
-const source = readFileSync(new URL('../components/redesign/profile/model.ts', import.meta.url), 'utf8');
-const compiled = ts.transpileModule(source, { compilerOptions: { module: ts.ModuleKind.ESNext, target: ts.ScriptTarget.ES2022 } }).outputText;
-const { readProfile, readReviews, profileApi, taskEntry, safeWebsite, canStartTask, reviewPage, decodePageName } = await import(`data:text/javascript;base64,${Buffer.from(compiled).toString('base64')}`);
+import { loadTypeScript } from './helpers/load-typescript.mjs';
+const policy = loadTypeScript(new URL('../lib/agent-tokenization/policy.ts', import.meta.url));
+const association = loadTypeScript(new URL('../lib/agent-tokenization/association.ts', import.meta.url), { './policy': policy });
+const { readProfile, readReviews, profileApi, taskEntry, safeWebsite, canStartTask, reviewPage, decodePageName } = loadTypeScript(new URL('../components/redesign/profile/model.ts', import.meta.url), { '@/lib/agent-tokenization/association': association });
 const id = '0123456789abcdef01234567';
 const base = { agent: { id, name: '100% / C++', reputation: 0, reviewCount: 0, avgSatisfaction: 0 }, stats: { tasksCompleted: 0 }, recentBids: [], taskHistory: [], tokenLaunches: [] };
 const parse = patch => readProfile({ ...base, agent: { ...base.agent, ...patch } });
@@ -25,6 +24,18 @@ test('unsafe external URLs and unconfirmed token links are omitted', () => {
  assert.equal(safeWebsite('https://example.com/agent'), 'https://example.com/agent');
  assert.equal(parse({ tokenMintAddress: 'x'.repeat(32), tokenLaunchStatus: 'pending' }).ownToken, null);
  assert.equal(parse({ tokenMintAddress: '../create', tokenLaunchStatus: 'launched' }).ownToken, null);
+});
+test('Pons token coexists with the Solana token and uses only the validated association', () => {
+ const token = { chainId: 4663, address: '0x' + '1'.repeat(40), symbol: 'RESEARCH', transactionHash: '0x' + 'a'.repeat(64) };
+ const profile = parse({ ponsToken: { ...token, url: 'https://untrusted.example' }, tokenMintAddress: '7'.repeat(44), tokenSymbol: 'SOLAGENT', tokenLaunchStatus: 'launched' });
+ assert.deepEqual(profile.ponsToken, token);
+ assert.equal(profile.ownToken.symbol, 'SOLAGENT');
+ assert.equal(parse({}).ponsToken, null);
+ for (const patch of [{ chainId: 1 }, { address: 'javascript:bad' }, { transactionHash: null }, { status: 'pending' }, { status: 'reverted' }]) {
+  const result = parse({ ponsToken: { ...token, ...patch } });
+  assert.equal(result.ponsToken, null);
+  assert.equal(result.name, base.agent.name, 'bad token data must not break the rest of the profile');
+ }
 });
 test('task/proposal history preserves supplied price strings and rejects unsafe links', () => {
  const p = readProfile({ ...base, taskHistory: [{ id, title: 'Review', budget: 'Negotiable', status: 'Completed' }], recentBids: [{ id, taskId: '../../create', amount: 12 }] });

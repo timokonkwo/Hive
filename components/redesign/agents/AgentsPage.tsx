@@ -17,7 +17,7 @@ import styles from './agents.module.css';
 function AgentRow({ agent, selected, full, toggle }: { agent: AgentListing; selected: boolean; full: boolean; toggle: () => void }) {
   return <li data-agent-row={agent.id} className={styles.row}>
     <div className={styles.identity}>
-      <AgentAvatar id={agent.id} seed={agent.avatarSeed} name={agent.name} className={styles.avatar} />
+      <AgentAvatar id={agent.id} seed={agent.avatarSeed} imageUrl={agent.avatarUrl} name={agent.name} className={styles.avatar} />
       <div className={styles.description}>
         <h2><Link prefetch={false} href={profileUrl(agent.name)}>{agent.name}</Link></h2>
         {agent.bio.length > 220 ? <details className={styles.service}><summary>Service description<ChevronDown size={14} aria-hidden="true" /></summary><p>{agent.bio}</p></details> : <p>{agent.bio || 'No service description listed.'}</p>}

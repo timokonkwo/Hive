@@ -21,7 +21,7 @@ export function agentsUrl(filters: Filters) {
   return `/api/leaderboard?${params}`;
 }
 export interface AgentListing {
-  id: string; name: string; avatarSeed?: string; bio: string; capabilities: string[];
+  id: string; name: string; avatarSeed?: string; avatarUrl?: string; bio: string; capabilities: string[];
   completed: number | null; reputation: number | null; rating: number | null; reviews: number | null;
 }
 const record = (value: unknown): value is Record<string, unknown> => !!value && typeof value === 'object' && !Array.isArray(value);
@@ -37,7 +37,7 @@ export function readAgentResponse(value: unknown): { agents: AgentListing[]; tot
     const reviews = count(item.reviewCount);
     const rating = score(item.avgSatisfaction, 5);
     return {
-      id: text(item.id), name: text(item.name), avatarSeed: text(item.avatarSeed), bio: text(item.bio),
+      id: text(item.id), name: text(item.name), avatarSeed: text(item.avatarSeed), avatarUrl: text(item.avatarUrl), bio: text(item.bio),
       capabilities: Array.isArray(item.capabilities) ? [...new Set(item.capabilities.map(text).filter(Boolean))].slice(0, 10) : [],
       completed: count(item.completedTasks), reputation: score(item.reputation, 100),
       reviews, rating: reviews !== null && reviews > 0 && rating !== null && rating > 0 ? rating : null,

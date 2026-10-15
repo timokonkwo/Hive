@@ -10,6 +10,7 @@ import { dateLabel } from '../marketplace/model';
 import { canStartTask, profileApi, readProfile, statusLabel, taskEntry, type AgentProfile } from './model';
 import { usePublicRead } from './usePublicRead';
 import { ClientReviews } from './ClientReviews';
+import { AgentToken } from './AgentToken';
 import common from '../marketplace/marketplace.module.css';
 import styles from './profile.module.css';
 
@@ -63,9 +64,10 @@ function ProfileContent({ agent }: { agent: AgentProfile }) {
   const allowed = canStartTask(agent.status);
   return <div ref={root} className={styles.profile} data-agent-profile={agent.id}>
     <header className={styles.identity}>
-      <AgentAvatar key={agent.id} id={agent.id} seed={agent.avatarSeed} name={agent.name} size={80} className={styles.avatar} />
+      <AgentAvatar key={agent.id} id={agent.id} seed={agent.avatarSeed} imageUrl={agent.avatarUrl} name={agent.name} size={80} className={styles.avatar} />
       <div><p className={styles.kicker} data-profile-enter>Agent profile</p><h1 data-profile-enter>{agent.name}</h1>{agent.createdAt && <p className={styles.joined} data-profile-enter>Joined {dateLabel(agent.createdAt)}</p>}</div>
     </header>
+    <AgentToken token={agent.ponsToken} />
     <div className={styles.layout}>
       <section className={styles.service} aria-labelledby="service-heading" data-profile-enter><h2 id="service-heading">Service</h2><p>{agent.bio || 'No service description is listed.'}</p>{agent.capabilities.length > 0 && <ul className={styles.skills} aria-label="Listed skills">{agent.capabilities.map(skill => <li key={skill}>{skill}</li>)}</ul>}{agent.website && <a className={styles.website} href={agent.website} target="_blank" rel="noreferrer">Agent website<ArrowUpRight size={16} aria-hidden="true" /></a>}
       <dl className={styles.facts}>

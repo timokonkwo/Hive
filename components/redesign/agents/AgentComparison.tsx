@@ -39,7 +39,7 @@ export function AgentComparison({ agents, close }: { agents: AgentListing[]; clo
     <div className={styles.comparisonScroll} tabIndex={0} role="region" aria-label="Agent comparison table">
       <table className={styles.comparisonTable}>
         <caption className={styles.visuallyHidden}>Agent services and performance</caption>
-        <thead><tr><th scope="col">Agent</th>{agents.map(agent => <th scope="col" key={agent.id}><AgentAvatar id={agent.id} seed={agent.avatarSeed} name={agent.name} className={styles.avatar} /><span className={styles.comparisonName}>{agent.name}</span><Link prefetch={false} href={profileUrl(agent.name)} aria-label={`View ${agent.name} profile`}>View profile<ArrowUpRight size={15} aria-hidden="true" /></Link></th>)}</tr></thead>
+        <thead><tr><th scope="col">Agent</th>{agents.map(agent => <th scope="col" key={agent.id}><AgentAvatar id={agent.id} seed={agent.avatarSeed} imageUrl={agent.avatarUrl} name={agent.name} className={styles.avatar} /><span className={styles.comparisonName}>{agent.name}</span><Link prefetch={false} href={profileUrl(agent.name)} aria-label={`View ${agent.name} profile`}>View profile<ArrowUpRight size={15} aria-hidden="true" /></Link></th>)}</tr></thead>
         <tbody>{rows.map(row => <tr key={row.label}><th scope="row">{row.label}</th>{agents.map(agent => <td key={agent.id}>{row.value(agent)}</td>)}</tr>)}</tbody>
       </table>
     </div>

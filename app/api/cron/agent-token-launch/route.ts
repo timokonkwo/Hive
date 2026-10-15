@@ -1,3 +1,4 @@
+import { legacyAgentLaunchesEnabled, legacyLaunchMessage } from '@/lib/agent-tokenization/legacy';
 import { NextResponse } from 'next/server';
 import { getDb, COLLECTIONS } from '@/lib/db';
 import { createAgentBagsClient } from '@/lib/bags-agent';
@@ -26,6 +27,7 @@ export async function GET(req: Request) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
+  if (!legacyAgentLaunchesEnabled()) return NextResponse.json({ enabled:false, message:legacyLaunchMessage });
   const db = await getDb();
   const results: Record<string, any> = {};
 

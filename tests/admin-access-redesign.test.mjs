@@ -34,7 +34,7 @@ test('role endpoint preserves denial status and forbids caching',async()=>{for(c
 test('access token verifier validates signature, issuer, audience, expiry and session claims',async()=>{
  const saved=process.env.NEXT_PUBLIC_PRIVY_APP_ID;process.env.NEXT_PUBLIC_PRIVY_APP_ID='test-app';
  try{
- const {authenticateClient}=load('../lib/client-auth.ts',{'jose':{...jose,createRemoteJWKSet:()=>keys},'@/lib/logger':{logger:{error(){}}}});
+ const {authenticateClient}=load('../lib/client-auth.ts',{'jose':{...jose,createRemoteJWKSet:()=>keys},'@/lib/logger':{logger:{error(){},warn(){}}}});
  const token=async(overrides={})=>new jose.SignJWT({sid:'fixture-session',...overrides}).setProtectedHeader({alg:'ES256',kid:'test-key'}).setSubject(userId).setIssuer('privy.io').setAudience('test-app').setIssuedAt().setExpirationTime('5m').sign(pair.privateKey);
  const valid=await token();const r=request({authorization:'Bearer '+valid});const verified=await authenticateClient(r);assert.equal(verified.userId,userId);assert.equal(verified.sessionId,'fixture-session');
  assert.equal(await authenticateClient(request()),null);

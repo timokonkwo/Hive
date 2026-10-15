@@ -468,3 +468,8 @@ Completed the navigation/metadata/recovery unit, with validation recorded in HIV
 
 ## September 19 — Token route rename
 Per user instruction, /token now renders the existing token workspace directly. Removed /stake entirely; no redirect was added. Updated navigation, docs links, sitemap, canonical metadata and tab navigation to /token. Build and five browser checks passed: direct load, active navigation/canonical, explicit Solana trade view, old-route 404 and no runtime errors. Legacy security-suite execution remains blocked by its pre-existing reference to removed docs ContentSections; its token-route assertions were updated. Changes are local pending publication.
+
+## September 21 — Robinhood HIVE launch update
+Updated the /token Robinhood view from prelaunch to live using the supplied contract address `0xc65e9630D8Af1eA278cbE359f78931684b4ff9f8`. Removed the "$Hive Launching soon On RobinHood" cover from the token page. Trade and stake controls remain disabled until reviewed destination URLs are configured, so the page does not invent a trading or staking integration.
+
+Follow-up correction: staking is the coming-soon action, not the token launch. Added `/api/token/robinhood-market` to read live Robinhood Chain token data from Pons Portal, with ponsapi enrichment only when useful non-zero values are returned. The token page now shows Robinhood market state and the contract address, while the stake tab says "Staking coming soon." Docs copy was updated to match the launched token state.

@@ -1,3 +1,6 @@
+import { readAssociation } from '@/lib/agent-tokenization/association';
+import type { TokenAssociation } from '@/lib/agent-tokenization/types';
+
 const record = (value: unknown): value is Record<string, unknown> => !!value && typeof value === 'object' && !Array.isArray(value);
 const text = (value: unknown) => typeof value === 'string' ? value.trim() : '';
 const id = (value: unknown) => /^[a-f0-9]{24}$/i.test(text(value)) ? text(value) : '';
@@ -12,10 +15,11 @@ const mint = (value: unknown) => /^[1-9A-HJ-NP-Za-km-z]{32,44}$/.test(text(value
 export interface HistoryItem { id: string; taskId: string; title: string; status: string; category: string; budget: string; createdAt: string | null }
 export interface TokenRecord { id: string; name: string; symbol: string; mint: string; createdAt: string | null }
 export interface AgentProfile {
-  id: string; name: string; avatarSeed?: string; bio: string; capabilities: string[]; status: string | null;
+  id: string; name: string; avatarSeed?: string; avatarUrl?: string; bio: string; capabilities: string[]; status: string | null;
   completed: number | null; reputation: number | null; rating: number | null; reviews: number | null;
   createdAt: string | null; website: string | null; wallet: string;
   tasks: HistoryItem[]; proposals: HistoryItem[]; tokens: TokenRecord[]; ownToken: { symbol: string; mint: string } | null;
+  ponsToken: TokenAssociation | null;
 }
 function history(value: unknown, proposal: boolean): HistoryItem[] {
   if (!Array.isArray(value) || value.length > 10) throw new Error('Invalid history');
@@ -33,13 +37,14 @@ export function readProfile(value: unknown): AgentProfile {
   const reviews = count(a.reviewCount), rating = score(a.avgSatisfaction, 5);
   if (!Array.isArray(value.tokenLaunches)) throw new Error('Invalid token history');
   return {
-    id: id(a.id), name: text(a.name), avatarSeed: text(a.avatarSeed), bio: text(a.bio), capabilities: texts(a.capabilities), status: a.status == null ? null : text(a.status) || 'unknown',
+    id: id(a.id), name: text(a.name), avatarSeed: text(a.avatarSeed), avatarUrl: text(a.avatarUrl), bio: text(a.bio), capabilities: texts(a.capabilities), status: a.status == null ? null : text(a.status) || 'unknown',
     completed: count(value.stats.tasksCompleted), reputation: score(a.reputation, 100), reviews,
     rating: reviews !== null && reviews > 0 && rating !== null && rating > 0 ? rating : null,
     createdAt: date(a.createdAt), website: safeWebsite(a.website), wallet: text(a.walletAddress) || text(a.solanaAddress),
     tasks: history(value.taskHistory, false), proposals: history(value.recentBids, true),
     tokens: value.tokenLaunches.filter(record).filter(item => id(item.id) && mint(item.mintAddress)).slice(0, 10).map(item => ({ id: id(item.id), name: text(item.tokenName), symbol: text(item.tokenSymbol), mint: mint(item.mintAddress), createdAt: date(item.createdAt) })),
     ownToken: a.tokenLaunchStatus === 'launched' && mint(a.tokenMintAddress) ? { symbol: text(a.tokenSymbol), mint: mint(a.tokenMintAddress) } : null,
+    ponsToken: readAssociation(a.ponsToken),
   };
 }
 export interface ClientReview { id: string; taskId: string; title: string; rating: number | null; comment: string; tags: string[]; createdAt: string | null }

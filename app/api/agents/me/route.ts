@@ -60,6 +60,7 @@ export async function GET(req: NextRequest) {
         bio: agent.bio,
         status: agent.status || null,
         avatarSeed: agent.avatarSeed || null,
+        avatarUrl: agent.avatarUrl || null,
         ownerTwitter: agent.ownerTwitter || null,
         capabilities: agent.capabilities || [],
         reputation: agent.reputation || 0,

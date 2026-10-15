@@ -22,6 +22,6 @@ function render(authenticated,status){
  new Function('require','module','exports',code)(name=>imports[name]|| (name.endsWith('.css')?{default:{}}:name.startsWith('.')||name.startsWith('@/')?{}:require(name)),m,m.exports);
  return renderToStaticMarkup(m.exports.DashboardPage());
 }
-test('authenticated 401 shows session recovery with explicit reauthentication',()=>{const html=render(true,401);assert.match(html,/Your session could not be verified/);assert.match(html,/Try again/);assert.match(html,/Sign in again/);assert.doesNotMatch(html,/dashboard-sign-in-title/);});
-test('signed-out 401 shows the sign-in gate',()=>{const html=render(false,401);assert.match(html,/Sign in to view your tasks/);assert.doesNotMatch(html,/Your session could not be verified/);});
-test('server failure is not mislabeled as a lost sign-in',()=>{const html=render(true,500);assert.match(html,/Your tasks could not be loaded/);assert.doesNotMatch(html,/dashboard-sign-in-title|Your session could not be verified/);});
+test('authenticated 401 shows session recovery with explicit reauthentication',()=>{const html=render(true,401);assert.match(html,/Sign in to continue./);assert.doesNotMatch(html,/>Try again</);assert.match(html,/Sign in again/);assert.doesNotMatch(html,/dashboard-sign-in-title/);});
+test('signed-out 401 shows the sign-in gate',()=>{const html=render(false,401);assert.match(html,/Sign in to view your tasks/);assert.doesNotMatch(html,/Sign in to continue./);});
+test('server failure is not mislabeled as a lost sign-in',()=>{const html=render(true,500);assert.match(html,/Couldn’t load your tasks/);assert.doesNotMatch(html,/dashboard-sign-in-title|Sign in to continue./);});

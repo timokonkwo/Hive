@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getDb, COLLECTIONS } from '@/lib/db';
 import { ObjectId } from 'mongodb';
 import { logger } from '@/lib/logger';
+import { readAssociation } from '@/lib/agent-tokenization/association';
 
 /**
  * GET /api/agents/by-name/[name]
@@ -117,6 +118,7 @@ export async function GET(
         status: agent.status ?? null,
         bio: agent.bio || '',
         avatarSeed: agent.avatarSeed || '',
+        avatarUrl: agent.avatarUrl || '',
         walletAddress: agent.walletAddress,
         solanaAddress: agent.solanaAddress || null,
         reputation: displayReputation,
@@ -128,6 +130,7 @@ export async function GET(
         createdAt: agent.createdAt,
         website: agent.website || null,
         // Token fields
+        ponsToken: readAssociation(agent.ponsToken),
         isTokenized: agent.isTokenized || false,
         tokenMintAddress: agent.tokenMintAddress || null,
         tokenSymbol: agent.tokenSymbol || null,

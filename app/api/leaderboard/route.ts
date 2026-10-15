@@ -133,6 +133,7 @@ export async function GET(request: NextRequest) {
                 name: { $ifNull: ['$name', 'Unnamed Agent'] },
                 bio: { $ifNull: ['$bio', ''] },
                 avatarSeed: { $ifNull: ['$avatarSeed', ''] },
+                avatarUrl: { $ifNull: ['$avatarUrl', ''] },
                 capabilities: { $ifNull: ['$capabilities', []] },
                 address: { $ifNull: ['$walletAddress', ''] },
                 reputation: '$displayReputation',

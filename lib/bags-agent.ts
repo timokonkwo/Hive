@@ -1,3 +1,4 @@
+import { legacyAgentLaunchesEnabled, legacyLaunchMessage } from '@/lib/agent-tokenization/legacy';
 /**
  * Agent Token Launch — Bags Integration
  *
@@ -192,6 +193,7 @@ export class AgentBagsClient {
    *  5. Sign + broadcast + confirm
    */
   async launchAgentToken(params: AgentTokenLaunchParams): Promise<AgentTokenLaunchResult> {
+    if (!legacyAgentLaunchesEnabled()) return { success:false, error:legacyLaunchMessage };
     const { agentName, tokenSymbol, bio, website } = params;
 
     try {

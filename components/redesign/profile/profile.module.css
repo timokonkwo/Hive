@@ -9,6 +9,15 @@
 .kicker { font-size: 12px; color: var(--muted); margin-bottom: 8px!important; }
 .identity h1 { font-size: clamp(32px, 3.3vw, 48px); line-height: 1.2; letter-spacing: -.045em; font-weight: 500; overflow-wrap: anywhere; }
 .joined { font-size: 12px; color: var(--muted); margin-top: 10px!important; }
+.agentToken { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 16px 24px; padding: 20px 24px; margin-top: 24px; border: 1px solid var(--rule); border-radius: 8px; background: var(--surface); }
+.agentToken>div { min-width: 0; }
+.agentToken h2 { margin: 0 0 8px; color: var(--muted); font-size: 12px; font-weight: 400; }
+.agentToken p { display: flex; align-items: baseline; flex-wrap: wrap; gap: 8px 16px; margin: 0; }
+.agentToken strong { font-size: 18px; font-weight: 500; overflow-wrap: anywhere; }
+.agentToken span { color: var(--muted); font-size: 12px; }
+.agentToken a { display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-height: 44px; padding: 10px 14px; border: 1px solid var(--rule); border-radius: 6px; font-size: 13px; }
+.agentToken a:hover { background: var(--soft); }
+.agentToken a:focus-visible { outline: 2px solid var(--accent-text); outline-offset: 3px; }
 .layout { display: grid; grid-template-columns: minmax(0, 1fr) 290px; column-gap: 56px; align-items: start; }
 .service { padding-top: 32px; min-width: 0; }
 .service h2,.section h2,.taskRail h2 { font-size: 20px; line-height: 1.4; letter-spacing: -.025em; font-weight: 500; }

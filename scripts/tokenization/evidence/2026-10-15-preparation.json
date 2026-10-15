@@ -1,0 +1,32 @@
+{
+  "date": "2026-10-15",
+  "releaseReviewed": false,
+  "signingEnabled": false,
+  "deployed": false,
+  "liveChainTransactions": 0,
+  "cloudinary": {
+    "purpose": "Generated test avatar; no token launched",
+    "url": "https://res.cloudinary.com/dgjseefcx/image/upload/v1792054160/hive-agent-tokens/544e5887ba64a0e6740993fff08772077ab3f836ab5f6dba0ce71ab029feb557.png",
+    "httpStatus": 200,
+    "contentType": "image/png",
+    "bytes": 9006,
+    "width": 512,
+    "height": 512,
+    "repeatUploadSameUrl": true,
+    "overwrite": false
+  },
+  "tests": {
+    "focusedUnitApiRegression": 75,
+    "isolatedMongoIntegrationIncludingParent": 15,
+    "typecheck": "passed",
+    "scopedLint": "passed",
+    "productionBuild": "passed"
+  },
+  "remaining": [
+    "Reviewed deployed source/build evidence",
+    "Browser signing, fee review and recovery",
+    "Expired prepared-transaction resume and nonce cancellation",
+    "Fee collection and legacy Bags isolation",
+    "Real-wallet acceptance and separately approved funded pilot"
+  ]
+}

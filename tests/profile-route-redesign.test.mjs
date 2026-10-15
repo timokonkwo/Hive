@@ -2,6 +2,9 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import ts from 'typescript';
+import { loadTypeScript } from './helpers/load-typescript.mjs';
+const policy = loadTypeScript(new URL('../lib/agent-tokenization/policy.ts', import.meta.url));
+const association = loadTypeScript(new URL('../lib/agent-tokenization/association.ts', import.meta.url), { './policy': policy });
 
 // Exercise the actual route without a database connection or database writes.
 const source = readFileSync(new URL('../app/api/agents/by-name/[name]/route.ts', import.meta.url), 'utf8');
@@ -20,6 +23,7 @@ async function routeFor(agent) {
   '@/lib/db': { getDb: async () => ({ collection: () => collection }), COLLECTIONS: {} },
   mongodb: { ObjectId: class { static isValid() { return false; } } },
   '@/lib/logger': { logger: { error() {} } },
+  '@/lib/agent-tokenization/association': association,
  };
  new Function('require', 'module', 'exports', compiled)(name => { if (!(name in imports)) throw Error(name); return imports[name]; }, module, module.exports);
  const response = await module.exports.GET(new Request('http://localhost/api/agents/by-name/100%25%20done'), { params: Promise.resolve({ name: '100% done' }) });
@@ -32,4 +36,15 @@ test('literal percent names reach lookup and stored zero reputation is preserved
 });
 test('an absent percent-name agent is a real not-found response, not a decoding failure', async () => {
  const { response } = await routeFor(null); assert.equal(response.status, 404);
+});
+test('public profile exposes only a valid Pons association and no launch internals', async () => {
+ const token = { chainId: 4663, address: '0x' + '1'.repeat(40), symbol: 'RESEARCH', transactionHash: '0x' + 'a'.repeat(64) };
+ const agent = { _id: { toString: () => agentId }, name: '100% done', ponsToken: { ...token, internalIntent: 'private', url: 'https://untrusted.example' } };
+ const { response } = await routeFor(agent);
+ assert.deepEqual((await response.json()).agent.ponsToken, token);
+ for (const value of [undefined, { ...token, status: 'pending' }, { ...token, chainId: 1 }, { ...token, transactionHash: '' }]) {
+  const result = await routeFor({ ...agent, ponsToken: value });
+  assert.equal(result.response.status, 200);
+  assert.equal((await result.response.json()).agent.ponsToken, null);
+ }
 });

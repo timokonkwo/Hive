@@ -19,6 +19,9 @@
 [functions."scheduled-agent-tokens"]
   timeout = 60
 
+[functions."scheduled-pons-launches"]
+  timeout = 60
+
 [functions."scheduled-agent-fees"]
   timeout = 60
 

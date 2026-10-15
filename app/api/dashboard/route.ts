@@ -1,14 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getDb, COLLECTIONS } from '@/lib/db';
-import { authenticateClient } from '@/lib/client-auth';
+import { authenticateClientResult } from '@/lib/client-auth';
 import { checkRateLimit, getClientIp, RATE_LIMITS } from '@/lib/rate-limit';
 import { redactTaskForPublic } from '@/lib/public-redaction';
 import { logger } from '@/lib/logger';
 export const dynamic = 'force-dynamic';
 const headers = { 'Cache-Control': 'private, no-store', Vary: 'Authorization, Cookie' };
 export async function GET(request: NextRequest) {
-  const verified = await authenticateClient(request);
-  if (!verified) return NextResponse.json({ error: 'Sign in to view your tasks.' }, { status: 401, headers });
+  const auth = await authenticateClientResult(request);
+  if (!auth.ok) return NextResponse.json({ error: auth.status === 503 ? 'Session verification is temporarily unavailable.' : 'Sign in to view your tasks.', code:auth.code, requestId:auth.requestId }, { status:auth.status, headers });
+  const verified = auth.client;
   const rl = checkRateLimit(`dashboard:${getClientIp(request)}`, RATE_LIMITS.READ);
   if (!rl.allowed) return NextResponse.json({ error: 'Too many requests. Try again shortly.' }, { status: 429, headers });
   try {

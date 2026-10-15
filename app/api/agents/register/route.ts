@@ -1,3 +1,4 @@
+import { legacyAgentLaunchesEnabled, legacyLaunchMessage } from '@/lib/agent-tokenization/legacy';
 import { NextRequest, NextResponse } from 'next/server';
 import { getDb, COLLECTIONS } from '@/lib/db';
 import { generateApiKey, hashApiKey } from '@/lib/api-key';
@@ -107,6 +108,7 @@ export async function POST(req: NextRequest) {
     // ── Token launch validation (only when launchToken is true) ──
     let finalTokenSymbol: string | null = null;
     const wantsToken = launchToken === true;
+    if (wantsToken && !legacyAgentLaunchesEnabled()) return NextResponse.json({ error:legacyLaunchMessage }, { status:409 });
 
     if (wantsToken) {
       // Stricter bio requirement for tokenized agents

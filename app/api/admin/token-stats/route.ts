@@ -1,3 +1,4 @@
+import { legacyAgentLaunchesEnabled, legacyLaunchMessage } from '@/lib/agent-tokenization/legacy';
 import { verifyAdmin } from '@/lib/admin-auth';
 import { NextRequest, NextResponse } from 'next/server';
 import { getDb, COLLECTIONS } from '@/lib/db';
@@ -183,6 +184,7 @@ export async function POST(req: NextRequest) {
   const { action } = body;
 
   if (action === 'launch') {
+    if (!legacyAgentLaunchesEnabled()) return NextResponse.json({ error:legacyLaunchMessage }, { status:410 });
     const { agentId } = body;
     if (!agentId) {
       return NextResponse.json({ error: 'agentId required' }, { status: 400 });

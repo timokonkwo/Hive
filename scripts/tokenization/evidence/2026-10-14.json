@@ -1,0 +1,85 @@
+{
+  "inspectedAt": "2026-10-14T22:51:53.487Z",
+  "source": "https://docs.ponsfamily.com/v2",
+  "reviewed": false,
+  "snapshot": {
+    "chainId": 4663,
+    "blockNumber": "88738160",
+    "blockHash": "0x20a1e8973d1fa1561b2b8c0901fe50b0b353c80fbb6fce8803933c96fe564755",
+    "timestamp": "1792018311",
+    "signer": "0x1111111111111111111111111111111111111111",
+    "configId": "0",
+    "launchFee": "500000000000000",
+    "expectedEconomics": "0xa9fc75d4203a33fe660e8fa32c74c3aa41c1fda4bf23d3a39b6bc22a1f8b1ca7",
+    "canLaunch": true,
+    "maxCreatorTaxBps": "1000",
+    "snipeTaxStartBps": "9900",
+    "snipeTaxSeconds": "3",
+    "config": {
+      "supply": "1000000000000000000000000000",
+      "curveFeeBps": "100",
+      "phantomQuote": "1680000000000000000",
+      "graduationThreshold": "4200000000000000000",
+      "poolFee": 0,
+      "tickSpacing": 200,
+      "enabled": true,
+      "hookFeeBps": "100"
+    },
+    "contracts": {
+      "factory": {
+        "address": "0x7eD598BcEf8bd9Edd8C97A195C6d13f40801EC7e",
+        "codeHash": "0x89a27da6f703e0a7cdd4f233e7cb57604ff75b164530962d3ff7cf8483a67d84"
+      },
+      "hook": {
+        "address": "0xE5e702641Ea86F4ae6cC3cDaeD2B886f976Be044",
+        "codeHash": "0xc21b1e6c1b45403e81a581f22ed6d9c747997af1cfdac1b1dc9f4b1d346a10db"
+      },
+      "deployer": {
+        "address": "0x3711ceA4feaDE896C913C68F01Eda97Cb06D1A42",
+        "codeHash": "0xeade22566c766377f6adfb99534f2772251efad9568642c0704a7051418e624c"
+      },
+      "escrow": {
+        "address": "0xd3AFEB2a57f70eF218Aa82451c51B2fb0416Ac9e",
+        "codeHash": "0xf25f75cfbc1637ba068dc34f69098fa4e8a80f8ee8fe7bf7820594e0b3fed2f1"
+      },
+      "router": {
+        "address": "0xe33E9E479dF8802cb0866d5d05258bEc4cF62948",
+        "codeHash": "0xed9065184519eaa24a22c2556403d5d8bbb230ff94dbc5c414cf5028e20e52e7"
+      }
+    }
+  },
+  "finalized": {
+    "number": "88727275",
+    "hash": "0x7dbbb28698feb22c478a81ad878d1834b8f954478e87c3be2e9fd5fef4191c6f",
+    "timestamp": "1792017210"
+  },
+  "sourceVerification": {
+    "status": "unavailable",
+    "explorerAPI": 403,
+    "publishedRepository": 404,
+    "sourcifyFullMatch": 404,
+    "reviewed": false
+  },
+  "forkRehearsal": {
+    "blockNumber": "88734592",
+    "chainId": 4663,
+    "network": "local Anvil only",
+    "passed": [
+      "owner launch with zero buy",
+      "owner launch with 0.1 ETH buy",
+      "admin launch with 0.1 ETH buy",
+      "owner launch with 10 ETH buy and excess refund",
+      "receipt metadata and recipient checks",
+      "finality gate",
+      "duplicate salt rejected",
+      "nonzero stale economics pin rejected"
+    ],
+    "liveTransactions": 0
+  },
+  "notes": [
+    "Observed hashes are not an approved release manifest.",
+    "Live snipe-tax duration was 3 seconds; public docs describe 5 seconds.",
+    "An all-zero expectedEconomics disables the contract comparison. Hive rejects zero.",
+    "Finalized block timestamp trailed latest by 1101 seconds in this observation. Keep reconciliation in a durable background worker."
+  ]
+}

@@ -1,3 +1,4 @@
+import { legacyAgentLaunchesEnabled, legacyLaunchMessage } from '@/lib/agent-tokenization/legacy';
 import { NextRequest, NextResponse } from 'next/server';
 import { getDb, COLLECTIONS } from '@/lib/db';
 import { authenticateRequest } from '@/lib/api-key';
@@ -15,6 +16,7 @@ import { logger } from '@/lib/logger';
  * Body: { tokenSymbol?: string }
  */
 export async function POST(req: NextRequest) {
+  if (!legacyAgentLaunchesEnabled()) return NextResponse.json({ error:legacyLaunchMessage }, { status:410 });
   try {
     // Rate limit — stricter than normal
     const ip = getClientIp(req);

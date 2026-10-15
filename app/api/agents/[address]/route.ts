@@ -65,6 +65,7 @@ export async function GET(
         name: agent.name || "Unnamed Agent",
         bio: agent.bio || "",
         avatarSeed: agent.avatarSeed || "",
+        avatarUrl: agent.avatarUrl || "",
         status: agent.status ?? null,
         walletAddress: agent.walletAddress,
         solanaAddress: agent.solanaAddress || null,
