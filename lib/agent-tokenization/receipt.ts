@@ -67,13 +67,26 @@ export async function reconcileLaunchReceipt(client: PublicClient, expected: Lau
       throw Error('The opening purchase could not be verified.');
     }
   }
-  const at = { blockNumber: receipt.blockNumber };
-  const [record, info, name, symbol] = await Promise.all([
-    client.readContract({ ...at, address: PONS_FACTORY, abi: factoryAbi, functionName: 'getLaunchedToken', args: [event.token] }),
-    client.readContract({ ...at, address: event.token, abi: tokenAbi, functionName: 'getTokenInfo' }),
-    client.readContract({ ...at, address: event.token, abi: tokenAbi, functionName: 'name' }),
-    client.readContract({ ...at, address: event.token, abi: tokenAbi, functionName: 'symbol' }),
-  ]);
+  const readState = (blockNumber: bigint) => {
+    const at = { blockNumber };
+    return Promise.all([
+      client.readContract({ ...at, address: PONS_FACTORY, abi: factoryAbi, functionName: 'getLaunchedToken', args: [event.token] }),
+      client.readContract({ ...at, address: event.token, abi: tokenAbi, functionName: 'getTokenInfo' }),
+      client.readContract({ ...at, address: event.token, abi: tokenAbi, functionName: 'name' }),
+      client.readContract({ ...at, address: event.token, abi: tokenAbi, functionName: 'symbol' }),
+    ] as const);
+  };
+  let state, stateBlock;
+  try { state = await readState(receipt.blockNumber); } catch (error) {
+    // The public RPC prunes historical state before L1 finality. The finalized
+    // transaction and event above prove the launch; current state is an additional
+    // exact metadata/fee-recipient check, never a substitute for receipt finality.
+    if (!(error instanceof Error) || !/historical state .* is not available/.test(error.message)) throw error;
+    stateBlock = await client.getBlock({ blockTag: 'latest' });
+    if (stateBlock.number === null || !stateBlock.hash || stateBlock.number < receipt.blockNumber) return { state: 'confirming' };
+    state = await readState(stateBlock.number);
+  }
+  const [record, info, name, symbol] = state;
   if (!record.exists || !sameAddress(record.token, event.token) || !sameAddress(record.curve, event.curve)
     || !sameAddress(record.deployer, candidate.from) || !sameAddress(record.creatorFeeRecipient, candidate.params.creatorFeeRecipient)
     || record.pairToken !== zeroAddress || record.creatorTaxBps !== CREATOR_TAX_BPS || record.buybackEnabled
@@ -84,5 +97,6 @@ export async function reconcileLaunchReceipt(client: PublicClient, expected: Lau
   }
   // Recheck the block after the reads; never publish data from an observed reorg.
   if ((await client.getBlock({ blockNumber: receipt.blockNumber })).hash !== receipt.blockHash) return { state: 'confirming' };
+  if (stateBlock && (await client.getBlock({ blockNumber: stateBlock.number! })).hash !== stateBlock.hash) return { state: 'confirming' };
   return { state: 'confirmed', token: { chainId: PONS_CHAIN_ID, address: event.token, symbol, transactionHash: hash } };
 }

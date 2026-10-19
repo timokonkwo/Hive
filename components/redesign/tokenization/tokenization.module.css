@@ -20,8 +20,8 @@
 .details{display:grid;gap:12px;margin:0;padding:18px 0;border-block:1px solid var(--rule);font-size:13px}
 .details>div{display:flex;align-items:baseline;justify-content:space-between;gap:16px}.details dt{color:var(--muted)}.details dd{margin:0;text-align:right;font-variant-numeric:tabular-nums}
 .primary,.secondary{min-height:44px;display:inline-flex;align-items:center;justify-content:center;gap:8px;padding:11px 16px;border:1px solid var(--rule);border-radius:8px;font-size:14px;font-weight:500;text-decoration:none;cursor:pointer}
-.primary{background:var(--accent);color:var(--accent-ink);border-color:transparent}.secondary{background:transparent;color:var(--ink)}
-.primary:disabled,.secondary:disabled{cursor:not-allowed;background:var(--soft);color:var(--muted);border-color:var(--rule);opacity:1}
+.primary.primary{background:var(--accent);color:var(--accent-ink);border-color:transparent}.secondary.secondary{background:transparent;color:var(--ink)}
+.primary.primary:disabled,.secondary.secondary:disabled{cursor:not-allowed;background:var(--soft);color:var(--muted);border-color:var(--rule);opacity:1}
 .wallet .secondary{justify-self:start}
 .footer{display:grid;gap:12px}.footer p,.hint{margin:0}
 .notice{padding:16px;border:1px solid var(--rule);border-radius:10px;background:var(--soft);font-size:13px;line-height:1.6;overflow-wrap:anywhere}.notice p{margin:0 0 12px}.notice ul{margin:0;padding-left:18px}

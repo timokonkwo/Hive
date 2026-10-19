@@ -182,3 +182,18 @@ test('wrong factory events, duplicate launches and altered on-chain metadata are
  const f=receiptFixture('0.1');f.receipt.logs=[f.event];
  await assert.rejects(receipts.reconcileLaunchReceipt(f.client,f.expected,hash),/opening purchase/);
 });
+
+test('pruned historical state uses a pinned current state only after exact finalized receipt verification', async () => {
+ const f=receiptFixture(),currentHash='0x'+'c'.repeat(64), reads=[];
+ const client={...f.client,
+  getBlock:async ({blockTag,blockNumber})=>blockTag==='latest'||blockNumber===20n?{number:20n,hash:currentHash}:{number:10n,hash},
+  readContract:async args=>{reads.push(args.blockNumber);if(args.blockNumber===10n)throw Error('historical state abc is not available');return f.values[args.functionName];},
+ };
+ assert.equal((await receipts.reconcileLaunchReceipt(client,f.expected,hash)).state,'confirmed');
+ assert.ok(reads.includes(10n)&&reads.includes(20n));
+ f.values.symbol='CHANGED';await assert.rejects(receipts.reconcileLaunchReceipt(client,f.expected,hash),/differs/);f.values.symbol=f.call.params.symbol;
+ assert.equal((await receipts.reconcileLaunchReceipt({...client,getBlock:async args=>args.blockNumber===20n?{number:20n,hash}:client.getBlock(args)},f.expected,hash)).state,'confirming');
+ let read=0;
+ assert.equal((await receipts.reconcileLaunchReceipt({...client,getBlock:async()=>({number:9n,hash}),readContract:async()=>{read++;}},f.expected,hash)).state,'confirming');assert.equal(read,0);
+ await assert.rejects(receipts.reconcileLaunchReceipt({...client,readContract:async()=>{throw Error('RPC offline');}},f.expected,hash),/RPC offline/);
+});

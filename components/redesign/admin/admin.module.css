@@ -125,3 +125,7 @@
  .feedbackRow { grid-template-columns:32px minmax(0,1fr); gap:12px; }
  .feedbackStatus { grid-column:2; width:min(100%,200px); }
 }
+
+.tokenPrimary.tokenPrimary { display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-height: 44px; padding: 10px 16px; flex-shrink: 0; border-radius: 6px; background: var(--accent); color: var(--accent-ink); font-size: 13px; font-weight: 600; }
+.tokenPrimary:disabled { opacity: .5; cursor: not-allowed; }
+.tokenPrimary:focus-visible { outline: 2px solid var(--accent-text); outline-offset: 3px; }

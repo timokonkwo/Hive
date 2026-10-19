@@ -3,7 +3,7 @@ import { LaunchDialog } from "../tokenization/LaunchDialog";
 import AnalyticsPage from '../analytics/AnalyticsPage';
 import { Select } from '@/components/redesign/Select';
 
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useRef } from "react";
 import { useAdminAccess } from '../AdminAccess';
 import { AppShell } from '../AppShell';
 import { Toaster } from 'sonner';
@@ -121,6 +121,8 @@ function AdminWorkspace() {
   const [tokenStats, setTokenStats] = useState<any>(null);
   const [tokenStatsLoading, setTokenStatsLoading] = useState(false);
   const [claimingFees, setClaimingFees] = useState(false);
+  const feeClaimBusy = useRef(false);
+  const [feeClaimResult, setFeeClaimResult] = useState<{ message: string; transactions: Array<{ signature: string; confirmed: boolean }>; errors: string[] } | null>(null);
   const [tokenLaunchModal, setTokenLaunchModal] = useState<{ id: string; name: string } | null>(null);
 
   // Roadmap management state
@@ -1367,7 +1369,7 @@ function AdminWorkspace() {
       )}
 
       {/* Token Launch Confirmation Modal */}
-      {tokenLaunchModal && <LaunchDialog agentId={tokenLaunchModal.id} role="admin" request={authFetch} close={() => setTokenLaunchModal(null)} />}
+      {tokenLaunchModal && <LaunchDialog agentId={tokenLaunchModal.id} role="admin" request={authFetch} close={() => { setTokenLaunchModal(null); void fetchAgents(); }} />}
 
       {/* Delete Confirmation Modal */}
       {deleteModal && (
@@ -1437,33 +1439,20 @@ function AdminWorkspace() {
                 </div>
               </div>
 
-              {/* Monthly Usage */}
-              <div className="bg-[var(--surface)] border border-[var(--rule)] p-4 rounded-lg">
-                <div className="flex items-center justify-between mb-3">
-                  <h3 className="text-xs    text-[var(--muted)] font-semibold">Monthly Usage</h3>
-                  <span className="text-xs  text-[var(--muted)]">
-                    {tokenStats.stats.launchesThisMonth} / {tokenStats.stats.monthlyCap} ({tokenStats.stats.monthlyRemaining} remaining)
-                  </span>
-                </div>
-                <div className="h-2 bg-[var(--surface)] rounded-full overflow-hidden">
-                  <div
-                    className="h-full bg-[var(--accent)] text-[var(--accent-ink)] rounded-full transition-all"
-                    style={{ width: `${Math.min(100, (tokenStats.stats.launchesThisMonth / tokenStats.stats.monthlyCap) * 100)}%` }}
-                  />
-                </div>
-                <div className="flex items-center justify-between mt-2 text-xs  text-[var(--muted)]">
-                  <span>Today: {tokenStats.stats.launchesToday} / 10</span>
-                  <span>Monthly cap: {tokenStats.stats.monthlyCap}</span>
-                </div>
+              <div className="flex flex-wrap gap-6 text-sm text-[var(--muted)]">
+                <span>Solana: {tokenStats.stats.byChain?.solana ?? tokenStats.stats.totalLaunched}</span>
+                <span>Robinhood: {tokenStats.stats.byChain?.robinhood ?? 0}</span>
+                <span>This month: {tokenStats.stats.launchesThisMonth}</span>
+                <span>Today: {tokenStats.stats.launchesToday}</span>
               </div>
 
               {/* Revenue Breakdown */}
               <div className="bg-[var(--surface)] border border-[var(--rule)] rounded-lg overflow-hidden">
                 <div className="p-4 border-b border-[var(--rule)] flex items-center justify-between">
                   <div>
-                    <h3 className="text-xs    text-[var(--accent-text)] font-semibold">Partner Revenue</h3>
+                    <h3 className="text-xs    text-[var(--accent-text)] font-semibold">Solana creator fees</h3>
                     <p className="text-xs text-[var(--muted)]  mt-1">
-                      10% fee on all bonding curve trading volume
+                      Fees earned by the Solana launch wallet.
                       {tokenStats.stats.walletAddress && (
                         <span className="ml-2 text-[var(--muted)]">Wallet: {tokenStats.stats.walletAddress.slice(0, 6)}...{tokenStats.stats.walletAddress.slice(-4)}</span>
                       )}
@@ -1471,7 +1460,10 @@ function AdminWorkspace() {
                   </div>
                   <button
                     onClick={async () => {
+                      if (feeClaimBusy.current) return;
+                      feeClaimBusy.current = true;
                       setClaimingFees(true);
+                      setFeeClaimResult(null);
                       try {
                         const res = await authFetch('/api/admin/token-stats', {
                           method: 'POST',
@@ -1479,9 +1471,10 @@ function AdminWorkspace() {
                           body: JSON.stringify({ action: 'claim-fees', adminAddress: user?.wallet?.address }),
                         });
                         const data = await res.json();
+                        setFeeClaimResult({ message: data.message || data.error || 'Claim failed', transactions: data.transactions || [], errors: data.errors || [] });
                         if (res.ok) {
-                          toast.success(data.message || 'Fees claimed');
-                          if (data.solGained) toast.success(`+${data.solGained} SOL received`);
+                          if (data.failed) toast.error(data.message);
+                          else toast.success(data.message || 'Fees claimed');
                           // Refetch token stats to update revenue section
                           authFetch(`/api/admin/token-stats?address=${user?.wallet?.address}`)
                             .then(r => r.ok ? r.json() : null)
@@ -1493,17 +1486,24 @@ function AdminWorkspace() {
                       } catch (err: any) {
                         toast.error(err.message);
                       } finally {
+                        feeClaimBusy.current = false;
                         setClaimingFees(false);
                       }
                     }}
                     disabled={claimingFees}
-                    className="px-4 py-2 bg-[var(--accent)] text-[var(--accent-ink)] hover:bg-[var(--accent)] text-[var(--accent-ink)] text-xs font-semibold    rounded transition-colors disabled:opacity-50 flex items-center gap-2 shrink-0"
+                    className={styles.tokenPrimary}
                   >
                     {claimingFees ? <Loader2 size={14} className="animate-spin" /> : null}
                     Claim Fees
                   </button>
                 </div>
 
+                {feeClaimResult && <div role="status" className="p-4 text-sm space-y-2">
+                  <p>{feeClaimResult.message}</p>
+                  {feeClaimResult.transactions.map((tx, index) => <a key={tx.signature} className={styles.rowActions} href={`https://solscan.io/tx/${encodeURIComponent(tx.signature)}`} target="_blank" rel="noopener noreferrer">{tx.confirmed ? 'Confirmed claim' : 'Check transaction'} {index + 1}<ExternalLink size={14}/></a>)}
+                  {feeClaimResult.errors.map(error => <p key={error} className="text-[var(--danger)] break-words">{error}</p>)}
+                </div>}
+                {tokenStats.revenue?.error && <p role="alert" className="p-4 text-sm text-[var(--danger)]">{tokenStats.revenue.error}</p>}
                 {/* Revenue Summary Cards */}
                 <div className="grid grid-cols-3 divide-x divide-zinc-800 border-b border-[var(--rule)]">
                   <div className="p-4 text-center">
@@ -1578,7 +1578,7 @@ function AdminWorkspace() {
                               launch.status === 'launched' ? 'bg-[var(--soft)] text-[var(--accent-text)] border-[var(--rule)]'
                               : launch.status === 'failed' ? 'bg-[var(--danger-soft)] text-[var(--danger)] border-[var(--danger)]'
                               : 'bg-[var(--soft)] text-[var(--accent-text)] border-[var(--rule)]'
-                            }`}>{launch.status}</span>
+                            }`}>{launch.status} · {launch.chain || 'Solana'}</span>
                           </div>
                           {launch.mintAddress && (
                             <code className="text-xs text-[var(--muted)] ">{launch.mintAddress.slice(0, 12)}...{launch.mintAddress.slice(-8)}</code>
@@ -1591,8 +1591,8 @@ function AdminWorkspace() {
                           <span className="text-xs text-[var(--muted)] ">
                             {new Date(launch.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
                           </span>
-                          {launch.bagsUrl && (
-                            <a href={launch.bagsUrl} target="_blank" rel="noopener noreferrer" className="text-[var(--accent-text)] hover:text-[var(--accent-text)] transition-colors">
+                          {(launch.tradeUrl || launch.bagsUrl) && (
+                            <a href={launch.tradeUrl || launch.bagsUrl} aria-label={`Trade ${launch.tokenSymbol || launch.agentName} on ${launch.chain === 'Robinhood' ? 'Pons' : 'Bags'}`} target="_blank" rel="noopener noreferrer" className="text-[var(--accent-text)] hover:text-[var(--accent-text)] transition-colors">
                               <ExternalLink size={14} />
                             </a>
                           )}

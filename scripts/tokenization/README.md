@@ -329,3 +329,22 @@ disposable key, signs only on the fork, verifies finalized receipts and profile
 publication, then reverts the fork and drops its disposable MongoDB database.
 It does not validate live funding, real admin session access or production
 hosting secrets. Those remain pilot/deployment checks.
+
+## Launch recovery and admin regression checks
+
+The public Robinhood RPC can prune state at a launch block before that block
+reaches L1 finality. Receipt verification still requires the exact finalized
+transaction and factory event. Only an explicit pruned-state error permits the
+additional metadata/fee-recipient reads at a pinned current block; both block
+hashes are rechecked, and all expected fields must match. RPC outages and mismatches
+remain unresolved. Authenticated status polling uses the same leased worker,
+scoped to the requested agent, and never signs or broadcasts.
+
+Admin totals read the Pons confirmation journal alongside legacy Solana launches.
+Solana creator claims use Bags' `/token-launch/claim-txs/v3`, include user-vault
+balances, preserve supplied signatures/blockhashes, and check confirmation errors.
+This is separate from Pons creator fees and Bags' separate deployer entitlement.
+
+Regression checks: `node --test tests/agent-tokenization*.test.mjs tests/agent-fees.test.mjs`,
+`npm run typecheck`, and `scripts/tokenization/check-browser.mjs` with `PLAYWRIGHT_MODULE`.
+The browser fixture includes the actual shared surface CSS in both themes.

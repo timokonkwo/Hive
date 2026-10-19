@@ -11,10 +11,10 @@ const root=fileURLToPath(new URL('../../',import.meta.url));
 const dir=await mkdtemp(join(tmpdir(),'hive-pons-browser-'));
 let browser,server;
 try {
-  await build({entryPoints:[root+'scripts/tokenization/browser-fixture.jsx'],bundle:true,format:'iife',jsx:'automatic',outfile:dir+'/app.js',plugins:[{name:'fixture-boundaries',setup(b){
+  await build({entryPoints:[root+'scripts/tokenization/browser-fixture.jsx'],bundle:true,external:['/redesign/fonts/*'],format:'iife',jsx:'automatic',outfile:dir+'/app.js',plugins:[{name:'fixture-boundaries',setup(b){
     b.onResolve({filter:/^@\//},args=>({path:root+args.path.slice(2)+'.ts'}));
-    b.onResolve({filter:/^@privy-io\/react-auth$|^next\/image$/},args=>({path:args.path,namespace:'fixture'}));
-    b.onLoad({filter:/.*/,namespace:'fixture'},args=>({contents:args.path==='next/image'
+    b.onResolve({filter:/^@privy-io\/react-auth$|^next\/(image|link)$/},args=>({path:args.path,namespace:'fixture'}));
+    b.onLoad({filter:/.*/,namespace:'fixture'},args=>({contents:args.path==='next/link'?`import React from '${root}node_modules/react/index.js';export default function Link({children,...props}){return React.createElement('a',props,children)}`:args.path==='next/image'
       ?`import React from '${root}node_modules/react/index.js';export default function Image({unoptimized,...props}){return React.createElement('img',props)}`
       :`import {useSyncExternalStore} from '${root}node_modules/react/index.js';export function usePrivy(){return{connectWallet(){window.fixture.modalOpen=true;window.dispatchEvent(new Event('fixture-modal'))}}}export function useModalStatus(){return{isOpen:useSyncExternalStore(cb=>{window.addEventListener('fixture-modal',cb);return()=>window.removeEventListener('fixture-modal',cb)},()=>!!window.fixture.modalOpen)}}export function useWallets(){return{wallets:[window.fixture.wallet]}}`,resolveDir:root,loader:'js'}));
   }}]});
@@ -27,6 +27,30 @@ try {
   const open=async(role='Owner')=>{await page.getByRole('button',{name:role+' tokenize'}).click();await page.getByLabel('Ticker',{exact:true}).waitFor();};
   const prepare=async()=>{await page.getByLabel('Launch wallet',{exact:true}).selectOption('0x'+'1'.repeat(40));await page.getByRole('button',{name:'Review launch',exact:true}).click();};
   const fresh=async()=>{await page.goto(origin);await page.getByRole('button',{name:'Owner tokenize'}).waitFor();};
+  await fresh();
+  const sage=page.getByRole('row').filter({hasText:'Sage Agent'});
+  assert.equal(await sage.getByRole('button',{name:'Tokenize',exact:true}).count(),0);
+  assert.equal(await sage.getByRole('button',{name:'View token',exact:true}).count(),1);
+  assert.equal(await sage.getByRole('link',{name:'SAGE · Robinhood'}).getAttribute('href'),'https://www.ponsfamily.com/launchpad/0x2222222222222222222222222222222222222222');
+  assert.equal(await page.getByRole('row').filter({hasText:'Untokenized agent'}).getByRole('button',{name:'Tokenize',exact:true}).count(),1);
+  for (const theme of ['light','dark']) {
+    await page.evaluate(value=>document.documentElement.dataset.hiveTheme=value,theme);
+    for(const width of [320,1280]) {
+      await page.setViewportSize({width,height:900});
+      const trade=page.getByRole('link',{name:'Trade on Pons',exact:true});
+      assert.equal(await trade.getAttribute('href'),'https://www.ponsfamily.com/launchpad/0x2222222222222222222222222222222222222222');
+      await open('Admin');
+      const action=page.getByRole('button',{name:'Review launch',exact:true});
+      for(const state of ['normal','hover','focus']) {
+        if(state==='hover')await action.hover();if(state==='focus')await action.focus();
+        assert.equal(await action.evaluate(el=>getComputedStyle(el).color),'rgb(24, 32, 21)',`${theme} ${state} button contrast`);
+      }
+      await page.getByRole('button',{name:'Close token launch'}).click();
+      assert.equal(await trade.evaluate(el=>getComputedStyle(el).color),'rgb(24, 32, 21)');
+      assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1),true);
+    }
+  }
+  console.log('PASS profile trade section and primary button contrast in light/dark at mobile and desktop');
   await fresh();await open();assert.equal(await page.getByRole('button',{name:'Edit agent details'}).count(),0);
   await page.getByRole('button',{name:'Close token launch'}).click();await open('Admin');
   await page.getByRole('button',{name:'Edit agent details'}).click();
@@ -128,6 +152,9 @@ try {
   await page.getByRole('button',{name:'Admin tokenize'}).click();
   await page.getByRole('button',{name:'Retry submission',exact:true}).waitFor();
   assert.equal(await page.getByRole('button',{name:'Connect launch wallet'}).count(),0);
+  await page.evaluate(()=>fixture.saved.phase='confirming');await page.getByRole('button',{name:'Check status',exact:true}).click();
+  await page.getByText('Waiting for network confirmation.',{exact:true}).waitFor();
+  assert.equal(await page.getByRole('button',{name:'Retry submission',exact:true}).count(),0);
   await page.evaluate(()=>fixture.confirm());await page.getByRole('button',{name:'Check status',exact:true}).click();
   await page.getByRole('heading',{name:'RESEARCH is live'}).waitFor();
   await fresh();await page.evaluate(()=>fixture.managedUnavailable=true);await open('Admin');

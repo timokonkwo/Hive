@@ -1,11 +1,14 @@
+import { ponsAdminStats } from '@/lib/agent-tokenization/admin-stats';
+import { claimableLamports, claimAgentFees } from '@/lib/agent-fees';
 import { legacyAgentLaunchesEnabled, legacyLaunchMessage } from '@/lib/agent-tokenization/legacy';
 import { verifyAdmin } from '@/lib/admin-auth';
 import { NextRequest, NextResponse } from 'next/server';
 import { getDb, COLLECTIONS } from '@/lib/db';
 import { createAgentBagsClient } from '@/lib/bags-agent';
-import { logger } from '@/lib/logger';
 
 
+
+export const maxDuration = 60;
 
 /**
  * GET /api/admin/token-stats
@@ -26,6 +29,8 @@ export async function GET(req: NextRequest) {
   }
 
   const db = await getDb();
+  const monthStart = new Date(); monthStart.setUTCDate(1); monthStart.setUTCHours(0, 0, 0, 0);
+  const todayStart = new Date(); todayStart.setUTCHours(0, 0, 0, 0);
 
   // Gather all stats in parallel
   const [
@@ -36,6 +41,7 @@ export async function GET(req: NextRequest) {
     launchesToday,
     recentLaunches,
     topTokens,
+    pons,
   ] = await Promise.all([
     db.collection(COLLECTIONS.AGENTS).countDocuments({
       isTokenized: true,
@@ -47,23 +53,14 @@ export async function GET(req: NextRequest) {
     db.collection(COLLECTIONS.AGENTS).countDocuments({
       tokenLaunchStatus: { $in: ['queued', 'launching'] },
     }),
-    (() => {
-      const monthStart = new Date();
-      monthStart.setDate(1);
-      monthStart.setHours(0, 0, 0, 0);
-      return db.collection(COLLECTIONS.ACTIVITY).countDocuments({
-        type: 'AgentTokenLaunched',
-        createdAt: { $gte: monthStart },
-      });
-    })(),
-    (() => {
-      const todayStart = new Date();
-      todayStart.setHours(0, 0, 0, 0);
-      return db.collection(COLLECTIONS.ACTIVITY).countDocuments({
-        type: 'AgentTokenLaunched',
-        createdAt: { $gte: todayStart },
-      });
-    })(),
+    db.collection(COLLECTIONS.ACTIVITY).countDocuments({
+      type: 'AgentTokenLaunched',
+      createdAt: { $gte: monthStart },
+    }),
+    db.collection(COLLECTIONS.ACTIVITY).countDocuments({
+      type: 'AgentTokenLaunched',
+      createdAt: { $gte: todayStart },
+    }),
     db.collection(COLLECTIONS.TOKEN_LAUNCHES)
       .find({ launchType: 'agent-token' })
       .sort({ createdAt: -1 })
@@ -75,6 +72,7 @@ export async function GET(req: NextRequest) {
       .sort({ tokenLaunchedAt: -1 })
       .limit(50)
       .toArray(),
+    ponsAdminStats(db, monthStart, todayStart),
   ]);
 
   // Get wallet balance + revenue data
@@ -83,6 +81,8 @@ export async function GET(req: NextRequest) {
   let claimablePositions: any[] = [];
   let perTokenFees: Array<{ name: string; symbol: string; mintAddress: string; lifetimeFees: number }> = [];
 
+  let revenueError: string | null = null;
+  let totalClaimable = 0;
   try {
     const bags = createAgentBagsClient();
     if (bags) {
@@ -91,6 +91,7 @@ export async function GET(req: NextRequest) {
 
       // Fetch claimable positions for the launch wallet
       claimablePositions = await bags.getClaimablePositions();
+      totalClaimable = Number(claimablePositions.reduce((sum, p) => sum + claimableLamports(p), 0n)) / 1e9;
 
       // Fetch lifetime fees for each launched token (cap at 20 to avoid timeout)
       const tokensToCheck = topTokens.slice(0, 20);
@@ -110,34 +111,29 @@ export async function GET(req: NextRequest) {
         .map(r => r.value)
         .sort((a, b) => b.lifetimeFees - a.lifetimeFees);
     }
+    else { revenueError = 'Solana fee wallet is not configured.'; }
   } catch {
-    walletBalance = null;
+    revenueError = 'Solana fee data is unavailable. Try again.';
   }
 
   const totalLifetimeFees = perTokenFees.reduce((sum, t) => sum + t.lifetimeFees, 0);
-  // Sum claimable from positions — SDK returns lamports in various fields
-  const totalClaimable = claimablePositions.reduce((sum: number, p: any) => {
-    try {
-      const vp = Number(p.virtualPoolClaimableLamportsUserShare || p.virtualPoolClaimableAmount || 0);
-      const dp = Number(p.dammPoolClaimableLamportsUserShare || p.dammPoolClaimableAmount || 0);
-      return sum + (vp + dp) / 1e9; // lamports -> SOL
-    } catch { return sum; }
-  }, 0);
   const monthlyCap = parseInt(process.env.AGENT_LAUNCH_MONTHLY_CAP || '50', 10);
 
   return NextResponse.json({
     stats: {
-      totalLaunched,
-      totalFailed,
-      totalQueued,
-      launchesThisMonth,
-      launchesToday,
+      totalLaunched: totalLaunched + pons.totalLaunched,
+      totalFailed: totalFailed + pons.totalFailed,
+      totalQueued: totalQueued + pons.totalQueued,
+      launchesThisMonth: launchesThisMonth + pons.launchesThisMonth,
+      launchesToday: launchesToday + pons.launchesToday,
+      byChain: { solana: totalLaunched, robinhood: pons.totalLaunched },
       monthlyCap,
       monthlyRemaining: Math.max(0, monthlyCap - launchesThisMonth),
       walletBalance: walletBalance !== null ? parseFloat(walletBalance.toFixed(4)) : null,
       walletAddress,
     },
     revenue: {
+      error: revenueError,
       totalLifetimeFees: parseFloat(totalLifetimeFees.toFixed(6)),
       totalClaimable: parseFloat(totalClaimable.toFixed(6)),
       claimablePositions: claimablePositions.length,
@@ -147,7 +143,9 @@ export async function GET(req: NextRequest) {
         bagsUrl: `https://bags.fm/${t.mintAddress}`,
       })),
     },
-    recentLaunches: recentLaunches.map(l => ({
+    recentLaunches: [...pons.recentLaunches, ...recentLaunches.map(l => ({
+      chain: 'Solana',
+      tradeUrl: l.mintAddress ? `https://bags.fm/${l.mintAddress}` : null,
       id: l._id.toString(),
       agentName: l.agentName,
       tokenSymbol: l.tokenSymbol,
@@ -157,15 +155,17 @@ export async function GET(req: NextRequest) {
       error: l.error || null,
       createdAt: l.createdAt,
       bagsUrl: l.mintAddress ? `https://bags.fm/${l.mintAddress}` : null,
-    })),
-    tokenizedAgents: topTokens.map(a => ({
+    }))].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()).slice(0, 20),
+    tokenizedAgents: [...pons.recentLaunches.map(l => ({ id: l.agentId, name: l.agentName, tokenSymbol: l.tokenSymbol, mintAddress: l.mintAddress, launchedAt: l.createdAt, chain: l.chain, tradeUrl: l.tradeUrl })), ...topTokens.map(a => ({
+      chain: 'Solana',
+      tradeUrl: `https://bags.fm/${a.tokenMintAddress}`,
       id: a._id.toString(),
       name: a.name,
       tokenSymbol: a.tokenSymbol,
       mintAddress: a.tokenMintAddress,
       launchedAt: a.tokenLaunchedAt,
       bagsUrl: `https://bags.fm/${a.tokenMintAddress}`,
-    })),
+    }))],
   });
 }
 
@@ -313,61 +313,10 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ error: 'Agent Bags client not configured' }, { status: 503 });
       }
 
-      // Get claimable positions
-      const positions = await bags.getClaimablePositions();
-      if (!positions || positions.length === 0) {
-        return NextResponse.json({ message: 'No claimable positions found', claimed: 0 });
-      }
-
-      // Get balance before claiming
-      const balanceBefore = await bags.getBalance();
-
-      // Claim each position
-      let claimed = 0;
-      let failed = 0;
-      const errors: string[] = [];
-
-      for (const position of positions) {
-        try {
-          // Check if position has anything to claim
-          const vp = Number(position.virtualPoolClaimableLamportsUserShare || position.virtualPoolClaimableAmount || 0);
-          const dp = Number(position.dammPoolClaimableLamportsUserShare || position.dammPoolClaimableAmount || 0);
-          if (vp + dp <= 0) continue;
-
-          const claimTxs = await bags.sdk.fee.getClaimTransaction(bags.keypair.publicKey, position);
-
-          for (const tx of claimTxs) {
-            tx.partialSign(bags.keypair);
-            const sig = await bags.sdk.state.getConnection().sendRawTransaction(tx.serialize(), {
-              skipPreflight: true,
-              maxRetries: 3,
-            });
-            await bags.sdk.state.getConnection().confirmTransaction(sig, 'confirmed');
-            logger.info(`[ADMIN-CLAIM] Claimed position ${position.baseMint}: ${sig}`);
-          }
-          claimed++;
-        } catch (err: any) {
-          failed++;
-          errors.push(`${position.baseMint}: ${err.message}`);
-          logger.error(`[ADMIN-CLAIM] Failed to claim ${position.baseMint}:`, err.message);
-        }
-      }
-
-      // Get balance after claiming
-      const balanceAfter = await bags.getBalance();
-      const gained = balanceAfter - balanceBefore;
-
-      return NextResponse.json({
-        message: `Claimed ${claimed} position(s)${failed > 0 ? `, ${failed} failed` : ''}`,
-        claimed,
-        failed,
-        solGained: parseFloat(gained.toFixed(6)),
-        balanceBefore: parseFloat(balanceBefore.toFixed(4)),
-        balanceAfter: parseFloat(balanceAfter.toFixed(4)),
-        errors: errors.length > 0 ? errors : undefined,
-      });
-    } catch (err: any) {
-      return NextResponse.json({ error: err.message }, { status: 500 });
+      const result = await claimAgentFees(bags);
+      return NextResponse.json(result, { status: result.failed && !result.claimed ? 502 : 200 });
+    } catch {
+      return NextResponse.json({ error: 'Solana fee claims are unavailable. Refresh balances and try again.' }, { status: 503 });
     }
   }
 

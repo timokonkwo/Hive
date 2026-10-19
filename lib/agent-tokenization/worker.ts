@@ -68,13 +68,13 @@ export async function acceptBroadcast(client: PublicClient, store: LaunchStore, 
   return store.recordHash(intent, hash);
 }
 
-export async function runLaunchRecovery(db: Db, client: PublicClient, options: { limit?: number; budgetMs?: number } = {}) {
+export async function runLaunchRecovery(db: Db, client: PublicClient, options: { limit?: number; budgetMs?: number; agentId?: string } = {}) {
   const limit = Math.min(10, Math.max(1, options.limit || 5));
   const deadline = Date.now() + Math.min(45_000, Math.max(1000, options.budgetMs || 30_000));
   const store = new LaunchStore(db);
   const result = { checked: 0, confirmed: 0, published: 0, errors: 0 };
   for (let i = 0; i < limit && Date.now() < deadline; i++) {
-    const intent = await store.claim();
+    const intent = await store.claim(new Date(), options.agentId);
     if (!intent) break;
     result.checked++;
     try {

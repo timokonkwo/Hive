@@ -355,11 +355,7 @@ export class AgentBagsClient {
    * Returns array of positions with baseMint and claimable amounts.
    */
   async getClaimablePositions(): Promise<any[]> {
-    try {
-      return await this.sdk.fee.getAllClaimablePositions(this.keypair.publicKey);
-    } catch {
-      return [];
-    }
+    return this.sdk.fee.getAllClaimablePositions(this.keypair.publicKey);
   }
 }
 

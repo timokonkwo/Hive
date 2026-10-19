@@ -1,3 +1,4 @@
+import { readAssociation } from '@/lib/agent-tokenization/association';
 import { NextRequest, NextResponse } from 'next/server';
 import { getDb, COLLECTIONS } from '@/lib/db';
 import { verifyAdmin } from '@/lib/admin-auth';
@@ -67,7 +68,8 @@ export async function GET(request: NextRequest) {
         capabilities: a.capabilities || [],
         registrationMethod: a.registrationMethod || 'unknown',
         tasksCompleted: a.tasksCompleted || 0,
-        isTokenized: !!a.isTokenized,
+        ponsToken: readAssociation(a.ponsToken),
+        isTokenized: !!a.isTokenized || !!readAssociation(a.ponsToken),
         tokenLaunchStatus: a.tokenLaunchStatus || null,
         tokenSymbol: a.tokenSymbol || null,
         tokenMintAddress: a.tokenMintAddress || null,

@@ -37,10 +37,12 @@ export function LaunchRecovery({ launch,enabled,connected,review,cancelDraft,res
   const hash=launch.cancellationHash||launch.transactionHash;
   const managed=launch.mode==='managed';
   const unsigned=managed&&!hash;
+  const confirming=launch.phase==='confirming';
   return <div className={styles.review}>
     <div className={styles.pending} role="status">
       {!terminal&&!draft&&<Loader2 size={26} className={styles.spinner} aria-hidden="true"/>}
       <h3>{terminal?(launch.phase==='cancelled'?'Launch cancelled':'Launch transaction reverted'):draft?'Unfinished launch':launch.cancellationHash?'Confirming cancellation…':hash?'Confirming your launch…':'Your pending launch'}</h3>
+      {confirming&&<p className={styles.hint}>Waiting for network confirmation.</p>}
       <p className={styles.hint}>Wallet · {shortAddress(launch.signer)}</p>
       {hash&&<a href={explorerTransactionUrl(hash)} target="_blank" rel="noopener noreferrer">View transaction<ArrowUpRight size={15} aria-hidden="true"/></a>}
     </div>
@@ -54,7 +56,7 @@ export function LaunchRecovery({ launch,enabled,connected,review,cancelDraft,res
             {unsigned ? <>
               <button type="button" className={styles.secondary} disabled={!enabled} onClick={()=>review('resume')}>Review launch</button>
               <button type="button" className={styles.secondary} onClick={cancelDraft}>Discard review</button>
-            </> : <button type="button" className={styles.secondary} onClick={retry}>Retry submission</button>}
+            </> : !confirming&&<button type="button" className={styles.secondary} onClick={retry}>Retry submission</button>}
           </> : <>
           {!launch.cancellationHash&&<button type="button" className={styles.secondary} disabled={!enabled} onClick={()=>review('resume')}>Review launch</button>}
           <button type="button" className={styles.secondary} onClick={()=>review('cancel')}>{launch.cancellationHash?'Review cancellation':'Cancel launch'}</button>

@@ -15,8 +15,8 @@
 .agentToken p { display: flex; align-items: baseline; flex-wrap: wrap; gap: 8px 16px; margin: 0; }
 .agentToken strong { font-size: 18px; font-weight: 500; overflow-wrap: anywhere; }
 .agentToken span { color: var(--muted); font-size: 12px; }
-.agentToken a { display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-height: 44px; padding: 10px 14px; border: 1px solid var(--rule); border-radius: 6px; font-size: 13px; }
-.agentToken a:hover { background: var(--soft); }
+.agentToken a { background: var(--accent); color: var(--accent-ink); font-weight: 600; display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-height: 44px; padding: 10px 14px; border: 1px solid var(--rule); border-radius: 6px; font-size: 13px; }
+.agentToken a:hover { filter: brightness(.94); }
 .agentToken a:focus-visible { outline: 2px solid var(--accent-text); outline-offset: 3px; }
 .layout { display: grid; grid-template-columns: minmax(0, 1fr) 290px; column-gap: 56px; align-items: start; }
 .service { padding-top: 32px; min-width: 0; }

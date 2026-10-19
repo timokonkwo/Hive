@@ -2,6 +2,9 @@
 import React, { useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import { LaunchDialog } from '../../components/redesign/tokenization/LaunchDialog';
+import foundation from '../../components/redesign/foundation.module.css';
+import { AgentsPanel } from '../../components/redesign/admin/Records';
+import { AgentToken } from '../../components/redesign/profile/AgentToken';
 import { profilePreview } from '../../lib/agent-tokenization/metadata';
 
 const managedSigner='0x31A9Fb923F1bcB2cEb1221dbdc06B94A6a749De2';
@@ -73,9 +76,12 @@ const request=async(url,init)=>{
   throw Error('Unexpected fixture request: '+url);
 };
 f.confirm=()=>{f.saved={...f.saved,phase:'confirmed',token:{chainId:4663,address:token,symbol:'RESEARCH',transactionHash:hash}};};
+const noop=()=>{};
+const rows=[{id,name:'Sage Agent',isVerified:true,ponsToken:{chainId:4663,address:token,symbol:'SAGE',transactionHash:hash}},{id:'a'.repeat(24),name:'Untokenized agent',isVerified:false}];
 function Fixture(){
   const[role,setRole]=useState(null);
-  return <><button onClick={event=>{event.currentTarget.focus();setRole('owner');}}>Owner tokenize</button><button onClick={event=>{event.currentTarget.focus();setRole('admin');}}>Admin tokenize</button>
-    {role&&<LaunchDialog agentId={id} role={role} request={request} close={()=>setRole(null)}/>}</>;
+  return <div className={foundation.surface}><AgentToken token={{chainId:4663,address:token,symbol:'RESEARCH',transactionHash:hash}}/><button onClick={event=>{event.currentTarget.focus();setRole('owner');}}>Owner tokenize</button><button onClick={event=>{event.currentTarget.focus();setRole('admin');}}>Admin tokenize</button>
+    <AgentsPanel agents={rows} total={2} loading={false} search="" onSearch={noop} verified="all" onVerified={noop} page={1} onPage={noop} sort="name" order="asc" onSort={noop} editing={null} value="" onValue={noop} onEdit={noop} onSave={noop} onToggle={noop} onLaunch={()=>setRole('admin')} onDelete={noop}/>
+    {role&&<LaunchDialog agentId={id} role={role} request={request} close={()=>setRole(null)}/>}</div>;
 }
 createRoot(document.getElementById('root')).render(<Fixture/>);

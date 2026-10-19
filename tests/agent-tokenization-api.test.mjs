@@ -19,6 +19,8 @@ test('status authenticates both roles and returns only safe recovery fields', as
     'next/server': next, '@/lib/db': { getDb: async () => ({}) }, '@/lib/agent-tokenization/access': access,
     '@/lib/agent-tokenization/store': { LaunchStore: class { async current() { reads++; return intent; } } },
     '@/lib/agent-tokenization/release': { launchesEnabled: () => false },
+    '@/lib/agent-tokenization/worker': { runLaunchRecovery: async () => {} },
+    viem: { http: () => '', createPublicClient: () => ({}) },
     '@/lib/rate-limit': { checkRateLimit: () => ({ allowed }), getClientIp: () => 'fixture', RATE_LIMITS: { READ: {} } },
   });
   assert.equal((await route.GET(request('owner'), params(agentId))).status, 401);
@@ -198,4 +200,26 @@ test('launch capability requires reviewed code, recovery and image storage confi
   // The tooling loader uses CommonJS exports: substitute a reviewed manifest only inside this test.
   release.reviewedLaunchRelease={reviewed:true};assert.equal(release.launchesEnabled(),true);
   for(const key of keys){const value=process.env[key];delete process.env[key];assert.equal(release.launchesEnabled(),false,key);process.env[key]=value;}
+});
+
+test('status recovery is authenticated, agent scoped, disabled by default and rereads the result', async t => {
+ const before=process.env.PONS_RECONCILIATION_ENABLED;
+ t.after(()=>{if(before===undefined)delete process.env.PONS_RECONCILIATION_ENABLED;else process.env.PONS_RECONCILIATION_ENABLED=before;});
+ let denied=true,runs=0,reads=0,intent={...intentFixture(),phase:'confirming'};
+ const route=load('../app/api/agents/[address]/tokenization/status/route.ts',{
+  'next/server':next,'@/lib/db':{getDb:async()=>({})},
+  '@/lib/agent-tokenization/access':{authorizeTokenization:async()=>denied?Response.json({}, {status:403}):null},
+  '@/lib/agent-tokenization/store':{LaunchStore:class{async current(){reads++;return intent;}}},
+  '@/lib/agent-tokenization/release':{launchesEnabled:()=>true},
+  '@/lib/agent-tokenization/worker':{runLaunchRecovery:async(_db,_client,options)=>{assert.equal(options.agentId,agentId);assert.equal(options.limit,1);runs++;intent={...intent,phase:'confirmed',projected:true};}},
+  viem:{http:()=>'',createPublicClient:()=>({})},
+  '@/lib/rate-limit':{checkRateLimit:()=>({allowed:true}),getClientIp:()=>'',RATE_LIMITS:{READ:{}}},
+ });
+ process.env.PONS_RECONCILIATION_ENABLED='true';
+ assert.equal((await route.GET(request('admin'),params(agentId))).status,403);assert.equal(reads,0);assert.equal(runs,0);
+ denied=false;delete process.env.PONS_RECONCILIATION_ENABLED;
+ assert.equal((await (await route.GET(request('admin'),params(agentId))).json()).launch.phase,'confirming');assert.equal(runs,0);
+ process.env.PONS_RECONCILIATION_ENABLED='true';
+ assert.equal((await (await route.GET(request('admin'),params(agentId))).json()).launch.phase,'confirmed');assert.equal(runs,1);
+ await route.GET(request('admin'),params(agentId));assert.equal(runs,1);
 });

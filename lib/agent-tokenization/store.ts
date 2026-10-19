@@ -179,8 +179,9 @@ export class LaunchStore {
     return result;
   }
 
-  async claim(now = new Date()) {
-    const query: Filter<LaunchIntent> = { chainId: PONS_CHAIN_ID, $and: [
+  async claim(now = new Date(), agentId?: string) {
+    if (agentId !== undefined && !/^[a-f0-9]{24}$/i.test(agentId)) throw Error('Invalid recovery agent.');
+    const query: Filter<LaunchIntent> = { chainId: PONS_CHAIN_ID, ...(agentId ? { agentId: agentId.toLowerCase() } : {}), $and: [
       { $or: [{ mode: { $ne: 'managed' } }, { managedSubmission: { $exists: true } }] },
       { $or: [{ phase: { $in: ['awaiting-signature', 'submitted', 'confirming'] } }, { phase: 'confirmed', projected: { $ne: true } }] },
       { $or: [{ nextCheckAt: { $lte: now } }, { nextCheckAt: { $exists: false } }] },
