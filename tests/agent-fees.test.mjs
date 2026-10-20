@@ -10,7 +10,7 @@ function fixture(){
  const expiry={blockhash,lastValidBlockHeight:123};let sent=0;
  const bags={keypair,getClaimablePositions:async()=>[{baseMint:mint,totalClaimableLamportsUserShare:'1000000',virtualPoolClaimableLamportsUserShare:0}],
   sdk:{bagsApiClient:{post:async(path,body)=>{assert.equal(path,'/token-launch/claim-txs/v3');assert.deepEqual(body,{feeClaimer:keypair.publicKey.toBase58(),tokenMint:mint});return[{tx:bs58.encode(tx.serialize()),blockhash:expiry}];}}},
-  connection:{sendRawTransaction:async(bytes,options)=>{assert.equal(options.skipPreflight,false);const signed=web3.VersionedTransaction.deserialize(bytes);assert.ok(signed.signatures[0].some(v=>v!==0));assert.equal(signed.message.recentBlockhash,blockhash);sent++;return'signature';},confirmTransaction:async(strategy,commitment)=>{assert.deepEqual(strategy,{signature:'signature',...expiry});assert.equal(commitment,'confirmed');return{value:{err:null}};}}};
+  connection:{sendRawTransaction:async(bytes,options)=>{assert.equal(options.skipPreflight,false);const signed=web3.VersionedTransaction.deserialize(bytes);assert.ok(signed.signatures[0].some(v=>v!==0));assert.equal(signed.message.recentBlockhash,blockhash);sent++;return'signature';},confirmTransaction:async(strategy,commitment)=>{assert.ok(strategy.signature.length>60);assert.deepEqual({blockhash:strategy.blockhash,lastValidBlockHeight:strategy.lastValidBlockHeight},expiry);assert.equal(commitment,'confirmed');return{value:{err:null}};}}};
  return{bags,expiry,mint,sent:()=>sent};
 }
 test('fee amounts include vault shares and reject unknown balances',()=>{
@@ -32,4 +32,13 @@ test('an API outage is not treated as zero fees and empty transaction lists are 
 });
 test('expiry mismatch rejects before broadcast',async()=>{
  const f=fixture();f.expiry.blockhash=web3.Keypair.generate().publicKey.toBase58();const r=await claimAgentFees(f.bags);assert.equal(r.failed,1);assert.equal(f.sent(),0);
+});
+test('a journal write failure prevents signing results from being broadcast',async()=>{
+ const f=fixture();const result=await claimAgentFees(f.bags,{beforeSend:async()=>{throw Error('Storage unavailable');},settled:async()=>assert.fail('Not submitted')});
+ assert.equal(f.sent(),0);assert.equal(result.failed,1);assert.equal(result.transactions.length,0);
+});
+test('response loss retains the locally computed signature for recovery',async()=>{
+ const f=fixture();let saved;f.bags.connection.sendRawTransaction=async()=>{assert.ok(saved);throw Error('Connection lost');};
+ const result=await claimAgentFees(f.bags,{beforeSend:async tx=>{saved={...tx};},settled:async()=>assert.fail('Not confirmed')});
+ assert.equal(result.transactions[0].signature,saved.signature);assert.equal(result.transactions[0].confirmed,false);
 });

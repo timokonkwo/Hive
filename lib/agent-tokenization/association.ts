@@ -12,5 +12,6 @@ export function readAssociation(value: unknown): TokenAssociation | null {
     address: token.address,
     symbol: typeof token.symbol === 'string' ? token.symbol.trim() : '',
     transactionHash: token.transactionHash,
+    ...(typeof token.launchedAt === 'string' && Number.isFinite(Date.parse(token.launchedAt)) ? { launchedAt: token.launchedAt } : {}),
   };
 }

@@ -1,5 +1,6 @@
 import { ponsAdminStats } from '@/lib/agent-tokenization/admin-stats';
-import { claimableLamports, claimAgentFees } from '@/lib/agent-fees';
+import { claimableLamports } from '@/lib/agent-fees';
+import { feeClaimStatus, runFeeClaim } from '@/lib/agent-fee-claims';
 import { legacyAgentLaunchesEnabled, legacyLaunchMessage } from '@/lib/agent-tokenization/legacy';
 import { verifyAdmin } from '@/lib/admin-auth';
 import { NextRequest, NextResponse } from 'next/server';
@@ -29,6 +30,13 @@ export async function GET(req: NextRequest) {
   }
 
   const db = await getDb();
+  if (new URL(req.url).searchParams.get('claimStatus') === '1') {
+    try {
+      const bags = createAgentBagsClient();
+      if (!bags) return NextResponse.json({ error: 'Solana fee wallet is not configured.' }, { status: 503 });
+      return NextResponse.json({ claim: await feeClaimStatus(db, bags) }, { headers: { 'Cache-Control': 'private, no-store' } });
+    } catch { return NextResponse.json({ error: 'Claim status is unavailable. Try again.' }, { status: 503 }); }
+  }
   const monthStart = new Date(); monthStart.setUTCDate(1); monthStart.setUTCHours(0, 0, 0, 0);
   const todayStart = new Date(); todayStart.setUTCHours(0, 0, 0, 0);
 
@@ -79,10 +87,11 @@ export async function GET(req: NextRequest) {
   let walletBalance: number | null = null;
   let walletAddress: string | null = null;
   let claimablePositions: any[] = [];
-  let perTokenFees: Array<{ name: string; symbol: string; mintAddress: string; lifetimeFees: number }> = [];
+  let perTokenFees: Array<{ name: string; symbol: string; mintAddress: string; lifetimeFees: number | null }> = [];
 
   let revenueError: string | null = null;
-  let totalClaimable = 0;
+  let totalClaimable: number | null = null;
+  let lifetimeComplete = false;
   try {
     const bags = createAgentBagsClient();
     if (bags) {
@@ -106,17 +115,18 @@ export async function GET(req: NextRequest) {
           };
         })
       );
-      perTokenFees = feeResults
-        .filter((r): r is PromiseFulfilledResult<typeof perTokenFees[0]> => r.status === 'fulfilled')
-        .map(r => r.value)
-        .sort((a, b) => b.lifetimeFees - a.lifetimeFees);
+      lifetimeComplete = topTokens.length <= 20 && feeResults.every(r => r.status === 'fulfilled');
+      perTokenFees = feeResults.map((r, index) => r.status === 'fulfilled' ? r.value : {
+        name: tokensToCheck[index].name, symbol: tokensToCheck[index].tokenSymbol,
+        mintAddress: tokensToCheck[index].tokenMintAddress, lifetimeFees: null,
+      }).sort((a, b) => (b.lifetimeFees ?? -1) - (a.lifetimeFees ?? -1));
     }
     else { revenueError = 'Solana fee wallet is not configured.'; }
   } catch {
     revenueError = 'Solana fee data is unavailable. Try again.';
   }
 
-  const totalLifetimeFees = perTokenFees.reduce((sum, t) => sum + t.lifetimeFees, 0);
+  const totalLifetimeFees = perTokenFees.reduce((sum, t) => sum + (t.lifetimeFees ?? 0), 0);
   const monthlyCap = parseInt(process.env.AGENT_LAUNCH_MONTHLY_CAP || '50', 10);
 
   return NextResponse.json({
@@ -134,12 +144,12 @@ export async function GET(req: NextRequest) {
     },
     revenue: {
       error: revenueError,
-      totalLifetimeFees: parseFloat(totalLifetimeFees.toFixed(6)),
-      totalClaimable: parseFloat(totalClaimable.toFixed(6)),
-      claimablePositions: claimablePositions.length,
+      feesTruncated: topTokens.length > 20,
+      totalLifetimeFees: lifetimeComplete ? parseFloat(totalLifetimeFees.toFixed(6)) : null,
+      totalClaimable: totalClaimable === null ? null : parseFloat(totalClaimable.toFixed(9)),
+      claimablePositions: totalClaimable === null ? null : claimablePositions.length,
       perTokenFees: perTokenFees.map(t => ({
         ...t,
-        lifetimeFees: parseFloat(t.lifetimeFees.toFixed(6)),
         bagsUrl: `https://bags.fm/${t.mintAddress}`,
       })),
     },
@@ -155,7 +165,7 @@ export async function GET(req: NextRequest) {
       error: l.error || null,
       createdAt: l.createdAt,
       bagsUrl: l.mintAddress ? `https://bags.fm/${l.mintAddress}` : null,
-    }))].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()).slice(0, 20),
+    }))].sort((a, b) => (b.createdAt ? new Date(b.createdAt).getTime() : 0) - (a.createdAt ? new Date(a.createdAt).getTime() : 0)).slice(0, 20),
     tokenizedAgents: [...pons.recentLaunches.map(l => ({ id: l.agentId, name: l.agentName, tokenSymbol: l.tokenSymbol, mintAddress: l.mintAddress, launchedAt: l.createdAt, chain: l.chain, tradeUrl: l.tradeUrl })), ...topTokens.map(a => ({
       chain: 'Solana',
       tradeUrl: `https://bags.fm/${a.tokenMintAddress}`,
@@ -313,8 +323,9 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ error: 'Agent Bags client not configured' }, { status: 503 });
       }
 
-      const result = await claimAgentFees(bags);
-      return NextResponse.json(result, { status: result.failed && !result.claimed ? 502 : 200 });
+      if (typeof body.requestId !== 'string' || !/^[a-f0-9-]{36}$/i.test(body.requestId)) return NextResponse.json({ error: 'Invalid fee claim request.' }, { status: 400 });
+      const result = await runFeeClaim(await getDb(), bags, body.requestId);
+      return NextResponse.json({ claim: result }, { status: result?.pending ? 202 : 200, headers: { 'Cache-Control': 'private, no-store' } });
     } catch {
       return NextResponse.json({ error: 'Solana fee claims are unavailable. Refresh balances and try again.' }, { status: 503 });
     }

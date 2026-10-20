@@ -8,6 +8,7 @@ import { privateKeyToAccount } from 'viem/accounts';
 import { PublicKey } from '@solana/web3.js';
 import bs58 from 'bs58';
 import { ObjectId } from 'mongodb';
+import { policy } from '../scripts/tokenization/modules.mjs';
 function load(path, imports = {}) { const code = ts.transpileModule(readFileSync(new URL(path, import.meta.url), 'utf8'), { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022, esModuleInterop: true } }).outputText; const m = { exports: {} }; new Function('require', 'module', 'exports', code)(n => { if (!(n in imports)) throw Error(n); return imports[n]; }, m, m.exports); return m.exports; }
 const message = load('../lib/agent-wallet-message.ts');
 const proof = load('../lib/agent-wallet-proof.ts', { crypto, viem, '@solana/web3.js': { PublicKey }, bs58, './agent-wallet-message': message });
@@ -22,7 +23,7 @@ test('proof consumption uses a unique key and fails on replay', async () => { co
 const settings = { agentId: id, name: 'Reader', revision: 1, robinhood: { address, verifiedAt: new Date().toISOString() }, solana: { address: null, verifiedAt: null } };
 test('wallet response preserves legacy unverified state and rejects wrong identity or malformed data', () => { assert.equal(model.readWallets(settings, id).robinhood.address, address); assert.equal(model.readWallets({ ...settings, robinhood: { address, verifiedAt: null } }, id).robinhood.verifiedAt, null); assert.throws(() => model.readWallets(settings, 'f'.repeat(24))); assert.throws(() => model.readWallets({ ...settings, revision: -1 }, id)); assert.throws(() => model.readWallets({ ...settings, solana: {} }, id)); });
 test('unknown-result reconciliation needs the exact address, verification and a newer revision', () => { const p = { network: 'robinhood', address, revision: 0 }; assert.ok(model.confirmed(settings, p)); assert.equal(model.confirmed(settings, { ...p, revision: 1 }), false); assert.equal(model.confirmed(settings, { ...p, address: 'wrong' }), false); assert.equal(model.confirmed({ ...settings, robinhood: { address, verifiedAt: null } }, p), false); assert.deepEqual(model.readPending(JSON.stringify(p)), p); assert.throws(() => model.readPending('broken')); });
-const common = { 'next/server': { NextResponse: { json: (d, o) => Response.json(d, o) } }, mongodb: { ObjectId }, '@/lib/rate-limit': { getClientIp: () => '', checkRateLimit: () => ({ allowed: true }), RATE_LIMITS: {} }, '@/lib/logger': { logger: { error() {} } } };
+const common = { '@/lib/agent-tokenization/association': load('../lib/agent-tokenization/association.ts', { './policy': policy }), 'next/server': { NextResponse: { json: (d, o) => Response.json(d, o) } }, mongodb: { ObjectId }, '@/lib/rate-limit': { getClientIp: () => '', checkRateLimit: () => ({ allowed: true }), RATE_LIMITS: {} }, '@/lib/logger': { logger: { error() {} } } };
 function route({ auth = true, matched = 1, agent = {}, badProof = false } = {}) {
   const calls = [], a = { id, name: 'Reader', ...agent };
   const db = { collection: () => ({ updateOne: async (q, u) => { calls.push({ q, u }); return { matchedCount: matched }; }, insertOne: async d => { calls.push({ consume: d }); } }) };

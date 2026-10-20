@@ -355,3 +355,32 @@ Merge validation: all other root test suites passed (374 passed, 3 optional
 database suites skipped; those database suites passed in the earlier isolated
 validation). Type checking, staged whitespace checks and credential-pattern
 checks passed; no environment files or secrets are included in the commit.
+
+### Token flow review follow-up — 2026-10-20
+
+- [x] Replace the repeated admin metric cards with a compact summary, launch list,
+  and Solana fee section. Trading fees by token remain visible without a dropdown.
+- [x] Show unavailable or stale balances explicitly; retain failed lifetime-fee
+  rows as unavailable and label the 20-token reporting limit when applicable.
+- [x] Persist each fee transaction signature before broadcasting. A wallet lease
+  prevents overlapping batches, and request IDs prevent duplicate submission.
+  Reconcile lost responses by signature, distinguishing pending, failed/expired,
+  and confirmed transactions. Preserve preparation failures alongside receipts.
+- [x] Align browser request timeouts with the server's confirmation budget, bound
+  each batch, provide pending spinners and explorer links, and refresh balances
+  after confirmation. No automatic write retries.
+- [x] Expose the verified Pons association in the owner API/tools page, replace
+  the tokenize action with the token/trade section, and preserve Solana links.
+- [x] Derive launch dates from the canonical receipt block. The backfill script
+  verifies saved transaction identity, finality and metadata before date updates;
+  it is read-only unless invoked with `--apply`.
+
+Validation: typecheck and targeted lint passed; 96 focused tests passed, with
+three optional MongoDB suites skipped. The complete root run passed 415 tests,
+with three skipped and three existing failed tests in the legacy security suite
+(removed-page references and outdated source assertions). Those files are
+unchanged from main. Browser fixtures passed at 320/390/768/1440 in both themes,
+including stale/unavailable data, duplicate clicks, lost responses and confirmed
+explorer links. The launch fixture also passed profile links, admin token state,
+wallet choice, editing, recovery, focus return and managed/connected signing flows.
+These are fixture checks; no live fee claim was signed or broadcast for validation.

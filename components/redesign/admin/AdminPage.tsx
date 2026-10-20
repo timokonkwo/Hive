@@ -1,9 +1,10 @@
 "use client";
+import { AgentTokensPanel } from "./AgentTokensPanel";
 import { LaunchDialog } from "../tokenization/LaunchDialog";
 import AnalyticsPage from '../analytics/AnalyticsPage';
 import { Select } from '@/components/redesign/Select';
 
-import React, { useState, useEffect, useCallback, useRef } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import { useAdminAccess } from '../AdminAccess';
 import { AppShell } from '../AppShell';
 import { Toaster } from 'sonner';
@@ -118,11 +119,6 @@ function AdminWorkspace() {
   const [repInputValue, setRepInputValue] = useState<string>("");
 
   // Token management state
-  const [tokenStats, setTokenStats] = useState<any>(null);
-  const [tokenStatsLoading, setTokenStatsLoading] = useState(false);
-  const [claimingFees, setClaimingFees] = useState(false);
-  const feeClaimBusy = useRef(false);
-  const [feeClaimResult, setFeeClaimResult] = useState<{ message: string; transactions: Array<{ signature: string; confirmed: boolean }>; errors: string[] } | null>(null);
   const [tokenLaunchModal, setTokenLaunchModal] = useState<{ id: string; name: string } | null>(null);
 
   // Roadmap management state
@@ -316,14 +312,6 @@ function AdminWorkspace() {
 
   useEffect(() => {
     if (activeTab === "feedback") fetchFeedback();
-    if (activeTab === "tokens") {
-      setTokenStatsLoading(true);
-      authFetch(`/api/admin/token-stats?address=${user?.wallet?.address}`)
-        .then(res => res.ok ? res.json() : null)
-        .then(data => { if (data) setTokenStats(data); })
-        .catch(() => {})
-        .finally(() => setTokenStatsLoading(false));
-    }
     if (activeTab === "roadmap") {
       setRoadmapLoading(true);
       authFetch('/api/roadmap')
@@ -1410,204 +1398,7 @@ function AdminWorkspace() {
         </ConfirmDialog>
       )}
 
-      {/* ── Tokens Tab ── */}
-      {activeTab === "tokens" && (
-        <div>
-          {tokenStatsLoading ? (
-            <div className="py-20 text-center"><Loader2 className="w-6 h-6 text-[var(--accent-text)] animate-spin mx-auto" /></div>
-          ) : tokenStats ? (
-            <div className="space-y-8">
-              {/* Stats Cards */}
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                <div className="bg-[var(--surface)] border border-[var(--rule)] p-4 rounded-lg text-center">
-                  <div className="text-2xl font-semibold  text-[var(--accent-text)]">{tokenStats.stats.totalLaunched}</div>
-                  <div className="text-xs text-[var(--muted)]   mt-1">Tokens Launched</div>
-                </div>
-                <div className="bg-[var(--surface)] border border-[var(--rule)] p-4 rounded-lg text-center">
-                  <div className="text-2xl font-semibold  text-[var(--accent-text)]">{tokenStats.stats.totalQueued}</div>
-                  <div className="text-xs text-[var(--muted)]   mt-1">Queued</div>
-                </div>
-                <div className="bg-[var(--surface)] border border-[var(--rule)] p-4 rounded-lg text-center">
-                  <div className="text-2xl font-semibold  text-[var(--danger)]">{tokenStats.stats.totalFailed}</div>
-                  <div className="text-xs text-[var(--muted)]   mt-1">Failed</div>
-                </div>
-                <div className="bg-[var(--surface)] border border-[var(--rule)] p-4 rounded-lg text-center">
-                  <div className="text-2xl font-semibold  text-[var(--accent-text)]">
-                    {tokenStats.stats.walletBalance !== null ? `${tokenStats.stats.walletBalance} SOL` : 'N/A'}
-                  </div>
-                  <div className="text-xs text-[var(--muted)]   mt-1">Wallet Balance</div>
-                </div>
-              </div>
-
-              <div className="flex flex-wrap gap-6 text-sm text-[var(--muted)]">
-                <span>Solana: {tokenStats.stats.byChain?.solana ?? tokenStats.stats.totalLaunched}</span>
-                <span>Robinhood: {tokenStats.stats.byChain?.robinhood ?? 0}</span>
-                <span>This month: {tokenStats.stats.launchesThisMonth}</span>
-                <span>Today: {tokenStats.stats.launchesToday}</span>
-              </div>
-
-              {/* Revenue Breakdown */}
-              <div className="bg-[var(--surface)] border border-[var(--rule)] rounded-lg overflow-hidden">
-                <div className="p-4 border-b border-[var(--rule)] flex items-center justify-between">
-                  <div>
-                    <h3 className="text-xs    text-[var(--accent-text)] font-semibold">Solana creator fees</h3>
-                    <p className="text-xs text-[var(--muted)]  mt-1">
-                      Fees earned by the Solana launch wallet.
-                      {tokenStats.stats.walletAddress && (
-                        <span className="ml-2 text-[var(--muted)]">Wallet: {tokenStats.stats.walletAddress.slice(0, 6)}...{tokenStats.stats.walletAddress.slice(-4)}</span>
-                      )}
-                    </p>
-                  </div>
-                  <button
-                    onClick={async () => {
-                      if (feeClaimBusy.current) return;
-                      feeClaimBusy.current = true;
-                      setClaimingFees(true);
-                      setFeeClaimResult(null);
-                      try {
-                        const res = await authFetch('/api/admin/token-stats', {
-                          method: 'POST',
-                          headers: { 'Content-Type': 'application/json' },
-                          body: JSON.stringify({ action: 'claim-fees', adminAddress: user?.wallet?.address }),
-                        });
-                        const data = await res.json();
-                        setFeeClaimResult({ message: data.message || data.error || 'Claim failed', transactions: data.transactions || [], errors: data.errors || [] });
-                        if (res.ok) {
-                          if (data.failed) toast.error(data.message);
-                          else toast.success(data.message || 'Fees claimed');
-                          // Refetch token stats to update revenue section
-                          authFetch(`/api/admin/token-stats?address=${user?.wallet?.address}`)
-                            .then(r => r.ok ? r.json() : null)
-                            .then(d => { if (d) setTokenStats(d); })
-                            .catch(() => {});
-                        } else {
-                          toast.error(data.error || 'Claim failed');
-                        }
-                      } catch (err: any) {
-                        toast.error(err.message);
-                      } finally {
-                        feeClaimBusy.current = false;
-                        setClaimingFees(false);
-                      }
-                    }}
-                    disabled={claimingFees}
-                    className={styles.tokenPrimary}
-                  >
-                    {claimingFees ? <Loader2 size={14} className="animate-spin" /> : null}
-                    Claim Fees
-                  </button>
-                </div>
-
-                {feeClaimResult && <div role="status" className="p-4 text-sm space-y-2">
-                  <p>{feeClaimResult.message}</p>
-                  {feeClaimResult.transactions.map((tx, index) => <a key={tx.signature} className={styles.rowActions} href={`https://solscan.io/tx/${encodeURIComponent(tx.signature)}`} target="_blank" rel="noopener noreferrer">{tx.confirmed ? 'Confirmed claim' : 'Check transaction'} {index + 1}<ExternalLink size={14}/></a>)}
-                  {feeClaimResult.errors.map(error => <p key={error} className="text-[var(--danger)] break-words">{error}</p>)}
-                </div>}
-                {tokenStats.revenue?.error && <p role="alert" className="p-4 text-sm text-[var(--danger)]">{tokenStats.revenue.error}</p>}
-                {/* Revenue Summary Cards */}
-                <div className="grid grid-cols-3 divide-x divide-zinc-800 border-b border-[var(--rule)]">
-                  <div className="p-4 text-center">
-                    <div className="text-xl font-semibold  text-[var(--accent-text)]">
-                      {tokenStats.revenue?.totalLifetimeFees?.toFixed(4) || '0'} SOL
-                    </div>
-                    <div className="text-xs text-[var(--muted)]   mt-1">Total Lifetime Fees</div>
-                  </div>
-                  <div className="p-4 text-center">
-                    <div className="text-xl font-semibold  text-[var(--accent-text)]">
-                      {tokenStats.revenue?.totalClaimable?.toFixed(4) || '0'} SOL
-                    </div>
-                    <div className="text-xs text-[var(--muted)]   mt-1">Claimable Now</div>
-                  </div>
-                  <div className="p-4 text-center">
-                    <div className="text-xl font-semibold  text-[var(--accent-text)]">
-                      {tokenStats.revenue?.claimablePositions || 0}
-                    </div>
-                    <div className="text-xs text-[var(--muted)]   mt-1">Fee Positions</div>
-                  </div>
-                </div>
-
-                {/* Per-Token Fee Breakdown */}
-                {tokenStats.revenue?.perTokenFees?.length > 0 && (
-                  <div className="p-4">
-                    <h4 className="text-xs    text-[var(--muted)] font-semibold mb-3">Per-Token Breakdown</h4>
-                    <div className="space-y-1.5">
-                      {tokenStats.revenue.perTokenFees.map((token: any) => (
-                        <div key={token.mintAddress} className="flex items-center justify-between p-2 bg-[var(--paper)] rounded hover:bg-[var(--paper)] transition-colors group">
-                          <div className="flex items-center gap-3 min-w-0">
-                            <span className="text-[var(--accent-text)] text-xs  font-semibold w-16 shrink-0">${token.symbol}</span>
-                            <span className="text-[var(--muted)] text-sm truncate">{token.name}</span>
-                          </div>
-                          <div className="flex items-center gap-3 shrink-0">
-                            <span className={`text-sm  font-semibold ${token.lifetimeFees > 0 ? 'text-[var(--accent-text)]' : 'text-[var(--muted)]'}`}>
-                              {token.lifetimeFees.toFixed(4)} SOL
-                            </span>
-                            <a
-                              href={token.bagsUrl}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="text-[var(--muted)] hover:text-[var(--accent-text)] transition-colors "
-                            >
-                              <ExternalLink size={12} />
-                            </a>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
-
-                {(!tokenStats.revenue?.perTokenFees || tokenStats.revenue.perTokenFees.length === 0) && (
-                  <div className="p-6 text-center text-[var(--muted)] text-sm ">No token fee data available yet</div>
-                )}
-              </div>
-
-              {/* Recent Launches */}
-              <div>
-                <h3 className="text-xs    text-[var(--muted)] font-semibold mb-4">Recent Launches</h3>
-                {tokenStats.recentLaunches.length === 0 ? (
-                  <div className="py-8 text-center text-[var(--muted)] text-sm ">No agent tokens launched yet</div>
-                ) : (
-                  <div className="space-y-2">
-                    {tokenStats.recentLaunches.map((launch: any) => (
-                      <div key={launch.id} className="bg-[var(--paper)] border border-[var(--rule)] rounded p-3 flex items-center justify-between gap-4">
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-center gap-2">
-                            <span className="text-[var(--ink)] text-sm font-medium">{launch.agentName}</span>
-                            <span className="text-[var(--accent-text)] text-xs ">${launch.tokenSymbol}</span>
-                            <span className={`px-1.5 py-0.5 text-xs font-semibold  rounded border ${
-                              launch.status === 'launched' ? 'bg-[var(--soft)] text-[var(--accent-text)] border-[var(--rule)]'
-                              : launch.status === 'failed' ? 'bg-[var(--danger-soft)] text-[var(--danger)] border-[var(--danger)]'
-                              : 'bg-[var(--soft)] text-[var(--accent-text)] border-[var(--rule)]'
-                            }`}>{launch.status} · {launch.chain || 'Solana'}</span>
-                          </div>
-                          {launch.mintAddress && (
-                            <code className="text-xs text-[var(--muted)] ">{launch.mintAddress.slice(0, 12)}...{launch.mintAddress.slice(-8)}</code>
-                          )}
-                          {launch.error && (
-                            <p className="text-xs text-[var(--danger)]  mt-1">{launch.error}</p>
-                          )}
-                        </div>
-                        <div className="flex items-center gap-2 shrink-0">
-                          <span className="text-xs text-[var(--muted)] ">
-                            {new Date(launch.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
-                          </span>
-                          {(launch.tradeUrl || launch.bagsUrl) && (
-                            <a href={launch.tradeUrl || launch.bagsUrl} aria-label={`Trade ${launch.tokenSymbol || launch.agentName} on ${launch.chain === 'Robinhood' ? 'Pons' : 'Bags'}`} target="_blank" rel="noopener noreferrer" className="text-[var(--accent-text)] hover:text-[var(--accent-text)] transition-colors">
-                              <ExternalLink size={14} />
-                            </a>
-                          )}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-            </div>
-          ) : (
-            <div className="py-12 text-center text-[var(--muted)] text-sm ">Failed to load token stats</div>
-          )}
-        </div>
-      )}
+      {activeTab === "tokens" && <AgentTokensPanel request={authFetch}/>}
 
       {/* ── Roadmap Tab ── */}
       {activeTab === "roadmap" && (

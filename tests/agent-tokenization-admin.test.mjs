@@ -10,8 +10,8 @@ const match=(row,query)=>Object.entries(query).every(([k,v])=>v&&typeof v==='obj
 test('Robinhood stats count confirmed launches once, respect UTC boundaries, omit drafts and never expose journal secrets',async()=>{
  const today=new Date('2026-10-20T00:00:00Z'),month=new Date('2026-10-01T00:00:00Z');
  const rows=[
-  {_id:'sage',agentId:'a'.repeat(24),chainId:4663,phase:'confirmed',active:true,token,preview:{metadata:{name:'Sage Agent'}},createdAt:new Date('2026-10-20T01:00:00Z'),managedSubmission:{ciphertext:'SECRET'}},
-  {_id:'older',agentId:'b'.repeat(24),chainId:4663,phase:'confirmed',token:{...token,address:'0x'+'2'.repeat(40)},createdAt:new Date('2026-09-30T23:59:00Z')},
+  {_id:'sage',agentId:'a'.repeat(24),chainId:4663,phase:'confirmed',active:true,token,preview:{metadata:{name:'Sage Agent'}},createdAt:new Date('2026-09-20T01:00:00Z'),launchedAt:new Date('2026-10-20T01:00:00Z'),managedSubmission:{ciphertext:'SECRET'}},
+  {_id:'older',agentId:'b'.repeat(24),chainId:4663,phase:'confirmed',token:{...token,address:'0x'+'2'.repeat(40)},createdAt:new Date('2026-09-20T01:00:00Z'),launchedAt:new Date('2026-09-30T23:59:00Z')},
   {chainId:4663,phase:'draft',active:true,createdAt:today},
   {chainId:4663,phase:'confirming',active:true,createdAt:today},
   {chainId:4663,phase:'reverted',active:false,createdAt:today},
@@ -52,10 +52,11 @@ test('admin totals combine both chains and fee failures remain failures with exp
   '@/lib/bags-agent':{createAgentBagsClient:()=>({getBalance:async()=>1,getWalletAddress:()=>'',getClaimablePositions:async()=>[]})},
   '@/lib/agent-tokenization/admin-stats':{ponsAdminStats:async()=>({totalLaunched:1,totalQueued:0,totalFailed:0,launchesThisMonth:1,launchesToday:1,recentLaunches:[]})},
   '@/lib/agent-tokenization/legacy':{legacyAgentLaunchesEnabled:()=>false},
-  '@/lib/agent-fees':{claimableLamports:()=>0n,claimAgentFees:async()=>{claims++;return{claimed:0,failed:1,error:'Could not confirm',transactions:[{signature:'test',confirmed:false}]};}},
+  '@/lib/agent-fees':{claimableLamports:()=>0n},
+  '@/lib/agent-fee-claims':{feeClaimStatus:async()=>null,runFeeClaim:async()=>{claims++;return{pending:true,confirmed:0,failed:0,transactions:[{signature:'test',confirmed:false}]};}},
  });
- const request=()=>new Request('https://hive.test/api',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({action:'claim-fees'})});
+ const request=()=>new Request('https://hive.test/api',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({action:'claim-fees',requestId:'00000000-0000-4000-8000-000000000001'})});
  assert.equal((await route.POST(request())).status,403);assert.equal(claims,0);authorized=true;
  const data=await(await route.GET(new Request('https://hive.test/api'))).json();assert.equal(data.stats.totalLaunched,3);assert.deepEqual(data.stats.byChain,{solana:2,robinhood:1});
- const response=await route.POST(request());assert.equal(response.status,502);assert.equal((await response.json()).transactions[0].confirmed,false);assert.equal(claims,1);
+ const response=await route.POST(request());assert.equal(response.status,202);assert.equal((await response.json()).claim.transactions[0].confirmed,false);assert.equal(claims,1);
 });

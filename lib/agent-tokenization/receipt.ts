@@ -98,5 +98,5 @@ export async function reconcileLaunchReceipt(client: PublicClient, expected: Lau
   // Recheck the block after the reads; never publish data from an observed reorg.
   if ((await client.getBlock({ blockNumber: receipt.blockNumber })).hash !== receipt.blockHash) return { state: 'confirming' };
   if (stateBlock && (await client.getBlock({ blockNumber: stateBlock.number! })).hash !== stateBlock.hash) return { state: 'confirming' };
-  return { state: 'confirmed', token: { chainId: PONS_CHAIN_ID, address: event.token, symbol, transactionHash: hash } };
+  return { state: 'confirmed', token: { chainId: PONS_CHAIN_ID, address: event.token, symbol, transactionHash: hash, ...(canonical.timestamp !== undefined ? { launchedAt: new Date(Number(canonical.timestamp) * 1000).toISOString() } : {}) } };
 }

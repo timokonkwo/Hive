@@ -34,6 +34,7 @@ export interface LaunchIntent {
   token?: TokenAssociation;
   tokenAddress?: string;
   projected?: boolean;
+  launchedAt?: Date;
   leaseId?: string;
   leaseUntil?: Date;
   nextCheckAt?: Date;
@@ -197,6 +198,7 @@ export class LaunchStore {
     const terminal = patch.phase === 'reverted' || patch.phase === 'cancelled';
     const updated = await this.intents.findOneAndUpdate({ _id: intent._id, revision: intent.revision, leaseId: intent.leaseId }, {
       $set: { ...patch, ...((terminal || patch.phase === 'confirmed') ? { managedPending: false } : {}), active: !terminal, updatedAt: now, nextCheckAt: new Date(now.getTime() + 60_000),
+        ...(patch.token?.launchedAt ? { launchedAt: new Date(patch.token.launchedAt) } : {}),
         ...(patch.token ? { tokenAddress: patch.token.address.toLowerCase(), projected: false } : {}) },
       $unset: { leaseId: '', leaseUntil: '', ...(!patch.lastError ? { lastError: '' as const } : {}) },
       $inc: { revision: 1 },

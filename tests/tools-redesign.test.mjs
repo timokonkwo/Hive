@@ -1,9 +1,10 @@
+import {policy} from '../scripts/tokenization/modules.mjs';
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
 import ts from 'typescript';
 function load(path,imports={}){const code=ts.transpileModule(readFileSync(new URL(path,import.meta.url),'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022}}).outputText;const m={exports:{}};new Function('require','module','exports',code)(n=>{if(!(n in imports))throw Error(n);return imports[n]},m,m.exports);return m.exports;}
-const task=load('../components/redesign/task/model.ts'),owner=load('../components/redesign/owner/model.ts',{'../task/model':task}),m=load('../components/redesign/tools/model.ts',{'../task/model':task,'../owner/model':owner});
+const task=load('../components/redesign/task/model.ts'),owner=load('../components/redesign/owner/model.ts',{'../task/model':task}),m=load('../components/redesign/tools/model.ts',{'../task/model':task,'../owner/model':owner,'@/lib/agent-tokenization/association':load('../lib/agent-tokenization/association.ts',{'./policy':policy})});
 const id='0123456789abcdef01234567',draft={name:'source_reader',description:'Read source reports with references.',endpoint:'https://example.com/read',price:'0.01',schema:'{"type":"object"}'};
 test('tools navigation accepts only implemented views',()=>{assert.equal(m.readTab('tokens'),'tokens');assert.equal(m.readTab('unknown'),'tools')});
 test('tool payload preserves per-call price including free tools and normalizes name',()=>{assert.equal(m.toolPayload({...draft,name:'Source Reader',price:'0'}).name,'Source_Reader');assert.equal(m.toolPayload(draft).costPerCall,.01)});
@@ -17,3 +18,9 @@ test('delivery reader preserves failure, unknown attempts and valid dates',()=>{
 test('token review validates symbol and image URL before launch',()=>{assert.deepEqual(m.tokenPayload('read',''),{tokenSymbol:'READ'});assert.throws(()=>m.tokenPayload('a',''));assert.throws(()=>m.tokenPayload('READ','http://example.com/image'));assert.throws(()=>m.tokenPayload('READ','https://u:p@example.com/image'))});
 test('conversion confirmation requires exact points, expected output and transaction signature',()=>{const d={success:true,pointsConverted:1000,hiveTokensTransferred:100,txSignature:'a'.repeat(88)};assert.equal(m.conversionResult(d,1000,10).amount,100);assert.throws(()=>m.conversionResult({...d,pointsConverted:2000},1000,10));assert.throws(()=>m.conversionResult({...d,hiveTokensTransferred:99},1000,10));assert.throws(()=>m.conversionResult({...d,txSignature:'bad'},1000,10))});
 test('writes never auto-retry and retain HTTP status for safe pre-launch rejection',async()=>{let count=0;await assert.rejects(m.write(async()=>{count++;throw Error('network')},'/api',{}));assert.equal(count,1);await assert.rejects(m.write(async()=>Response.json({error:'Rejected'},{status:400}),'/api',{}),e=>e instanceof m.WriteError&&e.status===400);await assert.rejects(m.write(async()=>new Response('bad',{status:200}),'/api',{}))});
+test('owner token view retains the verified Robinhood launch and existing Solana token',()=>{
+ const token={chainId:4663,address:'0x'+'1'.repeat(40),symbol:'SAGE',transactionHash:'0x'+'a'.repeat(64)};
+ const data={agent:{id,name:'Sage',ponsToken:token,tokenMintAddress:'1'.repeat(32),tokenLaunchStatus:'launched'}};
+ const result=m.readOwner(data);assert.deepEqual(result.ponsToken,token);assert.equal(result.token.mint,'1'.repeat(32));
+ assert.equal(m.readOwner({agent:{...data.agent,ponsToken:{...token,status:'confirming'}}}).ponsToken,null);
+});

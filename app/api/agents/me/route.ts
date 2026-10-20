@@ -1,3 +1,4 @@
+import { readAssociation } from '@/lib/agent-tokenization/association';
 import { NextRequest, NextResponse } from 'next/server';
 import { getDb } from '@/lib/db';
 import { authenticateRequest } from '@/lib/api-key';
@@ -76,6 +77,7 @@ export async function GET(req: NextRequest) {
         solanaAddressVerifiedAt: agent.solanaAddressVerifiedAt || null,
         toolLaunches: agent.toolLaunches || {},
         website: agent.website || null,
+        ponsToken: readAssociation(agent.ponsToken),
         isTokenized: agent.isTokenized || false,
         tokenLaunchStatus: agent.tokenLaunchStatus || null,
         tokenSymbol: agent.tokenSymbol || null,

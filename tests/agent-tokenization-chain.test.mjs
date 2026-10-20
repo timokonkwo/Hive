@@ -197,3 +197,8 @@ test('pruned historical state uses a pinned current state only after exact final
  assert.equal((await receipts.reconcileLaunchReceipt({...client,getBlock:async()=>({number:9n,hash}),readContract:async()=>{read++;}},f.expected,hash)).state,'confirming');assert.equal(read,0);
  await assert.rejects(receipts.reconcileLaunchReceipt({...client,readContract:async()=>{throw Error('RPC offline');}},f.expected,hash),/RPC offline/);
 });
+test('launch time comes from the canonical receipt block, not the latest block or draft',async()=>{
+ const f=receiptFixture();const timestamp=1792451028n;
+ const result=await receipts.reconcileLaunchReceipt({...f.client,getBlock:async({blockTag})=>({number:blockTag==='finalized'?20n:10n,hash,timestamp:blockTag?timestamp+3600n:timestamp})},f.expected,hash);
+ assert.equal(result.state,'confirmed');assert.equal(result.token.launchedAt,new Date(Number(timestamp)*1000).toISOString());
+});

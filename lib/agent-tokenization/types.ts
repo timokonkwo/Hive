@@ -16,6 +16,7 @@ export interface TokenAssociation {
   address: string;
   symbol: string;
   transactionHash: string;
+  launchedAt?: string;
 }
 
 export interface LaunchPreview {
