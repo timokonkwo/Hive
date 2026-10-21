@@ -1,3 +1,4 @@
+import { sessionPonsPreview } from '@/lib/agent-tokenization/session-access';
 import { managedDeployerStatus } from '@/lib/agent-tokenization/managed-signer';
 import { NextRequest, NextResponse } from 'next/server';
 import { ObjectId } from 'mongodb';
@@ -27,7 +28,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ addr
     if (denied) return denied;
     const agent = await db.collection('agents').findOne({ _id: new ObjectId(agentId) });
     if (!agent) return reply({ error: 'Agent not found.' }, 404);
-    return reply({ ...profilePreview(agentId, agent, role), signingEnabled: launchesEnabled(), ...(role === 'admin' ? { managedDeployer: managedDeployerStatus() } : {}) });
+    return reply({ ...await sessionPonsPreview(db, profilePreview(agentId, agent, role), req.nextUrl.searchParams.get('session') || undefined), signingEnabled: launchesEnabled(), ...(role === 'admin' ? { managedDeployer: managedDeployerStatus() } : {}) });
   } catch (error) {
     logger.error('[PONS] Preview unavailable', error);
     return reply({ error: 'Token details could not be loaded. Try again.' }, 503);

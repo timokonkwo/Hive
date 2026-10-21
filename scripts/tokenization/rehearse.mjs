@@ -34,7 +34,7 @@ try {
   const {token,curve,deployer,pairToken} = events[0].args;
   assert.equal(token.toLowerCase(),simulated.token.toLowerCase());assert.equal(curve.toLowerCase(),simulated.curve.toLowerCase());assert.equal(deployer.toLowerCase(),signer);assert.equal(pairToken,zeroAddress);
   const record = await client.readContract({address:policy.PONS_FACTORY,abi:abi.factoryAbi,functionName:'getLaunchedToken',args:[token]});
-  assert.equal(record.creatorFeeRecipient.toLowerCase(),preview.recipient.toLowerCase());assert.equal(record.creatorTaxBps,200);assert.equal(record.buybackEnabled,false);assert.equal(record.exists,true);
+  assert.equal(record.creatorFeeRecipient.toLowerCase(),preview.recipient.toLowerCase());assert.equal(record.creatorTaxBps,policy.creatorTaxBps(preview.feePolicyVersion));assert.equal(record.buybackEnabled,false);assert.equal(record.exists,true);
   const info = await client.readContract({address:token,abi:abi.tokenAbi,functionName:'getTokenInfo'});
   assert.equal(info[0].toLowerCase(),signer);assert.equal(info[1],choices.logoURI);assert.equal(info[2],preview.metadata.description);assert.deepEqual(info[3],candidate.params.socials);
   const balance = await client.readContract({address:token,abi:abi.tokenAbi,functionName:'balanceOf',args:[signer]});

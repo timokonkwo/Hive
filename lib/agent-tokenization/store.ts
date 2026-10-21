@@ -1,7 +1,7 @@
 import { randomBytes, randomUUID } from 'node:crypto';
 import { ObjectId, type Db, type Filter } from 'mongodb';
 import type { Hex } from 'viem';
-import { PONS_CHAIN_ID, feeRecipient, purchaseWei, sameAddress, validAddress, validHash, validTokenLogo } from './policy';
+import { PONS_CHAIN_ID, creatorTaxBps, feeRecipient, purchaseWei, sameAddress, validAddress, validHash, validTokenLogo } from './policy';
 import { packPrepared, unpackPrepared, type PreparedEnvelope, type PreparedLaunch } from './journal';
 import type { LaunchPreview, TokenAssociation } from './types';
 import type { ReviewChoices } from './authorization';
@@ -147,6 +147,7 @@ export class LaunchStore {
       || !sameAddress(candidate.from, intent.signer) || !sameAddress(transaction.from, intent.signer)
       || transaction.data !== candidate.data || transaction.value !== candidate.value || !sameAddress(transaction.to, candidate.to)
       || candidate.params.salt !== intent.salt || !sameAddress(candidate.params.creatorFeeRecipient, intent.preview.recipient || '')
+      || candidate.params.creatorTaxBps !== creatorTaxBps(intent.preview.feePolicyVersion)
       || candidate.params.name !== intent.preview.metadata.name || candidate.params.description !== intent.preview.metadata.description
       || candidate.params.socials.website !== intent.preview.metadata.socials.website
       || (intent.choices && (candidate.params.symbol !== intent.choices.symbol || candidate.budget !== purchaseWei(intent.choices.purchase)))

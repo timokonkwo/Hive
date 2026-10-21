@@ -30,8 +30,7 @@ try {
   await fresh();
   const sage=page.getByRole('row').filter({hasText:'Sage Agent'});
   assert.equal(await sage.getByRole('button',{name:'Tokenize',exact:true}).count(),0);
-  assert.equal(await sage.getByRole('button',{name:'View token',exact:true}).count(),1);
-  assert.equal(await sage.getByRole('link',{name:'SAGE · Robinhood'}).getAttribute('href'),'https://www.ponsfamily.com/launchpad/0x2222222222222222222222222222222222222222');
+  assert.equal(await sage.getByRole('button',{name:'Manage tokens',exact:true}).count(),1);
   assert.equal(await page.getByRole('row').filter({hasText:'Untokenized agent'}).getByRole('button',{name:'Tokenize',exact:true}).count(),1);
   for (const theme of ['light','dark']) {
     await page.evaluate(value=>document.documentElement.dataset.hiveTheme=value,theme);

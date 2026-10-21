@@ -1,7 +1,7 @@
 import { createHash, randomUUID } from 'node:crypto';
 import type { Db } from 'mongodb';
 import { formatEther, verifyMessage, type Hex } from 'viem';
-import { BASE_FEE_BPS, CREATOR_TAX_BPS, PONS_CHAIN_ID, PONS_FACTORY, feeRecipient, normalizeSymbol, purchaseWei, sameAddress, validAddress } from './policy';
+import { BASE_FEE_BPS, creatorTaxBps, PONS_CHAIN_ID, PONS_FACTORY, feeRecipient, normalizeSymbol, purchaseWei, sameAddress, validAddress } from './policy';
 import type { LaunchPreview } from './types';
 
 export class LaunchAuthorizationError extends Error {}
@@ -32,7 +32,7 @@ export function launchReview(preview: LaunchPreview, signer: string, input: Revi
   catch (error) { throw new LaunchAuthorizationError(error instanceof Error ? error.message : 'Invalid launch choices.'); }
   const value = { version: 1, chainId: PONS_CHAIN_ID, factory: PONS_FACTORY, agentId: preview.agentId, role: preview.role,
     signer: signer.toLowerCase(), recipient: recipient.toLowerCase(), metadata: preview.metadata, choices,
-    baseFeeBps: BASE_FEE_BPS, creatorFeeBps: CREATOR_TAX_BPS, buybacks: false };
+    ...(preview.sessionId ? { sessionId: preview.sessionId } : {}), baseFeeBps: BASE_FEE_BPS, creatorFeeBps: creatorTaxBps(preview.feePolicyVersion), buybacks: false };
   return { choices, digest: digest(value) };
 }
 
@@ -79,7 +79,7 @@ export class LaunchAuthorizations {
     if (!/^[a-f0-9-]{36}$/.test(id) || typeof signature !== 'string' || !/^0x[a-f0-9]{130}$/i.test(signature)) throw new LaunchAuthorizationError('Sign the wallet authorization message.');
     const record = await this.records.findOne({ _id: id, agentId: preview.agentId, role: preview.role });
     if (!record || record.origin !== this.origin || record.issuedAt > now || record.expiresAt <= now) throw new LaunchAuthorizationError('The wallet authorization expired. Refresh and sign again.');
-    const current = launchReview(preview, record.signer, record.choices);
+    const current = launchReview({ ...preview, feePolicyVersion: record.preview.feePolicyVersion }, record.signer, record.choices);
     if (record.digest !== current.digest) throw new LaunchAuthorizationError('The agent or launch settings changed. Review and sign again.');
     // The launch flow uses direct EVM transactions; smart-account execution needs a separate adapter.
     let valid = false;

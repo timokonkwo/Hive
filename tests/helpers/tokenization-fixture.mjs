@@ -8,7 +8,8 @@ export const hash = `0x${'a'.repeat(64)}`;
 export const replacementHash = `0x${'b'.repeat(64)}`;
 export const agentId = '0123456789abcdef01234567';
 export const agent = { name: 'Research agent', bio: 'Research with sources.', status: 'active', walletAddress: signer, walletAddressVerifiedAt: new Date() };
-export const preview = metadata.profilePreview(agentId, agent, 'owner');
+// Historical journal fixture predates fee-policy versioning.
+export const preview = { ...metadata.profilePreview(agentId, agent, 'owner'), feePolicyVersion: undefined };
 
 export function preparedFor(intent = { preview, signer, salt: hash }, nonce = 4) {
   const config = { supply: 10n ** 27n, phantomQuote: 168n * 10n ** 16n, graduationThreshold: 420n * 10n ** 16n, curveFeeBps: 100n, hookFeeBps: 100n, poolFee: 0, tickSpacing: 200, enabled: true };

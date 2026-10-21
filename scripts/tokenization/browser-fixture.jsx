@@ -1,7 +1,7 @@
 // Test boundary only: real dialog/hook, deterministic API and wallet adapters.
 import React, { useState } from 'react';
 import { createRoot } from 'react-dom/client';
-import { LaunchDialog } from '../../components/redesign/tokenization/LaunchDialog';
+import { PonsLaunchDialog as LaunchDialog } from '../../components/redesign/tokenization/PonsLaunchDialog';
 import foundation from '../../components/redesign/foundation.module.css';
 import { AgentsPanel } from '../../components/redesign/admin/Records';
 import { AgentToken } from '../../components/redesign/profile/AgentToken';

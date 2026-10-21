@@ -1,3 +1,4 @@
+import { catalog } from '../scripts/tokenization/modules.mjs';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
@@ -14,7 +15,7 @@ async function routeFor(agent) {
  const reads = [];
  const collection = {
   findOne: async query => { reads.push(query); return agent; },
-  countDocuments: async () => 3,
+  countDocuments: async query => { reads.push(query); return 3; },
   find: () => { const cursor = { sort: () => cursor, limit: () => cursor, toArray: async () => [] }; return cursor; },
  };
  const module = { exports: {} };
@@ -23,7 +24,7 @@ async function routeFor(agent) {
   '@/lib/db': { getDb: async () => ({ collection: () => collection }), COLLECTIONS: {} },
   mongodb: { ObjectId: class { static isValid() { return false; } } },
   '@/lib/logger': { logger: { error() {} } },
-  '@/lib/agent-tokenization/association': association,
+  '@/lib/agent-tokenization/catalog': catalog, '@/lib/agent-tokenization/association': association,
  };
  new Function('require', 'module', 'exports', compiled)(name => { if (!(name in imports)) throw Error(name); return imports[name]; }, module, module.exports);
  const response = await module.exports.GET(new Request('http://localhost/api/agents/by-name/100%25%20done'), { params: Promise.resolve({ name: '100% done' }) });
@@ -31,11 +32,21 @@ async function routeFor(agent) {
 }
 test('literal percent names reach lookup and stored zero reputation is preserved', async () => {
  const { response, reads } = await routeFor({ _id: { toString: () => agentId }, name: '100% done', reputation: 0, status: 'pending' });
- assert.equal(response.status, 200); assert.ok(reads[0].name.$regex.test('100% done'));
+ assert.equal(response.status, 200); assert.ok(reads[0].$or[0].name.$regex.test('100% done'));
  const data = await response.json(); assert.equal(data.agent.reputation, 0); assert.equal(data.agent.status, 'pending'); assert.equal(data.stats.tasksCompleted, 3);
 });
 test('an absent percent-name agent is a real not-found response, not a decoding failure', async () => {
  const { response } = await routeFor(null); assert.equal(response.status, 404);
+});
+test('renamed profiles retain task history assigned by either legacy name field', async () => {
+ const { response, reads } = await routeFor({ _id: { toString: () => agentId }, name: 'New agent', profileNames: ['old (agent)', 'new agent'] });
+ assert.equal(response.status, 200);
+ const clauses = reads[1].$or;
+ for (const name of ['New agent', 'old (agent)']) {
+  assert.ok(clauses.some(row => row.assignedAgent?.$regex?.test(name)));
+  assert.ok(clauses.some(row => row.assignedAgentName?.$regex?.test(name)));
+ }
+ assert.equal(clauses.some(row => row.assignedAgent?.$regex?.test('old agent')), false);
 });
 test('public profile exposes only a valid Pons association and no launch internals', async () => {
  const token = { chainId: 4663, address: '0x' + '1'.repeat(40), symbol: 'RESEARCH', transactionHash: '0x' + 'a'.repeat(64) };

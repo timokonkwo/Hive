@@ -10,7 +10,7 @@ import { dateLabel } from '../marketplace/model';
 import { canStartTask, profileApi, readProfile, statusLabel, taskEntry, type AgentProfile } from './model';
 import { usePublicRead } from './usePublicRead';
 import { ClientReviews } from './ClientReviews';
-import { AgentToken } from './AgentToken';
+import { AgentTokens } from './AgentTokens';
 import common from '../marketplace/marketplace.module.css';
 import styles from './profile.module.css';
 
@@ -41,7 +41,7 @@ function AccountDetails({ agent }: { agent: AgentProfile }) {
   }
   return <details className={styles.account}><summary>Account and token details<ChevronDown size={16} aria-hidden="true" /></summary>
     {agent.wallet && <div className={styles.address}><label htmlFor="agent-wallet">Agent wallet</label><div><input ref={address} id="agent-wallet" readOnly value={agent.wallet} /><button className={common.iconButton} aria-label="Copy agent wallet" onClick={() => void copy()}><Copy size={16} aria-hidden="true" /></button></div><p role="status">{message}</p></div>}
-    {agent.ownToken && <p className={styles.tokenLink}><a href={`https://bags.fm/${agent.ownToken.mint}`} target="_blank" rel="noreferrer">{agent.ownToken.symbol || 'Agent token'} on Bags<ArrowUpRight size={15} aria-hidden="true" /></a></p>}
+    {agent.ownToken && !agent.agentTokens.some(token => token.platform === 'bags') && <p className={styles.tokenLink}><a href={`https://bags.fm/${agent.ownToken.mint}`} target="_blank" rel="noreferrer">{agent.ownToken.symbol || 'Agent token'} on Bags<ArrowUpRight size={15} aria-hidden="true" /></a></p>}
     {agent.tokens.length > 0 && <div><h3>Tokens created</h3><ul className={styles.tokenList}>{agent.tokens.map(token => <li key={token.id}><a href={`https://bags.fm/${token.mint}`} target="_blank" rel="noreferrer">{token.name || token.symbol || 'Token'}<ArrowUpRight size={15} aria-hidden="true" /></a><time dateTime={token.createdAt || undefined}>{dateLabel(token.createdAt)}</time></li>)}</ul></div>}
   </details>;
 }
@@ -67,7 +67,7 @@ function ProfileContent({ agent }: { agent: AgentProfile }) {
       <AgentAvatar key={agent.id} id={agent.id} seed={agent.avatarSeed} imageUrl={agent.avatarUrl} name={agent.name} size={80} className={styles.avatar} />
       <div><p className={styles.kicker} data-profile-enter>Agent profile</p><h1 data-profile-enter>{agent.name}</h1>{agent.createdAt && <p className={styles.joined} data-profile-enter>Joined {dateLabel(agent.createdAt)}</p>}</div>
     </header>
-    <AgentToken token={agent.ponsToken} />
+    <AgentTokens tokens={agent.agentTokens} />
     <div className={styles.layout}>
       <section className={styles.service} aria-labelledby="service-heading" data-profile-enter><h2 id="service-heading">Service</h2><p>{agent.bio || 'No service description is listed.'}</p>{agent.capabilities.length > 0 && <ul className={styles.skills} aria-label="Listed skills">{agent.capabilities.map(skill => <li key={skill}>{skill}</li>)}</ul>}{agent.website && <a className={styles.website} href={agent.website} target="_blank" rel="noreferrer">Agent website<ArrowUpRight size={16} aria-hidden="true" /></a>}
       <dl className={styles.facts}>

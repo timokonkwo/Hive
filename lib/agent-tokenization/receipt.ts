@@ -1,6 +1,6 @@
 import { decodeEventLog, TransactionNotFoundError, TransactionReceiptNotFoundError, zeroAddress, type Address, type Hex, type PublicClient } from 'viem';
 import { curveAbi, factoryAbi, tokenAbi } from './abi';
-import { CREATOR_TAX_BPS, PONS_CHAIN_ID, PONS_FACTORY, sameAddress, validAddress, validHash } from './policy';
+import { PONS_CHAIN_ID, PONS_FACTORY, sameAddress, validAddress, validHash } from './policy';
 import type { LaunchCandidate } from './transaction';
 import type { TokenAssociation } from './types';
 
@@ -89,7 +89,7 @@ export async function reconcileLaunchReceipt(client: PublicClient, expected: Lau
   const [record, info, name, symbol] = state;
   if (!record.exists || !sameAddress(record.token, event.token) || !sameAddress(record.curve, event.curve)
     || !sameAddress(record.deployer, candidate.from) || !sameAddress(record.creatorFeeRecipient, candidate.params.creatorFeeRecipient)
-    || record.pairToken !== zeroAddress || record.creatorTaxBps !== CREATOR_TAX_BPS || record.buybackEnabled
+    || record.pairToken !== zeroAddress || record.creatorTaxBps !== candidate.params.creatorTaxBps || record.buybackEnabled
     || !sameAddress(info[0], candidate.from) || info[1] !== candidate.params.logo || info[2] !== candidate.params.description
     || name !== candidate.params.name || symbol !== candidate.params.symbol
     || (Object.keys(candidate.params.socials) as Array<keyof typeof candidate.params.socials>).some(key => info[3][key] !== candidate.params.socials[key])) {

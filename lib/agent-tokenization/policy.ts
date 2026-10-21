@@ -5,6 +5,12 @@ export const PONS_CHAIN_ID = 4663;
 export const PONS_FACTORY = '0x7eD598BcEf8bd9Edd8C97A195C6d13f40801EC7e';
 export const HIVE_CREATOR_FEE_WALLET = '0x4a7c1d6872c6B7D0AAC1ab2311F15b2D750A9B19';
 export const CREATOR_TAX_BPS = 200;
+/** Version 1 remains the default for persisted records written before versioning. */
+export function creatorTaxBps(version: 1 | 2 = 1): number {
+  if (version === 1) return CREATOR_TAX_BPS;
+  if (version === 2) return 300;
+  throw Error('Unrecognized Pons fee policy.');
+}
 export const BASE_FEE_BPS = 100;
 export const PURCHASE_SLIPPAGE_BPS = 100;
 

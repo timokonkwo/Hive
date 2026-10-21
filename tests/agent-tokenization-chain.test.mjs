@@ -63,7 +63,7 @@ test('zero buy encodes only the factory launch and exact launch fee', () => {
  const decoded = decodeFunctionData({abi:abi.factoryAbi,data:call.data});
  assert.equal(decoded.functionName,'launchToken'); assert.equal(decoded.args[1],0n); assert.equal(decoded.args[2],zeroAddress);
  const p = decoded.args[0];
- assert.equal(p.symbol,'RESEARCH'); assert.equal(p.creatorFeeRecipient.toLowerCase(),signer); assert.equal(p.creatorTaxBps,200); assert.equal(p.buybackEnabled,false);
+ assert.equal(p.symbol,'RESEARCH'); assert.equal(p.creatorFeeRecipient.toLowerCase(),signer); assert.equal(p.creatorTaxBps,300); assert.equal(p.buybackEnabled,false);
  assert.equal(p.description,preview.metadata.description); assert.equal(p.expectedEconomics,hash); assert.equal(p.salt,hash);
  assert.deepEqual(p.socials,{twitter:'',telegram:'',discord:'',website:preview.metadata.socials.website,farcaster:''});
 });
@@ -114,8 +114,8 @@ test('reviewed preparation includes gas headroom and total affordability', async
  await assert.rejects(transactions.prepareReviewedLaunch(clientFor(call),preview,choices,snapshot,{...release,reviewed:false}),/not complete/);
 });
 
-function receiptFixture(purchase = '') {
- const call=candidate({purchase});
+function receiptFixture(purchase = '', feePolicyVersion = 2) {
+ const call=transactions.buildLaunchCandidate({...preview,feePolicyVersion},{...choices,purchase},snapshot);
  const prediction={token:other,curve:contracts.deployer.address,tokensOut:call.quote.tokens};
  const transaction={hash,from:call.from,to:call.to,nonce:4,value:call.value,input:call.data,blockHash:hash};
  const event={address:policy.PONS_FACTORY,removed:false,
@@ -125,7 +125,7 @@ function receiptFixture(purchase = '') {
   topics:encodeEventTopics({abi:abi.curveAbi,eventName:'CurveBuy',args:{buyer:contracts.router.address,recipient:signer}}),
   data:encodeAbiParameters(Array.from({length:4},()=>({type:'uint256'})),[call.quote.spent,call.quote.tokens,0n,0n])};
  const receipt={transactionHash:hash,blockNumber:10n,blockHash:hash,status:'success',logs:purchase?[event,buy]:[event]};
- const record={exists:true,token:prediction.token,curve:prediction.curve,deployer:signer,creatorFeeRecipient:signer,pairToken:zeroAddress,creatorTaxBps:200,buybackEnabled:false};
+ const record={exists:true,token:prediction.token,curve:prediction.curve,deployer:signer,creatorFeeRecipient:signer,pairToken:zeroAddress,creatorTaxBps:call.params.creatorTaxBps,buybackEnabled:false};
  const values={getLaunchedToken:record,getTokenInfo:[signer,call.params.logo,call.params.description,call.params.socials],name:call.params.name,symbol:call.params.symbol};
  const reads=[];
  const client={getChainId:async()=>4663,getTransaction:async()=>transaction,getTransactionReceipt:async()=>receipt,
@@ -140,6 +140,18 @@ test('receipt publishes only a finalized launch with matching metadata and openi
   assert.deepEqual(result,{state:'confirmed',token:{chainId:4663,address:other,symbol:'RESEARCH',transactionHash:hash}});
   assert.ok(f.reads.every(read=>read.blockNumber===10n));
  }
+});
+test('historical 2% and new 3% Pons receipts reconcile against their own saved terms', async () => {
+ for (const version of [1,2]) {
+  const f=receiptFixture('0.1',version);
+  assert.equal(f.call.params.creatorTaxBps,version===1?200:300);
+  assert.equal((await receipts.reconcileLaunchReceipt(f.client,f.expected,hash)).state,'confirmed');
+  f.values.getLaunchedToken.creatorTaxBps=version===1?300:200;
+  await assert.rejects(receipts.reconcileLaunchReceipt(f.client,f.expected,hash),/differs/);
+ }
+ const legacy=transactions.buildLaunchCandidate({...preview,feePolicyVersion:undefined},choices,snapshot);
+ assert.equal(legacy.params.creatorTaxBps,200);
+ assert.throws(()=>transactions.buildLaunchCandidate(preview,choices,{...snapshot,maxCreatorTaxBps:200n}),/reviewed creator fee/);
 });
 
 test('unknown hashes, unfinalized receipts and reorgs stay unresolved; outages are surfaced', async () => {

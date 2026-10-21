@@ -8,7 +8,7 @@ import { privateKeyToAccount } from 'viem/accounts';
 import { PublicKey } from '@solana/web3.js';
 import bs58 from 'bs58';
 import { ObjectId } from 'mongodb';
-import { policy } from '../scripts/tokenization/modules.mjs';
+import { policy, catalog } from '../scripts/tokenization/modules.mjs';
 function load(path, imports = {}) { const code = ts.transpileModule(readFileSync(new URL(path, import.meta.url), 'utf8'), { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022, esModuleInterop: true } }).outputText; const m = { exports: {} }; new Function('require', 'module', 'exports', code)(n => { if (!(n in imports)) throw Error(n); return imports[n]; }, m, m.exports); return m.exports; }
 const message = load('../lib/agent-wallet-message.ts');
 const proof = load('../lib/agent-wallet-proof.ts', { crypto, viem, '@solana/web3.js': { PublicKey }, bs58, './agent-wallet-message': message });
@@ -38,7 +38,7 @@ test('concurrent save returns conflict without false success', async () => { ass
 test('Solana removal clears only the chosen wallet and verification', async () => { const r = route({ agent: { walletAddress: address, solanaAddress: '1'.repeat(32), walletRevision: 3 } }), response = await r.run({ network: 'solana', address: null, previous: '1'.repeat(32), revision: 3, proof: undefined }); assert.equal(response.status, 200); const w = r.calls.find(c => c.q); assert.equal(w.u.$set.solanaAddress, null); assert.equal(w.u.$set.solanaAddressVerifiedAt, null); assert.equal(w.u.$set.walletAddress, undefined); assert.equal(r.calls.filter(c => c.consume).length, 0); });
 function legacy({ agent = {}, matched = 1 } = {}) {
   const calls = [], db = { collection: () => ({ updateOne: async (q, u) => { calls.push({ q, u }); return { matchedCount: matched }; }, insertOne: async () => {} }) };
-  const r = load('../app/api/agents/me/route.ts', { ...common, '@/lib/db': { getDb: async () => db }, '@/lib/api-key': { authenticateRequest: async () => ({ agent: { id, ...agent } }) }, '@solana/web3.js': { PublicKey }, '@/lib/solana-signature': { verifyAndConsumeSolanaMessageSignature: async () => ({ verified: true }) }, '@/lib/agent-work': { agentWorkQuery: () => ({}) }, '@/lib/agent-wallet-proof': proof });
+  const r = load('../app/api/agents/me/route.ts', { ...common, '@/lib/agent-tokenization/catalog': catalog, '@/lib/db': { getDb: async () => db }, '@/lib/api-key': { authenticateRequest: async () => ({ agent: { id, ...agent } }) }, '@solana/web3.js': { PublicKey }, '@/lib/solana-signature': { verifyAndConsumeSolanaMessageSignature: async () => ({ verified: true }) }, '@/lib/agent-work': { agentWorkQuery: () => ({}) }, '@/lib/agent-wallet-proof': proof });
   return { calls, run: body => r.PATCH(new Request('http://local', { method: 'PATCH', body: JSON.stringify(body) })) };
 }
 test('legacy generic profile PATCH cannot link an unsigned primary wallet', async () => { const r = legacy(); assert.equal((await r.run({ walletAddress: address })).status, 400); assert.equal(r.calls.length, 0); });

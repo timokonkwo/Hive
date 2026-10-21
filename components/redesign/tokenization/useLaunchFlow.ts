@@ -12,7 +12,7 @@ export interface SigningWallet {
   switchChain:(chain:number)=>Promise<void>;
   getEthereumProvider:()=>Promise<{request:(args:{method:string;params?:unknown[]})=>Promise<unknown>}>;
 }
-export function useLaunchFlow(agentId:string,role:LaunchRole,request:Request,wallets:SigningWallet[]) {
+export function useLaunchFlow(agentId:string,role:LaunchRole,request:Request,wallets:SigningWallet[],session?:{id:string;mode:LaunchMode;signer:string;symbol:string;purchase:string}) {
   const [preview,setPreview]=useState<LaunchPreview|null>(null),[saved,setSaved]=useState<SavedLaunch|null>(null);
   const [quote,setQuote]=useState<LaunchQuote|null>(null),[error,setError]=useState('');
   const [mode,setMode]=useState<LaunchMode>(role==='admin'?'managed':'connected');
@@ -24,12 +24,12 @@ export function useLaunchFlow(agentId:string,role:LaunchRole,request:Request,wal
   useEffect(()=>{alive.current=true;return()=>{alive.current=false;};},[]);
   const base=`/api/agents/${agentId}/tokenization`;
   const api=useCallback(async (path:string,body?:unknown) => {
-    const response=await request(`${base}${path}?role=${role}`,{cache:'no-store',signal:AbortSignal.timeout(body?55000:20000),
+    const response=await request(`${base}${path}?role=${role}${session ? `&session=${session.id}` : ''}`,{cache:'no-store',signal:AbortSignal.timeout(body?55000:20000),
       ...(body===undefined?{}:{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)})});
     const data=await response.json();
     if(!response.ok) throw Error(typeof data.error==='string'?data.error:'The request failed. Check the launch status.');
     return data;
-  },[base,role,request]);
+  },[base,role,request,session?.id]);
   const saveProfile=async(input:AgentProfileEdit)=>{
     if(busy.current)throw Error('Wait for the current operation to finish.');
     const response=await request(`${base}/profile?role=${role}`,{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify(input),signal:AbortSignal.timeout(35000)});
@@ -49,12 +49,13 @@ export function useLaunchFlow(agentId:string,role:LaunchRole,request:Request,wal
       const [details,status]=await Promise.all([api(''),api('/status')]);
       const next=readPreview(details,agentId,role),launch=readStatus(status);
       if(!alive.current)return;
-      setPreview(next);setSymbol(next.metadata.symbol);setSaved(launch);
+      setPreview(next);setSymbol(session?.symbol || next.metadata.symbol);setSaved(launch);
+      if(session){setWallet(session.signer);setMode(session.mode);setPurchase(session.purchase);}
       if(launch){setWallet(launch.signer);setMode(launch.mode || 'connected');}
       if(launch?.token)setProgress({stage:'success',token:launch.token,transactionHash:launch.token.transactionHash});
     }catch(e){if(alive.current)setError(e instanceof Error?e.message:'Token details are unavailable.');}
     finally{if(alive.current)setLoading(false);}
-  },[api,agentId,role]);
+  },[api,agentId,role,session?.id,session?.mode,session?.signer,session?.symbol,session?.purchase]);
   useEffect(()=>{void load();},[load]);
   useEffect(()=>{
     if(!saved || !['awaiting-signature','submitted','confirming'].includes(saved.phase))return;

@@ -1,3 +1,5 @@
+import { SessionConflict } from './session';
+import { sessionPonsPreview } from './session-access';
 import { NextRequest, NextResponse } from 'next/server';
 import { ObjectId, type Db } from 'mongodb';
 import { getDb } from '@/lib/db';
@@ -59,13 +61,15 @@ export async function withLaunchAccess(req: NextRequest, params: Promise<{ addre
     const refreshPreview = async () => {
       const agent = await db.collection('agents').findOne({ _id: new ObjectId(agentId) });
       if (!agent) throw new LaunchHttpError(404, 'Agent not found.');
-      return profilePreview(agentId, agent, role);
+      const preview = profilePreview(agentId, agent, role);
+      if (req.nextUrl.pathname.includes('/session')) return preview;
+      return sessionPonsPreview(db, preview, req.nextUrl.searchParams.get('session') || undefined);
     };
     return await operation({ db, preview: await refreshPreview(), origin, refreshPreview });
   } catch (error) {
     if (error instanceof LaunchHttpError) return launchReply({ error: error.message }, error.status);
     if (error instanceof LaunchAuthorizationError) return launchReply({ error: error.message }, 400);
-    if (error instanceof LaunchConflict) return launchReply({ error: error.message }, 409);
+    if (error instanceof LaunchConflict || error instanceof SessionConflict) return launchReply({ error: error.message }, 409);
     // Provider exceptions can contain URLs/credentials. Never return or log their raw payloads.
     return launchReply({ error: 'The launch could not be prepared. Check its status before trying again.' }, 503);
   }

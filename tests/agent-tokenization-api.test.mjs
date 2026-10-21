@@ -83,6 +83,8 @@ function mutationHttp({ reviewed = null, denied = null } = {}) {
     'next/server': next, mongodb: { ObjectId: class {} },
     '@/lib/db': { getDb: async () => ({ collection: () => ({ findOne: async () => { counters.reads++; return {}; } }) }) },
     '@/lib/rate-limit': { checkRateLimit: () => ({ allowed: true }), getClientIp: () => 'test' },
+    './session': { SessionConflict: class extends Error {} },
+    './session-access': { sessionPonsPreview: async (_db, preview) => preview },
     './access': { authorizeTokenization: async () => denied },
     './metadata': { profilePreview: () => intentFixture().preview },
     './authorization': { LaunchAuthorizationError: class extends Error {} },

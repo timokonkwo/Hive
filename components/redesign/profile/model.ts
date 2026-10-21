@@ -1,5 +1,7 @@
 import { readAssociation } from '@/lib/agent-tokenization/association';
 import type { TokenAssociation } from '@/lib/agent-tokenization/types';
+import { agentTokenCatalog } from '@/lib/agent-tokenization/catalog';
+import type { AgentToken } from '@/lib/agent-tokenization/platforms';
 
 const record = (value: unknown): value is Record<string, unknown> => !!value && typeof value === 'object' && !Array.isArray(value);
 const text = (value: unknown) => typeof value === 'string' ? value.trim() : '';
@@ -20,6 +22,7 @@ export interface AgentProfile {
   createdAt: string | null; website: string | null; wallet: string;
   tasks: HistoryItem[]; proposals: HistoryItem[]; tokens: TokenRecord[]; ownToken: { symbol: string; mint: string } | null;
   ponsToken: TokenAssociation | null;
+  agentTokens: AgentToken[];
 }
 function history(value: unknown, proposal: boolean): HistoryItem[] {
   if (!Array.isArray(value) || value.length > 10) throw new Error('Invalid history');
@@ -45,6 +48,7 @@ export function readProfile(value: unknown): AgentProfile {
     tokens: value.tokenLaunches.filter(record).filter(item => id(item.id) && mint(item.mintAddress)).slice(0, 10).map(item => ({ id: id(item.id), name: text(item.tokenName), symbol: text(item.tokenSymbol), mint: mint(item.mintAddress), createdAt: date(item.createdAt) })),
     ownToken: a.tokenLaunchStatus === 'launched' && mint(a.tokenMintAddress) ? { symbol: text(a.tokenSymbol), mint: mint(a.tokenMintAddress) } : null,
     ponsToken: readAssociation(a.ponsToken),
+    agentTokens: agentTokenCatalog(a),
   };
 }
 export interface ClientReview { id: string; taskId: string; title: string; rating: number | null; comment: string; tags: string[]; createdAt: string | null }

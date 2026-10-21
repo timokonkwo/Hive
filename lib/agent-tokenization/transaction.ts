@@ -1,6 +1,6 @@
 import { decodeFunctionResult, encodeFunctionData, zeroAddress, type Address, type Hex, type PublicClient } from 'viem';
 import { factoryAbi, routerAbi } from './abi';
-import { CREATOR_TAX_BPS, PONS_CHAIN_ID, feeRecipient, normalizeSymbol, purchaseWei, sameAddress, validAddress, validHash, validTokenLogo } from './policy';
+import { creatorTaxBps, PONS_CHAIN_ID, feeRecipient, normalizeSymbol, purchaseWei, sameAddress, validAddress, validHash, validTokenLogo } from './policy';
 import { quoteOpeningBuy } from './quote';
 import { assertLaunchAvailable, assertReviewedRelease, type LaunchSnapshot, type ReviewedRelease } from './snapshot';
 import type { LaunchPreview } from './types';
@@ -34,12 +34,14 @@ export function buildLaunchCandidate(preview: LaunchPreview, choices: LaunchChoi
     throw Error('The token profile links changed. Refresh the review.');
   }
   const budget = purchaseWei(choices.purchase);
-  const quote = quoteOpeningBuy(snapshot.config, budget);
+  const tax = creatorTaxBps(preview.feePolicyVersion);
+  if (snapshot.maxCreatorTaxBps < BigInt(tax)) throw Error('Pons no longer supports the reviewed creator fee.');
+  const quote = quoteOpeningBuy(snapshot.config, budget, tax);
   const params = {
     name: preview.metadata.name, symbol: normalizeSymbol(choices.symbol), logo: choices.logoURI,
     description: preview.metadata.description,
     socials: { twitter: '', telegram: '', discord: '', website, farcaster: '' },
-    creatorFeeRecipient: recipient as Address, creatorTaxBps: CREATOR_TAX_BPS, buybackEnabled: false,
+    creatorFeeRecipient: recipient as Address, creatorTaxBps: tax, buybackEnabled: false,
     expectedEconomics: snapshot.expectedEconomics, salt: choices.salt,
   } as const;
   const kind = budget === 0n ? 'launch' : 'launch-and-buy';

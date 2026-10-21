@@ -20,6 +20,9 @@ export interface TokenAssociation {
 }
 
 export interface LaunchPreview {
+  sessionId?: string;
+  /** Missing on historical intents; those retain policy 1 (200 bps). */
+  feePolicyVersion?: 1 | 2;
   agentId: string;
   role: LaunchRole;
   metadata: AgentTokenMetadata;

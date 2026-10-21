@@ -15,8 +15,9 @@ export function readPreview(value: unknown, agentId: string, role: LaunchRole): 
   if (data.agentId !== agentId || data.role !== role || typeof data.signingEnabled !== 'boolean') {
     throw Error('Token settings changed. Refresh before continuing.');
   }
+  if (data.feePolicyVersion !== undefined && data.feePolicyVersion !== 1 && data.feePolicyVersion !== 2) throw Error('The token fee policy needs review.');
   if (socials.twitter !== '' || socials.telegram !== ''
-    || socials.website !== `https://uphive.xyz/agent/${encodeURIComponent(text(metadata.name))}`) {
+    || !([`https://uphive.xyz/agent/${encodeURIComponent(text(metadata.name))}`, `https://uphive.xyz/agent/id/${agentId}`].includes(text(socials.website)))) {
     throw Error('Token profile links changed. Refresh before continuing.');
   }
   if (!Array.isArray(data.issues) || data.issues.some(i => typeof i !== 'string')
@@ -46,6 +47,7 @@ export function readPreview(value: unknown, agentId: string, role: LaunchRole): 
     managedDeployer = { address: deployer.address, available: deployer.available, ...(typeof deployer.reason === 'string' ? { reason: deployer.reason } : {}) };
   }
   return {
+    ...(data.feePolicyVersion === undefined ? {} : { feePolicyVersion: data.feePolicyVersion }),
     ...(managedDeployer ? { managedDeployer } : {}),
     ...(adminProfile ? { adminProfile } : {}),
     agentId, role, signingEnabled: data.signingEnabled, existingToken,

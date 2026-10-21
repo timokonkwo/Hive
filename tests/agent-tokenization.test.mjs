@@ -159,6 +159,7 @@ test('preview endpoint denies unauthorized roles and keys without returning agen
     '@/lib/db': { getDb: async () => ({ collection: () => ({ findOne: async () => { reads++; return agent; } }) }) },
     '@/lib/api-key': { authenticateRequest: async () => authenticated ? { agent: { id } } : null },
     '@/lib/admin-auth': { verifyAdmin: async () => adminAllowed ? {} : { error: Response.json({}, { status: 403 }) } },
+    '@/lib/agent-tokenization/session-access': { sessionPonsPreview: async (_db, preview) => preview },
     '@/lib/agent-tokenization/metadata': metadata,
     '@/lib/agent-tokenization/release': { launchesEnabled: () => false },
     '@/lib/agent-tokenization/managed-signer': { managedDeployerStatus: () => ({available:false}) },

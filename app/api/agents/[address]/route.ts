@@ -1,3 +1,4 @@
+import { agentTokenCatalog } from '@/lib/agent-tokenization/catalog';
 import { NextResponse } from "next/server";
 import { getDb, COLLECTIONS } from "@/lib/db";
 import { ObjectId } from "mongodb";
@@ -62,6 +63,7 @@ export async function GET(
     return NextResponse.json({
       agent: {
         id: agentId,
+        agentTokens: agentTokenCatalog(agent),
         name: agent.name || "Unnamed Agent",
         bio: agent.bio || "",
         avatarSeed: agent.avatarSeed || "",

@@ -24,11 +24,12 @@ export function validateEconomics(config: LaunchEconomics): void {
  * Simulated router output must match this estimate before a transaction is exposed.
  * This is not used for ordinary trades (which may include a temporary snipe tax).
  */
-export function quoteOpeningBuy(config: LaunchEconomics, budget: bigint) {
+export function quoteOpeningBuy(config: LaunchEconomics, budget: bigint, creatorTax = CREATOR_TAX_BPS) {
   validateEconomics(config);
   if (budget < 0n) throw new Error('Purchase amount cannot be negative.');
   const bps = 10_000n;
-  const baseFee = BigInt(BASE_FEE_BPS), creatorFee = BigInt(CREATOR_TAX_BPS);
+  if (![200, 300].includes(creatorTax)) throw Error('Unrecognized Pons fee policy.');
+  const baseFee = BigInt(BASE_FEE_BPS), creatorFee = BigInt(creatorTax);
   const net = budget - budget * baseFee / bps - budget * creatorFee / bps;
   const reserved = config.supply * config.phantomQuote / (config.phantomQuote + config.graduationThreshold);
   const sellable = config.supply - reserved;

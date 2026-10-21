@@ -45,3 +45,15 @@ test('preparation failures remain visible even alongside a confirmed transaction
  const result=await f.api.runFeeClaim(f.db,f.bags,crypto.randomUUID());
  assert.equal(result.confirmed,1);assert.match(result.error,/could not be claimed/);assert.match(result.message,/confirmed/);
 });
+test('all providers share the wallet lease and unknown receipts block another fee source',async()=>{
+ const f=fixture(async j=>{await j.beforeSend(tx);return{message:'Pending'};});
+ f.bags.source='bags-deployer';
+ await f.api.runFeeClaim(f.db,f.bags,crypto.randomUUID());
+ assert.equal((await f.api.feeClaimStatus(f.db,f.bags)).source,'bags-deployer');
+ f.bags.source='pump';
+ await f.api.runFeeClaim(f.db,f.bags,crypto.randomUUID());
+ assert.equal(f.executions,1);assert.equal(f.row.source,'bags-deployer');
+ f.setStatus({confirmationStatus:'finalized',err:null});
+ await f.api.runFeeClaim(f.db,f.bags,crypto.randomUUID());
+ assert.equal(f.executions,2);assert.equal(f.row.source,'pump');
+});

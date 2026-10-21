@@ -1,11 +1,11 @@
-import { PublicKey, VersionedTransaction } from '@solana/web3.js';
+import { PublicKey, VersionedTransaction, type Connection } from '@solana/web3.js';
 import bs58 from 'bs58';
 import type { AgentBagsClient } from './bags-agent';
 
 /** The total includes fees already swept into a user's vault. Pool-only fields do not. */
 export function claimableLamports(position: Record<string, unknown>): bigint {
   const amount = position.totalClaimableLamportsUserShare;
-  if ((typeof amount !== 'string' && typeof amount !== 'number') || !/^\d+$/.test(String(amount))) {
+  if ((typeof amount !== 'string' && typeof amount !== 'number') || (typeof amount === 'number' && !Number.isSafeInteger(amount)) || !/^\d+$/.test(String(amount))) {
     throw Error('Bags returned an invalid claimable balance.');
   }
   return BigInt(amount);
@@ -29,9 +29,18 @@ function feeError(error: unknown) {
 }
 
 type ClaimTransaction = { tx: string; blockhash: { blockhash: string; lastValidBlockHeight: number } };
+export interface ManagedFeeClient {
+  source: 'pump' | 'bags-deployer';
+  connection: Connection;
+  getWalletAddress():string;
+  getClaimablePositions():Promise<Array<{baseMint:string;totalClaimableLamportsUserShare:string}>>;
+  prepareClaimTransactions(mint:string):Promise<Array<{transaction:VersionedTransaction;blockhash:{blockhash:string;lastValidBlockHeight:number}}>>;
+  signTransaction(transaction:VersionedTransaction):Uint8Array;
+}
+export type AgentFeeClient = AgentBagsClient | ManagedFeeClient;
 
 export type FeeTransaction = { mint: string; signature: string; confirmed: boolean; failed?: boolean; blockhash: string; lastValidBlockHeight: number };
-export async function claimAgentFees(bags: AgentBagsClient, journal?: { beforeSend: (tx: FeeTransaction) => Promise<void>; settled: (tx: FeeTransaction) => Promise<void> }) {
+export async function claimAgentFees(bags: AgentFeeClient, journal?: { beforeSend: (tx: FeeTransaction) => Promise<void>; settled: (tx: FeeTransaction) => Promise<void> }) {
   const positions = await bags.getClaimablePositions(); // An outage must not look like an empty balance.
   const mints = [...new Set(positions.filter(p => claimableLamports(p) > 0n).map(p => new PublicKey(p.baseMint).toBase58()))];
   const transactions: FeeTransaction[] = [];
@@ -42,9 +51,10 @@ export async function claimAgentFees(bags: AgentBagsClient, journal?: { beforeSe
     if (Date.now() >= deadline) break;
     processed++;
     try {
-      const rows = await bags.sdk.bagsApiClient.post<ClaimTransaction[]>('/token-launch/claim-txs/v3', {
-        feeClaimer: bags.keypair.publicKey.toBase58(), tokenMint: mint,
-      });
+      const rows = 'prepareClaimTransactions' in bags ? (await bags.prepareClaimTransactions(mint)).map(row=>({tx:bs58.encode(row.transaction.serialize()),blockhash:row.blockhash}))
+        : await bags.sdk.bagsApiClient.post<ClaimTransaction[]>('/token-launch/claim-txs/v3', {
+          feeClaimer: bags.keypair.publicKey.toBase58(), tokenMint: mint,
+        });
       if (!Array.isArray(rows)) throw Error('Bags returned invalid claim transactions.');
       for (const row of rows) {
         if (Date.now() >= deadline) { processed--; break claims; }
@@ -53,12 +63,13 @@ export async function claimAgentFees(bags: AgentBagsClient, journal?: { beforeSe
           throw Error('Claim transaction expiry could not be verified.');
         }
         // Preserve sponsor signatures and the exact blockhash supplied by Bags.
-        tx.sign([bags.keypair]);
-        const signature = bs58.encode(tx.signatures[0]);
+        const signed = 'signTransaction' in bags ? VersionedTransaction.deserialize(bags.signTransaction(tx)) : tx;
+        if (!('signTransaction' in bags)) signed.sign([bags.keypair]);
+        const signature = bs58.encode(signed.signatures[0]);
         const submitted: FeeTransaction = { mint, signature, confirmed: false, ...row.blockhash };
         if (journal) await journal.beforeSend(submitted);
         transactions.push(submitted);
-        await bags.connection.sendRawTransaction(tx.serialize(), { skipPreflight: false, maxRetries: 3 });
+        await bags.connection.sendRawTransaction(signed.serialize(), { skipPreflight: false, maxRetries: 3 });
         const result = await confirmationWithin(bags.connection.confirmTransaction({ signature, ...row.blockhash }, 'confirmed'), Math.max(1000, Math.min(15000, deadline - Date.now())));
         submitted.failed = !!result.value.err;
         submitted.confirmed = !submitted.failed;

@@ -231,8 +231,9 @@ export async function POST(req: NextRequest) {
     }
 
     // Pending listings keep their names; never delete them during another registration.
-    const existing = await db.collection(COLLECTIONS.AGENTS).findOne({ name: { $regex: new RegExp(`^${name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i') } });
+    const existing = await db.collection(COLLECTIONS.AGENTS).findOne({ $or: [{ name: { $regex: new RegExp(`^${name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i') } }, { profileNames: name.toLowerCase() }] });
     if (existing) return NextResponse.json({ error: 'That agent name is already in use.' }, { status: 409 });
+    await db.collection(COLLECTIONS.AGENTS).createIndex({ profileNames: 1 }, { unique: true, partialFilterExpression: { profileNames: { $exists: true } }, name: 'unique_agent_profile_names' });
     await db.collection(COLLECTIONS.AGENTS).createIndex({ nameKey: 1 }, { unique: true, partialFilterExpression: { nameKey: { $type: 'string' } }, name: 'unique_agent_name_key' });
     await db.collection(COLLECTIONS.AGENTS).createIndex({ registrationWalletProofDigest: 1 }, { unique: true, partialFilterExpression: { registrationWalletProofDigest: { $type: 'string' } }, name: 'unique_registration_wallet_proof' });
 
@@ -267,7 +268,7 @@ export async function POST(req: NextRequest) {
 
     const agent = {
       name,
-      nameKey: name.toLowerCase(),
+      nameKey: name.toLowerCase(), profileNames: [name.toLowerCase()],
       ...(avatarSeed ? { avatarSeed } : {}),
       bio,
       capabilities: capabilities || [],
@@ -318,7 +319,7 @@ export async function POST(req: NextRequest) {
             { status: 409 }
           );
         }
-        if (keyPattern.name || keyPattern.nameKey) {
+        if (keyPattern.name || keyPattern.nameKey || keyPattern.profileNames) {
           return NextResponse.json(
             { error: `An agent named "${name}" was just registered. Choose a different name.` },
             { status: 409 }

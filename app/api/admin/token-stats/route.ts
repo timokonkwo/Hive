@@ -1,4 +1,4 @@
-import { ponsAdminStats } from '@/lib/agent-tokenization/admin-stats';
+import { ponsAdminStats, solanaSessionStats } from '@/lib/agent-tokenization/admin-stats';
 import { claimableLamports } from '@/lib/agent-fees';
 import { feeClaimStatus, runFeeClaim } from '@/lib/agent-fee-claims';
 import { legacyAgentLaunchesEnabled, legacyLaunchMessage } from '@/lib/agent-tokenization/legacy';
@@ -6,6 +6,9 @@ import { verifyAdmin } from '@/lib/admin-auth';
 import { NextRequest, NextResponse } from 'next/server';
 import { getDb, COLLECTIONS } from '@/lib/db';
 import { createAgentBagsClient } from '@/lib/bags-agent';
+import { additionalFeeBalances, feeClient, type FeeSource } from '@/lib/agent-tokenization/fee-sources';
+import { launchConnection } from '@/lib/agent-tokenization/solana-runtime';
+import { HIVE_SOLANA_FEE_WALLET } from '@/lib/agent-tokenization/session';
 
 
 
@@ -32,9 +35,7 @@ export async function GET(req: NextRequest) {
   const db = await getDb();
   if (new URL(req.url).searchParams.get('claimStatus') === '1') {
     try {
-      const bags = createAgentBagsClient();
-      if (!bags) return NextResponse.json({ error: 'Solana fee wallet is not configured.' }, { status: 503 });
-      return NextResponse.json({ claim: await feeClaimStatus(db, bags) }, { headers: { 'Cache-Control': 'private, no-store' } });
+      return NextResponse.json({ claim: await feeClaimStatus(db, { connection: launchConnection(), getWalletAddress: () => HIVE_SOLANA_FEE_WALLET }) }, { headers: { 'Cache-Control': 'private, no-store' } });
     } catch { return NextResponse.json({ error: 'Claim status is unavailable. Try again.' }, { status: 503 }); }
   }
   const monthStart = new Date(); monthStart.setUTCDate(1); monthStart.setUTCHours(0, 0, 0, 0);
@@ -50,6 +51,7 @@ export async function GET(req: NextRequest) {
     recentLaunches,
     topTokens,
     pons,
+    solanaSessions,
   ] = await Promise.all([
     db.collection(COLLECTIONS.AGENTS).countDocuments({
       isTokenized: true,
@@ -81,7 +83,13 @@ export async function GET(req: NextRequest) {
       .limit(50)
       .toArray(),
     ponsAdminStats(db, monthStart, todayStart),
+    solanaSessionStats(db, monthStart, todayStart),
   ]);
+
+  const feeTokens = [...topTokens];
+  for (const token of solanaSessions.recentLaunches.filter(t => t.platform === 'Bags')) {
+    if (!feeTokens.some(t => t.tokenMintAddress === token.mintAddress)) feeTokens.push({ _id: new (await import('mongodb')).ObjectId(token.agentId), name: token.agentName, tokenSymbol: token.tokenSymbol, tokenMintAddress: token.mintAddress, tokenLaunchedAt: token.createdAt });
+  }
 
   // Get wallet balance + revenue data
   let walletBalance: number | null = null;
@@ -92,6 +100,7 @@ export async function GET(req: NextRequest) {
   let revenueError: string | null = null;
   let totalClaimable: number | null = null;
   let lifetimeComplete = false;
+  const additionalFees = additionalFeeBalances(db);
   try {
     const bags = createAgentBagsClient();
     if (bags) {
@@ -103,7 +112,7 @@ export async function GET(req: NextRequest) {
       totalClaimable = Number(claimablePositions.reduce((sum, p) => sum + claimableLamports(p), 0n)) / 1e9;
 
       // Fetch lifetime fees for each launched token (cap at 20 to avoid timeout)
-      const tokensToCheck = topTokens.slice(0, 20);
+      const tokensToCheck = feeTokens.slice(0, 20);
       const feeResults = await Promise.allSettled(
         tokensToCheck.map(async (a) => {
           const feesLamports = await bags.getTokenLifetimeFees(a.tokenMintAddress);
@@ -115,7 +124,7 @@ export async function GET(req: NextRequest) {
           };
         })
       );
-      lifetimeComplete = topTokens.length <= 20 && feeResults.every(r => r.status === 'fulfilled');
+      lifetimeComplete = feeTokens.length <= 20 && feeResults.every(r => r.status === 'fulfilled');
       perTokenFees = feeResults.map((r, index) => r.status === 'fulfilled' ? r.value : {
         name: tokensToCheck[index].name, symbol: tokensToCheck[index].tokenSymbol,
         mintAddress: tokensToCheck[index].tokenMintAddress, lifetimeFees: null,
@@ -130,13 +139,15 @@ export async function GET(req: NextRequest) {
   const monthlyCap = parseInt(process.env.AGENT_LAUNCH_MONTHLY_CAP || '50', 10);
 
   return NextResponse.json({
+    feeSources: [{ source: 'bags-creator', totalClaimable, error: revenueError }, ...await additionalFees],
     stats: {
-      totalLaunched: totalLaunched + pons.totalLaunched,
-      totalFailed: totalFailed + pons.totalFailed,
-      totalQueued: totalQueued + pons.totalQueued,
-      launchesThisMonth: launchesThisMonth + pons.launchesThisMonth,
-      launchesToday: launchesToday + pons.launchesToday,
-      byChain: { solana: totalLaunched, robinhood: pons.totalLaunched },
+      totalLaunched: totalLaunched + pons.totalLaunched + solanaSessions.totalLaunched,
+      totalFailed: totalFailed + pons.totalFailed + solanaSessions.totalFailed,
+      totalQueued: totalQueued + pons.totalQueued + solanaSessions.totalQueued,
+      launchesThisMonth: launchesThisMonth + pons.launchesThisMonth + solanaSessions.launchesThisMonth,
+      launchesToday: launchesToday + pons.launchesToday + solanaSessions.launchesToday,
+      byChain: { solana: totalLaunched + solanaSessions.totalLaunched, robinhood: pons.totalLaunched },
+      byPlatform: { pons: pons.totalLaunched, bags: totalLaunched + solanaSessions.bags, pump: solanaSessions.pump },
       monthlyCap,
       monthlyRemaining: Math.max(0, monthlyCap - launchesThisMonth),
       walletBalance: walletBalance !== null ? parseFloat(walletBalance.toFixed(4)) : null,
@@ -144,7 +155,7 @@ export async function GET(req: NextRequest) {
     },
     revenue: {
       error: revenueError,
-      feesTruncated: topTokens.length > 20,
+      feesTruncated: feeTokens.length > 20,
       totalLifetimeFees: lifetimeComplete ? parseFloat(totalLifetimeFees.toFixed(6)) : null,
       totalClaimable: totalClaimable === null ? null : parseFloat(totalClaimable.toFixed(9)),
       claimablePositions: totalClaimable === null ? null : claimablePositions.length,
@@ -153,7 +164,7 @@ export async function GET(req: NextRequest) {
         bagsUrl: `https://bags.fm/${t.mintAddress}`,
       })),
     },
-    recentLaunches: [...pons.recentLaunches, ...recentLaunches.map(l => ({
+    recentLaunches: [...pons.recentLaunches, ...solanaSessions.recentLaunches, ...recentLaunches.map(l => ({
       chain: 'Solana',
       tradeUrl: l.mintAddress ? `https://bags.fm/${l.mintAddress}` : null,
       id: l._id.toString(),
@@ -166,7 +177,7 @@ export async function GET(req: NextRequest) {
       createdAt: l.createdAt,
       bagsUrl: l.mintAddress ? `https://bags.fm/${l.mintAddress}` : null,
     }))].sort((a, b) => (b.createdAt ? new Date(b.createdAt).getTime() : 0) - (a.createdAt ? new Date(a.createdAt).getTime() : 0)).slice(0, 20),
-    tokenizedAgents: [...pons.recentLaunches.map(l => ({ id: l.agentId, name: l.agentName, tokenSymbol: l.tokenSymbol, mintAddress: l.mintAddress, launchedAt: l.createdAt, chain: l.chain, tradeUrl: l.tradeUrl })), ...topTokens.map(a => ({
+    tokenizedAgents: [...solanaSessions.recentLaunches.map(l => ({ id: l.agentId, name: l.agentName, tokenSymbol: l.tokenSymbol, mintAddress: l.mintAddress, launchedAt: l.createdAt, chain: l.chain, platform: l.platform, tradeUrl: l.tradeUrl })), ...pons.recentLaunches.map(l => ({ id: l.agentId, name: l.agentName, tokenSymbol: l.tokenSymbol, mintAddress: l.mintAddress, launchedAt: l.createdAt, chain: l.chain, tradeUrl: l.tradeUrl })), ...topTokens.map(a => ({
       chain: 'Solana',
       tradeUrl: `https://bags.fm/${a.tokenMintAddress}`,
       id: a._id.toString(),
@@ -189,8 +200,12 @@ export async function POST(req: NextRequest) {
   // Admin auth
   const admin = await verifyAdmin(req);
   if (admin.error) return admin.error;
-
-  const body = await req.json();
+  const origin = req.headers.get('origin');
+  if (origin && origin !== (process.env.PONS_APP_ORIGIN || 'https://uphive.xyz')) return NextResponse.json({ error: 'Open Hive to continue.' }, { status: 403 });
+  if (req.headers.get('content-type')?.split(';')[0].trim().toLowerCase() !== 'application/json') return NextResponse.json({ error: 'Send a JSON request.' }, { status: 415 });
+  let body;
+  try { body = await req.json(); } catch { return NextResponse.json({ error: 'Invalid request.' }, { status: 400 }); }
+  if (!body || typeof body !== 'object' || Array.isArray(body)) return NextResponse.json({ error: 'Invalid request.' }, { status: 400 });
   const { action } = body;
 
   if (action === 'launch') {
@@ -317,14 +332,12 @@ export async function POST(req: NextRequest) {
   }
 
   if (action === 'claim-fees') {
+    const source = body.source ?? 'bags-creator';
+    if (!['bags-creator', 'bags-deployer', 'pump'].includes(source)) return NextResponse.json({ error: 'Unknown fee source.' }, { status: 400 });
     try {
-      const bags = createAgentBagsClient();
-      if (!bags) {
-        return NextResponse.json({ error: 'Agent Bags client not configured' }, { status: 503 });
-      }
-
       if (typeof body.requestId !== 'string' || !/^[a-f0-9-]{36}$/i.test(body.requestId)) return NextResponse.json({ error: 'Invalid fee claim request.' }, { status: 400 });
-      const result = await runFeeClaim(await getDb(), bags, body.requestId);
+      const db = await getDb();
+      const result = await runFeeClaim(db, feeClient(db, source as FeeSource), body.requestId);
       return NextResponse.json({ claim: result }, { status: result?.pending ? 202 : 200, headers: { 'Cache-Control': 'private, no-store' } });
     } catch {
       return NextResponse.json({ error: 'Solana fee claims are unavailable. Refresh balances and try again.' }, { status: 503 });

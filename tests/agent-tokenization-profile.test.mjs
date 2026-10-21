@@ -59,5 +59,8 @@ test('admin profile saves are durable, unique and serialized against launches',{
  await assert.rejects(profileEdit.saveAgentProfile(db,agentId,await edit({image}),persist),/already has a launch/);assert.equal(uploaded,1);
  await db.collection('pons_launch_intents').deleteMany({});
  await agents.updateOne({_id:new ObjectId(agentId)},{$set:{ponsToken:{address:'exists'}}});
- await assert.rejects(profileEdit.saveAgentProfile(db,agentId,await edit({}),persist),/already has a launch/);
+ const published = await profileEdit.saveAgentProfile(db,agentId,await edit({name:'Published agent renamed'}),persist);
+ assert.equal(published.metadata.name,'Published agent renamed');
+ assert.ok((await draft()).profileNames.includes('concurrent agent'));
+ assert.deepEqual((await draft()).ponsToken,{address:'exists'});
 });

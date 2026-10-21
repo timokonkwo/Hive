@@ -1,4 +1,36 @@
 .main { padding-bottom: 48px; }
+/* One profile action; platform choices live in the trade dialog. */
+.agentTokens { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-top: 24px; padding: 20px 24px; border: 1px solid var(--rule); border-radius: 8px; background: var(--surface); }
+.agentTokens>div { min-width: 0; }
+.agentTokens h2 { color: var(--muted); font-size: 12px; font-weight: 400; margin: 0 0 8px; }
+.agentTokens p { display: flex; align-items: baseline; flex-wrap: wrap; gap: 8px 16px; margin: 0; }
+.agentTokens strong { font-size: 18px; font-weight: 500; overflow-wrap: anywhere; }
+.agentTokens p span { color: var(--muted); font-size: 12px; }
+.tradeTrigger { display: inline-flex; align-items: center; justify-content: center; gap: 8px; flex-shrink: 0; min-height: 44px; padding: 10px 16px; border: 0; border-radius: 6px; background: var(--accent); color: var(--accent-ink); font-size: 13px; font-weight: 600; cursor: pointer; }
+.tradeTrigger:hover { filter: brightness(.94); }
+.tradeDialog { width: min(440px, calc(100% - 32px)); max-height: calc(100dvh - 48px); overflow-y: auto; margin: auto; padding: 24px; border: 1px solid var(--rule); border-radius: 12px; background: var(--surface); color: var(--ink); box-shadow: 0 24px 80px rgb(0 0 0 / .2); }
+.tradeDialog::backdrop { background: rgb(0 0 0 / .6); }
+.tradeDialog[open] { animation: tradeEnter 140ms ease-out; }
+.tradeDialog header { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-bottom: 16px; }
+.tradeDialog h2 { color: var(--ink); font-size: 20px; font-weight: 500; letter-spacing: -.025em; margin: 0; }
+.tradeDialog button { display: inline-flex; align-items: center; justify-content: center; width: 44px; height: 44px; flex-shrink: 0; background: transparent; border: 0; border-radius: 6px; color: var(--muted); cursor: pointer; }
+.tradeDialog button:hover { background: var(--soft); color: var(--ink); }
+.tradeDialog ul { list-style: none; margin: 0; padding: 0; }
+.tradeOption { display: flex; align-items: center; flex-wrap: wrap; gap: 0 8px; border-top: 1px solid var(--rule); }
+.tradeOption>a { display: flex; align-items: center; justify-content: space-between; gap: 16px; flex: 1; min-width: 0; padding: 20px 8px; border-radius: 6px; color: var(--ink); }
+.tradeOption>a:hover { background: var(--soft); }
+.tradeOption a>span { min-width: 0; }
+.tradeOption strong { display: block; font-size: 15px; font-weight: 500; }
+.tradeOption a span>span { display: block; font-size: 12px; color: var(--muted); margin-top: 6px; overflow-wrap: anywhere; }
+.tradeOption a>svg { color: var(--muted); flex-shrink: 0; }
+.copyStatus { flex-basis: 100%; color: var(--muted); font-size: 12px; padding: 0 8px 12px; }
+.copyStatus:empty { display: none; }
+.agentTokens :is(a,button):focus-visible { outline: 2px solid var(--accent-text); outline-offset: 3px; }
+.tokenSpinner { animation: tokenSpin .8s linear infinite; }
+@keyframes tokenSpin { to { transform: rotate(360deg); } }
+@keyframes tradeEnter { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
+@media (prefers-reduced-motion:reduce) { .tokenSpinner { animation-duration: 2s; } .tradeDialog[open] { animation: none; } }
+@media (max-width:600px) { .agentTokens { padding: 20px; } .tradeDialog { padding: 20px; } }
 .topline { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-bottom: 24px; }
 .topline>a { display: inline-flex; gap: 10px; align-items: center; min-height: 44px; font-size: 13px; color: var(--muted); }
 .topline>a:hover { color: var(--ink); }

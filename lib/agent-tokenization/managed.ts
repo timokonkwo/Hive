@@ -30,18 +30,19 @@ function assertManaged(intent: LaunchIntent) {
 }
 function assertCurrent(intent: LaunchIntent, preview: LaunchPreview) {
   assertManaged(intent);
-  if (!intent.choices || launchReview(preview, intent.signer, intent.choices).digest !== intent.reviewDigest) {
+  if (!intent.choices || launchReview({ ...preview, feePolicyVersion: intent.preview.feePolicyVersion }, intent.signer, intent.choices).digest !== intent.reviewDigest) {
     throw new LaunchConflict('Agent details changed. Discard this review and start again.');
   }
 }
 /** Preparation is not permission to spend. Only confirmManagedLaunch authorizes a submission. */
 export async function prepareManagedLaunch(db: Db, client: PublicClient, preview: LaunchPreview, choices: ReviewChoices, services: Services) {
   requireManagedAdmin(preview);
-  const review = launchReview(preview, HIVE_LAUNCH_WALLET, choices);
   const current = await new LaunchStore(db).current(preview.agentId);
+  const reviewedPreview = current?.active ? { ...preview, feePolicyVersion: current.preview.feePolicyVersion } : preview;
+  const review = launchReview(reviewedPreview, HIVE_LAUNCH_WALLET, choices);
   if (current?.active && current.mode !== 'managed') throw new LaunchConflict('Resume or cancel this agent’s connected-wallet launch first.');
   if (current?.active && current.reviewDigest !== review.digest) throw new LaunchConflict('Discard the saved review before changing launch settings.');
-  try { return await prepareVerifiedLaunch(db, client, preview, {
+  try { return await prepareVerifiedLaunch(db, client, reviewedPreview, {
     _id: current?.active ? current._id : randomUUID(), signer: HIVE_LAUNCH_WALLET, ...review,
   }, services, 'managed'); } catch (error) {
     if (error instanceof Error && error.message === 'This wallet needs more ETH for the launch and network fee.') {

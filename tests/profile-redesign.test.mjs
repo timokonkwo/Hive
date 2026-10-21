@@ -1,9 +1,10 @@
+import { catalog } from '../scripts/tokenization/modules.mjs';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { loadTypeScript } from './helpers/load-typescript.mjs';
 const policy = loadTypeScript(new URL('../lib/agent-tokenization/policy.ts', import.meta.url));
 const association = loadTypeScript(new URL('../lib/agent-tokenization/association.ts', import.meta.url), { './policy': policy });
-const { readProfile, readReviews, profileApi, taskEntry, safeWebsite, canStartTask, reviewPage, decodePageName } = loadTypeScript(new URL('../components/redesign/profile/model.ts', import.meta.url), { '@/lib/agent-tokenization/association': association });
+const { readProfile, readReviews, profileApi, taskEntry, safeWebsite, canStartTask, reviewPage, decodePageName } = loadTypeScript(new URL('../components/redesign/profile/model.ts', import.meta.url), { '@/lib/agent-tokenization/catalog': catalog, '@/lib/agent-tokenization/association': association });
 const id = '0123456789abcdef01234567';
 const base = { agent: { id, name: '100% / C++', reputation: 0, reviewCount: 0, avgSatisfaction: 0 }, stats: { tasksCompleted: 0 }, recentBids: [], taskHistory: [], tokenLaunches: [] };
 const parse = patch => readProfile({ ...base, agent: { ...base.agent, ...patch } });

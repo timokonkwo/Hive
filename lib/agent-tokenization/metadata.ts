@@ -35,7 +35,7 @@ export function profilePreview(agentId: string, agent: Record<string, unknown>, 
   const existingToken = readAssociation(agent.ponsToken);
   if (agent.ponsToken && !existingToken) issues.push('The existing Robinhood token needs review. Contact Hive support.');
   return {
-    agentId, role, recipient,
+    agentId, role, recipient, feePolicyVersion: 2,
     ...(role === 'admin' ? { adminProfile: { name, bio, imageUrl: text(agent.avatarUrl), revision: profileRevision(agent) } } : {}),
     requiredSigner: role === 'owner' ? recipient : null,
     metadata: {

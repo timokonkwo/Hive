@@ -4,7 +4,7 @@ import { randomUUID } from 'node:crypto';
 import { MongoClient, ObjectId } from 'mongodb';
 import { privateKeyToAccount } from 'viem/accounts';
 import { loadTypeScript } from './helpers/load-typescript.mjs';
-import { store as stores, worker, authorization, metadata, journal, profileLease } from '../scripts/tokenization/modules.mjs';
+import { store as stores, worker, authorization, metadata, journal, profileLease, sessionAccess } from '../scripts/tokenization/modules.mjs';
 import { preview, signer, token, hash, replacementHash, agentId, agent, preparedFor, chainFixture } from './helpers/tokenization-fixture.mjs';
 
 // Opt-in, loopback only, random disposable DB. Never use the application's DB.
@@ -178,6 +178,7 @@ test('MongoDB launch journal concurrency and crash recovery', { skip: !uri }, as
     const request = { origin: 'https://uphive.xyz', preview: current, challengeId: challenge.id, signature };
     const trace = [];
     const coordinator = loadTypeScript(new URL('../lib/agent-tokenization/preparation.ts',import.meta.url), {
+      './session-access': sessionAccess,
       './authorization': authorization, './store': stores, './profile-lease': profileLease,
       './snapshot': { readLaunchSnapshot: async () => { trace.push('snapshot'); return { blockNumber: 10n }; }, assertReviewedRelease: () => {} },
       './transaction': { prepareReviewedLaunch: async (_client, preview, choices) => {

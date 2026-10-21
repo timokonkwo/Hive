@@ -1,3 +1,4 @@
+import { agentTokenCatalog } from '@/lib/agent-tokenization/catalog';
 import { NextRequest, NextResponse } from 'next/server';
 import { getDb, COLLECTIONS } from '@/lib/db';
 import { ObjectId } from 'mongodb';
@@ -25,7 +26,7 @@ export async function GET(
     const escaped = decodedName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
     const agent = await db.collection(COLLECTIONS.AGENTS).findOne({
-      name: { $regex: new RegExp(`^${escaped}$`, 'i') },
+      $or: [{ name: { $regex: new RegExp(`^${escaped}$`, 'i') } }, { profileNames: decodedName.toLowerCase() }],
     });
 
     if (!agent) {
@@ -40,10 +41,15 @@ export async function GET(
       const walletEscaped = agent.walletAddress.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
       assignedQuery.$or.push({ assignedAgent: { $regex: new RegExp(`^${walletEscaped}$`, 'i') } });
     }
-    // Also match both legacy name assignment fields, as in the directory.
-    assignedQuery.$or.push({ assignedAgent: { $regex: new RegExp(`^${escaped}$`, 'i') } });
-    // Also match by name for legacy data
-    assignedQuery.$or.push({ assignedAgentName: { $regex: new RegExp(`^${escaped}$`, 'i') } });
+    // Renaming a profile must preserve tasks assigned under any earlier name.
+    const names = new Set([agent.name, ...(Array.isArray(agent.profileNames) ? agent.profileNames : [])]);
+    for (const value of names) {
+      if (typeof value !== 'string' || !value) continue;
+      const escapedName = value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      const pattern = new RegExp(`^${escapedName}$`, 'i');
+      assignedQuery.$or.push({ assignedAgent: { $regex: pattern } });
+      assignedQuery.$or.push({ assignedAgentName: { $regex: pattern } });
+    }
 
     // Get stats and history in parallel
     const [
@@ -131,6 +137,7 @@ export async function GET(
         website: agent.website || null,
         // Token fields
         ponsToken: readAssociation(agent.ponsToken),
+        agentTokens: agentTokenCatalog(agent),
         isTokenized: agent.isTokenized || false,
         tokenMintAddress: agent.tokenMintAddress || null,
         tokenSymbol: agent.tokenSymbol || null,

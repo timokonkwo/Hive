@@ -1,3 +1,5 @@
+import { createRequire } from 'node:module';
+const requirePackage = createRequire(import.meta.url);
 // Node tooling adapter: compile the same TypeScript modules used by the app.
 import { readFileSync } from 'node:fs';
 import ts from 'typescript';
@@ -12,7 +14,7 @@ const modules = new Map();
 function load(name) {
   if (modules.has(name)) return modules.get(name);
   const source = readFileSync(new URL(`../../lib/agent-tokenization/${name}.ts`, import.meta.url), 'utf8');
-  const code = ts.transpileModule(source, { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 } }).outputText;
+  const code = ts.transpileModule(source, { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022, esModuleInterop: true } }).outputText;
   const compiledModule = { exports: {} };
   new Function('require', 'module', 'exports', code)(dependency => {
     if (dependency === 'viem') return viem;
@@ -22,6 +24,8 @@ function load(name) {
     if (dependency === '@dicebear/core') return dicebear;
     if (dependency === '@dicebear/bottts') return bottts;
     if (dependency === 'cloudinary') return cloudinary;
+    if (dependency === './idl/bags-fee-share-v2.json') return requirePackage('../../lib/agent-tokenization/idl/bags-fee-share-v2.json');
+    if (['@solana/web3.js', '@solana/spl-token', '@pump-fun/pump-sdk', '@pump-fun/pump-swap-sdk', '@coral-xyz/anchor', 'bs58'].includes(dependency) || dependency.startsWith('@bagsfm/bags-sdk/dist/idl/')) return requirePackage(dependency);
     if (/^\.\/[a-z-]+$/.test(dependency)) return load(dependency.slice(2));
     throw Error(`Unsupported tooling import: ${dependency}`);
   }, compiledModule, compiledModule.exports);
@@ -49,3 +53,20 @@ export const managedSigner = load('managed-signer');
 export const managed = load('managed');
 
 export const reviewedRelease = load("release");
+export const platforms = load('platforms');
+export const catalog = load('catalog');
+export const sessions = load('session');
+export const sessionStore = load('session-store');
+
+export const sessionAccess = load('session-access');
+export const sessionRuntime = load('session-runtime');
+export const solanaRuntime = load('solana-runtime');
+export const solanaJournal = load('solana-journal');
+export const bagsValidation = load('bags-validation');
+export const bagsFeeConfig = load('bags-fee-config');
+export const bagsSetup = load('bags-setup');
+export const bagsLaunch = load('bags');
+export const pump = load('pump');
+export const sessionPreview = load('session-preview');
+export const bagsFees = load('bags-fees');
+export const pumpFees = load('pump-fees');

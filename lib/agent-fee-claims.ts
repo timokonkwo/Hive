@@ -1,13 +1,12 @@
 import { randomUUID } from 'node:crypto';
 import type { Db } from 'mongodb';
-import type { AgentBagsClient } from './bags-agent';
-import { claimAgentFees, type FeeTransaction } from './agent-fees';
+import { claimAgentFees, type FeeTransaction, type AgentFeeClient } from './agent-fees';
 
-type ClaimRecord = { _id: string; requestId?: string; leaseId?: string; leaseUntil: Date; transactions: FeeTransaction[]; message?: string; error?: string | null; updatedAt: Date };
+type ClaimRecord = { _id: string; source?:string; requestId?: string; leaseId?: string; leaseUntil: Date; transactions: FeeTransaction[]; message?: string; error?: string | null; updatedAt: Date };
 const collection = (db: Db) => db.collection<ClaimRecord>('agent_fee_claims');
 
 /** A signed transaction is journaled before broadcast, so response loss is recoverable. */
-export async function feeClaimStatus(db: Db, bags: AgentBagsClient) {
+export async function feeClaimStatus(db: Db, bags: Pick<AgentFeeClient, 'connection' | 'getWalletAddress'>) {
   const record = await collection(db).findOne({ _id: bags.getWalletAddress() });
   if (!record) return null;
   const transactions = record.transactions.map(tx => ({ ...tx }));
@@ -32,10 +31,10 @@ export async function feeClaimStatus(db: Db, bags: AgentBagsClient) {
     : confirmed ? `${confirmed} fee claim${confirmed === 1 ? '' : 's'} confirmed.` : record.message || 'No claimable fees found.';
   const error = !pending ? record.error || null : null;
   const message = error ? `${confirmed ? summary + ' ' : ''}${error}` : summary;
-  return { requestId: record.requestId, pending, confirmed, failed, error, message, transactions };
+  return { source:record.source || 'bags-creator', requestId: record.requestId, pending, confirmed, failed, error, message, transactions };
 }
 
-export async function runFeeClaim(db: Db, bags: AgentBagsClient, requestId: string) {
+export async function runFeeClaim(db: Db, bags: AgentFeeClient, requestId: string) {
   if (!/^[a-f0-9-]{36}$/i.test(requestId)) throw Error('Invalid fee claim request.');
   const rows = collection(db), wallet = bags.getWalletAddress(), now = new Date();
   try { await rows.updateOne({ _id: wallet }, { $setOnInsert: { leaseUntil: new Date(0), transactions: [], updatedAt: now } }, { upsert: true }); }
@@ -48,7 +47,7 @@ export async function runFeeClaim(db: Db, bags: AgentBagsClient, requestId: stri
     // Read the saved transactions while holding the wallet lease. Other tabs cannot start a competing batch.
     const previous = await feeClaimStatus(db, bags);
     if (saved.requestId !== requestId && !previous?.transactions.some(tx => !tx.confirmed && !tx.failed)) {
-      await rows.updateOne(fence, { $set: { requestId, transactions: [], error: null, message: 'Preparing fee claims…', updatedAt: now } });
+      await rows.updateOne(fence, { $set: { requestId, source:'source' in bags ? bags.source : 'bags-creator', transactions: [], error: null, message: 'Preparing fee claims…', updatedAt: now } });
       const result = await claimAgentFees(bags, {
         beforeSend: async tx => {
           const result = await rows.updateOne({ ...fence, leaseUntil: { $gt: new Date() } }, { $push: { transactions: tx }, $set: { updatedAt: new Date() } });

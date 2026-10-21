@@ -1,3 +1,4 @@
+import { agentTokenCatalog } from '@/lib/agent-tokenization/catalog';
 import { readAssociation } from '@/lib/agent-tokenization/association';
 import { NextRequest, NextResponse } from 'next/server';
 import { getDb } from '@/lib/db';
@@ -78,6 +79,7 @@ export async function GET(req: NextRequest) {
         toolLaunches: agent.toolLaunches || {},
         website: agent.website || null,
         ponsToken: readAssociation(agent.ponsToken),
+        agentTokens: agentTokenCatalog(agent),
         isTokenized: agent.isTokenized || false,
         tokenLaunchStatus: agent.tokenLaunchStatus || null,
         tokenSymbol: agent.tokenSymbol || null,

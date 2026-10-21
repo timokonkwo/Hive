@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { loadTypeScript } from './helpers/load-typescript.mjs';
-import { policy } from '../scripts/tokenization/modules.mjs';
+import { policy, catalog } from '../scripts/tokenization/modules.mjs';
 const load=(name,imports)=>loadTypeScript(new URL(name,import.meta.url),imports);
 const association=load('../lib/agent-tokenization/association.ts',{'./policy':policy});
 const {ponsAdminStats}=load('../lib/agent-tokenization/admin-stats.ts',{'./association':association,'./policy':policy});
@@ -32,6 +32,7 @@ test('admin list exposes a validated Robinhood association and rejects incomplet
  const rows=[{_id:'sage',name:'Sage',ponsToken:token},{_id:'pending',name:'Pending',ponsToken:{...token,status:'confirming'}},{_id:'solana',isTokenized:true,tokenLaunchStatus:'launched',tokenMintAddress:'solanamint'}];
  const cursor={sort:()=>cursor,skip:()=>cursor,limit:()=>cursor,toArray:async()=>rows};
  const route=load('../app/api/admin/agents/route.ts',{
+  '@/lib/agent-tokenization/catalog':catalog,
   'next/server':{NextResponse:{json:(body,options)=>Response.json(body,options)}},
   '@/lib/admin-auth':{verifyAdmin:async()=>allowed?{}:{error:Response.json({}, {status:403})}},
   '@/lib/db':{getDb:async()=>({collection:()=>({find:()=>cursor,countDocuments:async()=>rows.length})}),COLLECTIONS:{AGENTS:'agents'}},
@@ -43,20 +44,28 @@ test('admin list exposes a validated Robinhood association and rejects incomplet
 });
 
 test('admin totals combine both chains and fee failures remain failures with explorer receipts',async()=>{
- let authorized=false,claims=0;
+ let authorized=false,claims=0,source;
  const next={NextResponse:{json:(body,options)=>Response.json(body,options)}};
  const cursor={sort:()=>cursor,limit:()=>cursor,project:()=>cursor,toArray:async()=>[]};
  const route=load('../app/api/admin/token-stats/route.ts',{
   'next/server':next,'@/lib/admin-auth':{verifyAdmin:async()=>authorized?{}:{error:Response.json({}, {status:403})}},
   '@/lib/db':{COLLECTIONS:{AGENTS:'agents',ACTIVITY:'activity',TOKEN_LAUNCHES:'launches'},getDb:async()=>({collection:()=>({countDocuments:async query=>query.isTokenized?2:0,find:()=>cursor})})},
   '@/lib/bags-agent':{createAgentBagsClient:()=>({getBalance:async()=>1,getWalletAddress:()=>'',getClaimablePositions:async()=>[]})},
-  '@/lib/agent-tokenization/admin-stats':{ponsAdminStats:async()=>({totalLaunched:1,totalQueued:0,totalFailed:0,launchesThisMonth:1,launchesToday:1,recentLaunches:[]})},
+  '@/lib/agent-tokenization/admin-stats':{solanaSessionStats:async()=>({totalLaunched:0,bags:0,pump:0,totalQueued:0,totalFailed:0,launchesThisMonth:0,launchesToday:0,recentLaunches:[]}),ponsAdminStats:async()=>({totalLaunched:1,totalQueued:0,totalFailed:0,launchesThisMonth:1,launchesToday:1,recentLaunches:[]})},
   '@/lib/agent-tokenization/legacy':{legacyAgentLaunchesEnabled:()=>false},
+  '@/lib/agent-tokenization/fee-sources':{additionalFeeBalances:async()=>[{source:'bags-deployer',totalClaimable:.1,error:null},{source:'pump',totalClaimable:null,error:'Unavailable'}],feeClient:(_db,value)=>{source=value;return{};}},
+  '@/lib/agent-tokenization/solana-runtime':{launchConnection:()=>({})},
+  '@/lib/agent-tokenization/session':{HIVE_SOLANA_FEE_WALLET:'wallet'},
   '@/lib/agent-fees':{claimableLamports:()=>0n},
   '@/lib/agent-fee-claims':{feeClaimStatus:async()=>null,runFeeClaim:async()=>{claims++;return{pending:true,confirmed:0,failed:0,transactions:[{signature:'test',confirmed:false}]};}},
  });
- const request=()=>new Request('https://hive.test/api',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({action:'claim-fees',requestId:'00000000-0000-4000-8000-000000000001'})});
+ const request=(source,origin)=>new Request('https://hive.test/api',{method:'POST',headers:{'content-type':'application/json',...(origin?{origin}:{})},body:JSON.stringify({action:'claim-fees',source,requestId:'00000000-0000-4000-8000-000000000001'})});
  assert.equal((await route.POST(request())).status,403);assert.equal(claims,0);authorized=true;
  const data=await(await route.GET(new Request('https://hive.test/api'))).json();assert.equal(data.stats.totalLaunched,3);assert.deepEqual(data.stats.byChain,{solana:2,robinhood:1});
  const response=await route.POST(request());assert.equal(response.status,202);assert.equal((await response.json()).claim.transactions[0].confirmed,false);assert.equal(claims,1);
+ assert.equal(source,'bags-creator');assert.equal(data.feeSources[2].totalClaimable,null);
+ assert.equal((await route.POST(request('pump'))).status,202);assert.equal(source,'pump');
+ assert.equal((await route.POST(request('bags-deployer'))).status,202);assert.equal(source,'bags-deployer');
+ assert.equal((await route.POST(request('other'))).status,400);
+ assert.equal((await route.POST(request('pump','https://attacker.test'))).status,403);assert.equal(claims,3);
 });

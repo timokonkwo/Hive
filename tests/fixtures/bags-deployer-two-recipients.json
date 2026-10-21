@@ -1,0 +1,78 @@
+{
+  "signature": "3J1LxemZfp6bitGeYzsSE9qDXM1iwio5PY2FNppB7mBBW5KCfoz4JHy886SFDn8AVMbp3SyQ6EqjP7BedyTmEuav",
+  "slot": 459529154,
+  "message": "gAIABA2I4zGiod/2HrwTCxw5qtZIlMnTBGfKOokOEZJ7GdEfD2zK5aYsfR5CA/JTQkHA/dIRVAXS3C/oK17qFC+zMWNDGDWQ40DF2O7yv2HNtXmTGJ6WiX3q4RodadiijseeWJE4YDiNCJcIkH6DoO8FWLjNhkeKfWfpPyk+AORzPox/BUe3/0UA/4Gf29fIaaaX3jz4FazawdYSdQxk8Jr26IqcJMUd2ftU5M56ZKd5pPJCo5aNaX1FkU8ndewkWFFEi97xg2FZrnIcp7btObiRPCuuK9d6ctsVTKr30rYUipycvmCNqbtoNp95vRDeUap3GF3dUhUehAgTrHKVTD0Cz7hz/38KBJVYKSUKzrWj7IpfYWFpfjt4m3UAW+dAXNHGhEADBkZv5SEXMv/srbpyw5vnvIzlu8X3EmssQ5s6QAAAANNm50DPmAZYnwSDjPQ1zM01Ub1yMYcrgbmUfX5clzki0EB9TofI0oDf1flR4mQhYM4AkOj1923gljZvD7EudyMAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAB9UaRM8ztFTYPYMhzVBUKMv7Aq3fmWSgIf7yI4yArn0BAkABQKQ0AMACQAJAxAnAAAAAAAAChUBAA0CAwQKCgEFBgcLDgwPEBEKAQgWlgLorkDqp80CAAAA0AdAHwEBAADECQwCAQAMAgAAAFBGAAAAAAAAAc10Em9u+knFeLXML7Buu9gbud8sSmzJda4c7JJzK1OfAAU+CQUHPQ==",
+  "signatures": [
+    "3J1LxemZfp6bitGeYzsSE9qDXM1iwio5PY2FNppB7mBBW5KCfoz4JHy886SFDn8AVMbp3SyQ6EqjP7BedyTmEuav",
+    "3YU46EYuvQNHgqqPfYNe4JYGHs9NZixNa53jM23gAhRvRipL27JETjoLc2ZPu282G2joD9zVTcBjAFrgJaecBrsn"
+  ],
+  "loadedAddresses": {
+    "writable": [],
+    "readonly": [
+      "8SrW8DjZcAPAWYSdSu468LKLQ7WDRaEUsswNvHCiAYs",
+      "So11111111111111111111111111111111111111112",
+      "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
+      "ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL",
+      "5eTTZ83Yn158nGLjsnHQYGP9frmuTadsrsnqs8xnpeVf"
+    ]
+  },
+  "addresses": {
+    "payer": "8KgUXPvq9rmSzpMFj25NGGjpsndWv1fk9QxY1GBLBwgN",
+    "admin": "ADMNwg6TjZz6hs9F9rgH7PDLoTcJEVuCcXML6oQkJXU2",
+    "program_config": "8SrW8DjZcAPAWYSdSu468LKLQ7WDRaEUsswNvHCiAYs",
+    "fee_share_config": "2dWAD4u1BHKGtrQmu3koQ6gJjriQ1VUmWBYFHuca24A4",
+    "fee_share_authority": "4o4vuG5BTi9ZisAEZKLPQDa6Prchen68VFtLY9AVzkUL",
+    "fee_share_authority_quote_ata": "5pxg8BruFXfFCxALajNCtpFm9AVDJMXjcYwJWHfyxDaT",
+    "partner_config": "FEE2tBhCKAt7shrod19QttSVREUYPiyMzoku1mL1gqVK",
+    "partner": "FEE2tBhCKAt7shrod19QttSVREUYPiyMzoku1mL1gqVK",
+    "deployer": "8KgUXPvq9rmSzpMFj25NGGjpsndWv1fk9QxY1GBLBwgN",
+    "deployer_config": "3UY1U4vDXZyiCfPmux8Zy1ea4WDRJTBxpWzLgTi4SeNq",
+    "deployer_vault": "HFmT1tp1U59kWieH82UFQUwmGodVzoaScU2kx1tj1Uuj",
+    "deployer_vault_quote_ata": "7VuRjfHMrxfstDE2DPBRaqp5Ntpu1EB1bsGurqECZwM4",
+    "base_mint": "F1vqVAEZHE1MKHnvgypmPdnQ1q48HXcm1Z3ypyE4BAGS",
+    "quote_mint": "So11111111111111111111111111111111111111112",
+    "system_program": "11111111111111111111111111111111",
+    "token_program": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
+    "associated_token_program": "ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL",
+    "event_authority": "5eTTZ83Yn158nGLjsnHQYGP9frmuTadsrsnqs8xnpeVf",
+    "program": "FEE2tBhCKAt7shrod19QttSVREUYPiyMzoku1mL1gqVK"
+  },
+  "params": {
+    "params": {
+      "bps": [
+        2000,
+        8000
+      ],
+      "finalize_init": true,
+      "deployer_fee_collection_mode": 1,
+      "deployer_fee_collection_platform_bps": 0,
+      "deployer_fee_collection_claimers_bps": 2500
+    }
+  },
+  "claimers": [
+    "8KgUXPvq9rmSzpMFj25NGGjpsndWv1fk9QxY1GBLBwgN",
+    "JCMKPKxtsCYyE13oARKQoia9TNDWFMbL5Y2efoTpX3aX"
+  ],
+  "accounts": {
+    "fee_share_config": {
+      "address": "2dWAD4u1BHKGtrQmu3koQ6gJjriQ1VUmWBYFHuca24A4",
+      "owner": "FEE2tBhCKAt7shrod19QttSVREUYPiyMzoku1mL1gqVK",
+      "data": "KEeInN4xH8nQQH1Oh8jSgN/V+VHiZCFgzgCQ6PX3beCWNm8PsS53IwabiFf+q4GE+2h/Y0YYwDXaxDncGus7VZig8AAAAAABAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAGzK5aYsfR5CA/JTQkHA/dIRVAXS3C/oK17qFC+zMWNDAAAAAAAAAAABAAEAAAAA/AIAAABsyuWmLH0eQgPyU0JBwP3SEVQF0twv6Cte6hQvszFjQ/9/CgSVWCklCs61o+yKX2FhaX47eJt1AFvnQFzRxoRAAgAAANAHQB8="
+    },
+    "deployer_config": {
+      "address": "3UY1U4vDXZyiCfPmux8Zy1ea4WDRJTBxpWzLgTi4SeNq",
+      "owner": "FEE2tBhCKAt7shrod19QttSVREUYPiyMzoku1mL1gqVK",
+      "data": "IFFyXDNpHoZsyuWmLH0eQgPyU0JBwP3SEVQF0twv6Cte6hQvszFjQwEAAMQJAAD/AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=="
+    },
+    "deployer_vault": {
+      "address": "HFmT1tp1U59kWieH82UFQUwmGodVzoaScU2kx1tj1Uuj",
+      "owner": "FEE2tBhCKAt7shrod19QttSVREUYPiyMzoku1mL1gqVK",
+      "data": "Qr1KWOI5ywUAAAAAAAAAAAAAAAAAAAAAQmW1AAAAAABCZbUAAAAAAAAAAAAAAAAAbMrlpix9HkID8lNCQcD90hFUBdLcL+grXuoUL7MxY0MAAAAAAAAA/wAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA="
+    },
+    "program_config": {
+      "address": "8SrW8DjZcAPAWYSdSu468LKLQ7WDRaEUsswNvHCiAYs",
+      "owner": "FEE2tBhCKAt7shrod19QttSVREUYPiyMzoku1mL1gqVK",
+      "data": "xNJa55CVjD+I4zGiod/2HrwTCxw5qtZIlMnTBGfKOokOEZJ7GdEfDwDHX/1Mc801B83WejMWDQPHwtXr1wdQ6bc+edj/mm2yr4gTqtTVIJNoAAAAAAAAAAAAAE0MAAAAAAAA9+DVIJNoAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA/wAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+    }
+  }
+}
