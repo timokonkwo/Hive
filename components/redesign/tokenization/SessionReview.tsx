@@ -5,6 +5,7 @@ import { ChevronDown, Loader2 } from 'lucide-react';
 import { platforms, purchaseLamports, type PlatformId } from '@/lib/agent-tokenization/platforms';
 import type { LaunchMode, LaunchRole } from '@/lib/agent-tokenization/types';
 import { normalizeSymbol, purchaseWei, shortAddress } from '@/lib/agent-tokenization/policy';
+import { formatUnits } from 'viem';
 import { AgentAvatar } from '../AgentAvatar';
 import type { SessionDetails } from './session-model';
 import styles from './tokenization.module.css';
@@ -21,9 +22,15 @@ export interface SessionDraft {
 }
 export function initialSessionDraft(details: SessionDetails, role: LaunchRole): SessionDraft {
   const mode = role === 'admin' ? 'managed' : 'connected';
-  return { symbol: details.preview.metadata.symbol, modes: { evm: mode, solana: mode },
+  const draft: SessionDraft = { symbol: details.session?.metadata.symbol || details.preview.metadata.symbol, modes: { evm: mode, solana: mode },
     addresses: { evm: details.wallets.evm || '', solana: details.wallets.solana || '' },
     purchase: { pons: '0', bags: '0', pump: '0' }, purchasesOpen: false };
+  for (const target of details.session?.targets || []) {
+    const network = target.terms.platform === 'pons' ? 'evm' : 'solana';
+    draft.modes[network] = target.terms.mode; draft.addresses[network] = target.terms.signer;
+    draft.purchase[target.terms.platform] = formatUnits(BigInt(target.terms.purchase), network === 'evm' ? 18 : 9);
+  }
+  return draft;
 }
 const matches = (network: Network, a: string, b: string) => network === 'evm' ? a.toLowerCase() === b.toLowerCase() : a === b;
 

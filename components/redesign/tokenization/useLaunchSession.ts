@@ -39,17 +39,17 @@ export function useLaunchSession(agentId: string, role: LaunchRole, request: Req
       return result;
     } catch (e) { if (alive.current) {
       // A lost response is not proof that a transaction or reservation failed.
-      setNeedsCheck(true);
+      setNeedsCheck(!['pause', 'estimate', 'revise'].includes(String(body.action)));
       setError(e instanceof Error ? e.message : 'The action could not finish. Check its status.');
     } }
     finally { lock.current = false; if (alive.current) setBusy(false); }
   }, [api, agentId, apply]);
-  // Polling only reconciles saved receipts. It never signs, starts the next target or allocates another mint.
+  // Advancement requires a server-validated approval; legacy sessions only reconcile.
   useEffect(() => {
     const session = details?.session;
-    if (!session || details.readOnly || !session.targets.some(t => ['submitted', 'confirming'].includes(t.phase))) return;
+    if (!session || details.readOnly || (!session.approval && !session.targets.some(t => ['submitted', 'confirming'].includes(t.phase)))) return;
     let stopped = false, timer: ReturnType<typeof setTimeout>;
-    const poll = async () => { if (!document.hidden && !lock.current) await action({ action: 'check' }); if (!stopped) timer = setTimeout(poll, 7000); };
+    const poll = async () => { if (!document.hidden && !lock.current) await action({ action: session.approval && !session.paused ? 'advance' : 'check' }); if (!stopped) timer = setTimeout(poll, 7000); };
     timer = setTimeout(poll, 7000); return () => { stopped = true; clearTimeout(timer); };
   }, [details?.session, details?.readOnly, action]);
   return { details, error, setError, busy, loading, needsCheck, load, action };

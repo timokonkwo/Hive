@@ -44,6 +44,7 @@ export class SolanaLaunchRuntime {
   }
   private async save(intent: SolanaIntent) { await this.intents.replaceOne({ _id: intent._id, sessionId: intent.sessionId }, intent); return intent; }
   async prepare(session: LaunchSession, target: SessionTarget, preview: LaunchPreview, retryFailed = false) {
+    session = { ...session, metadata: target.metadata || session.metadata };
     if (target.terms.platform === 'pons' || !target.intentId) throw new SessionConflict('Invalid Solana launch.');
     const platform = target.terms.platform;
     let intent = await this.current(target);
@@ -75,7 +76,7 @@ export class SolanaLaunchRuntime {
         if ((await this.journal.get(bagsSetupStepId(intent._id,step.kind)))?.phase === 'confirmed') completed.add(step.kind);
       }
       let next = intent.bagsPlan?.steps.find(step=>!completed.has(step.kind));
-      if (!intent.bagsPlan || (next && (pending?.phase === 'failed' || !(await this.connection.isBlockhashValid(restoreBagsSetupStep(next).transaction.message.recentBlockhash,{commitment:'confirmed'})).value))) {
+      if (!intent.bagsPlan || (next && (['failed', 'expired'].includes(pending?.phase || '') || !(await this.connection.isBlockhashValid(restoreBagsSetupStep(next).transaction.message.recentBlockhash,{commitment:'confirmed'})).value))) {
         intent.bagsPlan = await refreshBagsSetupPlan(this.connection,api,{mint:intent.mint,uri:intent.uri!,payer:target.terms.signer,
           metadata:session.metadata,purchase:BigInt(target.terms.purchase)},intent.bagsPlan,completed);
         intent.config = intent.bagsPlan.config; intent.authority = intent.bagsPlan.authority;
@@ -95,7 +96,7 @@ export class SolanaLaunchRuntime {
     const purchase = stage === 'setup' ? 0n : BigInt(target.terms.purchase);
     // Hard implementation ceiling, not a charge: the review exposes the exact simulated debit.
     const review = await reviewSolanaTransaction(this.connection, built.transaction, target.terms.signer, purchase + 100_000_000n, built.lifetime);
-    if (pending) return pending.phase === 'failed' ? this.journal.retryFailed(pending,review) : this.journal.refresh(pending, review);
+    if (pending) return ['failed', 'expired'].includes(pending.phase) ? this.journal.retryFailed(pending,review) : this.journal.refresh(pending, review);
     const id = stage === 'launch' ? (intent.launchStep || `${intent._id}:launch`)
       : setupId!;
     if (stage === 'setup' && !intent.setupSteps.includes(id)) intent.setupSteps.push(id);
@@ -127,10 +128,17 @@ export class SolanaLaunchRuntime {
     });
   }
   async reconcile(session: LaunchSession, target: SessionTarget) {
+    session = { ...session, metadata: target.metadata || session.metadata };
     const intent = await this.current(target); if (!intent) return { phase: 'preparing' as const };
     const pending = await this.pendingStep(target);
     if (pending) {
-      const step = await this.journal.reconcile(pending, this.connection);
+      const witnessUrl = process.env.SOLANA_CONFIRMATION_RPC_URL || 'https://api.mainnet-beta.solana.com';
+      const witness = this.connection.rpcEndpoint !== witnessUrl ? new Connection(witnessUrl, {
+        commitment: 'finalized', disableRetryOnRateLimit: true,
+        fetch: (input, init) => fetch(input, { ...init, signal: AbortSignal.timeout(8000) }),
+      }) : undefined;
+      const step = await this.journal.reconcile(pending, this.connection, witness);
+      if (step.phase === 'expired') return { phase: 'awaiting-signature' as const };
       if (step.phase === 'failed') return { phase: 'failed' as const, error: 'The transaction failed. Your completed launches are saved.' };
       if (step.phase === 'submitted') return { phase: 'confirming' as const };
       if (step.phase === 'review') return { phase: 'awaiting-signature' as const };

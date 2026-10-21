@@ -4,12 +4,18 @@ import { createPublicClient, http } from 'viem';
 import { SessionStore } from './session-store';
 import { SessionConflict, continueSession, sessionComplete, nextTarget, transitionTarget, type LaunchSession, type TargetResult } from './session';
 import { SolanaLaunchRuntime } from './solana-runtime';
-import { LaunchStore } from './store';
+import { LaunchStore, LaunchConflict } from './store';
 import { runLaunchRecovery } from './worker';
 import type { LaunchPreview } from './types';
 import type { PlatformId } from './platforms';
 import { solanaLaunchesEnabled, verifiedLaunchWallets } from './session-preview';
 import { withAgentProfileLease } from './profile-lease';
+import { approved, approveSession, estimateSession, reserveSpend, prepareSessionPons, confirmSessionPons } from './session-approval';
+import { editablePlatforms } from './session-edit';
+import { unpackPrepared } from './journal';
+import { profilePreview, profileRevision } from './metadata';
+import { broadcastManagedSubmission } from './managed';
+import { ponsClient } from './session-approval';
 
 export class SessionRuntime {
   private readonly store: SessionStore;
@@ -22,7 +28,10 @@ export class SessionRuntime {
   }
   private async update(session: LaunchSession, platform: PlatformId, result: TargetResult) {
     const target = session.targets.find(t => t.terms.platform === platform)!;
-    if (target.phase === result.phase && (!result.intentId || target.intentId === result.intentId)) return session;
+    if (session.paused && target.error && !result.error) result = { ...result, error: target.error };
+    if (target.phase === result.phase && (!result.intentId || target.intentId === result.intentId) && target.error === result.error) return session;
+    if (target.phase === result.phase) return this.store.save(session, { ...session, revision: session.revision + 1,
+      targets: session.targets.map(t => t === target ? { ...t, ...result } : t) });
     return this.store.save(session, transitionTarget(session, platform, result));
   }
   async reconcile(session: LaunchSession) {
@@ -48,17 +57,97 @@ export class SessionRuntime {
       }
       if (session.targets.find(t => t.terms.platform === target.terms.platform)?.phase === 'confirmed') await this.store.publish(session.agentId, target.terms.platform);
     }
+    if (session.approval && sessionComplete(session)) session = await this.store.save(session, { ...session, approval: undefined, revision: session.revision + 1 });
+    if (session.approval && Date.parse(session.approval.expiresAt) <= Date.now()) session = await this.store.save(session, { ...session, paused: true, approval: undefined, revision: session.revision + 1 });
     return session;
   }
   async response(session: LaunchSession) {
     const target = session.targets.find(t => t.terms.platform !== 'pons' && !['confirmed', 'failed', 'skipped', 'queued'].includes(t.phase));
-    return { session, review: target ? await this.solana.review(target) : null };
+    return { session, review: target ? await this.solana.review(target) : null, editablePlatforms: await editablePlatforms(this.db, session) };
+  }
+  /** One bounded unit of durable execution. Invoked by authenticated UI or scheduled recovery. */
+  private async advance(session: LaunchSession, preview: LaunchPreview, assertHeld: () => Promise<void>) {
+    if (!approved(session)) return session;
+    let target = nextTarget(session);
+    if (!target || ['submitted', 'confirming', 'blocked', 'failed'].includes(target.phase)) {
+      if (target && ['submitted', 'confirming'].includes(target.phase) && target.terms.platform !== 'pons') await this.solana.rebroadcast(target);
+      if (target?.terms.platform === 'pons' && target.terms.mode === 'managed' && ['submitted', 'confirming'].includes(target.phase)) {
+        const intent = await new LaunchStore(this.db).current(session.agentId);
+        if (intent?.managedSubmission) await broadcastManagedSubmission(ponsClient(), intent);
+      }
+      return session;
+    }
+    const agent = await this.db.collection('agents').findOne({ _id: new ObjectId(session.agentId) });
+    if (!agent || agent.status !== 'active') throw new SessionConflict('This agent is no longer available for launching.');
+    const platform = target.terms.platform;
+    if (platform !== 'pons' && !solanaLaunchesEnabled(platform)) throw new SessionConflict('This platform is temporarily unavailable.');
+    if (session.role === 'owner') {
+      const wallets = verifiedLaunchWallets(agent);
+      if ((platform === 'pons' ? wallets.evm?.toLowerCase() : wallets.solana) !== target.terms.signer) throw new SessionConflict('The verified launch wallet changed.');
+    }
+    if (target.phase === 'queued') {
+      session = await this.update(session, platform, { phase: 'preparing', ...(platform !== 'pons' ? { intentId: target.intentId || randomUUID() } : {}) });
+      target = session.targets.find(t => t.terms.platform === platform)!;
+    }
+    if (platform === 'pons') {
+      if (target.terms.mode !== 'managed') return session;
+      if (session.role !== 'admin') throw new SessionConflict('Only admins can use Hive deployer.');
+      const prepared = await prepareSessionPons(this.db, session, preview);
+      session = await this.update(session, platform, { phase: 'awaiting-signature', intentId: prepared.intent._id });
+      if (!prepared.intent.prepared) throw new SessionConflict('Pons could not prepare this launch.');
+      const reserved = reserveSpend(session, platform, prepared.intent.prepared.digest, unpackPrepared(prepared.intent.prepared).maximumTotal.toString());
+      if (reserved !== session) session = await this.store.save(session, reserved);
+      await assertHeld();
+      await confirmSessionPons(this.db, prepared);
+      return this.update(session, platform, { phase: 'submitted' });
+    }
+    let step = await this.solana.pendingStep(target);
+    if (!step || step.phase !== 'review' || Date.parse(step.review.expiresAt) <= Date.now()) {
+      step = await this.solana.prepare(session, target, preview, true);
+      session = await this.update(session, platform, await this.solana.reconcile(session, target));
+    }
+    if (!step || step.phase !== 'review' || target.terms.mode !== 'managed') return session;
+    const reserved = reserveSpend(session, platform, `${step._id}:${step.review.digest}`, step.review.maximumDebit);
+    if (reserved !== session) session = await this.store.save(session, reserved);
+    await assertHeld();
+    await this.solana.confirm(session, target, step._id, step.review.digest);
+    return this.update(session, platform, { phase: 'submitted' });
   }
   async act(preview: LaunchPreview, body: Record<string, unknown>) {
     return withAgentProfileLease(this.db, `session:${preview.agentId}`, async assertHeld => {
       let session = await this.require(preview.agentId, body.id, preview.role);
+      if (body.action === 'pause') {
+        session = await this.store.save(session, { ...session, paused: true, editing: true, approval: undefined, estimate: undefined, revision: session.revision + 1,
+          targets: session.targets.map(t => t.intentId ? { ...t, metadata: t.metadata || session.metadata } : t) });
+        return this.response(session);
+      }
       session = await this.reconcile(session);
       if (body.action === 'check') return this.response(session);
+      if (body.action === 'estimate') {
+        if (approved(session)) throw new SessionConflict('Pause before changing this launch.');
+        const failed = session.targets.find(t => t.phase === 'failed');
+        if (failed) session = await this.store.save(session, continueSession(session, { platform: failed.terms.platform, action: 'retry' }));
+        if (session.editing && session.profileRevision !== profileRevision(await this.db.collection('agents').findOne({ _id: new ObjectId(session.agentId) }) || {})) throw new SessionConflict('Save the edited launch details before continuing.');
+        const estimate = await estimateSession(session, preview);
+        session = await this.store.save(session, { ...session, estimate, revision: session.revision + 1 });
+        return this.response(session);
+      }
+      if (body.action === 'approve') {
+        if (!approved(session)) session = await this.store.save(session, approveSession(session, body.confirmation));
+        return this.response(session);
+      }
+      if (body.action === 'advance') {
+        try { session = await this.advance(session, preview, assertHeld); }
+        catch (error) {
+          // No blind retries after a signing/preparation error. Reconcile the journal before the next approval.
+          session = await this.require(preview.agentId, body.id, preview.role);
+          const message = error instanceof SessionConflict || error instanceof LaunchConflict ? error.message : 'Launch interrupted. Review the remaining platforms to continue.';
+          const target = nextTarget(session);
+          session = await this.store.save(session, { ...session, paused: true, approval: undefined, revision: session.revision + 1,
+            targets: session.targets.map(t => t === target ? { ...t, error: message } : t) });
+        }
+        return this.response(session);
+      }
       if (body.action === 'retry' || body.action === 'skip' || body.action === 'continue') {
         const platform = body.platform as PlatformId;
         const next = continueSession(session, body.action === 'continue' ? undefined : { platform, action: body.action });
@@ -66,6 +155,7 @@ export class SessionRuntime {
         if (body.action !== 'retry') return this.response(session);
       }
       if (sessionComplete(session)) return this.response(session);
+      if (session.editing && ['prepare', 'retry', 'confirm'].includes(String(body.action))) throw new SessionConflict('Finish editing and review the launch first.');
       const target = nextTarget(session) || session.targets.find(t => ['preparing', 'awaiting-signature', 'submitted', 'confirming'].includes(t.phase));
       if (!target) throw new SessionConflict('Resolve the current launch before continuing.');
       const platform = target.terms.platform;
@@ -99,6 +189,12 @@ export class SessionRuntime {
         if (platform === 'pons') throw new SessionConflict('Use the Pons transaction review.');
         if (!solanaLaunchesEnabled(platform)) throw new SessionConflict('New signatures are temporarily unavailable.');
         if (typeof body.stepId !== 'string' || typeof body.confirmation !== 'string') throw new SessionConflict('Review the transaction first.');
+        if (session.approval) {
+          const step = await this.solana.pendingStep(target);
+          if (!step) throw new SessionConflict('Prepare the transaction first.');
+          const reserved = reserveSpend(session, platform, `${step._id}:${step.review.digest}`, step.review.maximumDebit);
+          if (reserved !== session) session = await this.store.save(session, reserved);
+        }
         await this.solana.confirm(session, target, body.stepId, body.confirmation, typeof body.signed === 'string' ? body.signed : undefined);
         await assertHeld();
         session = await this.update(session, platform, { phase: 'submitted' });
@@ -108,22 +204,28 @@ export class SessionRuntime {
   }
 }
 
-/** Scheduled recovery only reconciles saved results; it never allocates a mint, signs, or advances a queued target. */
+/** Legacy sessions only reconcile. Explicit, unexpired approvals can advance without an open browser. */
 export async function recoverLaunchSessions(db: Db, budgetMs = 25_000, runtime = new SessionRuntime(db)) {
   const deadline = Date.now() + budgetMs;
   const records = await db.collection<{ _id: string; session: LaunchSession }>('agent_launch_sessions').find({ $or: [
     // A process can stop after persisting signed bytes but before updating the session.
     // Reconciliation only reads journals/receipts, including when the UI still says review.
-    { 'session.targets.phase': { $in: ['preparing', 'awaiting-signature', 'submitted', 'confirming', 'blocked'] } }, { projectionPending: true },
+    { 'session.targets.phase': { $in: ['preparing', 'awaiting-signature', 'submitted', 'confirming', 'blocked'] } }, { 'session.approval.digest': { $type: 'string' }, 'session.paused': false }, { projectionPending: true },
   ] }).sort({ recoveredAt: 1, updatedAt: 1 }).limit(5).toArray();
   let checked = 0, errors = 0;
   for (const record of records) {
     if (Date.now() >= deadline) break;
     try {
+      let current: LaunchSession | undefined;
       await withAgentProfileLease(db, `session:${record._id}`, async () => {
         const session = await runtime.require(record._id, record.session.id, record.session.role);
-        await runtime.reconcile(session);
-      }); checked++;
+        current = await runtime.reconcile(session);
+      });
+      if (current && approved(current) && Date.now() < deadline) {
+        const agent = await db.collection('agents').findOne({ _id: new ObjectId(record._id) });
+        if (agent) await runtime.act(profilePreview(record._id, agent, current.role), { action: 'advance', id: current.id });
+      }
+      checked++;
     } catch { errors++; }
     finally {
       // Rotate unchanged reviews too, so abandoned tabs cannot starve submitted launches.

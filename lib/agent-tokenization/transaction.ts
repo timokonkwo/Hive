@@ -2,6 +2,7 @@ import { decodeFunctionResult, encodeFunctionData, zeroAddress, type Address, ty
 import { factoryAbi, routerAbi } from './abi';
 import { creatorTaxBps, PONS_CHAIN_ID, feeRecipient, normalizeSymbol, purchaseWei, sameAddress, validAddress, validHash, validTokenLogo } from './policy';
 import { quoteOpeningBuy } from './quote';
+import { profileUrl } from './platforms';
 import { assertLaunchAvailable, assertReviewedRelease, type LaunchSnapshot, type ReviewedRelease } from './snapshot';
 import type { LaunchPreview } from './types';
 
@@ -29,8 +30,8 @@ export function buildLaunchCandidate(preview: LaunchPreview, choices: LaunchChoi
   if (!validTokenLogo(choices.logoURI)) {
     throw Error('The agent avatar must be stored before preparing a launch.');
   }
-  const website = `https://uphive.xyz/agent/${encodeURIComponent(preview.metadata.name)}`;
-  if (preview.metadata.socials.website !== website || preview.metadata.socials.twitter !== '' || preview.metadata.socials.telegram !== '') {
+  const website = preview.metadata.socials.website;
+  if (![profileUrl(preview.agentId), `https://uphive.xyz/agent/${encodeURIComponent(preview.metadata.name)}`].includes(website) || preview.metadata.socials.twitter !== '' || preview.metadata.socials.telegram !== '') {
     throw Error('The token profile links changed. Refresh the review.');
   }
   const budget = purchaseWei(choices.purchase);

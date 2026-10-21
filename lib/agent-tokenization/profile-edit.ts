@@ -21,7 +21,8 @@ export async function saveAgentProfile(db: Db, agentId: string, input: Record<st
     const agent = await agents.findOne({ _id: id });
     if (!agent) throw new ProfileEditError(404, 'Agent not found.');
     const session = await db.collection<{ _id: string; session: LaunchSession }>('agent_launch_sessions').findOne({ _id: agentId });
-    if ((session && !sessionComplete(session.session)) || await db.collection('pons_launch_intents').findOne({ agentId, active: true, phase: { $ne: 'confirmed' } })) {
+    const editing = session?.session.editing && session.session.paused && !session.session.approval;
+    if ((session && !sessionComplete(session.session) && !editing) || (!editing && await db.collection('pons_launch_intents').findOne({ agentId, active: true, phase: { $ne: 'confirmed' } }))) {
       throw new LaunchConflict('This agent already has a launch. Resolve it before editing these details.');
     }
     if (profileRevision(agent) !== input.revision) throw new LaunchConflict('Agent details changed. Close and reopen this review before saving.');

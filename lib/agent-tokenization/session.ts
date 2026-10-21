@@ -22,6 +22,15 @@ export interface SessionTarget {
   intentId?: string;
   token?: AgentToken;
   error?: string;
+  /** Freeze metadata for an intent; subsequent edits apply to unstarted targets. */
+  metadata?: AgentTokenMetadata;
+  replacementSetup?: boolean;
+}
+export interface SessionApproval {
+  digest: string;
+  expiresAt: string;
+  limits: Partial<Record<PlatformId, string>>;
+  reserved: Record<string, { platform: PlatformId; amount: string }>;
 }
 export interface LaunchSession {
   id: string;
@@ -34,6 +43,9 @@ export interface LaunchSession {
   revision: number;
   paused: boolean;
   createdAt: string;
+  approval?: SessionApproval;
+  estimate?: { digest: string; expiresAt: string; limits: Partial<Record<PlatformId, string>> };
+  editing?: boolean;
 }
 export class SessionConflict extends Error {}
 
@@ -41,10 +53,11 @@ export function reviewSession(input: {
   id: string; agentId: string; role: LaunchRole; metadata: AgentTokenMetadata; profileRevision: string;
   choices: { platform: PlatformId; mode: LaunchMode; signer: string; purchase: string }[];
   verifiedOwnerEvm: string | null; verifiedOwnerSolana: string | null;
+  allowEmpty?: boolean;
 }, now = new Date()): LaunchSession {
   if (!/^[a-f0-9-]{36}$/.test(input.id) || !/^[a-f0-9]{24}$/.test(input.agentId)
     || !/^[a-f0-9]{64}$/.test(input.profileRevision) || !['owner', 'admin'].includes(input.role)) throw new SessionConflict('Refresh the agent details.');
-  if (!Array.isArray(input.choices) || input.choices.length < 1 || input.choices.length > 3
+  if (!Array.isArray(input.choices) || (!input.allowEmpty && input.choices.length < 1) || input.choices.length > 3
     || new Set(input.choices.map(c => c.platform)).size !== input.choices.length) throw new SessionConflict('Select each platform at most once.');
   const metadata = { ...input.metadata, symbol: normalizeSymbol(input.metadata.symbol),
     socials: { website: profileUrl(input.agentId), twitter: '' as const, telegram: '' as const } };
@@ -118,6 +131,7 @@ export function transitionTarget(session: LaunchSession, platform: PlatformId, r
   return { ...session, revision: session.revision + 1,
     paused: session.paused || result.phase === 'failed' || result.phase === 'blocked',
     targets: session.targets.map(t => t !== target ? t : { ...t, phase: result.phase,
+      ...(result.intentId && !t.metadata ? { metadata: session.metadata } : {}),
       ...(result.phase === 'queued' && platform === 'pons' ? { intentId: undefined } : {}),
       ...(result.intentId ? { intentId: result.intentId } : {}), token,
       error: result.error?.slice(0, 240) }) };

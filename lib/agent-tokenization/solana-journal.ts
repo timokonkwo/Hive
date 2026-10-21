@@ -69,7 +69,9 @@ export interface SolanaStep {
   mint: string;
   review: SolanaReview;
   revision: number;
-  phase: 'review' | 'submitted' | 'confirmed' | 'failed';
+  phase: 'review' | 'submitted' | 'confirmed' | 'failed' | 'expired';
+  expiredAt?: string;
+  broadcastError?: string;
   signature?: string;
   submission?: SealedValue;
   slot?: number;
@@ -126,14 +128,14 @@ export class SolanaJournal {
   }
   /** Only a verified finalized failure permits a replacement message for this same step/mint. */
   async retryFailed(step: SolanaStep, review: SolanaReview) {
-    if (step.phase !== 'failed' || !step.signature || !step.slot || !step.submission || step.review.digest === review.digest) {
+    if (!['failed', 'expired'].includes(step.phase) || !step.signature || (!step.slot && !step.expiredAt) || !step.submission || step.review.digest === review.digest) {
       throw new SessionConflict('The failed transaction needs a fresh review. Check status and try again.');
     }
     // Keep the failed signature and exact encrypted submission for audit/recovery.
     await this.db.collection<SolanaStep & {stepId:string}>('agent_launch_solana_attempts').updateOne({ _id: step.signature },
       { $setOnInsert: { ...step, _id:step.signature, stepId:step._id } },{upsert:true});
-    const saved=await this.steps.findOneAndUpdate({_id:step._id,revision:step.revision,phase:'failed',signature:step.signature},{
-      $set:{review,phase:'review'},$unset:{signature:'',submission:'',slot:''},$inc:{revision:1},
+    const saved=await this.steps.findOneAndUpdate({_id:step._id,revision:step.revision,phase:step.phase,signature:step.signature},{
+      $set:{review,phase:'review'},$unset:{signature:'',submission:'',slot:'',expiredAt:'',broadcastError:''},$inc:{revision:1},
     },{returnDocument:'after'});
     if(!saved) throw new SessionConflict('The transaction changed. Check its status.');
     return saved;
@@ -163,17 +165,40 @@ export class SolanaJournal {
     try {
       const signature = await connection.sendRawTransaction(bytes, { skipPreflight: false, maxRetries: 2, preflightCommitment: 'confirmed' });
       if (signature !== step.signature) throw new SessionConflict('The RPC returned a different transaction.');
-    } catch {
+    } catch (error) {
+      // Store only an allowlisted classification; provider errors may contain secrets.
+      const message = error instanceof Error ? error.message : '';
+      const broadcastError = /blockhash/i.test(message) ? 'Transaction expired before submission.'
+        : /simulation|preflight/i.test(message) ? 'The network rejected the transaction simulation.'
+        : 'Submission could not be confirmed. Retrying automatically.';
+      await this.steps.updateOne({ _id: step._id, signature: step.signature, phase: 'submitted' }, { $set: { broadcastError } });
       // A lost response, timeout or expired blockhash is unresolved. Reconcile history; never replace the mint.
       return false;
     }
     return true;
   }
-  async reconcile(step: SolanaStep, connection: Connection) {
+  async reconcile(step: SolanaStep, connection: Connection, witness?: Connection) {
     if (!step.signature || step.phase !== 'submitted') return step;
     if (await connection.getGenesisHash() !== SOLANA_MAINNET_GENESIS) throw new SessionConflict('The RPC is not connected to Solana mainnet.');
     const status = (await connection.getSignatureStatuses([step.signature], { searchTransactionHistory: true })).value[0];
-    if (!status || status.confirmationStatus !== 'finalized') return step;
+    if (!status) {
+      // A timeout is not failure. Replacement requires expired lifetime and independent history reads.
+      const limit = step.review?.lastValidBlockHeight;
+      if (!witness || !Number.isSafeInteger(limit) || await connection.getBlockHeight('finalized') <= limit!) return step;
+      const absent = async (rpc: Connection) => {
+        if (await rpc.getGenesisHash() !== SOLANA_MAINNET_GENESIS || await rpc.getBlockHeight('finalized') <= limit!) return false;
+        if ((await rpc.isBlockhashValid(step.review.blockhash, { commitment: 'finalized' })).value) return false;
+        if ((await rpc.getSignatureStatuses([step.signature!], { searchTransactionHistory: true })).value[0]) return false;
+        return await rpc.getTransaction(step.signature!, { commitment: 'finalized', maxSupportedTransactionVersion: 0 }) === null;
+      };
+      if (!await absent(connection) || !await absent(witness)) return step;
+      const saved = await this.steps.findOneAndUpdate({ _id: step._id, revision: step.revision, phase: 'submitted' }, {
+        $set: { phase: 'expired', expiredAt: new Date().toISOString() }, $inc: { revision: 1 },
+      }, { returnDocument: 'after' });
+      if (!saved) throw new SessionConflict('The transaction changed. Check its status.');
+      return saved;
+    }
+    if (status.confirmationStatus !== 'finalized') return step;
     // Exact finalized message prevents attaching an unrelated transaction even from a compromised provider response.
     const receipt = await connection.getTransaction(step.signature, { commitment: 'finalized', maxSupportedTransactionVersion: 0 });
     if (!receipt || !receipt.meta || receipt.slot !== status.slot || receipt.transaction.signatures[0] !== step.signature) return step;

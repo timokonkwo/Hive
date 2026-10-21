@@ -68,6 +68,16 @@ export class SessionStore {
     return saved.session;
   }
 
+  async revise(previous: LaunchSession, next: LaunchSession) {
+    if (!previous.editing || !previous.paused || previous.approval || next.approval || next.id !== previous.id || next.agentId !== previous.agentId || next.revision !== previous.revision + 1) throw new SessionConflict('Invalid launch edit.');
+    await this.db.collection('agent_launch_session_history').updateOne({ sessionId: previous.id, revision: previous.revision }, { $setOnInsert: { session: previous, archivedAt: new Date() } }, { upsert: true });
+    const saved = await this.records.findOneAndUpdate({ _id: previous.agentId, 'session.id': previous.id, 'session.revision': previous.revision }, {
+      $set: { session: next, updatedAt: new Date() }, $inc: { revision: 1 },
+    }, { returnDocument: 'after' });
+    if (!saved) throw new SessionConflict('The launch changed. Refresh and try again.');
+    return saved.session;
+  }
+
   /** Durable unique network/address ownership before the public projection. Retried publication is harmless. */
   async publish(agentId: string, platform: PlatformId) {
     const record = await this.current(agentId);

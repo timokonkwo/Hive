@@ -62,7 +62,7 @@ export async function withLaunchAccess(req: NextRequest, params: Promise<{ addre
       const agent = await db.collection('agents').findOne({ _id: new ObjectId(agentId) });
       if (!agent) throw new LaunchHttpError(404, 'Agent not found.');
       const preview = profilePreview(agentId, agent, role);
-      if (req.nextUrl.pathname.includes('/session')) return preview;
+      if (req.nextUrl.pathname.includes('/session') || req.nextUrl.pathname.endsWith('/profile')) return preview;
       return sessionPonsPreview(db, preview, req.nextUrl.searchParams.get('session') || undefined);
     };
     return await operation({ db, preview: await refreshPreview(), origin, refreshPreview });

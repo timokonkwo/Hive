@@ -70,3 +70,5 @@ export const pump = load('pump');
 export const sessionPreview = load('session-preview');
 export const bagsFees = load('bags-fees');
 export const pumpFees = load('pump-fees');
+export const sessionApproval = load('session-approval');
+export const sessionEdit = load('session-edit');

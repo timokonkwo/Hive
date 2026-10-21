@@ -27,6 +27,8 @@ function harness() {
     'next/server': next, mongodb, '@/lib/agent-tokenization/http': http,
     '@/lib/agent-tokenization/session': sessions, '@/lib/agent-tokenization/metadata': metadata,
     '@/lib/agent-tokenization/platforms': platforms,
+    '@/lib/agent-tokenization/profile-lease': { withAgentProfileLease: async (_db, _id, fn) => fn(async () => {}) },
+    '@/lib/agent-tokenization/session-edit': { reviseSession: async () => { throw Error('Unexpected edit'); } },
     '@/lib/agent-tokenization/session-preview': { sessionPreview: preview, verifiedLaunchWallets: () => wallets },
     '@/lib/agent-tokenization/session-store': { SessionStore: class {
       async current() { return state.session ? { session: state.session } : null; }

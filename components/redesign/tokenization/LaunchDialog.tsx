@@ -11,6 +11,7 @@ import type { Request } from '../task/useResource';
 import { PlatformSelection } from './PlatformSelection';
 import { SessionReview, initialSessionDraft, type SessionChoice, type SessionDraft } from './SessionReview';
 import { SolanaLaunchReview } from './SolanaLaunchReview';
+import { LaunchApproval } from './LaunchApproval';
 import { LaunchBatchProgress } from './LaunchBatchProgress';
 import { PonsLaunchDialog } from './PonsLaunchDialog';
 import { AgentDetailsEditor, type AgentProfileEdit } from './AgentDetailsEditor';
@@ -22,7 +23,7 @@ export function LaunchDialog(props: Props) { return <LaunchDialogContent key={`$
 function LaunchDialogContent({ agentId, role, request, close }: Props) {
   const dialog = useRef<HTMLDialogElement>(null), id = useId(), createId = useRef<string | null>(null);
   const flow = useLaunchSession(agentId, role, request), { details } = flow;
-  const [selected, setSelected] = useState<PlatformId[]>([]), [view, setView] = useState<'select' | 'review' | 'edit' | 'progress'>('select');
+  const [selected, setSelected] = useState<PlatformId[]>([]), [view, setView] = useState<'select' | 'review' | 'edit' | 'progress' | 'overview' | 'approval'>('select');
   const [draft, setDraft] = useState<SessionDraft | null>(null);
   const [pons, setPons] = useState(false), [legacy, setLegacy] = useState(false), [signing, setSigning] = useState(false), [editorBusy, setEditorBusy] = useState(false);
   const signingLock = useRef(false), alive = useRef(true), returnFocus = useRef<HTMLElement | null>(null);
@@ -49,18 +50,36 @@ function LaunchDialogContent({ agentId, role, request, close }: Props) {
     if (heading) { heading.tabIndex = -1; heading.focus({ preventScroll: true }); }
   }, [view]);
   const session = details?.session;
-  useEffect(() => { if (session?.id) setView('progress'); }, [session?.id]);
+  useEffect(() => { if (session?.id) setView('overview'); }, [session?.id]);
   const current = session?.targets.find(t => !['confirmed', 'skipped'].includes(t.phase));
   const complete = !!session && !current;
   const ponsTarget = session?.targets.find(t => t.terms.platform === 'pons');
+  async function estimate() {
+    const result = await flow.action({ action: 'estimate' });
+    if (result) setView('approval');
+  }
+  async function editRemaining() {
+    const result = await flow.action({ action: 'pause' });
+    if (!result || !details) return;
+    setDraft(initialSessionDraft({ ...details, ...result }, role));
+    setSelected(result.session.targets.filter(t => !['confirmed', 'skipped'].includes(t.phase) && result.editablePlatforms?.includes(t.terms.platform)).map(t => t.terms.platform));
+    setView('select');
+    await flow.load();
+  }
   async function start(symbol: string, choices: SessionChoice[]) {
     createId.current ||= crypto.randomUUID();
-    const result = await flow.action({ action: 'create', id: createId.current, revision: details!.profileRevision, symbol, choices });
+    const revising = !!session?.editing;
+    const result = await flow.action({ action: revising ? 'revise' : 'create', id: revising ? session!.id : createId.current,
+      sessionRevision: session?.revision, revision: details!.profileRevision, symbol, choices });
     if (result) {
       createId.current = null;
-      const prepared = await flow.action({ action: 'prepare', id: result.session.id });
-      if (prepared?.session.targets.find(t => !['confirmed', 'skipped'].includes(t.phase))?.terms.platform === 'pons') setPons(true);
+      if (result.session.targets.every(t => ['confirmed', 'skipped'].includes(t.phase))) { setView('overview'); return; }
+      await estimate();
     }
+  }
+  async function launch() {
+    const result = await flow.action({ action: 'approve', confirmation: session?.estimate?.digest });
+    if (result) { setView('progress'); await flow.action({ action: 'advance' }); }
   }
   async function prepare() { const result = await flow.action({ action: 'prepare' }); if (result?.session.targets.find(t => !['confirmed', 'skipped'].includes(t.phase))?.terms.platform === 'pons') setPons(true); }
   async function confirm() {
@@ -96,25 +115,32 @@ function LaunchDialogContent({ agentId, role, request, close }: Props) {
     <div className={styles.body} aria-busy={busy || flow.loading}>
       {flow.loading ? <div className={styles.pending} role="status"><Loader2 size={24} className={styles.spinner} aria-hidden="true" /><p>Loading token details…</p></div>
         : !details ? <button className={styles.secondary} onClick={() => void flow.load()}>Try again</button>
-        : session && (!complete || view === 'progress') ? <>
-          <LaunchBatchProgress session={session} busy={busy} readOnly={details.readOnly || flow.needsCheck} onCheck={() => void flow.action({ action: 'check' })}
-            onContinue={() => void flow.action({ action: 'continue' })} onRetry={platform => void flow.action({ action: 'retry', platform })} onSkip={platform => void flow.action({ action: 'skip', platform })} />
-          {details.readOnly ? <p className={styles.hint}>Resume this launch from the account that started it.</p>
-            : flow.needsCheck ? null
-            : details.review && current && ['awaiting-signature', 'preparing'].includes(current.phase)
+        : session && view === 'approval' ? <LaunchApproval session={session} busy={busy} launch={() => void launch()} back={() => void editRemaining()} />
+        : session && (view === 'overview' || view === 'progress') ? <>
+          <LaunchBatchProgress session={session} busy={busy} readOnly onCheck={() => void flow.action({ action: 'check' })}
+            onContinue={() => void estimate()} onRetry={() => void estimate()} onSkip={() => void editRemaining()} />
+          {!details.readOnly && !complete && <>
+            {session.paused && current?.error && <p className={styles.notice} role="alert">{current.error}</p>}
+            {view === 'progress' && session.approval && !session.paused && current?.terms.mode === 'connected' && details.review
               ? <SolanaLaunchReview review={details.review} purchase={current.terms.purchase} busy={busy} signing={signing}
-                connected={solana.some(w => w.address === details.review!.signer)} confirm={() => void confirm()} refresh={() => void prepare()}
-                connect={() => connectWallet({ walletChainType: 'solana-only' })} />
-              : current && (!session.paused || ['preparing', 'awaiting-signature'].includes(current.phase)) && ['queued', 'preparing', 'awaiting-signature'].includes(current.phase)
-                && <button type="button" className={styles.primary} disabled={busy} onClick={() => void prepare()}>{busy && <Loader2 size={17} className={styles.spinner} aria-hidden="true" />}{busy ? 'Preparing review…' : current.terms.platform === 'pons' ? 'Review Pons launch' : `Continue with ${platforms[current.terms.platform].name}`}</button>}
-          {current && ['submitted', 'confirming'].includes(current.phase) && !details.readOnly && !flow.needsCheck && <button type="button" className={styles.secondary} disabled={busy} onClick={() => current.terms.platform === 'pons' ? setPons(true) : void flow.action({ action: 'rebroadcast' })}>{busy && <Loader2 size={16} className={styles.spinner} aria-hidden="true" />}Retry submission</button>}
+                  connected={solana.some(w => w.address === details.review!.signer)} confirm={() => void confirm()} refresh={() => void prepare()}
+                  connect={() => connectWallet({ walletChainType: 'solana-only' })} />
+              : view === 'progress' && session.approval && !session.paused && current?.terms.mode === 'connected' && current.terms.platform === 'pons'
+                ? <button type="button" className={styles.primary} disabled={busy} onClick={() => setPons(true)}>Sign with wallet</button>
+                : null}
+            <div className={styles.reviewActions}>
+              <button type="button" className={styles.secondary} disabled={busy} onClick={() => void editRemaining()}>{busy && <Loader2 size={17} className={styles.spinner} aria-hidden="true" />}Edit remaining launches</button>
+              {(!session.approval || session.paused) && <button type="button" className={styles.primary} disabled={busy} onClick={() => void estimate()}>{busy && <Loader2 size={17} className={styles.spinner} aria-hidden="true" />}Continue</button>}
+              {session.approval && !session.paused && view === 'overview' && <button type="button" className={styles.primary} onClick={() => setView('progress')}>View progress</button>}
+            </div>
+          </>}
           {complete && <button type="button" className={styles.secondary} onClick={() => { setDraft(null); setSelected([]); setView('select'); void flow.load(); }}>Manage tokens</button>}
         </> : flow.needsCheck ? null
           : view === 'edit' && details.preview.adminProfile ? <AgentDetailsEditor preview={details.preview} save={saveProfile} cancel={() => setView('review')} busyChanged={setEditorBusy} />
           : view === 'review' ? <SessionReview details={details} selected={selected} role={role} busy={busy} draft={draft || initialSessionDraft(details, role)} change={value => { createId.current = null; setDraft(value); }}
             wallets={{ evm: evm.map(w => ({ address: w.address, label: w.walletClientType || 'Wallet' })), solana: solana.map(w => ({ address: w.address, label: 'Solana wallet' })) }}
             connect={network => connectWallet({ walletChainType: network === 'evm' ? 'ethereum-only' : 'solana-only' })} submit={(symbol, choices) => void start(symbol, choices)} back={() => setView('select')} edit={() => setView('edit')} />
-          : <PlatformSelection options={details.options} selected={selected} onChange={value => { createId.current = null; setSelected(value); }} busy={busy} onContinue={() => setView('review')} onResume={() => setLegacy(true)} />}
+          : <><PlatformSelection options={details.options.map(option => session?.editing && session.targets.some(t => t.terms.platform === option.platform && !['confirmed', 'skipped'].includes(t.phase)) && !details.editablePlatforms?.includes(option.platform) ? { ...option, available: false, pending: false, reason: 'Submitted transaction is settling' } : option)} selected={selected} onChange={value => { createId.current = null; setSelected(value); }} busy={busy} onContinue={() => setView('review')} onResume={() => setLegacy(true)} />{session?.editing && <div className={styles.reviewActions}><button type="button" className={styles.secondary} disabled={busy} onClick={() => setView('overview')}>Back</button>{selected.length === 0 && <button type="button" className={styles.secondary} disabled={busy} onClick={() => void start(draft?.symbol || session.metadata.symbol, [])}>Remove remaining launches</button>}</div>}</>}
       {(flow.error || flow.needsCheck) && <div className={styles.notice} role="alert"><p>{flow.error || 'Check the saved launch before continuing.'}</p>{flow.needsCheck && <button type="button" className={styles.secondary} disabled={busy || flow.loading} onClick={() => session && !details?.readOnly ? void flow.action({ action: 'check' }) : void flow.load()}>{(busy || flow.loading) && <Loader2 size={16} className={styles.spinner} aria-hidden="true" />}{busy || flow.loading ? 'Checking status…' : 'Check status'}</button>}</div>}
     </div>
   </dialog>;

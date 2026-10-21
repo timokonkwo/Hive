@@ -8,6 +8,8 @@ import { sessionPreview, verifiedLaunchWallets } from '@/lib/agent-tokenization/
 import { profileRevision } from '@/lib/agent-tokenization/metadata';
 import { isPlatform, purchaseLamports, type PlatformId } from '@/lib/agent-tokenization/platforms';
 import type { LaunchMode } from '@/lib/agent-tokenization/types';
+import { withAgentProfileLease } from '@/lib/agent-tokenization/profile-lease';
+import { reviseSession } from '@/lib/agent-tokenization/session-edit';
 
 export const dynamic = 'force-dynamic';
 export const maxDuration = 60;
@@ -25,10 +27,10 @@ export async function GET(req: NextRequest, { params }: Params) {
 export async function POST(req: NextRequest, { params }: Params) {
   return withLaunchAccess(req, params, async ({ db, preview, origin }) => {
     if (req.headers.get('origin') !== origin) throw new LaunchHttpError(403, 'Open Hive on its configured website to continue.');
-    const body = await readLaunchBody(req, ['action', 'id', 'revision', 'symbol', 'choices', 'platform', 'stepId', 'confirmation', 'signed']);
-    if (body.action === 'create') {
+    const body = await readLaunchBody(req, ['action', 'id', 'revision', 'sessionRevision', 'symbol', 'choices', 'platform', 'stepId', 'confirmation', 'signed']);
+    if (body.action === 'create' || body.action === 'revise') {
       if (typeof body.id !== 'string' || typeof body.revision !== 'string' || typeof body.symbol !== 'string'
-        || !Array.isArray(body.choices) || body.choices.length < 1 || body.choices.length > 3) throw new LaunchHttpError(400, 'Review the selected platforms.');
+        || !Array.isArray(body.choices) || (body.action === 'create' && body.choices.length < 1) || body.choices.length > 3) throw new LaunchHttpError(400, 'Review the selected platforms.');
       const choices = body.choices.map(value => {
         if (!value || typeof value !== 'object' || Array.isArray(value)) throw new LaunchHttpError(400, 'Invalid platform selection.');
         const c = value as Record<string, unknown>;
@@ -37,7 +39,7 @@ export async function POST(req: NextRequest, { params }: Params) {
         return c as { platform: PlatformId; mode: LaunchMode; signer: string; purchase: string };
       });
       const existing = (await new SessionStore(db).current(preview.agentId))?.session;
-      if (existing?.id === body.id) {
+      if (body.action === 'create' && existing?.id === body.id) {
         // Only an identical review can replay a request ID; never change the reservation.
         const same = reviewSession({ id: body.id, agentId: preview.agentId, role: preview.role, profileRevision: body.revision,
           metadata: { ...existing.metadata, symbol: body.symbol }, choices,
@@ -58,7 +60,18 @@ export async function POST(req: NextRequest, { params }: Params) {
       }
       const wallets = verifiedLaunchWallets(agent);
       const session = reviewSession({ id: body.id, agentId: preview.agentId, role: preview.role, profileRevision: body.revision,
-        metadata: { ...preview.metadata, symbol: body.symbol }, choices, verifiedOwnerEvm: wallets.evm, verifiedOwnerSolana: wallets.solana });
+        metadata: { ...preview.metadata, symbol: body.symbol }, choices, verifiedOwnerEvm: wallets.evm, verifiedOwnerSolana: wallets.solana,
+        allowEmpty: body.action === 'revise' });
+      if (body.action === 'revise') {
+        return withAgentProfileLease(db, `session:${preview.agentId}`, async () => withAgentProfileLease(db, preview.agentId, async () => {
+          const runtime = new SessionRuntime(db), current = await runtime.require(preview.agentId, body.id, preview.role);
+          if (body.sessionRevision !== current.revision) throw new LaunchHttpError(409, 'The launch changed. Refresh before saving.');
+          const latest = await db.collection('agents').findOne({ _id: new ObjectId(preview.agentId) });
+          if (!latest || profileRevision(latest) !== body.revision) throw new LaunchHttpError(409, 'Agent details changed. Refresh before saving.');
+          const next = await reviseSession(db, current, session);
+          return launchReply(await runtime.response(await new SessionStore(db).revise(current, next)));
+        }));
+      }
       return launchReply({ session: await new SessionStore(db).create(session), review: null });
     }
     return launchReply(await new SessionRuntime(db).act(preview, body));

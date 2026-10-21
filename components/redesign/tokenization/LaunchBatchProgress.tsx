@@ -18,20 +18,21 @@ export function LaunchBatchProgress({ session, busy, readOnly = false, onContinu
   const unresolved = session.targets.some(t => ['preparing', 'awaiting-signature', 'submitted', 'confirming', 'blocked'].includes(t.phase));
   const complete = session.targets.every(t => ['confirmed', 'skipped'].includes(t.phase));
   const heading = complete ? successes === 0 ? 'No tokens launched' : successes === session.targets.length ? 'Launch complete' : 'Launch finished'
-    : session.paused ? 'Launch paused' : 'Launching tokens';
+    : session.paused ? 'Launch paused' : session.approval ? 'Launching tokens' : 'Your launch';
   return <div className={styles.review} aria-busy={busy}>
     <div><h3 className={styles.stepTitle}>{heading}</h3>
+      <p className={styles.hint}>{session.metadata.name} · ${session.metadata.symbol}</p>
       <p className={styles.hint} role="status">{successes} of {session.targets.length} launched</p></div>
     <ol className={styles.batchList}>
       {session.targets.map(target => {
         const platform = platforms[target.terms.platform], token = target.token;
-        const pending = ['preparing', 'submitted', 'confirming'].includes(target.phase);
+        const pending = ['preparing', 'submitted', 'confirming'].includes(target.phase) || (target.phase === 'awaiting-signature' && target.terms.mode === 'managed' && !!session.approval && !session.paused);
         const failed = target.phase === 'failed' || target.phase === 'blocked';
         return <li key={target.terms.platform}>
           <div className={styles.batchIdentity}>
             {pending ? <Loader2 size={20} className={styles.spinner} aria-hidden="true" /> : token ? <Check size={20} aria-hidden="true" />
               : failed ? <TriangleAlert size={20} aria-hidden="true" /> : <Circle size={18} aria-hidden="true" />}
-            <div><strong>{platform.name}</strong><span role="status">{platform.chainName} · {labels[target.phase]}</span></div>
+            <div><strong>{platform.name}</strong><span role="status">{platform.chainName} · {pending && target.phase === 'awaiting-signature' ? 'Launching…' : labels[target.phase]}</span></div>
           </div>
           {token && <div className={styles.batchLinks}><a href={tradeUrl(token)} target="_blank" rel="noopener noreferrer">Trade<ArrowUpRight size={14} aria-hidden="true" /></a>
             <a href={transactionUrl(token.network, token.transactionHash)} target="_blank" rel="noopener noreferrer">Transaction<ArrowUpRight size={14} aria-hidden="true" /></a></div>}

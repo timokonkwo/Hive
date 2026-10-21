@@ -13,12 +13,13 @@ export async function sessionPonsPreview(db: Db, preview: LaunchPreview, session
   }
   const session = record.session;
   if (session.id !== sessionId || session.role !== preview.role) throw new SessionConflict('Resume this agent’s multi-platform launch.');
+  if (session.editing) throw new SessionConflict('Finish editing before launching on Pons.');
   const index = session.targets.findIndex(t => t.terms.platform === 'pons');
   const target = session.targets[index];
   if (!target || session.targets.slice(0, index).some(t => !['confirmed', 'skipped'].includes(t.phase))) {
     throw new SessionConflict('Finish the earlier platform before launching on Pons.');
   }
-  return { ...preview, sessionId, metadata: session.metadata, recipient: target.terms.recipient,
+  return { ...preview, sessionId, metadata: target.metadata || session.metadata, recipient: target.terms.recipient,
     requiredSigner: session.role === 'owner' ? target.terms.signer : null, feePolicyVersion: 2 };
 }
 
