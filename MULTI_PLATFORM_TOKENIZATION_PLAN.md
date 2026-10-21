@@ -115,7 +115,7 @@ Local and Netlify production release flags and a shared journal encryption key a
 2. Native pump.fun fee collection and the separate Bags deployer-fee path are implemented. Verify the first paid collections when these new launches have accrued fees.
 3. Legacy Bags tokens retain their existing links and reserved platform slots; receipt backfill is a later data-maintenance task, not permission to relaunch or publish unverified associations.
 4. Hosting configuration is complete. Never rotate the journal key while mint/transaction records still need it. No keys belong in chat or source control.
-5. Deploy and verify the authenticated API, worker and wallet providers, then perform a separately reviewed signed acceptance launch. The configured release flags apply to production on deployment.
+5. Production release completed from `main` at `545c49f` (deploy `6ad8bff35f9c5b16f5786b7a`). Public pages, protected-route rejection and the real mobile trade dialog pass. A signed acceptance launch and authenticated hosted admin session remain separate checks; no user wallet signature or new privileged API credential was requested for release testing.
 6. If atomic initial purchases on pump.fun are required at release, configure and simulate a suitable address table first. The basic token launch does not require one.
 
 ### Fee collection completion — 21 October 2026
@@ -127,6 +127,18 @@ Bags deployer amounts reconcile token-specific pending/accrued fees with the agg
 pump.fun uses locally built official SDK instructions to sweep native-SOL fees from confirmed Hive token curves/pools and collect into Hive's creator wallet. Aggregate vaults are counted once. The appended AMM fee field follows the pinned pump SDK's layout; old accounts read zero only for that absent field. Re-reading each position avoids collecting an already-drained vault. Simulation bounds costs before signing.
 
 Final local production build, typecheck, responsive admin fee controls and both launch/trade dialogs passed. These checks and unsigned simulations do not constitute signed mainnet acceptance.
+
+### Hosted release evidence
+
+- Source: `545c49f`, isolated branch `feat/multi-platform-agent-tokenization`.
+- Clean checkout: `/tmp/hive-multiplatform-release-20261021`; locked dependencies installed inside the checkout, no local environment files or symlinked dependencies.
+- Netlify draft built with production build settings: `6ad8b0ff0788dd2d71588799` (runtime context remains `deploy-preview`); prior published rollback: `6ad7a1ddf6707bac9c586bc6` (`c525824`). Production-only secrets were preserved, not exposed or copied to preview contexts.
+- Draft checks passed: agents, Token and admin pages return 200; protected admin/worker endpoints return 401 anonymously; actual Sage profile trade dialog opens, links to its existing Pons token, fits mobile and restores focus without page errors.
+- Real agent data through the server preview module offers Bags and pump.fun for Sage. Local Solana managed signer is available; the Pons managed key remains hosted only. No new admin API credential was added for testing.
+- Focused suite: 147 passed, zero failures/skips. Wider suite: 482 passed, three pre-existing assertions fail against removed docs/old token and registry UI; two enclosing suites also report the missing docs file. No database tests skipped.
+- Publication verification is separate from paid acceptance. No token launch, initial buy or fee claim was signed or broadcast by these checks. After launches begin, preserve the recovery worker and journal key when changing or rolling back the UI.
+- Published from Git-connected `main`: `6ad8bff35f9c5b16f5786b7a`, source `545c49f1c395637991916e3a7fbf1ee960c4420b`, runtime context `production`. Production browser and protected-route checks passed. The configured recovery schedule is every two minutes.
+- Canceled incomplete manual upload `6ad8bc8fb947adf1599e980e` before publication because skipping the Next.js build lifecycle produced a different file set. The old site stayed published until the normal Git-connected production build succeeded. Use the integrated Next.js build/deploy pipeline for future releases.
 
 ### UI and interaction review — 21 October 2026
 
