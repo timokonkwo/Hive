@@ -56,7 +56,7 @@ function LaunchDialogContent({ agentId, role, request, close }: Props) {
   const ponsTarget = session?.targets.find(t => t.terms.platform === 'pons');
   async function estimate() {
     const result = await flow.action({ action: 'estimate' });
-    if (result) setView('approval');
+    if (result) setView(result.session.estimate ? 'approval' : 'overview');
   }
   async function editRemaining() {
     const result = await flow.action({ action: 'pause' });

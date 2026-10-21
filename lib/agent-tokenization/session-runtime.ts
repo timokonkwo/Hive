@@ -101,11 +101,8 @@ export class SessionRuntime {
       await confirmSessionPons(this.db, prepared);
       return this.update(session, platform, { phase: 'submitted' });
     }
-    let step = await this.solana.pendingStep(target);
-    if (!step || step.phase !== 'review' || Date.parse(step.review.expiresAt) <= Date.now()) {
-      step = await this.solana.prepare(session, target, preview, true);
-      session = await this.update(session, platform, await this.solana.reconcile(session, target));
-    }
+    const step = await this.solana.prepare(session, target, preview, { retryFailed: true });
+    session = await this.update(session, platform, await this.solana.reconcile(session, target));
     if (!step || step.phase !== 'review' || target.terms.mode !== 'managed') return session;
     const reserved = reserveSpend(session, platform, `${step._id}:${step.review.digest}`, step.review.maximumDebit);
     if (reserved !== session) session = await this.store.save(session, reserved);
@@ -128,8 +125,23 @@ export class SessionRuntime {
         const failed = session.targets.find(t => t.phase === 'failed');
         if (failed) session = await this.store.save(session, continueSession(session, { platform: failed.terms.platform, action: 'retry' }));
         if (session.editing && session.profileRevision !== profileRevision(await this.db.collection('agents').findOne({ _id: new ObjectId(session.agentId) }) || {})) throw new SessionConflict('Save the edited launch details before continuing.');
+        // A saved setup may have finished since the last review. Check its next
+        // unsigned transaction before asking for another execution approval.
+        const target = session.targets.find(t => !['confirmed', 'skipped'].includes(t.phase));
+        try {
+          if (target?.intentId && target.terms.platform !== 'pons' && ['preparing', 'awaiting-signature'].includes(target.phase)) {
+            await this.solana.prepare(session, target, preview, { retryFailed: true, refreshReview: true });
+          }
+        } catch (error) {
+          if (!(error instanceof SessionConflict) && !(error instanceof LaunchConflict)) throw error;
+          session = await this.store.save(session, { ...session, paused: true, approval: undefined, estimate: undefined, revision: session.revision + 1,
+            targets: session.targets.map(t => t === target ? { ...t, error: error.message } : t) });
+          return this.response(session);
+        }
         const estimate = await estimateSession(session, preview);
-        session = await this.store.save(session, { ...session, estimate, revision: session.revision + 1 });
+        await assertHeld();
+        session = await this.store.save(session, { ...session, estimate, revision: session.revision + 1,
+          targets: session.targets.map(t => ({ ...t, error: undefined })) });
         return this.response(session);
       }
       if (body.action === 'approve') {
@@ -174,7 +186,7 @@ export class SessionRuntime {
         const active = session.targets.find(t => t.terms.platform === platform)!;
         if (platform === 'pons') return { ...await this.response(session), pons: true };
         try {
-          await this.solana.prepare(session, active, preview, body.action === 'retry');
+          await this.solana.prepare(session, active, preview, { retryFailed: body.action === 'retry' });
           await assertHeld();
           session = await this.update(session, platform, await this.solana.reconcile(session, active));
         } catch (error) {

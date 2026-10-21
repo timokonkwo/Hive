@@ -78,6 +78,26 @@ export interface SolanaStep {
   createdAt: Date;
 }
 
+/** Translate structured RPC errors without exposing provider logs or credentials. */
+function simulationFailure(error: unknown, transaction: VersionedTransaction, signer: string, balance: number): string {
+  const record = error && typeof error === 'object' ? error as Record<string, unknown> : {};
+  const rent = record.InsufficientFundsForRent as { account_index?: number } | undefined;
+  const index = rent?.account_index;
+  const signerRent = Number.isInteger(index) && transaction.message.staticAccountKeys[index!]?.toBase58() === signer;
+  const payer = transaction.message.staticAccountKeys[0]?.toBase58();
+  const instruction = record.InstructionError;
+  if (signerRent || (error === 'InsufficientFundsForFee' && payer === signer)) {
+    const available = Number.isSafeInteger(balance) ? ` Balance: ${(balance / 1_000_000_000).toFixed(9)} SOL.` : '';
+    return `The Solana launch wallet needs more SOL for fees and account rent.${available} Fund ${signer}, then continue.`;
+  }
+  if (rent || error === 'InsufficientFundsForFee') return 'A launch transaction account lacks SOL for fees or rent. The launch provider must resolve this before you continue.';
+  if (Array.isArray(instruction) && Number.isInteger(instruction[0])) {
+    const custom = instruction[1] && typeof instruction[1] === 'object' ? instruction[1].Custom : undefined;
+    return `Solana rejected launch instruction ${instruction[0] + 1}${Number.isSafeInteger(custom) ? ` (code ${custom})` : ''}. Your completed steps are saved.`;
+  }
+  return 'Solana rejected this launch transaction. Your completed steps are saved.';
+}
+
 /** Pure simulation/read. Platform adapters must validate instruction meaning before calling this. */
 export async function reviewSolanaTransaction(connection: Connection, transaction: VersionedTransaction,
   signer: string, maximumDebit: bigint, lifetime?: { blockhash: string; lastValidBlockHeight: number }): Promise<SolanaReview> {
@@ -91,7 +111,9 @@ export async function reviewSolanaTransaction(connection: Connection, transactio
     connection.simulateTransaction(transaction, { sigVerify: false, replaceRecentBlockhash: false, commitment: 'confirmed',
       accounts: { encoding: 'base64', addresses: [signer] } }),
   ]);
-  if (!blockhash.value || simulation.value.err || fee.value === null) throw new SessionConflict('This transaction could not be simulated. Refresh the review.');
+  if (!blockhash.value || simulation.value.err === 'BlockhashNotFound') throw new SessionConflict('The transaction expired. Continue to prepare a fresh transaction.');
+  if (simulation.value.err) throw new SessionConflict(simulationFailure(simulation.value.err, transaction, signer, balance));
+  if (fee.value === null) throw new SessionConflict('The network could not estimate the transaction fee. Try again shortly.');
   const remaining = simulation.value.accounts?.[0]?.lamports;
   if (!Number.isSafeInteger(balance) || !Number.isSafeInteger(fee.value) || !Number.isSafeInteger(remaining)) throw new SessionConflict('The launch cost could not be verified.');
   // Simulation includes the network fee. This is an affordability check, not an authorization to arbitrary programs.

@@ -97,4 +97,25 @@ test('editing and managed execution preserve journals and survive process restar
   await restarted.act(preview, { action: 'pause', id: session.id });
   await restarted.act(preview, { action: 'advance', id: session.id });
   assert.equal(signed, 1, 'editing revokes execution approval');
+
+  // A launch that ran out of funds after setup must not ask for approval again
+  // until its pending unsigned transaction can simulate successfully.
+  step.phase = 'review';
+  runtime.solana.prepare = async (_session, _target, _preview, options) => {
+    assert.equal(options.refreshReview, true);
+    throw new sessions.SessionConflict('The Solana launch wallet needs more SOL for fees and account rent.');
+  };
+  const unfunded = await runtime.act(preview, { action: 'estimate', id: session.id });
+  assert.equal(unfunded.session.paused, true);
+  assert.ok(!unfunded.session.estimate);
+  assert.ok(!unfunded.session.approval);
+  assert.match(unfunded.session.targets[0].error, /needs more SOL/);
+  await assert.rejects(runtime.act(preview, { action: 'approve', id: session.id, confirmation: 'quote' }), /changed/);
+  assert.equal(signed, 1, 'preflight failure never signs');
+  runtime.solana.prepare = async () => step;
+  const funded = await runtime.act(preview, { action: 'estimate', id: session.id });
+  assert.ok(funded.session.estimate);
+  assert.ok(!funded.session.targets[0].error);
+  assert.ok(!funded.session.approval, 'funding alone is not execution approval');
+  assert.equal(signed, 1);
 });

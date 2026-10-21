@@ -36,6 +36,23 @@ test('wallet signing must preserve the exact reviewed message and existing mint 
   signed.signatures[1][0] ^= 1;
   assert.throws(() => journal.verifySignedTransaction(prepared, signed.serialize()), /signature was replaced/);
 });
+test('simulation errors distinguish wallet rent, provider funding, expiry and program rejection', async () => {
+  const tx = transaction(), signer = payer.publicKey.toBase58();
+  const rpc = { getGenesisHash: async () => journal.SOLANA_MAINNET_GENESIS,
+    isBlockhashValid: async () => ({ value: true }), getBalance: async () => 20_920_853,
+    getFeeForMessage: async () => ({ value: 17500 }) };
+  const check = error => journal.reviewSolanaTransaction({ ...rpc,
+    simulateTransaction: async () => ({ value: { err: error, logs: ['secret provider diagnostic'] } }),
+  }, tx, signer, 100_000_000n);
+  await assert.rejects(check({ InsufficientFundsForRent: { account_index: 0 } }), error =>
+    error.message.includes('needs more SOL') && error.message.includes(signer)
+    && error.message.includes('0.020920853 SOL') && !error.message.includes('Refresh the review'));
+  await assert.rejects(check({ InsufficientFundsForRent: { account_index: 1 } }), /provider must resolve/);
+  await assert.rejects(check('InsufficientFundsForFee'), /needs more SOL/);
+  await assert.rejects(check('BlockhashNotFound'), /transaction expired/);
+  await assert.rejects(check({ InstructionError: [2, { Custom: 6001 }] }), /instruction 3 \(code 6001\)/);
+  await assert.rejects(check({ InstructionError: [2, 'secret provider diagnostic'] }), error => !error.message.includes('secret'));
+});
 test('mint secrets and transaction bytes are encrypted with separate authenticated contexts', () => {
   const previous = process.env.TOKENIZATION_JOURNAL_KEY;
   process.env.TOKENIZATION_JOURNAL_KEY = crypto.randomBytes(32).toString('hex');

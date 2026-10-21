@@ -43,7 +43,7 @@ export class SolanaLaunchRuntime {
       payer: target.terms.signer, metadata: session.metadata, purchase: BigInt(target.terms.purchase) };
   }
   private async save(intent: SolanaIntent) { await this.intents.replaceOne({ _id: intent._id, sessionId: intent.sessionId }, intent); return intent; }
-  async prepare(session: LaunchSession, target: SessionTarget, preview: LaunchPreview, retryFailed = false) {
+  async prepare(session: LaunchSession, target: SessionTarget, preview: LaunchPreview, options: { retryFailed?: boolean; refreshReview?: boolean } = {}) {
     session = { ...session, metadata: target.metadata || session.metadata };
     if (target.terms.platform === 'pons' || !target.intentId) throw new SessionConflict('Invalid Solana launch.');
     const platform = target.terms.platform;
@@ -54,8 +54,9 @@ export class SolanaLaunchRuntime {
     }
     if (intent.sessionId !== session.id || intent.platform !== platform) throw new SessionConflict('The launch identity changed.');
     const pending = await this.pendingStep(target);
-    if (pending?.phase === 'submitted' || (pending?.phase === 'failed' && !retryFailed)) return pending;
-    if (pending?.phase === 'review' && Date.parse(pending.review.expiresAt) > Date.now()) return pending;
+    if (pending?.phase === 'submitted' || (pending?.phase === 'failed' && !options.retryFailed)) return pending;
+    if (!options.refreshReview && pending?.phase === 'review' && Date.parse(pending.review.expiresAt) > Date.now()
+      && (await this.connection.isBlockhashValid(pending.review.blockhash, { commitment: 'confirmed' })).value) return pending;
     if (!intent.image) { intent.image = await persistTokenAvatar({ ...preview, metadata: session.metadata }); await this.save(intent); }
     let built: { transaction: VersionedTransaction; lifetime?: { blockhash: string; lastValidBlockHeight: number } };
     let stage: 'setup' | 'launch' = 'launch';

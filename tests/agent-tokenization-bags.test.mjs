@@ -148,6 +148,14 @@ test('Bags runtime resumes each saved setup step in order across requests', {ski
     const step=await runtime.prepare(session,target,{});
     assert.equal(step._id,bagsSetup.bagsSetupStepId(id,kind));
     assert.equal((await runtime.prepare(session,target,{}))._id,step._id);
+    // Reusing a review for the approval screen must re-simulate current balances.
+    const refreshed=await runtime.prepare(session,target,{}, {refreshReview:true});
+    assert.equal(refreshed._id,step._id);
+    assert.equal(refreshed.revision,step.revision+1);
+    const obsolete='obsolete-blockhash';
+    await db.collection('agent_launch_solana_steps').updateOne({_id:step._id},{$set:{'review.blockhash':obsolete}});
+    const freshRuntime=new solanaRuntime.SolanaLaunchRuntime(db,{...rpc,isBlockhashValid:async hash=>({value:hash!==obsolete})});
+    assert.equal((await freshRuntime.prepare(session,target,{})).revision,refreshed.revision+1,'a live review timestamp cannot keep an expired blockhash');
     await db.collection('agent_launch_solana_steps').updateOne({_id:step._id},{$set:{phase:'confirmed'}});
   }
   assert.equal(await new solanaRuntime.SolanaLaunchRuntime(db,rpc).pendingStep(target),null);

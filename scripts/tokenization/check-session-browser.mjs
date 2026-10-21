@@ -101,6 +101,27 @@ try {
     await page.getByRole('button',{name:'Manage tokens',exact:true}).click();
     await page.getByRole('button',{name:'Close token launch'}).click();
   }
+  // Insufficient SOL keeps the user on the overview without another approval loop.
+  await page.setViewportSize({width:390,height:900});
+  await page.goto(origin);
+  await page.evaluate(()=>fixture.unfunded=true);
+  await page.getByRole('button',{name:'Admin tokenize'}).click();
+  await page.getByRole('checkbox',{name:/Bags/}).check();
+  await page.getByRole('button',{name:'Continue',exact:true}).click();
+  await page.getByRole('button',{name:'Review launch',exact:true}).click();
+  await page.getByRole('alert').filter({hasText:'needs more SOL'}).waitFor();
+  assert.equal(await page.getByRole('button',{name:'Launch tokens',exact:true}).count(),0);
+  await page.getByRole('button',{name:'Continue',exact:true}).click();
+  await page.getByRole('alert').filter({hasText:'needs more SOL'}).waitFor();
+  assert.equal(await page.getByRole('button',{name:'Launch tokens',exact:true}).count(),0);
+  assert.equal(await page.evaluate(()=>fixture.calls.filter(c=>['approve','advance','confirm'].includes(c.body?.action)).length),0);
+  assert.equal(await page.locator('dialog').evaluate(el=>el.scrollWidth<=el.clientWidth+1),true);
+  await page.screenshot({path:'/tmp/hive-session-insufficient-sol-390.png'});
+  await page.evaluate(()=>fixture.unfunded=false);
+  await page.getByRole('button',{name:'Continue',exact:true}).click();
+  await page.getByRole('heading',{name:'Ready to launch'}).waitFor();
+  assert.equal(await page.getByRole('alert').filter({hasText:'needs more SOL'}).count(),0);
+
   await page.goto(origin);
   await page.getByRole('button',{name:'Owner tokenize'}).click();
   await page.getByRole('checkbox',{name:/pump.fun/}).check();
