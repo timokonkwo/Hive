@@ -4,6 +4,7 @@ import { PlatformSelection } from '../../components/redesign/tokenization/Platfo
 import { LaunchBatchProgress } from '../../components/redesign/tokenization/LaunchBatchProgress';
 import { AgentTokens } from '../../components/redesign/profile/AgentTokens';
 import styles from '../../components/redesign/tokenization/tokenization.module.css';
+import foundation from '../../components/redesign/foundation.module.css';
 
 const tokens = [
   { platform: 'pons', network: 'robinhood', symbol: 'SAGE', address: '0x2222222222222222222222222222222222222222', transactionHash: '0x' + 'a'.repeat(64) },
@@ -15,7 +16,7 @@ const profileTokens = variant === 'none' ? [] : variant === 'single' ? tokens.sl
 function App() {
   const [selected, setSelected] = useState([]), [step, setStep] = useState('select'), [busy, setBusy] = useState(false);
   const [blocked, setBlocked] = useState(false);
-  return <main style={{ maxWidth: 720, margin: 'auto' }}>
+  return <main className={foundation.surface} style={{ maxWidth: 720, margin: 'auto' }}>
     <h1>Agent token review</h1>
     <section className={styles.card}>
       {step === 'select' ? <PlatformSelection selected={selected} onChange={setSelected} busy={busy}

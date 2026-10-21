@@ -10,12 +10,10 @@ const root = fileURLToPath(new URL('../../', import.meta.url)), dir = await mkdt
 let browser, server;
 try {
   await build({ entryPoints: [root + 'scripts/tokenization/platform-browser-fixture.jsx'], bundle: true,
-    format: 'iife', jsx: 'automatic', outfile: dir + '/app.js',
+    format: 'iife', jsx: 'automatic', outfile: dir + '/app.js', external: ['/redesign/fonts/*'],
     plugins: [{ name: 'aliases', setup(b) { b.onResolve({ filter: /^@\// }, args => ({ path: root + args.path.slice(2) + '.ts' })); } }] });
   const html = `<!doctype html><html lang="en"><head><title>Multi-platform launch fixture</title><meta name="viewport" content="width=device-width,initial-scale=1"><link rel="stylesheet" href="/app.css"><style>
-    :root{--paper:#fafbf5;--ink:#182015;--muted:#5a6254;--rule:#d0d6c7;--accent:#ccff00;--accent-ink:#182015;--accent-text:#4a6200;--soft:#e9eddf;--surface:#fff}
-    :root[data-theme=dark]{--paper:#0f140d;--ink:#f1f4eb;--muted:#a6b09a;--rule:#353e2c;--accent-text:#ccff00;--soft:#202818;--surface:#181e14}
-    *{box-sizing:border-box}body{font-family:Arial,sans-serif;margin:0;padding:20px;background:var(--paper);color:var(--ink)}button,input{font:inherit}a{color:inherit;text-decoration:none}h1{font-size:24px}
+    body{margin:0;padding:20px}h1{font-size:24px}
     </style></head><body><div id="root"></div><script src="/app.js"></script></body></html>`;
   server = http.createServer(async (req, res) => {
     if (new URL(req.url, 'http://localhost').pathname === '/') { res.setHeader('Content-Type', 'text/html'); res.end(html); }
@@ -30,12 +28,13 @@ try {
   for (const theme of ['light', 'dark']) for (const width of [320, 390, 768, 1440]) {
     await page.setViewportSize({ width, height: 1000 });
     await page.goto(`http://127.0.0.1:${server.address().port}`);
-    await page.evaluate(theme => document.documentElement.dataset.theme = theme, theme);
+    await page.evaluate(theme => document.documentElement.dataset.hiveTheme = theme, theme);
     const next = page.getByRole('button', { name: 'Continue', exact: true });
     assert.equal(await next.isDisabled(), true);
     await page.getByRole('button', { name: 'Select all available' }).click();
     assert.equal(await page.getByRole('checkbox', { checked: true }).count(), 3);
     assert.equal(await next.isEnabled(), true);
+    assert.equal(await next.evaluate(el => getComputedStyle(el).color), 'rgb(24, 32, 21)');
     await page.getByRole('checkbox', { name: /Robinhood/ }).uncheck();
     assert.equal(await page.getByRole('checkbox', { checked: true }).count(), 2);
     await page.getByRole('button', { name: 'Select all available' }).click();
@@ -43,6 +42,7 @@ try {
     const tradeTrigger = tokenSection.getByRole('button', { name: 'Trade', exact: true });
     assert.equal(await tokenSection.getByRole('link').count(), 0);
     assert.equal(await tradeTrigger.evaluate(el => getComputedStyle(el).color), 'rgb(24, 32, 21)');
+    assert.equal(await tradeTrigger.locator('svg').evaluate(el => getComputedStyle(el).color), 'rgb(24, 32, 21)');
     assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1), true);
     await page.screenshot({ path: `/tmp/hive-platform-selection-${theme}-${width}.png`, fullPage: true });
     await tradeTrigger.click();

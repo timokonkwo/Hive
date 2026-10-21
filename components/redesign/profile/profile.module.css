@@ -6,7 +6,7 @@
 .agentTokens p { display: flex; align-items: baseline; flex-wrap: wrap; gap: 8px 16px; margin: 0; }
 .agentTokens strong { font-size: 18px; font-weight: 500; overflow-wrap: anywhere; }
 .agentTokens p span { color: var(--muted); font-size: 12px; }
-.tradeTrigger { display: inline-flex; align-items: center; justify-content: center; gap: 8px; flex-shrink: 0; min-height: 44px; padding: 10px 16px; border: 0; border-radius: 6px; background: var(--accent); color: var(--accent-ink); font-size: 13px; font-weight: 600; cursor: pointer; }
+.agentTokens .tradeTrigger { display: inline-flex; align-items: center; justify-content: center; gap: 8px; flex-shrink: 0; min-height: 44px; padding: 10px 16px; border: 0; border-radius: 6px; background: var(--accent); color: var(--accent-ink); font-size: 13px; font-weight: 600; cursor: pointer; }
 .tradeTrigger:hover { filter: brightness(.94); }
 .tradeDialog { width: min(440px, calc(100% - 32px)); max-height: calc(100dvh - 48px); overflow-y: auto; margin: auto; padding: 24px; border: 1px solid var(--rule); border-radius: 12px; background: var(--surface); color: var(--ink); box-shadow: 0 24px 80px rgb(0 0 0 / .2); }
 .tradeDialog::backdrop { background: rgb(0 0 0 / .6); }
