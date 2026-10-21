@@ -1,6 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import * as crypto from 'node:crypto';
+import { readFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import * as solana from '@solana/web3.js';
 import bs58 from 'bs58';
@@ -89,6 +90,23 @@ test('Bags setup does not flatten unsupported bundles or accept a changed payer'
   response.bundles = [[response.transactions[0]]];
   await assert.rejects(bags.prepareBagsConfiguration(api, mint.publicKey.toBase58(), payer.publicKey.toBase58()), /bundled/);
 });
+test('Bags metadata accepts multipart line endings after a rename, but rejects real metadata changes', async () => {
+  const metadata = { name: 'Renamed agent', symbol: 'RENAME', description: 'First paragraph.\n\nListed on Hive.',
+    socials: { website: platforms.profileUrl('a'.repeat(24)), twitter: '', telegram: '' } };
+  const form = new FormData(); form.append('description', metadata.description);
+  const wire = await new Response(form).text();
+  assert.ok(wire.includes('First paragraph.\r\n\r\nListed on Hive.'));
+  const response = { tokenMint: mint.publicKey.toBase58(), tokenMetadata: 'https://ipfs.io/ipfs/test', tokenLaunch: {
+    ...metadata, ...metadata.socials, tokenMint: mint.publicKey.toBase58(), description: metadata.description.replaceAll('\n', '\r\n'), accountKeys: 'must not persist',
+  } };
+  const parsed = bags.readBagsMetadataResponse(response);
+  assert.equal(parsed.tokenLaunch.accountKeys, undefined);
+  assert.equal(bags.verifyBagsMetadataResponse(parsed, metadata).mint, mint.publicKey.toBase58());
+  for (const [field, value] of Object.entries({ name: 'Old agent', symbol: 'OTHER', description: metadata.description + ' ', website: 'https://other.test', twitter: 'unrequested', telegram: 'unrequested', tokenMint: payer.publicKey.toBase58() })) {
+    assert.throws(() => bags.verifyBagsMetadataResponse({ ...parsed, tokenLaunch: { ...parsed.tokenLaunch, [field]: value } }, metadata), /different token details/);
+  }
+  assert.throws(() => bags.readBagsMetadataResponse({ ...response, tokenMetadata: 'https://user:password@example.test/metadata' }), /unsupported/);
+});
 test('official Pump builder keeps payer separate from Hive creator and disables alternative modes', async () => {
   const connection = {
     getGenesisHash: async () => '5eykt4UsFv8P8NJdTREpY1vzqKqZKvdpKuc147dw2N9d', getAccountInfo: async () => null,
@@ -114,6 +132,31 @@ test('official Pump builder keeps payer separate from Hive creator and disables 
     metadata: { name: 'Test agent', symbol: 'TEST' }, uri, purchase: 0n })).transaction, tx.serialize()).signature);
   await assert.rejects(pump.buildPumpLaunch({ ...connection, getAccountInfo: async () => ({}) }, { mint, payer: payer.publicKey,
     metadata: { name: 'Test', symbol: 'TEST' }, uri, purchase: 0n }), /already exists/);
+});
+test('Pump launch and buy stay atomic, use the lookup table before serialization and respect the purchase cap', async t => {
+  const fixture=JSON.parse(readFileSync(new URL('fixtures/pump-launch-state.json',import.meta.url)));
+  const previous=process.env.PUMP_LAUNCH_LOOKUP_TABLE;
+  t.after(()=>{if(previous===undefined)delete process.env.PUMP_LAUNCH_LOOKUP_TABLE;else process.env.PUMP_LAUNCH_LOOKUP_TABLE=previous;});
+  process.env.PUMP_LAUNCH_LOOKUP_TABLE=fixture.table.address;
+  const table=new solana.AddressLookupTableAccount({key:new solana.PublicKey(fixture.table.address),state:{deactivationSlot:0xffffffffffffffffn,lastExtendedSlot:0,lastExtendedSlotStartIndex:0,addresses:fixture.table.addresses.map(k=>new solana.PublicKey(k))}});
+  const rpc={getGenesisHash:async()=>journal.SOLANA_MAINNET_GENESIS,getLatestBlockhash:async()=>({blockhash,lastValidBlockHeight:123}),
+    getAccountInfo:async key=>{const row=fixture.accounts[key.toBase58()];return row?{...row,owner:new solana.PublicKey(row.owner),data:Buffer.from(row.data,'base64')}:null;},
+    getAddressLookupTable:async key=>{assert.equal(key.toBase58(),fixture.table.address);return{value:table};}};
+  const uri='https://res.cloudinary.com/test/raw/upload/v1792610000/hive-agent-tokens/'+'a'.repeat(64)+'.json';
+  const input={mint,payer:payer.publicKey,metadata:{name:'A'.repeat(32),symbol:'A'.repeat(10)},uri,purchase:1_000_000n};
+  const {transaction:tx}=await pump.buildPumpLaunch(rpc,input);
+  assert.ok(tx.serialize().length<=1232);assert.equal(tx.message.addressTableLookups.length,1);
+  const uncompressed=solana.TransactionMessage.decompile(tx.message,{addressLookupTableAccounts:[table]});
+  assert.ok(new solana.VersionedTransaction(uncompressed.compileToV0Message()).serialize().length>1232,'fixture exercises the oversize path');
+  const coder=new anchor.BorshInstructionCoder(pumpSdk.pumpIdl);
+  const instructions=uncompressed.instructions.filter(ix=>ix.programId.equals(pumpSdk.PUMP_PROGRAM_ID)).map(ix=>coder.decode(ix.data));
+  assert.deepEqual(instructions.map(ix=>ix.name),['create_v2','buy']);
+  assert.equal(instructions[0].data.creator.toBase58(),sessions.HIVE_SOLANA_FEE_WALLET);
+  assert.ok(BigInt(instructions[1].data.max_sol_cost.toString())<=input.purchase);
+  tx.sign([payer]);assert.ok(journal.verifySignedTransaction(tx,tx.serialize()).signature);
+  await assert.rejects(pump.buildPumpLaunch({...rpc,getAddressLookupTable:async()=>({value:null})},input),/unavailable/);
+  delete process.env.PUMP_LAUNCH_LOOKUP_TABLE;
+  await assert.rejects(pump.buildPumpLaunch(rpc,input),/temporarily unavailable/);
 });
 test('a missing Solana receipt remains unresolved, including after blockhash expiry', async () => {
   let written = false;

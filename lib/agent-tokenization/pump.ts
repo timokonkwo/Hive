@@ -68,17 +68,20 @@ export async function buildPumpLaunch(connection: Connection, input: PumpLaunchI
     payerKey: input.payer, recentBlockhash: lifetime.blockhash,
     instructions: [ComputeBudgetProgram.setComputeUnitLimit({ units: input.purchase === 0n ? 300_000 : 500_000 }), ...instructions],
   });
-  let transaction = new VersionedTransaction(message.compileToV0Message());
-  if (transaction.serialize().length > 1232) {
-    // A configured table only compresses the exact SDK account list.
-    // Never create a second, non-atomic purchase when create + buy cannot fit.
-    if (!process.env.PUMP_LAUNCH_LOOKUP_TABLE) throw new SessionConflict('Launch without an initial purchase, then trade on pump.fun.');
+  // Compile with the table before serialization. An oversized uncompressed
+  // message can throw during serialize(), before a size check can run.
+  const tables = [];
+  if (input.purchase > 0n) {
+    if (!process.env.PUMP_LAUNCH_LOOKUP_TABLE) throw new SessionConflict('pump.fun purchases are temporarily unavailable. Try again later.');
     const table = (await connection.getAddressLookupTable(new PublicKey(process.env.PUMP_LAUNCH_LOOKUP_TABLE), { commitment: 'finalized' })).value;
     if (!table?.isActive()) throw new SessionConflict('The launch address table is unavailable. Try again later.');
-    transaction = new VersionedTransaction(message.compileToV0Message([table]));
+    tables.push(table);
   }
+  const transaction = new VersionedTransaction(message.compileToV0Message(tables));
+  let size: number;
+  try { size = transaction.serialize().length; } catch { throw new SessionConflict('The launch transaction is too large.'); }
+  if (size > 1232) throw new SessionConflict('The launch transaction is too large.');
   transaction.sign([input.mint]);
-  if (transaction.serialize().length > 1232) throw new SessionConflict('The launch transaction is too large.');
   return { transaction, lifetime };
 }
 

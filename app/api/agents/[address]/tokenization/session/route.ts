@@ -54,7 +54,7 @@ export async function POST(req: NextRequest, { params }: Params) {
       }
       if (choices.some(choice => choice.platform === 'pump' && purchaseLamports(choice.purchase) !== 0n
         && !details.options.find(option => option.platform === 'pump')?.purchaseAvailable)) {
-        throw new LaunchHttpError(409, 'Launch without an initial purchase, then trade on pump.fun.');
+        throw new LaunchHttpError(409, 'pump.fun purchases are temporarily unavailable. Try again later.');
       }
       const wallets = verifiedLaunchWallets(agent);
       const session = reviewSession({ id: body.id, agentId: preview.agentId, role: preview.role, profileRevision: body.revision,

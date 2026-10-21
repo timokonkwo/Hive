@@ -111,32 +111,67 @@ export async function prepareBagsLaunch(api: BagsLaunchApi, input: { mint: strin
 
 interface BagsMetadataReservation {
   _id: string; agentId: string; sessionId: string; metadata: AgentTokenMetadata; image: string;
-  phase: 'requesting' | 'ready'; mint?: string; uri?: string; createdAt: Date;
+  phase: 'requesting' | 'received' | 'ready'; response?: BagsMetadataResponse; mint?: string; uri?: string; createdAt: Date;
+}
+interface BagsMetadataResponse {
+  tokenMint: string; tokenMetadata: string;
+  tokenLaunch: { tokenMint: string; name: string; symbol: string; description: string; website: string; twitter: string; telegram: string };
+}
+/** Persist only public metadata, never provider account keys or other unknown fields. */
+export function readBagsMetadataResponse(value: unknown): BagsMetadataResponse {
+  const result = object(value), launch = object(result.tokenLaunch);
+  if (!validSolanaAddress(result.tokenMint) || typeof result.tokenMetadata !== 'string') throw new SessionConflict('Bags returned invalid token metadata.');
+  let url: URL;
+  try { url = new URL(result.tokenMetadata); } catch { throw new SessionConflict('Bags returned an unsupported metadata URL.'); }
+  if (url.protocol !== 'https:' || url.username || url.password || result.tokenMetadata.length > 200) throw new SessionConflict('Bags returned an unsupported metadata URL.');
+  for (const key of ['tokenMint', 'name', 'symbol', 'description', 'website']) {
+    if (typeof launch[key] !== 'string') throw new SessionConflict('Bags returned incomplete token metadata.');
+  }
+  const social = (key: string) => {
+    if (launch[key] == null) return '';
+    if (typeof launch[key] !== 'string') throw new SessionConflict('Bags returned invalid social links.');
+    return launch[key] as string;
+  };
+  return { tokenMint: result.tokenMint, tokenMetadata: result.tokenMetadata, tokenLaunch: {
+    tokenMint: launch.tokenMint as string, name: launch.name as string, symbol: launch.symbol as string,
+    description: launch.description as string, website: launch.website as string, twitter: social('twitter'), telegram: social('telegram'),
+  } };
+}
+export function verifyBagsMetadataResponse(response: BagsMetadataResponse, metadata: AgentTokenMetadata) {
+  const launch = response.tokenLaunch;
+  // Multipart encoders canonicalize line endings. Only this transport change is
+  // equivalent; different words, spacing, names, links or tickers still fail closed.
+  const lineEndings = (value: string) => value.replace(/\r\n|\r/g, '\n');
+  if (launch.tokenMint !== response.tokenMint || launch.name !== metadata.name || launch.symbol !== metadata.symbol
+    || lineEndings(launch.description) !== lineEndings(metadata.description) || launch.website !== metadata.socials.website || launch.twitter || launch.telegram) {
+    throw new SessionConflict('Bags returned different token details. Check the saved launch before retrying.');
+  }
+  return { mint: new PublicKey(response.tokenMint).toBase58(), uri: response.tokenMetadata };
 }
 /** A lost mint-allocation response cannot silently allocate another mint on retry. */
 export async function reserveBagsMetadata(db: Db, api: BagsLaunchApi, intentId: string, agentId: string, sessionId: string, metadata: AgentTokenMetadata, image: string) {
   if (!validTokenLogo(image) || metadata.socials.website !== profileUrl(agentId) || metadata.socials.twitter || metadata.socials.telegram) throw new SessionConflict('The metadata changed. Refresh the review.');
   const records = db.collection<BagsMetadataReservation>('agent_launch_bags_metadata');
   const existing = await records.findOne({ _id: intentId });
+  let response = existing?.response;
   if (existing) {
     if (existing.agentId !== agentId || existing.sessionId !== sessionId || JSON.stringify(existing.metadata) !== JSON.stringify(metadata) || existing.image !== image) {
       throw new SessionConflict('The saved Bags metadata belongs to another review.');
     }
     if (existing.phase === 'ready' && existing.mint && existing.uri) return { mint: existing.mint, uri: existing.uri };
-    throw new SessionConflict('The Bags mint allocation is unresolved. Recover its response before retrying.');
+    if (!response) throw new SessionConflict('The Bags mint allocation is unresolved. Recover its response before retrying.');
+  } else {
+    await records.insertOne({ _id: intentId, agentId, sessionId, metadata, image, phase: 'requesting', createdAt: new Date() });
+    response = readBagsMetadataResponse(await api.post('/token-launch/create-token-info', {
+      name: metadata.name, symbol: metadata.symbol, description: metadata.description, imageUrl: image, website: profileUrl(agentId),
+    }));
+    // Save the identity before comparing fields, so validation failures and process
+    // interruptions can recheck the same response without allocating another mint.
+    const saved = await records.updateOne({ _id: intentId, phase: 'requesting' }, { $set: { phase: 'received', response } });
+    if (saved.modifiedCount !== 1) throw new SessionConflict('The Bags reservation changed. Check its status.');
   }
-  await records.insertOne({ _id: intentId, agentId, sessionId, metadata, image, phase: 'requesting', createdAt: new Date() });
-  const result = object(await api.post('/token-launch/create-token-info', {
-    name: metadata.name, symbol: metadata.symbol, description: metadata.description, imageUrl: image, website: profileUrl(agentId),
-  }));
-  if (!validSolanaAddress(result.tokenMint) || typeof result.tokenMetadata !== 'string') throw new SessionConflict('Bags returned invalid token metadata.');
-  const url = new URL(result.tokenMetadata);
-  if (url.protocol !== 'https:' || url.username || url.password || result.tokenMetadata.length > 200) throw new SessionConflict('Bags returned an unsupported metadata URL.');
-  const launch = object(result.tokenLaunch);
-  if (launch.tokenMint !== result.tokenMint || launch.name !== metadata.name || launch.symbol !== metadata.symbol
-    || launch.description !== metadata.description || launch.website !== metadata.socials.website || launch.twitter || launch.telegram) {
-    throw new SessionConflict('Bags metadata differs from the review.');
-  }
-  await records.updateOne({ _id: intentId, phase: 'requesting' }, { $set: { phase: 'ready', mint: result.tokenMint, uri: result.tokenMetadata } });
-  return { mint: new PublicKey(result.tokenMint).toBase58(), uri: result.tokenMetadata };
+  const result = verifyBagsMetadataResponse(response, metadata);
+  const saved = await records.updateOne({ _id: intentId, phase: 'received' }, { $set: { phase: 'ready', ...result } });
+  if (saved.modifiedCount !== 1) throw new SessionConflict('The Bags reservation changed. Check its status.');
+  return result;
 }

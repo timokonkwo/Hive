@@ -6,7 +6,7 @@ import { MongoClient } from 'mongodb';
 import { randomUUID } from 'node:crypto';
 import bs58 from 'bs58';
 import { AddressLookupTableAccount, PublicKey, VersionedMessage, VersionedTransaction, TransactionMessage, Keypair, SystemProgram } from '@solana/web3.js';
-import { bagsFeeConfig as fees, bagsValidation as validator, bagsSetup, solanaJournal, solanaRuntime } from '../scripts/tokenization/modules.mjs';
+import { bagsFeeConfig as fees, bagsValidation as validator, bagsSetup, bagsLaunch, solanaJournal, solanaRuntime } from '../scripts/tokenization/modules.mjs';
 const require = createRequire(import.meta.url);
 const { BorshInstructionCoder } = require('@coral-xyz/anchor');
 const idl = require('../lib/agent-tokenization/idl/bags-fee-share-v2.json');
@@ -100,6 +100,37 @@ test('sponsored reviews allow zero signer debit and preserve the provider signat
 });
 const mongoUri=process.env.HIVE_TOKENIZATION_TEST_MONGO_URI;
 if (mongoUri && !/^mongodb:\/\/127\.0\.0\.1:\d+\/?$/.test(mongoUri)) throw Error('Tests require an isolated loopback database.');
+test('Bags metadata survives multiline uploads, validation failures and retry without allocating another mint', {skip:!mongoUri}, async t=>{
+  const mongo=new MongoClient(mongoUri);await mongo.connect();const db=mongo.db('hive_bags_metadata_'+randomUUID().replaceAll('-',''));
+  t.after(async()=>{await db.dropDatabase();await mongo.close();});
+  const agentId='a'.repeat(24),sessionId=randomUUID(),mint=Keypair.generate().publicKey.toBase58();
+  const metadata={name:'Edited agent',symbol:'EDITED',description:'Agent biography.\n\nThis agent is available on Hive.',socials:{website:`https://uphive.xyz/agent/id/${agentId}`,twitter:'',telegram:''}};
+  const image='https://res.cloudinary.com/test/image/upload/v1/hive-agent-tokens/'+ 'a'.repeat(64)+'.png';
+  let calls=0,wrongName=false;
+  const api=new bagsLaunch.BagsLaunchApi('test',async(url,init)=>{
+    calls++;
+    // Cross the actual multipart serialization boundary that caused the incident.
+    const form=await new Request(url,init).formData();
+    return Response.json({success:true,response:{tokenMint:mint,tokenMetadata:'https://ipfs.io/ipfs/fixture',tokenLaunch:{
+      tokenMint:mint,name:wrongName?'Wrong name':form.get('name'),symbol:form.get('symbol'),description:form.get('description'),website:form.get('website'),twitter:'',telegram:'',accountKeys:'discard',
+    }}});
+  });
+  const intent=randomUUID();
+  const first=await bagsLaunch.reserveBagsMetadata(db,api,intent,agentId,sessionId,metadata,image);
+  assert.equal(first.mint,mint);assert.equal(calls,1);
+  assert.deepEqual(await bagsLaunch.reserveBagsMetadata(db,api,intent,agentId,sessionId,metadata,image),first);assert.equal(calls,1);
+  assert.equal((await db.collection('agent_launch_bags_metadata').findOne({_id:intent})).response.tokenLaunch.accountKeys,undefined);
+  await assert.rejects(bagsLaunch.reserveBagsMetadata(db,api,intent,agentId,sessionId,{...metadata,name:'Changed again'},image),/another review/);
+  wrongName=true;const failed=randomUUID();
+  await assert.rejects(bagsLaunch.reserveBagsMetadata(db,api,failed,agentId,sessionId,metadata,image),/different token details/);
+  const saved=await db.collection('agent_launch_bags_metadata').findOne({_id:failed});assert.equal(saved.phase,'received');assert.equal(saved.response.tokenMint,mint);
+  await assert.rejects(bagsLaunch.reserveBagsMetadata(db,api,failed,agentId,sessionId,metadata,image),/different token details/);assert.equal(calls,2);
+  // A crash after persisting the provider response is recovered with no new POST.
+  await db.collection('agent_launch_bags_metadata').updateOne({_id:intent},{$set:{phase:'received'},$unset:{mint:'',uri:''}});
+  assert.deepEqual(await bagsLaunch.reserveBagsMetadata(db,api,intent,agentId,sessionId,metadata,image),first);assert.equal(calls,2);
+  const lost=randomUUID();await db.collection('agent_launch_bags_metadata').insertOne({_id:lost,agentId,sessionId,metadata,image,phase:'requesting'});
+  await assert.rejects(bagsLaunch.reserveBagsMetadata(db,api,lost,agentId,sessionId,metadata,image),/unresolved/);assert.equal(calls,2);
+});
 test('Bags runtime resumes each saved setup step in order across requests', {skip:!mongoUri}, async t=>{
   const mongo=new MongoClient(mongoUri);await mongo.connect();const db=mongo.db('hive_bags_'+randomUUID().replaceAll('-',''));
   t.after(async()=>{await db.dropDatabase();await mongo.close();});

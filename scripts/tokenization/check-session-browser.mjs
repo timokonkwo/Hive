@@ -59,6 +59,9 @@ try {
     await page.getByLabel('Bags purchase',{exact:true}).fill('-1');
     assert.equal(await page.getByRole('button',{name:'Review launch',exact:true}).isDisabled(),true);
     await page.getByLabel('Bags purchase',{exact:true}).fill('0.001');
+    await page.getByLabel('pump.fun purchase',{exact:true}).fill('-1');
+    assert.equal(await page.getByRole('button',{name:'Review launch',exact:true}).isDisabled(),true);
+    await page.getByLabel('pump.fun purchase',{exact:true}).fill('0.002');
     await page.getByRole('button',{name:'Back',exact:true}).click();
     await page.getByRole('button',{name:'Continue',exact:true}).click();
     assert.equal(await page.getByLabel('Ticker',{exact:true}).inputValue(),'SAGEAI');
@@ -69,10 +72,12 @@ try {
     await page.getByRole('heading',{name:'Sage Research',exact:true}).waitFor();
     assert.equal(await page.getByLabel('Ticker',{exact:true}).inputValue(),'SAGEAI','editing does not reset the ticker');
     assert.equal(await page.getByLabel('Bags purchase',{exact:true}).inputValue(),'0.001','editing preserves the purchase');
+    assert.equal(await page.getByLabel('pump.fun purchase',{exact:true}).inputValue(),'0.002','editing preserves the pump.fun purchase');
     await page.screenshot({path:`/tmp/hive-session-review-${width}.png`});
     assert.equal(await page.locator('dialog').evaluate(el=>el.scrollWidth<=el.clientWidth+1),true);
     await page.getByRole('button',{name:'Review launch',exact:true}).click();
     await page.getByRole('button',{name:'Approve transaction'}).waitFor();
+    assert.equal(await page.evaluate(()=>fixture.session.targets.find(t=>t.terms.platform==='pump').terms.purchase),'2000000');
     await page.getByRole('button',{name:'Close token launch'}).click();
     await page.getByRole('button',{name:'Admin tokenize'}).click();
     await page.getByRole('button',{name:'Approve transaction'}).click();
@@ -137,7 +142,7 @@ try {
   assert.equal(await page.getByRole('button',{name:'Review launch',exact:true}).count(),0,'Pons goes straight to the quote after review');
   assert.equal(await page.evaluate(()=>fixture.calls.filter(c=>c.body?.action==='confirm').length),0,'quote preparation never submits');
   await page.goto(origin);
-  await page.evaluate(()=>fixture.expired=true);
+  await page.evaluate(()=>{fixture.expired=true;fixture.options=['pons','bags','pump'].map(platform=>({platform,available:true,purchaseAvailable:platform!=='pump'}));});
   await page.getByRole('button',{name:'Admin tokenize'}).click();
   await page.getByRole('checkbox',{name:/pump.fun/}).check();
   await page.getByRole('button',{name:'Continue',exact:true}).click();
