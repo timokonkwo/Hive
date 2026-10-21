@@ -2,13 +2,13 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
 import { MongoClient, ObjectId } from 'mongodb';
-import { sessions, sessionApproval, sessionEdit, sessionStore, sessionRuntime, solanaJournal, metadata, profileEdit } from '../scripts/tokenization/modules.mjs';
+import { sessions, sessionApproval, sessionEdit, sessionStore, sessionRuntime, solanaJournal, metadata, profileEdit, policy } from '../scripts/tokenization/modules.mjs';
 import { agent, agentId } from './helpers/tokenization-fixture.mjs';
 
 const preview = metadata.profilePreview(agentId, agent, 'admin');
 const review = (platforms = ['bags', 'pump']) => sessions.reviewSession({ id: randomUUID(), agentId, role: 'admin', metadata: preview.metadata,
   profileRevision: metadata.profileRevision(agent), verifiedOwnerEvm: null, verifiedOwnerSolana: null,
-  choices: platforms.map(platform => ({ platform, mode: 'managed', signer: sessions.HIVE_SOLANA_FEE_WALLET, purchase: '0' })) });
+  choices: platforms.map(platform => ({ platform, mode: 'managed', signer: platform === 'pons' ? policy.HIVE_LAUNCH_WALLET : sessions.HIVE_SOLANA_FEE_WALLET, purchase: '0' })) });
 function approval(session) {
   return sessionApproval.approveSession({ ...session, estimate: { digest: 'quote', expiresAt: new Date(Date.now() + 60000).toISOString(), limits: { bags: '100', pump: '100' } } }, 'quote');
 }
@@ -45,6 +45,19 @@ test('expired Solana recovery requires independent finalized history, expiry and
 });
 
 const uri = process.env.HIVE_TOKENIZATION_TEST_MONGO_URI;
+test('receipt progress updates even when the session phase stays confirming', async () => {
+  const s = review(['pons']);
+  s.targets[0].phase = 'confirming';
+  const runtime = new sessionRuntime.SessionRuntime({ collection: () => ({ findOneAndUpdate: async (_query, patch) => ({ session: patch.$set.session }) }) });
+  const hash = '0x' + 'a'.repeat(64);
+  const included = await runtime.update(s, 'pons', { phase: 'confirming', transactionHash: hash, awaitingFinality: true });
+  assert.equal(included.targets[0].transactionHash, hash);
+  assert.equal(included.targets[0].awaitingFinality, true);
+  assert.equal(included.targets[0].token, undefined);
+  assert.equal(await runtime.update(included, 'pons', { phase: 'confirming', transactionHash: hash, awaitingFinality: true }), included);
+  const reorg = await runtime.update(included, 'pons', { phase: 'confirming', transactionHash: hash, awaitingFinality: false });
+  assert.equal(reorg.targets[0].awaitingFinality, false);
+});
 if (uri && !/^mongodb:\/\/127\.0\.0\.1:\d+\/?$/.test(uri)) throw Error('Use isolated loopback MongoDB.');
 test('editing and managed execution preserve journals and survive process restarts', { skip: !uri }, async t => {
   const mongo = new MongoClient(uri); await mongo.connect();

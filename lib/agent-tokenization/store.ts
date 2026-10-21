@@ -30,6 +30,7 @@ export interface LaunchIntent {
   prepared?: PreparedEnvelope;
   nonce?: number;
   transactionHash?: Hex;
+  receiptConfirmed?: boolean;
   nextBlock?: string;
   token?: TokenAssociation;
   tokenAddress?: string;
@@ -194,7 +195,7 @@ export class LaunchStore {
     });
   }
 
-  async finish(intent: LaunchIntent, patch: Partial<Pick<LaunchIntent, 'phase' | 'transactionHash' | 'nextBlock' | 'token' | 'cancellationEvidence' | 'lastError'>>, now = new Date()) {
+  async finish(intent: LaunchIntent, patch: Partial<Pick<LaunchIntent, 'phase' | 'transactionHash' | 'receiptConfirmed' | 'nextBlock' | 'token' | 'cancellationEvidence' | 'lastError'>>, now = new Date()) {
     if (!intent.leaseId) throw Error('Reconciliation requires a worker lease.');
     const terminal = patch.phase === 'reverted' || patch.phase === 'cancelled';
     const updated = await this.intents.findOneAndUpdate({ _id: intent._id, revision: intent.revision, leaseId: intent.leaseId }, {

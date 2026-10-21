@@ -26,6 +26,24 @@ test('recovery discovers a finalized launch after the browser loses its hash', a
   assert.equal(patch.token.transactionHash, hash);
 });
 
+test('successful inclusion is visible while finality waits, without publishing or replacing the launch', async () => {
+  const intent = { ...intentFixture(), transactionHash: hash };
+  const { client } = chainFixture(intent);
+  const getBlock = client.getBlock;
+  client.getBlock = args => args.blockTag === 'finalized' ? Promise.resolve({ number: 9n, hash }) : getBlock(args);
+  const waiting = await worker.recoverLaunch(client, intent);
+  assert.equal(waiting.phase, 'confirming');
+  assert.equal(waiting.receiptConfirmed, true);
+  assert.equal(waiting.transactionHash, hash);
+  assert.equal(waiting.token, undefined);
+  client.getBlock = getBlock;
+  assert.equal((await worker.recoverLaunch(client, intent)).phase, 'confirmed');
+  client.getBlock = async () => ({ number: 9n, hash: replacementHash });
+  const reorganized = await worker.recoverLaunch(client, intent);
+  assert.equal(reorganized.receiptConfirmed, false, 'an observed reorg clears the inclusion status');
+  assert.equal(reorganized.token, undefined);
+});
+
 test('recovery finds a matching replacement when the original hash disappeared', async () => {
   const intent = { ...intentFixture(), transactionHash: hash };
   const { client, actual } = chainFixture(intent, replacementHash);

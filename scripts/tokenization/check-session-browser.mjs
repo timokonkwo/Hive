@@ -101,6 +101,22 @@ try {
     await page.getByRole('button',{name:'Manage tokens',exact:true}).click();
     await page.getByRole('button',{name:'Close token launch'}).click();
   }
+  // Successful inclusion has a receipt link while public association waits for finality.
+  await page.setViewportSize({width:390,height:900});
+  await page.goto(origin);
+  await page.evaluate(()=>{
+    fixture.readOnly=true;
+    fixture.session={id:crypto.randomUUID(),agentId:'0123456789abcdef01234567',role:'admin',revision:0,
+      metadata:{name:'Cipher Agent',symbol:'CIPHER'},paused:false,targets:[{terms:{platform:'pons',purchase:'0',mode:'managed'},
+      phase:'confirming',awaitingFinality:true,transactionHash:'0x'+'a'.repeat(64)}]};
+  });
+  await page.getByRole('button',{name:'Admin tokenize'}).click();
+  await page.getByRole('status').filter({hasText:'Transaction confirmed · Finalizing…'}).waitFor();
+  assert.equal(await page.getByRole('link',{name:'View transaction'}).getAttribute('href'),'https://robinhoodchain.blockscout.com/tx/0x'+'a'.repeat(64));
+  assert.equal(await page.getByRole('link',{name:'Trade',exact:true}).count(),0,'no trade association before finality');
+  assert.equal(await page.locator('dialog').evaluate(el=>el.scrollWidth<=el.clientWidth+1),true);
+  await page.screenshot({path:'/tmp/hive-session-finality-390.png'});
+
   // Insufficient SOL keeps the user on the overview without another approval loop.
   await page.setViewportSize({width:390,height:900});
   await page.goto(origin);
@@ -113,6 +129,7 @@ try {
   assert.equal(await page.getByRole('button',{name:'Launch tokens',exact:true}).count(),0);
   await page.getByRole('button',{name:'Continue',exact:true}).click();
   await page.getByRole('alert').filter({hasText:'needs more SOL'}).waitFor();
+  await page.waitForFunction(()=>document.querySelector('dialog [aria-busy]')?.getAttribute('aria-busy')==='false');
   assert.equal(await page.getByRole('button',{name:'Launch tokens',exact:true}).count(),0);
   assert.equal(await page.evaluate(()=>fixture.calls.filter(c=>['approve','advance','confirm'].includes(c.body?.action)).length),0);
   assert.equal(await page.locator('dialog').evaluate(el=>el.scrollWidth<=el.clientWidth+1),true);

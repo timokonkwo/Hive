@@ -10,7 +10,7 @@ export interface LaunchExpectation {
   prediction: { token: Address; curve: Address; tokensOut: bigint };
 }
 export type LaunchReceiptState =
-  | { state: 'pending' | 'confirming' }
+  | { state: 'pending' | 'confirming'; receiptConfirmed?: boolean }
   | { state: 'reverted'; transactionHash: Hex }
   | { state: 'confirmed'; token: TokenAssociation };
 
@@ -36,8 +36,10 @@ export async function reconcileLaunchReceipt(client: PublicClient, expected: Lau
     client.getBlock({ blockNumber: receipt.blockNumber }),
     client.getBlock({ blockTag: 'finalized' }),
   ]);
-  if (canonical.hash !== receipt.blockHash || transaction.blockHash !== receipt.blockHash
-    || finalized.number === null || finalized.number < receipt.blockNumber) return { state: 'confirming' };
+  if (canonical.hash !== receipt.blockHash || transaction.blockHash !== receipt.blockHash) return { state: 'confirming' };
+  if (finalized.number === null || finalized.number < receipt.blockNumber) {
+    return { state: 'confirming', ...(receipt.status === 'success' ? { receiptConfirmed: true } : {}) };
+  }
   if (receipt.status === 'reverted') return { state: 'reverted', transactionHash: hash };
   if (receipt.status !== 'success') throw Error('The launch result could not be verified.');
   const events = receipt.logs.flatMap(log => {

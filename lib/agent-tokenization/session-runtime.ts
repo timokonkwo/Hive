@@ -29,7 +29,8 @@ export class SessionRuntime {
   private async update(session: LaunchSession, platform: PlatformId, result: TargetResult) {
     const target = session.targets.find(t => t.terms.platform === platform)!;
     if (session.paused && target.error && !result.error) result = { ...result, error: target.error };
-    if (target.phase === result.phase && (!result.intentId || target.intentId === result.intentId) && target.error === result.error) return session;
+    if (target.phase === result.phase && (!result.intentId || target.intentId === result.intentId) && target.error === result.error
+      && target.transactionHash === result.transactionHash && !!target.awaitingFinality === !!result.awaitingFinality) return session;
     if (target.phase === result.phase) return this.store.save(session, { ...session, revision: session.revision + 1,
       targets: session.targets.map(t => t === target ? { ...t, ...result } : t) });
     return this.store.save(session, transitionTarget(session, platform, result));
@@ -49,7 +50,8 @@ export class SessionRuntime {
         if (!current) continue;
         const phase = current.phase === 'confirmed' ? 'confirmed' : (current.phase === 'cancelled' || current.phase === 'reverted') ? 'failed'
           : current.phase === 'draft' ? 'preparing' : current.phase;
-        session = await this.update(session, 'pons', { phase, intentId: current._id,
+        session = await this.update(session, 'pons', { phase, intentId: current._id, transactionHash: current.transactionHash,
+          awaitingFinality: phase === 'confirming' && current.receiptConfirmed === true,
           ...(current.token ? { token: { ...current.token, platform: 'pons', network: 'robinhood' } } : {}),
           ...(phase === 'failed' ? { error: 'The Pons transaction did not launch a token.' } : {}) });
       } else {

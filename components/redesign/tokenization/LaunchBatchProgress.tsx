@@ -32,10 +32,13 @@ export function LaunchBatchProgress({ session, busy, readOnly = false, onContinu
           <div className={styles.batchIdentity}>
             {pending ? <Loader2 size={20} className={styles.spinner} aria-hidden="true" /> : token ? <Check size={20} aria-hidden="true" />
               : failed ? <TriangleAlert size={20} aria-hidden="true" /> : <Circle size={18} aria-hidden="true" />}
-            <div><strong>{platform.name}</strong><span role="status">{platform.chainName} · {pending && target.phase === 'awaiting-signature' ? 'Launching…' : labels[target.phase]}</span></div>
+            <div><strong>{platform.name}</strong><span role="status">{platform.chainName} · {target.phase === 'confirming' && target.awaitingFinality ? 'Transaction confirmed · Finalizing…' : pending && target.phase === 'awaiting-signature' ? 'Launching…' : labels[target.phase]}</span></div>
           </div>
           {token && <div className={styles.batchLinks}><a href={tradeUrl(token)} target="_blank" rel="noopener noreferrer">Trade<ArrowUpRight size={14} aria-hidden="true" /></a>
             <a href={transactionUrl(token.network, token.transactionHash)} target="_blank" rel="noopener noreferrer">Transaction<ArrowUpRight size={14} aria-hidden="true" /></a></div>}
+          {!token && target.transactionHash && <div className={styles.batchLinks}>
+            <a href={transactionUrl(platform.network, target.transactionHash)} target="_blank" rel="noopener noreferrer">View transaction<ArrowUpRight size={14} aria-hidden="true" /></a>
+          </div>}
           {failed && <div className={styles.batchError} role="alert"><p>{target.error || 'The launch needs attention before continuing.'}</p>
             {!readOnly && (target.phase === 'failed' ? <div className={styles.recoveryActions}>
               <button type="button" className={styles.secondary} disabled={busy} onClick={() => onRetry(target.terms.platform)}>{busy && <Loader2 size={16} className={styles.spinner} aria-hidden="true" />}Retry launch</button>

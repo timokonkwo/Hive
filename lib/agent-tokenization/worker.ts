@@ -12,7 +12,7 @@ const emptyCode = (code: Hex | undefined) => !code || code === '0x';
 const patchFor = (state: LaunchReceiptState, hash: Hex): RecoveryPatch => state.state === 'confirmed'
   ? { phase: 'confirmed', transactionHash: hash, token: state.token }
   : state.state === 'reverted' ? { phase: 'reverted', transactionHash: hash }
-    : { phase: state.state === 'confirming' ? 'confirming' : 'submitted', transactionHash: hash };
+    : { phase: state.state === 'confirming' ? 'confirming' : 'submitted', transactionHash: hash, receiptConfirmed: state.receiptConfirmed === true };
 
 /** Bounded, read-only chain recovery. All writes are made through the leased journal. */
 export async function recoverLaunch(client: PublicClient, intent: LaunchIntent): Promise<RecoveryPatch> {

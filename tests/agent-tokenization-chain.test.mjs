@@ -158,7 +158,8 @@ test('unknown hashes, unfinalized receipts and reorgs stay unresolved; outages a
  const f=receiptFixture();
  assert.deepEqual(await receipts.reconcileLaunchReceipt({...f.client,getTransaction:async()=>{throw new TransactionNotFoundError({hash})}},f.expected,hash),{state:'pending'});
  for(const patch of [{number:9n,hash},{number:10n,hash:'0x'+'b'.repeat(64)}]) {
-  assert.deepEqual(await receipts.reconcileLaunchReceipt({...f.client,getBlock:async()=>patch},f.expected,hash),{state:'confirming'});
+  assert.deepEqual(await receipts.reconcileLaunchReceipt({...f.client,getBlock:async()=>patch},f.expected,hash),
+    {state:'confirming',...(patch.hash===hash?{receiptConfirmed:true}:{})});
  }
  let reads=0;
  assert.deepEqual(await receipts.reconcileLaunchReceipt({...f.client,getBlock:async()=>({number:10n,hash:++reads===3?'0x'+'b'.repeat(64):hash})},f.expected,hash),{state:'confirming'});
