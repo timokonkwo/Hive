@@ -90,3 +90,5 @@
 .transactionReview .details { border-top:0; padding-top:0; }
 @media(hover:hover) { .primary:not(:disabled):hover { filter:brightness(.95); }.secondary:not(:disabled):hover { background:var(--soft); } }
 @media(prefers-reduced-motion:reduce) { .purchaseOptions summary svg { transition:none; } }
+
+.overviewActions{flex-wrap:wrap}.overviewActions .secondary{flex:1 1 160px}.overviewActions .primary{flex:1 1 100px}

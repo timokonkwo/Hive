@@ -47,7 +47,7 @@ try {
     await page.getByRole('dialog').waitFor({state:'detached'});
     assert.equal(await page.getByRole('button',{name:'Admin tokenize'}).evaluate(el=>el===document.activeElement),true);
   }
-  for(const width of [390,1280]) {
+  for(const width of [320,390,1280]) {
     await page.setViewportSize({width,height:900});
     await page.goto(origin);
     await page.getByRole('button',{name:'Admin tokenize'}).click();
@@ -77,11 +77,15 @@ try {
     assert.equal(await page.locator('dialog').evaluate(el=>el.scrollWidth<=el.clientWidth+1),true);
     await page.getByRole('button',{name:'Review launch',exact:true}).click();
     await page.getByRole('heading',{name:'Ready to launch'}).waitFor();
+    assert.equal(await page.locator('dialog').evaluate(el=>el.scrollWidth<=el.clientWidth+1),true,'approval fits mobile');
+    await page.screenshot({path:`/tmp/hive-session-approval-${width}.png`});
     assert.equal(await page.evaluate(()=>fixture.calls.filter(c=>c.body?.action==='confirm').length),0);
     assert.equal(await page.evaluate(()=>fixture.session.targets.find(t=>t.terms.platform==='pump').terms.purchase),'2000000');
     await page.getByRole('button',{name:'Close token launch'}).click();
     await page.getByRole('button',{name:'Admin tokenize'}).click();
     await page.getByRole('button',{name:'Edit remaining launches'}).waitFor();
+    assert.equal(await page.locator('dialog').evaluate(el=>el.scrollWidth<=el.clientWidth+1),true,'overview actions fit mobile');
+    await page.screenshot({path:`/tmp/hive-session-overview-${width}.png`});
     assert.equal(await page.getByRole('button',{name:'Approve transaction'}).count(),0);
     await page.getByRole('button',{name:'Edit remaining launches'}).click();
     await page.getByRole('checkbox',{name:/Bags/}).uncheck();
