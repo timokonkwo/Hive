@@ -197,7 +197,7 @@ export class LaunchStore {
     const query: Filter<LaunchIntent> = { chainId: PONS_CHAIN_ID, ...(agentId ? { agentId: agentId.toLowerCase() } : {}), $and: [
       { $or: [{ mode: { $ne: 'managed' } }, { managedSubmission: { $exists: true } }] },
       { $or: [{ phase: { $in: ['awaiting-signature', 'submitted', 'confirming'] } }, { phase: 'confirmed', projected: { $ne: true } }] },
-      { $or: [{ nextCheckAt: { $lte: now } }, { nextCheckAt: { $exists: false } }] },
+      ...(agentId ? [] : [{ $or: [{ nextCheckAt: { $lte: now } }, { nextCheckAt: { $exists: false } }] }]),
       { $or: [{ leaseUntil: { $lte: now } }, { leaseUntil: { $exists: false } }] },
     ] };
     return this.intents.findOneAndUpdate(query, { $set: { leaseId: randomUUID(), leaseUntil: new Date(now.getTime() + 120_000) } }, {
@@ -210,8 +210,9 @@ export class LaunchStore {
     const terminal = patch.phase === 'reverted' || patch.phase === 'cancelled';
     const included = intent.mode === 'managed' && !!intent.managedSubmission && patch.receiptConfirmed === true
       && patch.nonceConsumed === true && patch.transactionHash === intent.transactionHash;
+    const polling = !patch.lastError && ['submitted', 'confirming'].includes(patch.phase || intent.phase) && !!(patch.transactionHash || intent.transactionHash);
     const updated = await this.intents.findOneAndUpdate({ _id: intent._id, revision: intent.revision, leaseId: intent.leaseId }, {
-      $set: { ...patch, ...((terminal || patch.phase === 'confirmed' || included) ? { managedPending: false } : {}), active: !terminal, updatedAt: now, nextCheckAt: new Date(now.getTime() + 60_000),
+      $set: { ...patch, ...((terminal || patch.phase === 'confirmed' || included) ? { managedPending: false } : {}), active: !terminal, updatedAt: now, nextCheckAt: new Date(now.getTime() + (polling ? 5_000 : 60_000)),
         ...(patch.token?.launchedAt ? { launchedAt: new Date(patch.token.launchedAt) } : {}),
         ...(patch.token ? { tokenAddress: patch.token.address.toLowerCase(), projected: false } : {}) },
       $unset: { leaseId: '', leaseUntil: '', ...(!patch.lastError ? { lastError: '' as const } : {}) },

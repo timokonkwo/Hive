@@ -66,6 +66,19 @@ test('MongoDB launch journal concurrency and crash recovery', { skip: !uri }, as
     assert.ok(await store.finish(fresh, { phase: 'confirming' }));
     assert.equal((await store.current(agentId)).phase, 'confirming');
   });
+  await t.test('explicit status checks bypass the background timer but never another active lease', async t => {
+    const { store } = await fixture(t), now = new Date();
+    const draft = await store.reserve(preview, signer);
+    const exposed = await store.expose(draft, preparedFor(draft));
+    await store.recordHash(exposed, hash, now);
+    const claimed = await store.claim(now);
+    const pending = await store.finish(claimed, { phase: 'confirming', transactionHash: hash }, now);
+    assert.equal(pending.nextCheckAt.getTime() - now.getTime(), 5000);
+    assert.equal(await store.claim(now), null);
+    const check = await store.claim(now, agentId);
+    assert.equal(check._id, pending._id);
+    assert.equal(await store.claim(now, agentId), null);
+  });
   await t.test('a browser hash update cannot be overwritten by an older worker', async t => {
     const { store } = await fixture(t);
     const draft = await store.reserve(preview, signer);

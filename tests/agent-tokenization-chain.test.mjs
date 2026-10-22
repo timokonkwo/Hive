@@ -133,12 +133,12 @@ function receiptFixture(purchase = '', feePolicyVersion = 2) {
  return {client,call,transaction,receipt,event,buy,values,reads,expected:{candidate:call,nonce:4,prediction}};
 }
 
-test('receipt publishes only a finalized launch with matching metadata and opening purchase', async () => {
+test('successful receipt publishes the exact launch immediately, including an opening purchase', async () => {
  for(const purchase of ['', '0.1']) {
   const f=receiptFixture(purchase);
   const result=await receipts.reconcileLaunchReceipt(f.client,f.expected,hash);
   assert.deepEqual(result,{state:'confirmed',token:{chainId:4663,address:other,symbol:'RESEARCH',transactionHash:hash}});
-  assert.ok(f.reads.every(read=>read.blockNumber===10n));
+  assert.equal(f.reads.length,0);
  }
 });
 test('historical 2% and new 3% Pons receipts reconcile against their own saved terms', async () => {
@@ -146,29 +146,22 @@ test('historical 2% and new 3% Pons receipts reconcile against their own saved t
   const f=receiptFixture('0.1',version);
   assert.equal(f.call.params.creatorTaxBps,version===1?200:300);
   assert.equal((await receipts.reconcileLaunchReceipt(f.client,f.expected,hash)).state,'confirmed');
-  f.values.getLaunchedToken.creatorTaxBps=version===1?300:200;
-  await assert.rejects(receipts.reconcileLaunchReceipt(f.client,f.expected,hash),/differs/);
+  f.transaction.input='0x1234';
+  await assert.rejects(receipts.reconcileLaunchReceipt(f.client,f.expected,hash),/does not match/);
  }
  const legacy=transactions.buildLaunchCandidate({...preview,feePolicyVersion:undefined},choices,snapshot);
  assert.equal(legacy.params.creatorTaxBps,200);
  assert.throws(()=>transactions.buildLaunchCandidate(preview,choices,{...snapshot,maxCreatorTaxBps:200n}),/reviewed creator fee/);
 });
 
-test('unknown hashes, unfinalized receipts and reorgs stay unresolved; outages are surfaced', async () => {
+test('missing receipts and observed reorgs remain pending, without a finality wait', async () => {
  const f=receiptFixture();
  assert.deepEqual(await receipts.reconcileLaunchReceipt({...f.client,getTransaction:async()=>{throw new TransactionNotFoundError({hash})}},f.expected,hash),{state:'pending'});
- for(const patch of [{number:9n,hash},{number:10n,hash:'0x'+'b'.repeat(64)}]) {
-  assert.deepEqual(await receipts.reconcileLaunchReceipt({...f.client,getBlock:async()=>patch},f.expected,hash),
-    {state:'confirming',...(patch.hash===hash?{receiptConfirmed:true,nonceConsumed:true}:{})});
- }
- let reads=0;
- assert.deepEqual(await receipts.reconcileLaunchReceipt({...f.client,getBlock:async()=>({number:10n,hash:++reads===3?'0x'+'b'.repeat(64):hash})},f.expected,hash),{state:'confirming'});
+ assert.deepEqual(await receipts.reconcileLaunchReceipt({...f.client,getBlock:async()=>({number:10n,hash:'0x'+'b'.repeat(64)})},f.expected,hash),{state:'confirming'});
  await assert.rejects(receipts.reconcileLaunchReceipt({...f.client,getTransactionReceipt:async()=>{throw Error('RPC offline')}},f.expected,hash),/RPC offline/);
 });
-
-test('reverted transactions are not final failures before finality', async () => {
+test('a reverted receipt is a failure immediately, never a completed token', async () => {
  const f=receiptFixture();f.receipt.status='reverted';
- assert.deepEqual(await receipts.reconcileLaunchReceipt({...f.client,getBlock:async()=>({number:9n,hash})},f.expected,hash),{state:'confirming'});
  assert.deepEqual(await receipts.reconcileLaunchReceipt(f.client,f.expected,hash),{state:'reverted',transactionHash:hash});
 });
 
@@ -179,36 +172,23 @@ test('unrelated transactions cannot attach a token even with plausible launch lo
  }
 });
 
-test('wrong factory events, duplicate launches and altered on-chain metadata are rejected', async () => {
+test('wrong factory events, duplicate launches and missing purchase events are rejected', async () => {
  for(const logs of [[],[{address:other}],'duplicate']) {
   const f=receiptFixture();f.receipt.logs=logs==='duplicate'?[f.event,f.event]:logs.map(log=>({...f.event,...log}));
   await assert.rejects(receipts.reconcileLaunchReceipt(f.client,f.expected,hash),/exactly one/);
- }
- for(const patch of [{creatorFeeRecipient:other},{creatorTaxBps:0},{buybackEnabled:true},{deployer:other},{exists:false}]) {
-  const f=receiptFixture();Object.assign(f.values.getLaunchedToken,patch);
-  await assert.rejects(receipts.reconcileLaunchReceipt(f.client,f.expected,hash),/differs/);
- }
- for(const name of ['name','symbol','getTokenInfo']) {
-  const f=receiptFixture();f.values[name]=name==='getTokenInfo'?[signer,'changed','changed',{}]:'different';
-  await assert.rejects(receipts.reconcileLaunchReceipt(f.client,f.expected,hash),/differs/);
  }
  const f=receiptFixture('0.1');f.receipt.logs=[f.event];
  await assert.rejects(receipts.reconcileLaunchReceipt(f.client,f.expected,hash),/opening purchase/);
 });
 
-test('pruned historical state uses a pinned current state only after exact finalized receipt verification', async () => {
- const f=receiptFixture(),currentHash='0x'+'c'.repeat(64), reads=[];
+test('successful publication never queries finality, pending nonce or historical contract state', async () => {
+ const f=receiptFixture();
  const client={...f.client,
-  getBlock:async ({blockTag,blockNumber})=>blockTag==='latest'||blockNumber===20n?{number:20n,hash:currentHash}:{number:10n,hash},
-  readContract:async args=>{reads.push(args.blockNumber);if(args.blockNumber===10n)throw Error('historical state abc is not available');return f.values[args.functionName];},
+  getBlock:async args=>{assert.equal(args.blockNumber,10n);assert.equal(args.blockTag,undefined);return {number:10n,hash};},
+  getTransactionCount:async()=>{throw Error('Nonce must not delay publication');},
+  readContract:async()=>{throw Error('Historical state must not delay publication');},
  };
  assert.equal((await receipts.reconcileLaunchReceipt(client,f.expected,hash)).state,'confirmed');
- assert.ok(reads.includes(10n)&&reads.includes(20n));
- f.values.symbol='CHANGED';await assert.rejects(receipts.reconcileLaunchReceipt(client,f.expected,hash),/differs/);f.values.symbol=f.call.params.symbol;
- assert.equal((await receipts.reconcileLaunchReceipt({...client,getBlock:async args=>args.blockNumber===20n?{number:20n,hash}:client.getBlock(args)},f.expected,hash)).state,'confirming');
- let read=0;
- assert.equal((await receipts.reconcileLaunchReceipt({...client,getBlock:async()=>({number:9n,hash}),readContract:async()=>{read++;}},f.expected,hash)).state,'confirming');assert.equal(read,0);
- await assert.rejects(receipts.reconcileLaunchReceipt({...client,readContract:async()=>{throw Error('RPC offline');}},f.expected,hash),/RPC offline/);
 });
 test('launch time comes from the canonical receipt block, not the latest block or draft',async()=>{
  const f=receiptFixture();const timestamp=1792451028n;

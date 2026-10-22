@@ -1,5 +1,5 @@
 import { decodeEventLog, TransactionNotFoundError, TransactionReceiptNotFoundError, zeroAddress, type Address, type Hex, type PublicClient } from 'viem';
-import { curveAbi, factoryAbi, tokenAbi } from './abi';
+import { curveAbi, factoryAbi } from './abi';
 import { PONS_CHAIN_ID, PONS_FACTORY, sameAddress, validAddress, validHash } from './policy';
 import type { LaunchCandidate } from './transaction';
 import type { TokenAssociation } from './types';
@@ -32,13 +32,9 @@ export async function reconcileLaunchReceipt(client: PublicClient, expected: Lau
     || transaction.input.toLowerCase() !== candidate.data.toLowerCase()) {
     throw Error('This transaction does not match the saved launch.');
   }
-  const [canonical, finalized] = await Promise.all([
-    client.getBlock({ blockNumber: receipt.blockNumber }),
-    client.getBlock({ blockTag: 'finalized' }),
-  ]);
+  const canonical = await client.getBlock({ blockNumber: receipt.blockNumber });
   if (canonical.hash !== receipt.blockHash || transaction.blockHash !== receipt.blockHash) return { state: 'confirming' };
-  const awaitingFinality = finalized.number === null || finalized.number < receipt.blockNumber;
-  if (receipt.status === 'reverted') return awaitingFinality ? { state: 'confirming' } : { state: 'reverted', transactionHash: hash };
+  if (receipt.status === 'reverted') return { state: 'reverted', transactionHash: hash };
   if (receipt.status !== 'success') throw Error('The launch result could not be verified.');
   const events = receipt.logs.flatMap(log => {
     if (!sameAddress(log.address, PONS_FACTORY) || log.removed) return [];
@@ -67,43 +63,8 @@ export async function reconcileLaunchReceipt(client: PublicClient, expected: Lau
       throw Error('The opening purchase could not be verified.');
     }
   }
-  if (awaitingFinality) {
-    // The exact call and launch event succeeded. The next launch may use the
-    // next nonce while this receipt continues through finality independently.
-    const nonce = await client.getTransactionCount({ address: candidate.from, blockTag: 'pending' });
-    if ((await client.getBlock({ blockNumber: receipt.blockNumber })).hash !== receipt.blockHash) return { state: 'confirming' };
-    return { state: 'confirming', receiptConfirmed: true, nonceConsumed: nonce > expected.nonce };
-  }
-  const readState = (blockNumber: bigint) => {
-    const at = { blockNumber };
-    return Promise.all([
-      client.readContract({ ...at, address: PONS_FACTORY, abi: factoryAbi, functionName: 'getLaunchedToken', args: [event.token] }),
-      client.readContract({ ...at, address: event.token, abi: tokenAbi, functionName: 'getTokenInfo' }),
-      client.readContract({ ...at, address: event.token, abi: tokenAbi, functionName: 'name' }),
-      client.readContract({ ...at, address: event.token, abi: tokenAbi, functionName: 'symbol' }),
-    ] as const);
-  };
-  let state, stateBlock;
-  try { state = await readState(receipt.blockNumber); } catch (error) {
-    // The public RPC prunes historical state before L1 finality. The finalized
-    // transaction and event above prove the launch; current state is an additional
-    // exact metadata/fee-recipient check, never a substitute for receipt finality.
-    if (!(error instanceof Error) || !/historical state .* is not available/.test(error.message)) throw error;
-    stateBlock = await client.getBlock({ blockTag: 'latest' });
-    if (stateBlock.number === null || !stateBlock.hash || stateBlock.number < receipt.blockNumber) return { state: 'confirming' };
-    state = await readState(stateBlock.number);
-  }
-  const [record, info, name, symbol] = state;
-  if (!record.exists || !sameAddress(record.token, event.token) || !sameAddress(record.curve, event.curve)
-    || !sameAddress(record.deployer, candidate.from) || !sameAddress(record.creatorFeeRecipient, candidate.params.creatorFeeRecipient)
-    || record.pairToken !== zeroAddress || record.creatorTaxBps !== candidate.params.creatorTaxBps || record.buybackEnabled
-    || !sameAddress(info[0], candidate.from) || info[1] !== candidate.params.logo || info[2] !== candidate.params.description
-    || name !== candidate.params.name || symbol !== candidate.params.symbol
-    || (Object.keys(candidate.params.socials) as Array<keyof typeof candidate.params.socials>).some(key => info[3][key] !== candidate.params.socials[key])) {
-    throw Error('The on-chain token metadata or fee recipient differs from the saved launch.');
-  }
-  // Recheck the block after the reads; never publish data from an observed reorg.
-  if ((await client.getBlock({ blockNumber: receipt.blockNumber })).hash !== receipt.blockHash) return { state: 'confirming' };
-  if (stateBlock && (await client.getBlock({ blockNumber: stateBlock.number! })).hash !== stateBlock.hash) return { state: 'confirming' };
-  return { state: 'confirmed', token: { chainId: PONS_CHAIN_ID, address: event.token, symbol, transactionHash: hash, ...(canonical.timestamp !== undefined ? { launchedAt: new Date(Number(canonical.timestamp) * 1000).toISOString() } : {}) } };
+  // Exact successful calldata and the factory event bind the token, metadata and
+  // fee terms. Publish now; L1 finality and redundant contract reads are not gates.
+  return { state: 'confirmed', token: { chainId: PONS_CHAIN_ID, address: event.token, symbol: candidate.params.symbol, transactionHash: hash,
+    ...(canonical.timestamp !== undefined ? { launchedAt: new Date(Number(canonical.timestamp) * 1000).toISOString() } : {}) } };
 }

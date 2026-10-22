@@ -53,7 +53,7 @@ export class SessionRuntime {
         const phase = current.phase === 'confirmed' ? 'confirmed' : (current.phase === 'cancelled' || current.phase === 'reverted') ? 'failed'
           : current.phase === 'draft' ? 'preparing' : current.phase;
         session = await this.update(session, 'pons', { phase, intentId: current._id, transactionHash: current.transactionHash,
-          awaitingFinality: phase === 'confirming' && current.receiptConfirmed === true,
+          awaitingFinality: false,
           ...(current.token ? { token: { ...current.token, platform: 'pons', network: 'robinhood' } } : {}),
           ...(phase === 'failed' ? { error: 'The Pons transaction did not launch a token.' } : {}) });
       } else {

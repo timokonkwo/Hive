@@ -101,7 +101,7 @@ try {
     await page.getByRole('button',{name:'Manage tokens',exact:true}).click();
     await page.getByRole('button',{name:'Close token launch'}).click();
   }
-  // Successful inclusion has a receipt link while public association waits for finality.
+  // A pending hash has an explorer link; a successful receipt completes the flow.
   await page.setViewportSize({width:390,height:900});
   await page.goto(origin);
   await page.evaluate(()=>{
@@ -111,11 +111,21 @@ try {
       phase:'confirming',awaitingFinality:true,transactionHash:'0x'+'a'.repeat(64)}]};
   });
   await page.getByRole('button',{name:'Admin tokenize'}).click();
-  await page.getByRole('status').filter({hasText:'Transaction confirmed · Finalizing…'}).waitFor();
+  await page.getByRole('status').filter({hasText:'Robinhood · Confirming launch…'}).waitFor();
   assert.equal(await page.getByRole('link',{name:'View transaction'}).getAttribute('href'),'https://robinhoodchain.blockscout.com/tx/0x'+'a'.repeat(64));
-  assert.equal(await page.getByRole('link',{name:'Trade',exact:true}).count(),0,'no trade association before finality');
+  assert.equal(await page.getByRole('link',{name:'Trade',exact:true}).count(),0,'no trade association for a pending receipt');
   assert.equal(await page.locator('dialog').evaluate(el=>el.scrollWidth<=el.clientWidth+1),true);
-  await page.screenshot({path:'/tmp/hive-session-finality-390.png'});
+  await page.screenshot({path:'/tmp/hive-session-pending-390.png'});
+
+  await page.getByRole('button',{name:'Close token launch'}).click();
+  await page.evaluate(()=>{
+    fixture.session.targets[0].phase='confirmed';
+    fixture.session.targets[0].token={platform:'pons',network:'robinhood',address:'0x'+'1'.repeat(40),symbol:'CIPHER',transactionHash:'0x'+'a'.repeat(64)};
+  });
+  await page.getByRole('button',{name:'Admin tokenize'}).click();
+  await page.getByRole('heading',{name:'Launch complete',exact:true}).waitFor();
+  assert.equal(await page.getByRole('link',{name:'Trade',exact:true}).count(),1);
+  assert.equal(await page.getByText('Transaction confirmed · Finalizing…').count(),0);
 
   // Deployer contention keeps the approved launch polling, including after reopening.
   await page.goto(origin);
@@ -166,7 +176,8 @@ try {
   await page.getByRole('button',{name:'Owner tokenize'}).click();
   await page.getByRole('checkbox',{name:/pump.fun/}).check();
   await page.getByRole('button',{name:'Continue',exact:true}).click();
-  assert.equal(await page.getByRole('radio',{name:'Hive deployer'}).count(),0);
+  assert.equal(await page.getByRole('radio',{name:'Hive deployer'}).count(),1);
+  await page.getByRole('radio',{name:'Connected wallet'}).check();
   await page.getByRole('button',{name:'Review launch',exact:true}).click();
   await page.getByRole('button',{name:'Launch tokens',exact:true}).click();
   await page.getByRole('button',{name:'Sign transaction',exact:true}).waitFor();
@@ -183,6 +194,7 @@ try {
   await page.getByRole('button',{name:'Owner tokenize'}).click();
   await page.getByRole('checkbox',{name:/Robinhood/}).check();
   await page.getByRole('button',{name:'Continue',exact:true}).click();
+  await page.getByRole('radio',{name:'Connected wallet'}).check();
   assert.equal(await page.getByLabel('Select Robinhood wallet',{exact:true}).inputValue(),await page.evaluate(()=>fixture.wallet.address));
   assert.equal(await page.getByRole('button',{name:'Review launch',exact:true}).isEnabled(),true);
   // Explicit connection gives the provider modal the top layer and returns focus afterward.

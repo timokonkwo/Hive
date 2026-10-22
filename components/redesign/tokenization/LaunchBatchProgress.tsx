@@ -31,7 +31,6 @@ export function LaunchBatchProgress({ session, busy, readOnly = false, onContinu
         const failed = target.phase === 'failed' || target.phase === 'blocked';
         let status = labels[target.phase];
         if (target.phase === 'preparing') status = session.paused ? 'Ready to continue' : target.waitingForDeployer ? 'Waiting for Hive deployer…' : status;
-        if (target.phase === 'confirming' && target.awaitingFinality) status = 'Transaction confirmed · Finalizing…';
         if (target.phase === 'awaiting-signature' && pending) status = 'Launching…';
         return <li key={target.terms.platform}>
           <div className={styles.batchIdentity}>

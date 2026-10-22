@@ -234,3 +234,11 @@ Requested policy: owners may launch with Hive without linking a wallet; Hive pay
 - No existing token fees are changed, no wallet keys are exposed, and no token is launched as part of these tests.
 
 Validation: isolated launch regressions, typecheck, production build, then fixture-backed real-page browser checks for platform selection and both payment options. Deployment status is verified separately.
+
+### Complete Pons launches on successful receipt — 22 October 2026
+
+- Supersedes the remaining finality gate for Pons profile publication. Match the submitted call and successful factory launch event, then mark the journal/session complete and publish the token. Do not wait for the finalized head, another nonce read, or redundant historical metadata/fee reads. Metadata and fee terms are already bound to the exact transaction calldata.
+- Retain a direct canonical receipt block check, exact token identity and opening-purchase receipt checks. Missing receipts stay pending and reverted receipts fail; a bare transaction hash does not prove token creation.
+- Explicit authenticated checks bypass the background polling timer while retaining active worker leases. Background receipt polling is eligible after five seconds instead of one minute. Independent recovery of missing hashes and proven cancellation remains unchanged.
+- Reconciled CodeHack transaction `0xe7ccb8cc0706c634d7dfe839682d1cc694b194dadeb6f34483a1f56ad3469a69` through the existing runtime with `action: check`. It now completes and publishes token `0xdE1d5158203eb34Ac917D2750b1F03d5b20f41f9`; no new transaction was signed or broadcast.
+- Validation: 151 launch tests pass with no skips; typecheck and production build pass. Live CodeHack mobile profile, Pons link, focus return and protected endpoints verified.

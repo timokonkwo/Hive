@@ -26,37 +26,15 @@ test('recovery discovers a finalized launch after the browser loses its hash', a
   assert.equal(patch.token.transactionHash, hash);
 });
 
-test('successful inclusion is visible while finality waits, without publishing or replacing the launch', async () => {
-  const intent = { ...intentFixture(), transactionHash: hash };
-  const { client } = chainFixture(intent);
-  const getBlock = client.getBlock;
-  client.getBlock = args => args.blockTag === 'finalized' ? Promise.resolve({ number: 9n, hash }) : getBlock(args);
-  const waiting = await worker.recoverLaunch(client, intent);
-  assert.equal(waiting.phase, 'confirming');
-  assert.equal(waiting.receiptConfirmed, true);
-  assert.equal(waiting.transactionHash, hash);
-  assert.equal(waiting.token, undefined);
-  client.getBlock = getBlock;
-  assert.equal((await worker.recoverLaunch(client, intent)).phase, 'confirmed');
-  client.getBlock = async () => ({ number: 9n, hash: replacementHash });
-  const reorganized = await worker.recoverLaunch(client, intent);
-  assert.equal(reorganized.receiptConfirmed, false, 'an observed reorg clears the inclusion status');
-  assert.equal(reorganized.token, undefined);
-});
-
-test('a successful canonical launch releases the next nonce before finality, but missing events and stale nonce reads do not', async () => {
+test('successful inclusion completes the journal immediately without finality or extra state reads', async () => {
   const intent = { ...intentFixture(), transactionHash: hash };
   const { client, receipt } = chainFixture(intent);
-  client.getBlock = async args => ({ number: args.blockTag === 'finalized' ? 9n : 10n, hash });
-  client.getTransactionCount = async args => { assert.equal(args.blockTag, 'pending'); return 5; };
-  const included = await worker.recoverLaunch(client, intent);
-  assert.equal(included.nonceConsumed, true);
-  assert.equal(included.phase, 'confirming');
-  assert.equal(included.token, undefined);
-  client.getTransactionCount = async () => 4;
-  assert.equal((await worker.recoverLaunch(client, intent)).nonceConsumed, false);
-  client.getTransactionCount = async () => { throw Error('RPC offline'); };
-  await assert.rejects(worker.recoverLaunch(client, intent), /RPC offline/);
+  client.getBlock = async args => { assert.equal(args.blockTag,undefined); return { number: 10n, hash }; };
+  client.getTransactionCount = async () => { throw Error('Nonce read must not block completion'); };
+  client.readContract = async () => { throw Error('State read must not block completion'); };
+  const result = await worker.recoverLaunch(client, intent);
+  assert.equal(result.phase, 'confirmed');
+  assert.equal(result.token.transactionHash, hash);
   receipt.logs = [];
   await assert.rejects(worker.recoverLaunch(client, intent), /exactly one/);
 });
