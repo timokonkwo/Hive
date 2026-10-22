@@ -10,7 +10,7 @@ export interface LaunchExpectation {
   prediction: { token: Address; curve: Address; tokensOut: bigint };
 }
 export type LaunchReceiptState =
-  | { state: 'pending' | 'confirming'; receiptConfirmed?: boolean }
+  | { state: 'pending' | 'confirming'; receiptConfirmed?: boolean; nonceConsumed?: boolean }
   | { state: 'reverted'; transactionHash: Hex }
   | { state: 'confirmed'; token: TokenAssociation };
 
@@ -37,10 +37,8 @@ export async function reconcileLaunchReceipt(client: PublicClient, expected: Lau
     client.getBlock({ blockTag: 'finalized' }),
   ]);
   if (canonical.hash !== receipt.blockHash || transaction.blockHash !== receipt.blockHash) return { state: 'confirming' };
-  if (finalized.number === null || finalized.number < receipt.blockNumber) {
-    return { state: 'confirming', ...(receipt.status === 'success' ? { receiptConfirmed: true } : {}) };
-  }
-  if (receipt.status === 'reverted') return { state: 'reverted', transactionHash: hash };
+  const awaitingFinality = finalized.number === null || finalized.number < receipt.blockNumber;
+  if (receipt.status === 'reverted') return awaitingFinality ? { state: 'confirming' } : { state: 'reverted', transactionHash: hash };
   if (receipt.status !== 'success') throw Error('The launch result could not be verified.');
   const events = receipt.logs.flatMap(log => {
     if (!sameAddress(log.address, PONS_FACTORY) || log.removed) return [];
@@ -68,6 +66,13 @@ export async function reconcileLaunchReceipt(client: PublicClient, expected: Lau
       || buys[0].tokensOut !== prediction.tokensOut || buys[0].tokensOut < candidate.quote.minimumTokens) {
       throw Error('The opening purchase could not be verified.');
     }
+  }
+  if (awaitingFinality) {
+    // The exact call and launch event succeeded. The next launch may use the
+    // next nonce while this receipt continues through finality independently.
+    const nonce = await client.getTransactionCount({ address: candidate.from, blockTag: 'pending' });
+    if ((await client.getBlock({ blockNumber: receipt.blockNumber })).hash !== receipt.blockHash) return { state: 'confirming' };
+    return { state: 'confirming', receiptConfirmed: true, nonceConsumed: nonce > expected.nonce };
   }
   const readState = (blockNumber: bigint) => {
     const at = { blockNumber };

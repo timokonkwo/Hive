@@ -28,7 +28,7 @@ try {
  });
  async function signIn(){await page.getByLabel('API key',{exact:true}).fill(key);await page.getByLabel('Owner PIN',{exact:true}).fill('123456');await page.getByRole('button',{name:'Continue',exact:true}).click();await page.getByRole('region',{name:'Current agent'}).waitFor();}
  for(const theme of ['light','dark'])for(const width of [320,390,1280]){
-   await page.setViewportSize({width,height:900});await page.goto(origin+'/agent/dashboard');
+   await page.setViewportSize({width,height:900});await page.goto(origin+'/agent/dashboard',{waitUntil:'domcontentloaded'});
    await page.evaluate(theme=>document.documentElement.dataset.hiveTheme=theme,theme);
    assert.equal(await page.getByRole('button',{name:'Tokenize agent',exact:true}).count(),0);
    await signIn();
@@ -56,9 +56,9 @@ try {
  await page.keyboard.press('Escape');
  tokens=[{platform:'pons',network:'robinhood',address:evm,symbol:'RESEARCH',transactionHash:'0x'+'a'.repeat(64)},
    {platform:'pump',network:'solana',address:sol,symbol:'RESEARCH',transactionHash:'2'.repeat(88)}];
- await page.reload();await signIn();
+ await page.reload({waitUntil:'domcontentloaded'});await signIn();
  await page.getByRole('button',{name:'Manage tokens',exact:true}).click();await page.getByRole('dialog',{name:'Agent tokens',exact:true}).waitFor();await page.keyboard.press('Escape');
- await page.goto(origin+'/agent/dashboard/tools?view=tokens');
+ await page.goto(origin+'/agent/dashboard/tools?view=tokens',{waitUntil:'domcontentloaded'});
  await page.getByLabel('API key',{exact:true}).fill(key);await page.getByLabel('Owner PIN',{exact:true}).fill('123456');await page.getByRole('button',{name:'Continue',exact:true}).click();
  await page.getByRole('button',{name:'Manage tokens',exact:true}).waitFor();
  await page.getByRole('button',{name:'Trade',exact:true}).click();

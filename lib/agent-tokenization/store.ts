@@ -31,6 +31,7 @@ export interface LaunchIntent {
   nonce?: number;
   transactionHash?: Hex;
   receiptConfirmed?: boolean;
+  nonceConsumed?: boolean;
   nextBlock?: string;
   token?: TokenAssociation;
   tokenAddress?: string;
@@ -203,11 +204,13 @@ export class LaunchStore {
     });
   }
 
-  async finish(intent: LaunchIntent, patch: Partial<Pick<LaunchIntent, 'phase' | 'transactionHash' | 'receiptConfirmed' | 'nextBlock' | 'token' | 'cancellationEvidence' | 'lastError'>>, now = new Date()) {
+  async finish(intent: LaunchIntent, patch: Partial<Pick<LaunchIntent, 'phase' | 'transactionHash' | 'receiptConfirmed' | 'nonceConsumed' | 'nextBlock' | 'token' | 'cancellationEvidence' | 'lastError'>>, now = new Date()) {
     if (!intent.leaseId) throw Error('Reconciliation requires a worker lease.');
     const terminal = patch.phase === 'reverted' || patch.phase === 'cancelled';
+    const included = intent.mode === 'managed' && !!intent.managedSubmission && patch.receiptConfirmed === true
+      && patch.nonceConsumed === true && patch.transactionHash === intent.transactionHash;
     const updated = await this.intents.findOneAndUpdate({ _id: intent._id, revision: intent.revision, leaseId: intent.leaseId }, {
-      $set: { ...patch, ...((terminal || patch.phase === 'confirmed') ? { managedPending: false } : {}), active: !terminal, updatedAt: now, nextCheckAt: new Date(now.getTime() + 60_000),
+      $set: { ...patch, ...((terminal || patch.phase === 'confirmed' || included) ? { managedPending: false } : {}), active: !terminal, updatedAt: now, nextCheckAt: new Date(now.getTime() + 60_000),
         ...(patch.token?.launchedAt ? { launchedAt: new Date(patch.token.launchedAt) } : {}),
         ...(patch.token ? { tokenAddress: patch.token.address.toLowerCase(), projected: false } : {}) },
       $unset: { leaseId: '', leaseUntil: '', ...(!patch.lastError ? { lastError: '' as const } : {}) },

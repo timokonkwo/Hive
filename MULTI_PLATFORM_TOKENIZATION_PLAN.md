@@ -215,3 +215,9 @@ Validation for this review uses actual components/hooks with simulated API/walle
 - The owner tools token view now uses the multi-platform trade dialog and retains token management after a Pons launch. Legacy Bags links remain only when absent from the verified catalog. Wallet verification and server ownership checks remain unchanged.
 - Agent/session changes close the dialog, refreshed token details update the page, and keyboard focus returns to the launch action after the refresh.
 - Validation: 30 owner/tools tests, typecheck and production build passed. Fixture-backed checks of the actual owner pages passed in both themes at 320/390/1280px, including every workspace tab, missing-wallet availability, existing-token management, agent switching, focus restoration and multi-platform trade. No wallet signatures or launch submissions were made by these checks.
+
+### Release the managed deployer on successful inclusion — 22 October 2026
+
+- Supersedes the earlier signer-wide finality wait: a matching successful canonical transaction, exact Pons launch event/opening purchase and an advanced pending nonce now release `managedPending` immediately. Finalized profile publication continues independently; it no longer blocks another agent's launch.
+- Retain each transaction, encrypted submission and unique signer/nonce record. Reorg recovery cannot reclaim the signer-wide lock from a newer launch, and an RPC reporting an old nonce cannot create another transaction with the historical nonce. Missing receipts, wrong events, failed RPC reads and reverted transactions do not receive early-success release.
+- Validation: 147 tokenization tests passed without skips, including pre-finality release, stale nonce reads, missing events, RPC failure, independent receipt recovery and duplicate-nonce rejection. Typecheck and production build passed.

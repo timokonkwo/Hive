@@ -129,7 +129,7 @@ function receiptFixture(purchase = '', feePolicyVersion = 2) {
  const values={getLaunchedToken:record,getTokenInfo:[signer,call.params.logo,call.params.description,call.params.socials],name:call.params.name,symbol:call.params.symbol};
  const reads=[];
  const client={getChainId:async()=>4663,getTransaction:async()=>transaction,getTransactionReceipt:async()=>receipt,
-  getBlock:async()=>({number:10n,hash}),readContract:async args=>{reads.push(args);return values[args.functionName];}};
+  getTransactionCount:async()=>5,getBlock:async()=>({number:10n,hash}),readContract:async args=>{reads.push(args);return values[args.functionName];}};
  return {client,call,transaction,receipt,event,buy,values,reads,expected:{candidate:call,nonce:4,prediction}};
 }
 
@@ -159,7 +159,7 @@ test('unknown hashes, unfinalized receipts and reorgs stay unresolved; outages a
  assert.deepEqual(await receipts.reconcileLaunchReceipt({...f.client,getTransaction:async()=>{throw new TransactionNotFoundError({hash})}},f.expected,hash),{state:'pending'});
  for(const patch of [{number:9n,hash},{number:10n,hash:'0x'+'b'.repeat(64)}]) {
   assert.deepEqual(await receipts.reconcileLaunchReceipt({...f.client,getBlock:async()=>patch},f.expected,hash),
-    {state:'confirming',...(patch.hash===hash?{receiptConfirmed:true}:{})});
+    {state:'confirming',...(patch.hash===hash?{receiptConfirmed:true,nonceConsumed:true}:{})});
  }
  let reads=0;
  assert.deepEqual(await receipts.reconcileLaunchReceipt({...f.client,getBlock:async()=>({number:10n,hash:++reads===3?'0x'+'b'.repeat(64):hash})},f.expected,hash),{state:'confirming'});

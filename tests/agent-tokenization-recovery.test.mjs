@@ -44,6 +44,23 @@ test('successful inclusion is visible while finality waits, without publishing o
   assert.equal(reorganized.token, undefined);
 });
 
+test('a successful canonical launch releases the next nonce before finality, but missing events and stale nonce reads do not', async () => {
+  const intent = { ...intentFixture(), transactionHash: hash };
+  const { client, receipt } = chainFixture(intent);
+  client.getBlock = async args => ({ number: args.blockTag === 'finalized' ? 9n : 10n, hash });
+  client.getTransactionCount = async args => { assert.equal(args.blockTag, 'pending'); return 5; };
+  const included = await worker.recoverLaunch(client, intent);
+  assert.equal(included.nonceConsumed, true);
+  assert.equal(included.phase, 'confirming');
+  assert.equal(included.token, undefined);
+  client.getTransactionCount = async () => 4;
+  assert.equal((await worker.recoverLaunch(client, intent)).nonceConsumed, false);
+  client.getTransactionCount = async () => { throw Error('RPC offline'); };
+  await assert.rejects(worker.recoverLaunch(client, intent), /RPC offline/);
+  receipt.logs = [];
+  await assert.rejects(worker.recoverLaunch(client, intent), /exactly one/);
+});
+
 test('recovery finds a matching replacement when the original hash disappeared', async () => {
   const intent = { ...intentFixture(), transactionHash: hash };
   const { client, actual } = chainFixture(intent, replacementHash);

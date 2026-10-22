@@ -88,6 +88,29 @@ test('managed submission persistence, concurrency, fencing and recovery',{skip:!
   const claimed=await intents.findOne({_id:saved._id});await launches.finish(claimed,{phase:'reverted'});
   assert.equal((await intents.findOne({_id:saved._id})).managedPending,false);
  });
+ await t.test('successful inclusion releases the signer without releasing its nonce or ending receipt recovery',async()=>{
+  const intent=await reserve('c'.repeat(24),6);
+  await intents.updateOne({_id:intent._id},{$set:{phase:'submitted',managedSubmission:{ciphertext:'fixture'},transactionHash:hash}});
+  let claimed=await launches.claim();
+  const included=await launches.finish(claimed,{phase:'confirming',transactionHash:hash,receiptConfirmed:true,nonceConsumed:true});
+  assert.equal(included.managedPending,false);
+  assert.equal(included.nonce,6);
+  assert.equal(included.active,true);
+  assert.ok(included.managedSubmission);
+  assert.equal(included.token,undefined);
+  const p={...preview,agentId:'d'.repeat(24)},r=authorization.launchReview(p,account.address,choices);
+  const next=await launches.reserve(p,account.address,new Date(),{id:crypto.randomUUID(),...r,mode:'managed'});
+  await assert.rejects(launches.expose(next,preparedFor(next,6)),/nonce/);
+  const exposed=await launches.expose(next,preparedFor(next,7));
+  assert.equal(exposed.nonce,7);
+  claimed=await launches.claim(new Date(Date.now()+61000),intent.agentId);
+  assert.equal(claimed._id,intent._id,'the prior receipt continues reconciling independently');
+  const reorg=await launches.finish(claimed,{phase:'confirming',receiptConfirmed:false,nonceConsumed:false});
+  assert.equal(reorg.managedPending,false,'recovery never steals a newer signer reservation');
+  assert.equal(reorg.nonce,6,'historical nonce remains reserved even after a reorg');
+  assert.equal((await launches.current(next.agentId)).managedPending,true);
+  await managed.discardManagedLaunch(db,exposed);
+ });
  await t.test('discard winning a race prevents a stale confirmation from broadcasting',async()=>{
   const intent=await reserve('b'.repeat(24),5);let sends=0;
   const p={...preview,agentId:'b'.repeat(24)};
