@@ -8,7 +8,7 @@ import { readLaunchSnapshot } from './snapshot';
 import { prepareReviewedLaunch } from './transaction';
 import { reviewedLaunchRelease, launchesEnabled } from './release';
 import { prepareManagedLaunch, refreshManagedLaunch, confirmManagedLaunch } from './managed';
-import { sessionPonsPreview } from './session-access';
+import { sessionPonsPreview, sessionTargetPreview } from './session-access';
 import { unpackPrepared } from './journal';
 import { LaunchStore } from './store';
 import type { PlatformId } from './platforms';
@@ -25,7 +25,7 @@ export async function estimateSession(session: LaunchSession, preview: LaunchPre
       continue;
     }
     if (!launchesEnabled()) throw new SessionConflict('Pons launches are unavailable. Remove Pons or try again later.');
-    const p = { ...preview, metadata: target.metadata || session.metadata, recipient: target.terms.recipient, feePolicyVersion: 2 as const };
+    const p = sessionTargetPreview(preview, session, target);
     const client = ponsClient(), snapshot = await readLaunchSnapshot(client, target.terms.signer as `0x${string}`);
     const balance = await client.getBalance({ address: target.terms.signer as `0x${string}`, blockTag: 'pending' });
     if (balance <= snapshot.launchFee + BigInt(target.terms.purchase)) throw new SessionConflict('The Pons wallet needs more ETH for launch fees. Fund it, choose another wallet, or remove Pons.');

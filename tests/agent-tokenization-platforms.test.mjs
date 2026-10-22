@@ -25,10 +25,10 @@ test('all seven platform selections have deterministic chain-grouped execution a
     assert.equal(s.nextTarget(session).terms.platform, session.targets[0].terms.platform);
   }
 });
-test('Pons preserves owner/admin recipients; Solana creator recipient does not follow the connected payer', () => {
+test('Owner-funded launches pay their signer; admin recipients remain unchanged', () => {
   const owner = s.reviewSession(input());
   assert.equal(owner.targets.find(t => t.terms.platform === 'pons').terms.recipient, evm);
-  assert.ok(owner.targets.filter(t => t.terms.platform !== 'pons').every(t => t.terms.recipient === s.HIVE_SOLANA_FEE_WALLET));
+  assert.ok(owner.targets.every(t => t.terms.recipient === t.terms.signer));
   const admin = s.reviewSession({ ...input(), role: 'admin' });
   assert.equal(admin.targets.find(t => t.terms.platform === 'pons').terms.recipient, '0x4a7c1d6872c6B7D0AAC1ab2311F15b2D750A9B19');
   assert.equal(admin.targets[0].terms.signer, sol);
@@ -46,11 +46,10 @@ test('review binds metadata, platform selection, payer and exact purchases; soci
     { role: 'admin' },
   ]) assert.notEqual(s.reviewSession({ ...input(), ...change }).digest, base.digest);
 });
-test('duplicate targets, unverified wallets, fake managed deployer and conflicting Solana wallets fail closed', () => {
+test('duplicate targets, fake managed deployer and conflicting Solana wallets fail closed', () => {
   const original = input();
   for (const patch of [
     { choices: [] }, { choices: [original.choices[0], original.choices[0]] },
-    { verifiedOwnerSolana: null }, { verifiedOwnerEvm: null },
     { choices: original.choices.map(c => ({ ...c, mode: 'managed' })) },
     { role: 'admin', choices: original.choices.map(c => ({ ...c, mode: 'managed' })) },
     { role: 'admin', choices: original.choices.map(c => c.platform === 'bags' ? { ...c, signer: Keypair.generate().publicKey.toBase58() } : c) },
@@ -101,4 +100,23 @@ test('token identity uses network and exact Solana case; wrong-chain, duplicate 
 test('SOL purchases are exact and reject rounding, exponents and negative values', () => {
   assert.equal(p.purchaseLamports('1.000000001'), 1000000001n);
   for (const value of ['-1', '1e2', '.1', '0.0000000001', '01', 'Infinity', ' 1']) assert.throws(() => p.purchaseLamports(value));
+});
+
+test('walletless owners can use Hive on every platform; purchases require their own payer', () => {
+  const value = { ...input(), verifiedOwnerEvm: null, verifiedOwnerSolana: null,
+    choices: p.platformIds.map(platform => ({ platform, mode: 'managed', signer: platform === 'pons' ? '0x31A9Fb923F1bcB2cEb1221dbdc06B94A6a749De2' : s.HIVE_SOLANA_FEE_WALLET, purchase: '0' })) };
+  const reviewed = s.reviewSession(value);
+  assert.equal(reviewed.walletPolicy, 'payer');
+  assert.equal(reviewed.targets.find(t => t.terms.platform === 'pons').terms.recipient, '0x4a7c1d6872c6B7D0AAC1ab2311F15b2D750A9B19');
+  assert.ok(reviewed.targets.filter(t => t.terms.platform !== 'pons').every(t => t.terms.recipient === s.HIVE_SOLANA_FEE_WALLET));
+  for (const platform of p.platformIds) assert.throws(() => s.reviewSession({ ...value, choices: value.choices.map(c => c.platform === platform ? { ...c, purchase: '0.1' } : c) }), /own wallet/);
+  const connected = s.reviewSession({ ...input(), verifiedOwnerEvm: null, verifiedOwnerSolana: null });
+  assert.ok(connected.targets.every(t => t.terms.signer === t.terms.recipient));
+});
+test('historical reviews preserve verified-wallet policy and fixed Solana recipients', () => {
+  const previous = s.reviewSession({ ...input(), walletPolicy: 'verified' });
+  assert.equal(previous.walletPolicy, undefined);
+  assert.ok(previous.targets.filter(t => t.terms.platform !== 'pons').every(t => t.terms.recipient === s.HIVE_SOLANA_FEE_WALLET));
+  assert.throws(() => s.reviewSession({ ...input(), walletPolicy: 'verified', verifiedOwnerEvm: null }), /verified/);
+  assert.notEqual(previous.digest, s.reviewSession(input()).digest);
 });

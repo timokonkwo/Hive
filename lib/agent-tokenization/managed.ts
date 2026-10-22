@@ -1,3 +1,4 @@
+import { managedOwnerPreview } from './policy';
 import { randomUUID } from 'node:crypto';
 import type { Db } from 'mongodb';
 import { keccak256, toHex, type PublicClient } from 'viem';
@@ -18,14 +19,14 @@ interface Services {
   refreshPreview: () => Promise<LaunchPreview>;
 }
 export function requireManagedAdmin(preview: LaunchPreview, enabled = true) {
-  if (preview.role !== 'admin') throw new LaunchConflict('Only admins can use Hive deployer.');
+  if (preview.role !== 'admin' && !managedOwnerPreview(preview)) throw new LaunchConflict('Only admins can use Hive deployer.');
   if (enabled) {
     const status = managedDeployerStatus();
     if (!status.available) throw new LaunchConflict(status.reason!);
   }
 }
 function assertManaged(intent: LaunchIntent) {
-  if (intent.mode !== 'managed' || intent.preview.role !== 'admin' || !sameAddress(intent.signer, HIVE_LAUNCH_WALLET)) {
+  if (intent.mode !== 'managed' || (intent.preview.role !== 'admin' && !managedOwnerPreview(intent.preview)) || !sameAddress(intent.signer, HIVE_LAUNCH_WALLET)) {
     throw new LaunchConflict('This launch uses a connected wallet.');
   }
 }

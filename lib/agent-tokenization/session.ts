@@ -39,6 +39,7 @@ export interface LaunchSession {
   id: string;
   agentId: string;
   role: LaunchRole;
+  walletPolicy?: 'payer';
   metadata: AgentTokenMetadata;
   profileRevision: string;
   digest: string;
@@ -56,6 +57,7 @@ export function reviewSession(input: {
   id: string; agentId: string; role: LaunchRole; metadata: AgentTokenMetadata; profileRevision: string;
   choices: { platform: PlatformId; mode: LaunchMode; signer: string; purchase: string }[];
   verifiedOwnerEvm: string | null; verifiedOwnerSolana: string | null;
+  walletPolicy?: 'payer' | 'verified';
   allowEmpty?: boolean;
 }, now = new Date()): LaunchSession {
   if (!/^[a-f0-9-]{36}$/.test(input.id) || !/^[a-f0-9]{24}$/.test(input.agentId)
@@ -70,7 +72,8 @@ export function reviewSession(input: {
     || !metadata.description.trim() || byteLength(metadata.description) > 1000) throw new SessionConflict('Shorten the token name or description for the selected platforms.');
   const targets: SessionTarget[] = input.choices.map((choice): SessionTarget => {
     if (!isPlatform(choice.platform) || !['managed', 'connected'].includes(choice.mode)) throw new SessionConflict('Invalid launch selection.');
-    if (input.role !== 'admin' && choice.mode === 'managed') throw new SessionConflict('Only admins can use Hive deployer.');
+    const payerPolicy = input.walletPolicy !== 'verified';
+    if (!payerPolicy && input.role !== 'admin' && choice.mode === 'managed') throw new SessionConflict('Review the launch again.');
     const evm = choice.platform === 'pons';
     if (!(evm ? validAddress(choice.signer) : validSolanaAddress(choice.signer))) throw new SessionConflict('Select a valid launch wallet.');
     const signer = evm ? choice.signer.toLowerCase() : choice.signer;
@@ -78,8 +81,10 @@ export function reviewSession(input: {
       throw new SessionConflict('The Hive deployer changed. Refresh the launch review.');
     }
     const owner = evm ? input.verifiedOwnerEvm?.toLowerCase() : input.verifiedOwnerSolana;
-    if (input.role === 'owner' && signer !== owner) throw new SessionConflict('Select the verified agent wallet.');
-    const recipient = evm ? feeRecipient(input.role, owner, !!owner) : HIVE_SOLANA_FEE_WALLET;
+    if (!payerPolicy && input.role === 'owner' && signer !== owner) throw new SessionConflict('Select the verified agent wallet.');
+    const recipient = payerPolicy && input.role === 'owner' && choice.mode === 'connected' ? signer
+      : evm ? feeRecipient(payerPolicy ? 'admin' : input.role, owner, !!owner) : HIVE_SOLANA_FEE_WALLET;
+    if (input.role === 'owner' && choice.mode === 'managed' && (evm ? purchaseWei(choice.purchase) : purchaseLamports(choice.purchase)) !== 0n) throw new SessionConflict('Use your own wallet for an initial purchase.');
     if (!recipient) throw new SessionConflict('Verify the agent wallet first.');
     return { phase: 'queued', terms: { platform: choice.platform, mode: choice.mode, signer, recipient,
       purchase: (evm ? purchaseWei(choice.purchase) : purchaseLamports(choice.purchase)).toString(),
@@ -91,8 +96,8 @@ export function reviewSession(input: {
   }
   // Explicitly bind recipients, policy, selection, actor, immutable metadata and exact opening purchases.
   const digest = createHash('sha256').update(JSON.stringify({ version: 1, agentId: input.agentId, role: input.role,
-    metadata, profileRevision: input.profileRevision, terms: targets.map(t => t.terms) })).digest('hex');
-  return { id: input.id, agentId: input.agentId, role: input.role, metadata, profileRevision: input.profileRevision,
+    ...(input.walletPolicy !== 'verified' ? { walletPolicy: 'payer' } : {}), metadata, profileRevision: input.profileRevision, terms: targets.map(t => t.terms) })).digest('hex');
+  return { id: input.id, agentId: input.agentId, role: input.role, ...(input.walletPolicy !== 'verified' ? { walletPolicy: 'payer' as const } : {}), metadata, profileRevision: input.profileRevision,
     digest, targets, paused: false, revision: 0, createdAt: now.toISOString() };
 }
 

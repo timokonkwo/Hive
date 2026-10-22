@@ -1,4 +1,4 @@
-import type { LaunchRole } from './types';
+import type { LaunchRole, LaunchPreview } from './types';
 
 export const HIVE_LAUNCH_WALLET = '0x31A9Fb923F1bcB2cEb1221dbdc06B94A6a749De2';
 export const PONS_CHAIN_ID = 4663;
@@ -73,4 +73,14 @@ export function shortAddress(address: string): string {
 export function validTokenLogo(value: string): boolean {
   return /^ipfs:\/\/(?:Qm[1-9A-HJ-NP-Za-km-z]{44}|b[a-z2-7]{20,})(?:\/[a-zA-Z0-9._-]+)?$/.test(value)
     || /^https:\/\/res\.cloudinary\.com\/[a-zA-Z0-9_-]+\/image\/upload\/v[1-9][0-9]*\/hive-agent-tokens\/[a-f0-9]{64}\.png$/.test(value);
+}
+
+/** Session mode is set only after reading authenticated, frozen session terms. */
+export function previewFeeRecipient(preview: LaunchPreview): string | null {
+  if (preview.sessionId && preview.sessionMode === 'managed' && sameAddress(preview.requiredSigner || '', HIVE_LAUNCH_WALLET)) return HIVE_CREATOR_FEE_WALLET;
+  return feeRecipient(preview.role, preview.requiredSigner, true);
+}
+export function managedOwnerPreview(preview: LaunchPreview): boolean {
+  return preview.role === 'owner' && !!preview.sessionId && preview.sessionMode === 'managed'
+    && sameAddress(preview.requiredSigner || '', HIVE_LAUNCH_WALLET) && sameAddress(preview.recipient || '', HIVE_CREATOR_FEE_WALLET);
 }

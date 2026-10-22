@@ -8,6 +8,7 @@ export interface PlatformOption {
   platform: PlatformId;
   available: boolean;
   purchaseAvailable?: boolean;
+  existingUrl?: string;
   token?: AgentToken;
   pending?: boolean;
   reason?: string;
@@ -33,6 +34,7 @@ export function PlatformSelection({ options, selected, onChange, onContinue, onR
         return <div className={styles.platformChoice} key={platform} data-selected={selected.includes(platform) && !locked}>
           {option.token ? <><div><strong>{title}</strong><span>{subtitle} · ${option.token.symbol}</span></div>
             <a href={tradeUrl(option.token)} target="_blank" rel="noopener noreferrer">Trade<ArrowUpRight size={15} aria-hidden="true" /></a></>
+            : option.existingUrl ? <><div><strong>{title}</strong><span>{subtitle} · Existing token</span></div><a href={option.existingUrl} target="_blank" rel="noopener noreferrer">View token<ArrowUpRight size={15} aria-hidden="true" /></a></>
             : option.pending ? <><div><strong>{title}</strong><span>{subtitle}</span></div>
               <button type="button" className={styles.secondary} onClick={() => onResume(platform)}>Resume</button></>
               : <label><input type="checkbox" checked={!locked && selected.includes(platform)} disabled={locked}

@@ -78,14 +78,14 @@ export function readBagsTransaction(value: unknown): BagsPlanStep {
   return { transaction, ...(lifetime ? { lifetime } : {}) };
 }
 
-export function bagsFeeConfigRequest(mint: string, payer: string) {
-  if (!validSolanaAddress(mint) || !validSolanaAddress(payer)) throw new SessionConflict('Invalid Bags launch wallet or mint.');
-  return { payer, baseMint: mint, claimersArray: [HIVE_SOLANA_FEE_WALLET], basisPointsArray: [10000],
+export function bagsFeeConfigRequest(mint: string, payer: string, recipient = HIVE_SOLANA_FEE_WALLET) {
+  if (!validSolanaAddress(mint) || !validSolanaAddress(payer) || !validSolanaAddress(recipient)) throw new SessionConflict('Invalid Bags launch wallet or mint.');
+  return { payer, baseMint: mint, claimersArray: [recipient], basisPointsArray: [10000],
     bagsConfigType: BAGS_STANDARD_CONFIG };
 }
 
-export async function prepareBagsConfiguration(api: BagsLaunchApi, mint: string, payer: string) {
-  const response = object(await api.post('/fee-share/config', bagsFeeConfigRequest(mint, payer)));
+export async function prepareBagsConfiguration(api: BagsLaunchApi, mint: string, payer: string, recipient = HIVE_SOLANA_FEE_WALLET) {
+  const response = object(await api.post('/fee-share/config', bagsFeeConfigRequest(mint, payer, recipient)));
   if (!validSolanaAddress(response.meteoraConfigKey) || !validSolanaAddress(response.feeShareAuthority) || typeof response.needsCreation !== 'boolean') {
     throw new SessionConflict('Bags returned an invalid fee configuration.');
   }

@@ -171,3 +171,18 @@ test('Bags runtime resumes each saved setup step in order across requests', {ski
   assert.equal((await db.collection('agent_launch_solana_attempts').findOne({_id:'failed-signature'})).stepId,first._id);
   assert.equal((await journal.get(bagsSetup.bagsSetupStepId(id,'pool-config'))).phase,'confirmed');
 });
+
+test('Bags config requests and decoded setup bind the owner fee recipient', async () => {
+  const recipient=Keypair.generate().publicKey;
+  const request=bagsLaunch.bagsFeeConfigRequest(terms.mint,terms.payer,recipient.toBase58());
+  assert.deepEqual(request.claimersArray,[recipient.toBase58()]); assert.deepEqual(request.basisPointsArray,[10000]);
+  const tx=change(unpack(prepared.steps[0]),m=>{const key=m.instructions.find(i=>i.programId.equals(fees.BAGS_FEE_PROGRAM)).keys[19];key.pubkey=recipient;key.isSigner=false;});
+  assert.equal((await validator.validateBagsTransaction(connection,tx,{...terms,recipient:recipient.toBase58()},'setup')).setupKind,'fee-config');
+  await assert.rejects(validator.validateBagsTransaction(connection,tx,terms,'setup'));
+  const f=fixture('bags-simulated-fee-state');
+  const infos=f.accounts.map(a=>({owner:new PublicKey(a.owner),data:Buffer.from(a.data[0],'base64')}));
+  recipient.toBuffer().copy(infos[0].data,188);
+  const rpc={getMultipleAccountsInfo:async()=>infos};
+  await fees.verifyBagsFeeState(rpc,f.mint,f.payer,recipient.toBase58());
+  await assert.rejects(fees.verifyBagsFeeState(rpc,f.mint,f.payer));
+});

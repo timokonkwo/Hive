@@ -33,7 +33,7 @@ export async function reservePumpMint(db: Db, intentId: string, agentId: string,
 }
 
 export interface PumpLaunchInput {
-  mint: Keypair; payer: PublicKey; metadata: AgentTokenMetadata; uri: string; purchase: bigint;
+  mint: Keypair; payer: PublicKey; recipient?: string; metadata: AgentTokenMetadata; uri: string; purchase: bigint;
 }
 
 /** Official pinned SDK only. No remote unsigned transaction or arbitrary instruction injection. */
@@ -45,7 +45,7 @@ export async function buildPumpLaunch(connection: Connection, input: PumpLaunchI
     || input.purchase < 0n || input.purchase > BigInt(Number.MAX_SAFE_INTEGER)) throw new SessionConflict('Review the token metadata and opening purchase.');
   if (await connection.getAccountInfo(input.mint.publicKey, 'confirmed')) throw new SessionConflict('This mint already exists. Check the previous launch.');
   const common = { mint: input.mint.publicKey, name: input.metadata.name, symbol: input.metadata.symbol, uri: input.uri,
-    creator: new PublicKey(HIVE_SOLANA_FEE_WALLET), user: input.payer, mayhemMode: false, cashback: false, holderReward: false };
+    creator: new PublicKey(input.recipient || HIVE_SOLANA_FEE_WALLET), user: input.payer, mayhemMode: false, cashback: false, holderReward: false };
   let instructions;
   if (input.purchase === 0n) instructions = [await PUMP_SDK.createV2Instruction(common)];
   else {
@@ -103,7 +103,7 @@ export function pumpCreateEvents(logs: string[]) {
 }
 
 /** The shared journal verifies the exact finalized message first; this verifies the platform result. */
-export async function verifyPumpLaunch(connection: Connection, step: SolanaStep, metadata: AgentTokenMetadata, uri: string): Promise<AgentToken> {
+export async function verifyPumpLaunch(connection: Connection, step: SolanaStep, metadata: AgentTokenMetadata, uri: string, recipient = HIVE_SOLANA_FEE_WALLET): Promise<AgentToken> {
   if (step.phase !== 'confirmed' || !step.signature || !step.slot) throw new SessionConflict('The launch transaction is not finalized.');
   const receipt = await connection.getTransaction(step.signature, { commitment: 'finalized', maxSupportedTransactionVersion: 0 });
   if (!receipt || receipt.slot !== step.slot || !receipt.meta || receipt.meta.err) throw new SessionConflict('The launch receipt is unavailable.');
@@ -111,7 +111,7 @@ export async function verifyPumpLaunch(connection: Connection, step: SolanaStep,
   const mint = new PublicKey(step.mint), curve = bondingCurvePda(mint);
   const event = events[0];
   if (events.length !== 1 || !event.mint.equals(mint) || !event.bondingCurve.equals(curve) || event.user.toBase58() !== step.signer
-    || event.creator.toBase58() !== HIVE_SOLANA_FEE_WALLET || event.name !== metadata.name || event.symbol !== metadata.symbol || event.uri !== uri
+    || event.creator.toBase58() !== recipient || event.name !== metadata.name || event.symbol !== metadata.symbol || event.uri !== uri
     || !event.tokenProgram.equals(TOKEN_2022_PROGRAM_ID) || event.isMayhemMode || event.isCashbackEnabled || event.isHolderReward
     || !event.creatorFeeBps.isZero() || event.depth !== 0 || (!event.quoteMint.equals(PublicKey.default) && !event.quoteMint.equals(NATIVE_MINT))) {
     throw new SessionConflict('The pump.fun token does not match this launch.');
@@ -126,7 +126,7 @@ export async function verifyPumpLaunch(connection: Connection, step: SolanaStep,
     throw new SessionConflict('The token account or metadata could not be verified.');
   }
   const state = PUMP_SDK.decodeBondingCurve(curveAccount);
-  if (state.creator.toBase58() !== HIVE_SOLANA_FEE_WALLET || state.isMayhemMode || state.isCashbackCoin || state.isHolderReward) {
+  if (state.creator.toBase58() !== recipient || state.isMayhemMode || state.isCashbackCoin || state.isHolderReward) {
     throw new SessionConflict('The pump.fun creator configuration changed.');
   }
   return { platform: 'pump', network: 'solana', address: step.mint, symbol: metadata.symbol, transactionHash: step.signature,

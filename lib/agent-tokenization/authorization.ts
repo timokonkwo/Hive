@@ -1,7 +1,8 @@
+import { previewFeeRecipient, managedOwnerPreview } from './policy';
 import { createHash, randomUUID } from 'node:crypto';
 import type { Db } from 'mongodb';
 import { formatEther, verifyMessage, type Hex } from 'viem';
-import { BASE_FEE_BPS, creatorTaxBps, PONS_CHAIN_ID, PONS_FACTORY, feeRecipient, normalizeSymbol, purchaseWei, sameAddress, validAddress } from './policy';
+import { BASE_FEE_BPS, creatorTaxBps, PONS_CHAIN_ID, PONS_FACTORY, normalizeSymbol, purchaseWei, sameAddress, validAddress } from './policy';
 import type { LaunchPreview } from './types';
 
 export class LaunchAuthorizationError extends Error {}
@@ -23,9 +24,9 @@ const digest = (value: unknown) => createHash('sha256').update(JSON.stringify(va
 export function launchReview(preview: LaunchPreview, signer: string, input: ReviewChoices) {
   if (!/^[a-f0-9]{24}$/.test(preview.agentId) || !validAddress(signer) || preview.issues.length || preview.existingToken
     || !['owner', 'admin'].includes(preview.role)) throw new LaunchAuthorizationError('Refresh the agent token details before continuing.');
-  const recipient = feeRecipient(preview.role, preview.requiredSigner, true);
+  const recipient = previewFeeRecipient(preview);
   if (!recipient || !sameAddress(recipient, preview.recipient || '')
-    || (preview.role === 'owner' && !sameAddress(signer, recipient))) throw new LaunchAuthorizationError('Select the verified agent wallet.');
+    || (preview.role === 'owner' && !sameAddress(signer, managedOwnerPreview(preview) ? preview.requiredSigner || '' : recipient))) throw new LaunchAuthorizationError('Select the verified agent wallet.');
   if (typeof input.symbol !== 'string' || typeof input.purchase !== 'string') throw new LaunchAuthorizationError('Choose a ticker and opening purchase.');
   let choices: ReviewChoices;
   try { choices = { symbol: normalizeSymbol(input.symbol), purchase: formatEther(purchaseWei(input.purchase)) }; }

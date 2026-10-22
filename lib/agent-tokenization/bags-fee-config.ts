@@ -31,7 +31,7 @@ export function decodeBagsFeeConfig(data: Buffer) {
   return { header, claimers, bps };
 }
 
-export async function validateBagsFeeInstruction(connection: Connection, ix: TransactionInstruction, mint: string, payer: string) {
+export async function validateBagsFeeInstruction(connection: Connection, ix: TransactionInstruction, mint: string, payer: string, recipient = HIVE_SOLANA_FEE_WALLET) {
   const decoded = instructionCoder.decode(ix.data);
   if (!decoded || !['create_fee_config_with_deployer','update_fee_config_manager'].includes(decoded.name)) fail();
   const params = (decoded!.data as {params:Record<string,unknown>}).params;
@@ -49,7 +49,7 @@ export async function validateBagsFeeInstruction(connection: Connection, ix: Tra
     : [new PublicKey(payer), admin, programConfig, bagsConfigAddress(mint), authority,
     getAssociatedTokenAddressSync(NATIVE_MINT,authority,true), BAGS_FEE_PROGRAM, BAGS_FEE_PROGRAM, new PublicKey(payer),
     bagsDeployerConfig(mint), vault, getAssociatedTokenAddressSync(NATIVE_MINT,vault,true), new PublicKey(mint), NATIVE_MINT,
-    SystemProgram.programId, TOKEN_PROGRAM_ID, ASSOCIATED_TOKEN_PROGRAM_ID, pda('__event_authority'), BAGS_FEE_PROGRAM, new PublicKey(HIVE_SOLANA_FEE_WALLET)];
+    SystemProgram.programId, TOKEN_PROGRAM_ID, ASSOCIATED_TOKEN_PROGRAM_ID, pda('__event_authority'), BAGS_FEE_PROGRAM, new PublicKey(recipient)];
   if (ix.keys.length !== expected.length || expected.some((key,index)=>!same(ix.keys[index]?.pubkey,key))) fail();
   const definition = feeIdl.instructions.find(i=>i.name === decoded!.name)!;
   definition.accounts.forEach((account,index)=>{
@@ -59,7 +59,7 @@ export async function validateBagsFeeInstruction(connection: Connection, ix: Tra
   return { kind:decoded!.name === 'create_fee_config_with_deployer' ? 'fee-config' as const : 'manager' as const, admin };
 }
 
-export async function verifyBagsFeeState(connection: Connection, mint: string, payer: string) {
+export async function verifyBagsFeeState(connection: Connection, mint: string, payer: string, recipient = HIVE_SOLANA_FEE_WALLET) {
   const addresses = [bagsConfigAddress(mint), bagsDeployerConfig(mint), bagsDeployerVault(payer), bagsAuthority(mint)];
   const infos = await connection.getMultipleAccountsInfo(addresses, 'finalized');
   if (infos.length !== addresses.length || infos.some(info=>!info?.owner.equals(BAGS_FEE_PROGRAM))) fail();
@@ -68,7 +68,7 @@ export async function verifyBagsFeeState(connection: Connection, mint: string, p
     || !same(header.partner,PublicKey.default) || !same(header.partner_config,PublicKey.default)
     || !(same(header.manager,PublicKey.default) || same(header.manager,new PublicKey(payer)))
     || header.custom_platform_bps !== 0 || header.is_init_finalized !== 1 || header.is_update_locked !== 0 || header.is_separate_deployer !== 1
-    || claimers.length !== 1 || !same(claimers[0],new PublicKey(HIVE_SOLANA_FEE_WALLET)) || bps[0] !== 10000) fail();
+    || claimers.length !== 1 || !same(claimers[0],new PublicKey(recipient)) || bps[0] !== 10000) fail();
   const deployer = accountCoder.decode('DeployerConfig',infos[1]!.data) as {deployer:PublicKey;fee_collection_mode:number;fee_collection_platform_bps:number;fee_collection_claimers_bps:number};
   const vault = accountCoder.decode('DeployerVault',infos[2]!.data) as {deployer:PublicKey};
   const authority = accountCoder.decode('FeeShareAuthorityHeader',infos[3]!.data) as {config:PublicKey};

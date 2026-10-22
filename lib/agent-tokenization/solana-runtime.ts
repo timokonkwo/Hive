@@ -40,7 +40,7 @@ export class SolanaLaunchRuntime {
   private terms(intent: SolanaIntent, session: LaunchSession, target: SessionTarget): BagsTerms {
     if (!intent.mint || !intent.uri || !intent.config || !intent.authority) throw new SessionConflict('Bags setup is incomplete.');
     return { mint: intent.mint, uri: intent.uri, config: intent.config, authority: intent.authority,
-      payer: target.terms.signer, metadata: session.metadata, purchase: BigInt(target.terms.purchase) };
+      payer: target.terms.signer, recipient: target.terms.recipient, metadata: session.metadata, purchase: BigInt(target.terms.purchase) };
   }
   private async save(intent: SolanaIntent) { await this.intents.replaceOne({ _id: intent._id, sessionId: intent.sessionId }, intent); return intent; }
   async prepare(session: LaunchSession, target: SessionTarget, preview: LaunchPreview, options: { retryFailed?: boolean; refreshReview?: boolean } = {}) {
@@ -65,7 +65,7 @@ export class SolanaLaunchRuntime {
       const mint = await reservePumpMint(this.db, intent._id, session.agentId, session.id);
       intent.mint = mint.publicKey.toBase58();
       if (!intent.uri) { intent.uri = (await persistSolanaMetadata(session.agentId, session.metadata, intent.image)).uri; await this.save(intent); }
-      built = await buildPumpLaunch(this.connection, { mint, payer: new PublicKey(target.terms.signer), metadata: session.metadata, uri: intent.uri, purchase: BigInt(target.terms.purchase) });
+      built = await buildPumpLaunch(this.connection, { mint, payer: new PublicKey(target.terms.signer), recipient: target.terms.recipient, metadata: session.metadata, uri: intent.uri, purchase: BigInt(target.terms.purchase) });
     } else {
       const api = new BagsLaunchApi(process.env.BAGS_AGENT_API_KEY || '');
       if (!intent.mint || !intent.uri) {
@@ -78,7 +78,7 @@ export class SolanaLaunchRuntime {
       }
       let next = intent.bagsPlan?.steps.find(step=>!completed.has(step.kind));
       if (!intent.bagsPlan || (next && (['failed', 'expired'].includes(pending?.phase || '') || !(await this.connection.isBlockhashValid(restoreBagsSetupStep(next).transaction.message.recentBlockhash,{commitment:'confirmed'})).value))) {
-        intent.bagsPlan = await refreshBagsSetupPlan(this.connection,api,{mint:intent.mint,uri:intent.uri!,payer:target.terms.signer,
+        intent.bagsPlan = await refreshBagsSetupPlan(this.connection,api,{mint:intent.mint,uri:intent.uri!,payer:target.terms.signer,recipient:target.terms.recipient,
           metadata:session.metadata,purchase:BigInt(target.terms.purchase)},intent.bagsPlan,completed);
         intent.config = intent.bagsPlan.config; intent.authority = intent.bagsPlan.authority;
         intent.setupSteps = intent.bagsPlan.steps.map(step=>bagsSetupStepId(intent!._id,step.kind));
@@ -116,7 +116,7 @@ export class SolanaLaunchRuntime {
       await reviewSolanaTransaction(this.connection, prepared, step.signer, BigInt(step.review.maximumDebit));
       let bytes: Uint8Array;
       if (target.terms.mode === 'managed') {
-        if (session.role !== 'admin' || signed) throw new SessionConflict('Invalid managed-wallet confirmation.');
+        if ((session.role !== 'admin' && session.walletPolicy !== 'payer') || signed) throw new SessionConflict('Invalid managed-wallet confirmation.');
         bytes = signManagedSolana(prepared);
       } else {
         if (typeof signed !== 'string' || signed.length > 1700 || !/^[A-Za-z0-9+/]+={0,2}$/.test(signed)) throw new SessionConflict('Sign this transaction with the selected wallet.');
@@ -146,7 +146,7 @@ export class SolanaLaunchRuntime {
     }
     const launched = intent.launchStep ? await this.journal.get(intent.launchStep) : null;
     if (launched?.phase === 'confirmed') {
-      const token = intent.platform === 'pump' ? await verifyPumpLaunch(this.connection, launched, session.metadata, intent.uri!)
+      const token = intent.platform === 'pump' ? await verifyPumpLaunch(this.connection, launched, session.metadata, intent.uri!, target.terms.recipient)
         : await verifyBagsLaunch(this.connection, launched, this.terms(intent, session, target));
       return { phase: 'confirmed' as const, token };
     }

@@ -221,3 +221,16 @@ Validation for this review uses actual components/hooks with simulated API/walle
 - Supersedes the earlier signer-wide finality wait: a matching successful canonical transaction, exact Pons launch event/opening purchase and an advanced pending nonce now release `managedPending` immediately. Finalized profile publication continues independently; it no longer blocks another agent's launch.
 - Retain each transaction, encrypted submission and unique signer/nonce record. Reorg recovery cannot reclaim the signer-wide lock from a newer launch, and an RPC reporting an old nonce cannot create another transaction with the historical nonce. Missing receipts, wrong events, failed RPC reads and reverted transactions do not receive early-success release.
 - Validation: 147 tokenization tests passed without skips, including pre-finality release, stale nonce reads, missing events, RPC failure, independent receipt recovery and duplicate-nonce rejection. Typecheck and production build passed.
+
+## Owner payment choice — 2026-10-22
+
+Requested policy: owners may launch with Hive without linking a wallet; Hive pays launch costs and receives creator fees. Owners may instead connect, fund and sign with their own wallet, which receives creator fees. Admin fee routing remains unchanged.
+
+- Platform selection no longer requires linked wallets. Existing legacy Bags mints show a platform link instead of a dead checkbox.
+- Both networks offer Hive deployer or connected wallet. Owner initial buys require the connected wallet; sponsorship covers launch costs only.
+- New sessions freeze `walletPolicy: payer`, mode, signer and recipient in their review digest. Historical sessions retain their earlier fee terms.
+- Pons owner sponsorship is available only through authenticated saved sessions. Standalone admin endpoints remain restricted. Transaction authorization verifies the exact signer and fee recipient.
+- Bags configuration, setup instruction validation and finalized account verification use the frozen recipient. pump.fun creation and receipt/state verification use the frozen creator.
+- No existing token fees are changed, no wallet keys are exposed, and no token is launched as part of these tests.
+
+Validation: isolated launch regressions, typecheck, production build, then fixture-backed real-page browser checks for platform selection and both payment options. Deployment status is verified separately.

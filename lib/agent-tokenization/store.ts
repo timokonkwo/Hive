@@ -1,7 +1,8 @@
+import { previewFeeRecipient, managedOwnerPreview } from './policy';
 import { randomBytes, randomUUID } from 'node:crypto';
 import { ObjectId, type Db, type Filter } from 'mongodb';
 import type { Hex } from 'viem';
-import { PONS_CHAIN_ID, creatorTaxBps, feeRecipient, purchaseWei, sameAddress, validAddress, validHash, validTokenLogo } from './policy';
+import { PONS_CHAIN_ID, creatorTaxBps, purchaseWei, sameAddress, validAddress, validHash, validTokenLogo } from './policy';
 import { packPrepared, unpackPrepared, type PreparedEnvelope, type PreparedLaunch } from './journal';
 import type { LaunchPreview, TokenAssociation } from './types';
 import type { ReviewChoices } from './authorization';
@@ -69,8 +70,8 @@ export class LaunchStore {
   async reserve(preview: LaunchPreview, signer: string, now = new Date(), authorization?: { id: string; digest: string; choices: ReviewChoices; mode?: 'connected' | 'managed' }) {
     if (!/^[a-f0-9]{24}$/i.test(preview.agentId) || !validAddress(signer) || preview.issues.length || preview.existingToken) throw Error('The agent is not ready to launch.');
     if (preview.role !== 'owner' && preview.role !== 'admin') throw Error('Invalid launch role.');
-    const recipient = feeRecipient(preview.role, preview.requiredSigner, true);
-    if (!recipient || !sameAddress(recipient, preview.recipient || '') || (preview.role === 'owner' && !sameAddress(signer, recipient))) throw Error('The launch wallet or recipient changed.');
+    const recipient = previewFeeRecipient(preview);
+    if (!recipient || !sameAddress(recipient, preview.recipient || '') || (preview.role === 'owner' && !sameAddress(signer, managedOwnerPreview(preview) ? preview.requiredSigner || '' : recipient))) throw Error('The launch wallet or recipient changed.');
     await this.ensureIndexes();
     const intent: LaunchIntent = {
       _id: authorization?.id || randomUUID(), mode: authorization?.mode || 'connected', ...(authorization?.mode === 'managed' ? { managedPending: true } : {}), ...(authorization ? { reviewDigest: authorization.digest, choices: authorization.choices } : {}), agentId: preview.agentId.toLowerCase(), chainId: PONS_CHAIN_ID, signer: signer.toLowerCase(), preview,

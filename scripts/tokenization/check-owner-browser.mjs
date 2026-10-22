@@ -22,7 +22,7 @@ try {
      launchRequests.push({path,method:r.method(),role:new URL(r.url()).searchParams.get('role'),key:r.headers()['x-hive-api-key']});
      assert.equal(r.method(),'GET','opening the owner dialog must not submit a launch');
      assert.equal(r.headers()['x-hive-api-key'],key);
-     return reply({preview:{agentId:id,role:'owner',metadata:metadata(),issues:[],existingToken:null,requiredSigner:null,recipient:null,signingEnabled:true},profileRevision:'a'.repeat(64),tokens,session:null,review:null,readOnly:false,deployers:null,wallets:{evm:null,solana:null},options:['pons','bags','pump'].map(platform=>({platform,available:false,purchaseAvailable:true,token:tokens.find(t=>t.platform===platform),reason:'Verify your wallet in settings'}))});
+     return reply({preview:{agentId:id,role:'owner',metadata:metadata(),issues:[],existingToken:null,requiredSigner:null,recipient:null,signingEnabled:true},profileRevision:'a'.repeat(64),tokens,session:null,review:null,readOnly:false,deployers:{evm:{address:evm,available:true},solana:{address:sol,available:true}},wallets:{evm:null,solana:null},options:['pons','bags','pump'].map(platform=>({platform,available:platform!=='bags',existingUrl:platform==='bags'?'https://bags.fm/'+sol:undefined,purchaseAvailable:true,token:tokens.find(t=>t.platform===platform),reason:'Verify your wallet in settings'}))});
    }
    return route.fulfill({status:403,json:{error:'Not permitted by owner browser fixture'}});
  });
@@ -39,9 +39,21 @@ try {
    await page.waitForFunction(()=>[...document.querySelectorAll('[data-owner-enter]')].every(el=>getComputedStyle(el).opacity==='1'));
    await page.screenshot({path:`/tmp/hive-owner-token-${theme}-${width}.png`});
    await button.click();await page.getByRole('dialog',{name:'Agent tokens',exact:true}).waitFor();
-   await page.getByText(/Verify your wallet in settings/).first().waitFor();
-   assert.equal(await page.getByText(/Verify your wallet in settings/).count(),3);
-   assert.equal(await page.getByRole('radio',{name:'Hive deployer'}).count(),0);
+   await page.getByRole('checkbox',{name:'Robinhood Pons',exact:true}).check();
+   await page.getByRole('checkbox',{name:'pump.fun Solana',exact:true}).check();
+   assert.equal(await page.getByRole('link',{name:'View token',exact:true}).getAttribute('href'),'https://bags.fm/'+sol);
+   await page.getByRole('button',{name:'Continue',exact:true}).click();
+   assert.equal(await page.getByRole('radio',{name:'Hive deployer',exact:true}).count(),2);
+   for(const radio of await page.getByRole('radio',{name:'Hive deployer',exact:true}).all()) assert.equal(await radio.isChecked(),true);
+   assert.equal(await page.getByRole('button',{name:'Review launch',exact:true}).isEnabled(),true);
+   const own = page.getByRole('radio',{name:'Connected wallet',exact:true}).first();
+   await own.check();
+   assert.equal(await page.getByRole('button',{name:'Connect wallet',exact:true}).isEnabled(),true);
+   assert.equal(await page.getByRole('button',{name:'Review launch',exact:true}).isEnabled(),false);
+   await page.getByRole('radio',{name:'Hive deployer',exact:true}).first().check();
+   assert.equal(await page.getByRole('button',{name:'Review launch',exact:true}).isEnabled(),true);
+   await page.getByRole('button',{name:'Back',exact:true}).click();
+   assert.equal(await page.getByRole('checkbox',{name:'Robinhood Pons',exact:true}).isChecked(),true);
    await page.keyboard.press('Escape');await page.getByRole('dialog',{name:'Agent tokens',exact:true}).waitFor({state:'detached'});
    await page.waitForFunction(()=>document.activeElement?.hasAttribute('data-owner-token-action'));
    assert.equal(await button.evaluate(el=>el===document.activeElement),true);

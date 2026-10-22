@@ -85,7 +85,7 @@ export class SessionRuntime {
     if (!agent || agent.status !== 'active') throw new SessionConflict('This agent is no longer available for launching.');
     const platform = target.terms.platform;
     if (platform !== 'pons' && !solanaLaunchesEnabled(platform)) throw new SessionConflict('This platform is temporarily unavailable.');
-    if (session.role === 'owner') {
+    if (session.role === 'owner' && !session.walletPolicy) {
       const wallets = verifiedLaunchWallets(agent);
       if ((platform === 'pons' ? wallets.evm?.toLowerCase() : wallets.solana) !== target.terms.signer) throw new SessionConflict('The verified launch wallet changed.');
     }
@@ -95,7 +95,6 @@ export class SessionRuntime {
     }
     if (platform === 'pons') {
       if (target.terms.mode !== 'managed') return session;
-      if (session.role !== 'admin') throw new SessionConflict('Only admins can use Hive deployer.');
       const prepared = await prepareSessionPons(this.db, session, preview);
       session = await this.update(session, platform, { phase: 'awaiting-signature', intentId: prepared.intent._id });
       if (!prepared.intent.prepared) throw new SessionConflict('Pons could not prepare this launch.');
@@ -185,7 +184,7 @@ export class SessionRuntime {
       if (['prepare', 'retry', 'confirm'].includes(String(body.action))) {
         const agent = await this.db.collection('agents').findOne({ _id: new ObjectId(session.agentId) });
         if (!agent || agent.status !== 'active') throw new SessionConflict('This agent is not available for new launches. Saved transactions can still be checked.');
-        if (session.role === 'owner') {
+        if (session.role === 'owner' && !session.walletPolicy) {
           const wallets = verifiedLaunchWallets(agent);
           const selected = platform === 'pons' ? wallets.evm?.toLowerCase() : wallets.solana;
           if (selected !== target.terms.signer) throw new SessionConflict('The verified agent wallet changed. Check saved transactions before continuing.');

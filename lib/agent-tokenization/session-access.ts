@@ -1,6 +1,6 @@
 import type { Db } from 'mongodb';
 import type { LaunchPreview } from './types';
-import { SessionConflict, type LaunchSession } from './session';
+import { SessionConflict, type LaunchSession, type SessionTarget } from './session';
 import { sessionComplete } from './session';
 import { sameAddress, purchaseWei } from './policy';
 
@@ -19,8 +19,7 @@ export async function sessionPonsPreview(db: Db, preview: LaunchPreview, session
   if (!target || session.targets.slice(0, index).some(t => !['confirmed', 'skipped'].includes(t.phase))) {
     throw new SessionConflict('Finish the earlier platform before launching on Pons.');
   }
-  return { ...preview, sessionId, metadata: target.metadata || session.metadata, recipient: target.terms.recipient,
-    requiredSigner: session.role === 'owner' ? target.terms.signer : null, feePolicyVersion: 2 };
+  return sessionTargetPreview(preview, session, target);
 }
 
 export async function assertSessionPonsTerms(db: Db, preview: LaunchPreview, signer: string, mode: string, symbol: string, purchase: string) {
@@ -32,4 +31,10 @@ export async function assertSessionPonsTerms(db: Db, preview: LaunchPreview, sig
     || record!.session.metadata.symbol !== symbol || target.terms.purchase !== purchaseWei(purchase).toString()) {
     throw new SessionConflict('The Pons launch must match this session’s reviewed settings.');
   }
+}
+
+/** Frozen terms override wallet defaults only for the authenticated session. */
+export function sessionTargetPreview(preview: LaunchPreview, session: LaunchSession, target: SessionTarget): LaunchPreview {
+  return { ...preview, sessionId: session.id, ...(session.walletPolicy ? { sessionMode: target.terms.mode, issues: preview.issues.filter(issue => issue !== 'Verify your Robinhood wallet in wallet settings first.') } : {}), metadata: target.metadata || session.metadata, recipient: target.terms.recipient,
+    requiredSigner: session.role === 'owner' ? target.terms.signer : null, feePolicyVersion: 2 };
 }

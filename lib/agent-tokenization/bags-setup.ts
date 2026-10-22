@@ -14,7 +14,7 @@ export const restoreBagsSetupStep = (step:BagsSetupPlan['steps'][number]):BagsPl
 /** Keep the plan in order across requests. Refresh only transactions that have never been submitted. */
 export async function refreshBagsSetupPlan(connection:Connection, api:BagsLaunchApi, terms:Omit<BagsTerms,'config'|'authority'>,
   saved?:BagsSetupPlan, confirmed:ReadonlySet<BagsSetupKind> = new Set()) {
-  const response = await prepareBagsConfiguration(api,terms.mint,terms.payer);
+  const response = await prepareBagsConfiguration(api,terms.mint,terms.payer,terms.recipient);
   if (response.authority !== bagsAuthority(terms.mint).toBase58()) throw new SessionConflict('Bags changed the fee authority.');
   const checked = await Promise.all(response.steps.map(async step=>{
     const {setupKind} = await validateBagsTransaction(connection,step.transaction,{...terms,config:response.config,authority:response.authority},'setup');

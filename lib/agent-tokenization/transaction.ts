@@ -1,6 +1,7 @@
+import { previewFeeRecipient, managedOwnerPreview } from './policy';
 import { decodeFunctionResult, encodeFunctionData, zeroAddress, type Address, type Hex, type PublicClient } from 'viem';
 import { factoryAbi, routerAbi } from './abi';
-import { creatorTaxBps, PONS_CHAIN_ID, feeRecipient, normalizeSymbol, purchaseWei, sameAddress, validAddress, validHash, validTokenLogo } from './policy';
+import { creatorTaxBps, PONS_CHAIN_ID, normalizeSymbol, purchaseWei, sameAddress, validAddress, validHash, validTokenLogo } from './policy';
 import { quoteOpeningBuy } from './quote';
 import { profileUrl } from './platforms';
 import { assertLaunchAvailable, assertReviewedRelease, type LaunchSnapshot, type ReviewedRelease } from './snapshot';
@@ -22,9 +23,9 @@ export function buildLaunchCandidate(preview: LaunchPreview, choices: LaunchChoi
   if (preview.issues.length || preview.existingToken) throw Error('Resolve the agent token review before launching.');
   if (!validAddress(choices.signer) || !sameAddress(choices.signer, snapshot.signer)) throw Error('The launch wallet changed. Refresh the review.');
   if (preview.role !== 'owner' && preview.role !== 'admin') throw Error('Invalid launch role.');
-  const recipient = feeRecipient(preview.role, preview.requiredSigner, true);
+  const recipient = previewFeeRecipient(preview);
   if (!recipient || !sameAddress(preview.recipient || '', recipient)) throw Error('The creator fee recipient changed. Refresh the review.');
-  if (preview.role === 'owner' && !sameAddress(choices.signer, recipient)) throw Error('Select the verified agent wallet.');
+  if (preview.role === 'owner' && !sameAddress(choices.signer, managedOwnerPreview(preview) ? preview.requiredSigner || '' : recipient)) throw Error('Select the verified agent wallet.');
   if (!validHash(choices.salt) || /^0x0{64}$/.test(choices.salt)) throw Error('A unique launch salt is required.');
   if (!validHash(snapshot.expectedEconomics) || /^0x0{64}$/.test(snapshot.expectedEconomics)) throw Error('Launch economics could not be pinned.');
   if (!validTokenLogo(choices.logoURI)) {

@@ -22,7 +22,7 @@ const STANDARD_CONFIG_INSTRUCTION_SHA256 = 'cbe56dcc0758164778e6c6c2db59a30a15ad
 const fail = () => { throw new SessionConflict('The Bags transaction differs from the reviewed launch.'); };
 const same = (a: PublicKey | undefined, b: string | PublicKey) => !!a && a.equals(typeof b === 'string' ? new PublicKey(b) : b);
 
-export interface BagsTerms { mint: string; payer: string; config: string; authority: string; uri: string; metadata: AgentTokenMetadata; purchase: bigint }
+export interface BagsTerms { mint: string; payer: string; recipient?: string; config: string; authority: string; uri: string; metadata: AgentTokenMetadata; purchase: bigint }
 export type BagsSetupKind = 'fee-config' | 'pool-config' | 'manager';
 async function instructions(connection: Connection, transaction: VersionedTransaction) {
   const tables = await Promise.all((transaction.message.addressTableLookups || []).map(async lookup => {
@@ -69,7 +69,7 @@ export async function validateBagsTransaction(connection: Connection, transactio
     }
     if (ix.programId.equals(FEE)) {
       if (stage !== 'setup') fail();
-      const checked = await validateBagsFeeInstruction(connection, ix, terms.mint, terms.payer);
+      const checked = await validateBagsFeeInstruction(connection, ix, terms.mint, terms.payer, terms.recipient);
       setupKind = checked.kind; sponsor = checked.admin;
       meaningful++; continue;
     }
@@ -153,7 +153,7 @@ export async function verifyBagsConfiguration(connection: Connection, terms: Bag
   const state = accounts.decode('PoolConfig', config!.data) as Record<string, any>;
   if (!same(state.quote_mint, NATIVE_MINT) || !same(state.fee_claimer, terms.authority) || !same(state.leftover_receiver,BAGS_CREATION_AUTHORITY)) fail();
   standardFees(state, true);
-  await verifyBagsFeeState(connection, terms.mint, terms.payer);
+  await verifyBagsFeeState(connection, terms.mint, terms.payer, terms.recipient);
 }
 export async function verifyBagsLaunch(connection: Connection, step: SolanaStep, terms: BagsTerms): Promise<AgentToken> {
   if (step.phase !== 'confirmed' || !step.signature || !step.slot) throw new SessionConflict('The Bags launch is not finalized.');

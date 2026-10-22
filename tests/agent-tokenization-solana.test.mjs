@@ -140,6 +140,9 @@ test('official Pump builder keeps payer separate from Hive creator and disables 
   assert.ok(decoded);
   // The vendored IDL keeps snake_case instruction argument names.
   assert.equal(decoded.data.creator.toBase58(), sessions.HIVE_SOLANA_FEE_WALLET);
+  const ownerTx = await pump.buildPumpLaunch(connection, { mint, payer: payer.publicKey, recipient: payer.publicKey.toBase58(), metadata: { name: 'Test agent', symbol: 'TEST' }, uri, purchase: 0n });
+  const ownerCreate = TransactionMessage.decompile(ownerTx.transaction.message).instructions.find(ix => ix.programId.equals(pumpSdk.PUMP_PROGRAM_ID));
+  assert.equal(coder.decode(ownerCreate.data).data.creator.toBase58(), payer.publicKey.toBase58());
   assert.equal(decoded.data.name, 'Test agent');
   assert.equal(decoded.data.uri, uri);
   assert.ok(create.keys.some(key => key.pubkey.equals(payer.publicKey) && key.isSigner));

@@ -21,7 +21,7 @@ export interface SessionDraft {
   purchasesOpen: boolean;
 }
 export function initialSessionDraft(details: SessionDetails, role: LaunchRole): SessionDraft {
-  const mode = role === 'admin' ? 'managed' : 'connected';
+  const mode = 'managed';
   const draft: SessionDraft = { symbol: details.session?.metadata.symbol || details.preview.metadata.symbol, modes: { evm: mode, solana: mode },
     addresses: { evm: details.wallets.evm || '', solana: details.wallets.solana || '' },
     purchase: { pons: '0', bags: '0', pump: '0' }, purchasesOpen: false };
@@ -42,10 +42,10 @@ export function SessionReview({ details, selected, role, wallets, draft, change,
 }) {
   const id = useId();
   const networks = (['evm', 'solana'] as const).filter(network => selected.some(platform => (platform === 'pons' ? 'evm' : 'solana') === network));
-  const eligibleWallets = (network: Network) => wallets[network].filter(w => role === 'admin' || matches(network, w.address, details.wallets[network] || ''));
+  const eligibleWallets = (network: Network) => wallets[network];
   // The select uses the provider's exact casing; EVM identity remains case-insensitive.
   const selectedWallet = (network: Network) => eligibleWallets(network).find(w => matches(network, w.address, draft.addresses[network]));
-  const purchasePlatforms = selected.filter(platform => platform !== 'pump' || details.options.find(option => option.platform === platform)?.purchaseAvailable);
+  const purchasePlatforms = selected.filter(platform => (role === 'admin' || draft.modes[platform === 'pons' ? 'evm' : 'solana'] === 'connected') && (platform !== 'pump' || details.options.find(option => option.platform === platform)?.purchaseAvailable));
   const choices = selected.map(platform => {
     const network = platform === 'pons' ? 'evm' : 'solana';
     return { platform, mode: draft.modes[network],
@@ -82,7 +82,7 @@ export function SessionReview({ details, selected, role, wallets, draft, change,
     </div>
     <div className={styles.networkWallets}>{networks.map(network => <fieldset className={styles.networkWallet} key={network} disabled={busy}>
       <legend>{network === 'evm' ? 'Robinhood wallet' : 'Solana wallet'}</legend>
-      {role === 'admin' && <div className={styles.modeChoice}>
+      {<div className={styles.modeChoice}>
         {(['managed', 'connected'] as const).map(mode => <label key={mode}><input type="radio" name={`${id}-${network}-mode`} checked={draft.modes[network] === mode}
           onChange={() => change({ ...draft, modes: { ...draft.modes, [network]: mode } })} />{mode === 'managed' ? 'Hive deployer' : 'Connected wallet'}</label>)}
       </div>}
@@ -96,9 +96,8 @@ export function SessionReview({ details, selected, role, wallets, draft, change,
               <option value="">Select wallet</option>{eligibleWallets(network).map(w => <option key={network === 'evm' ? w.address.toLowerCase() : w.address} value={w.address}>{w.label} · {shortAddress(w.address)}</option>)}
             </select></>}
           <button type="button" className={styles.secondaryLink} onClick={() => connect(network)}>{eligibleWallets(network).length ? 'Connect another wallet' : 'Connect wallet'}</button>
-          {role === 'owner' && !selectedWallet(network) && <p className={styles.hint}>{details.wallets[network]
-            ? `Connect your verified wallet, ${shortAddress(details.wallets[network]!)}.` : 'Verify a wallet in account settings first.'}</p>}
         </div>}
+      {role === 'owner' && <p className={styles.hint}>{draft.modes[network] === 'managed' ? 'Hive pays launch costs and receives creator fees.' : 'You pay launch costs and receive creator fees.'}</p>}
     </fieldset>)}</div>
     {purchasePlatforms.length > 0 && <details className={styles.purchaseOptions} open={draft.purchasesOpen}
       onToggle={event => { if (event.currentTarget.open !== draft.purchasesOpen) change({ ...draft, purchasesOpen: event.currentTarget.open }); }}>

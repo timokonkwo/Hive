@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { privateKeyToAccount } from 'viem/accounts';
-import { authorization, metadata, avatar, policy } from '../scripts/tokenization/modules.mjs';
+import { authorization, metadata, avatar, policy, sessions, sessionAccess, managed } from '../scripts/tokenization/modules.mjs';
 import { preview, agent, agentId } from './helpers/tokenization-fixture.mjs';
 import { loadTypeScript } from './helpers/load-typescript.mjs';
 import * as crypto from 'node:crypto';
@@ -89,4 +89,23 @@ test('Cloudinary uploader never overwrites and rejects unexpected delivery resul
   await loaded.persistTokenAvatar(preview);
   assert.equal(options.overwrite,false); assert.equal(options.unique_filename,false); assert.equal(options.format,'png');
   for (patch of [{secure_url:'https://evil.test/image.png'}, {format:'svg'}, {version:0}, {width:1}, {public_id:'different'}]) await assert.rejects(loaded.persistTokenAvatar(preview), /verified|unexpected/);
+});
+
+test('walletless owner Pons sponsorship is session-bound and cannot redirect fees or signers', async () => {
+  const p=metadata.profilePreview(agentId,{...agent,walletAddress:null,walletAddressVerifiedAt:null},'owner');
+  const session=sessions.reviewSession({id:'11111111-1111-4111-8111-111111111111',agentId,role:'owner',metadata:p.metadata,profileRevision:metadata.profileRevision(agent),verifiedOwnerEvm:null,verifiedOwnerSolana:null,
+    choices:[{platform:'pons',mode:'managed',signer:policy.HIVE_LAUNCH_WALLET,purchase:'0'}]});
+  const db={collection:()=>({findOne:async()=>({session})})};
+  const frozen=await sessionAccess.sessionPonsPreview(db,p,session.id);
+  assert.deepEqual(frozen.issues,[]);
+  managed.requireManagedAdmin(frozen,false);
+  assert.ok(authorization.launchReview(frozen,policy.HIVE_LAUNCH_WALLET,{symbol:'TEST',purchase:'0'}));
+  assert.throws(()=>authorization.launchReview({...frozen,recipient:account.address},policy.HIVE_LAUNCH_WALLET,{symbol:'TEST',purchase:'0'}));
+  assert.throws(()=>authorization.launchReview(frozen,account.address,{symbol:'TEST',purchase:'0'}));
+  assert.throws(()=>managed.requireManagedAdmin({...frozen,sessionId:undefined},false));
+  await assert.rejects(sessionAccess.sessionPonsPreview(db,p,'wrong-session'));
+  session.targets[0].terms.mode='connected';session.targets[0].terms.signer=account.address;session.targets[0].terms.recipient=account.address;
+  const own=await sessionAccess.sessionPonsPreview(db,p,session.id);
+  assert.ok(authorization.launchReview(own,account.address,{symbol:'TEST',purchase:'0'}));
+  assert.throws(()=>managed.requireManagedAdmin(own,false));
 });
