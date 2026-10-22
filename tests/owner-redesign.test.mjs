@@ -1,10 +1,11 @@
+import {catalog} from '../scripts/tokenization/modules.mjs';
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
 import ts from 'typescript';
 function load(path,imports={}){const code=ts.transpileModule(readFileSync(new URL(path,import.meta.url),'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022}}).outputText;const m={exports:{}};new Function('require','module','exports',code)(n=>{if(!(n in imports))throw Error(n);return imports[n]},m,m.exports);return m.exports;}
 const task=load('../components/redesign/task/model.ts');
-const m=load('../components/redesign/owner/model.ts',{'../task/model':task});
+const m=load('../components/redesign/owner/model.ts',{'../task/model':task,'@/lib/agent-tokenization/catalog':catalog});
 const work=load('../lib/agent-work.ts');
 const id='0123456789abcdef01234567',other='1123456789abcdef01234567';
 test('owner URL state accepts supported views and bounds filters/pages',()=>{assert.deepEqual(m.query(new URLSearchParams('view=garbage&page=-1&status=paid')),{view:'work',q:'',status:'',page:1});assert.equal(m.query(new URLSearchParams('view=payments&page=999999')).page,10000);assert.equal(m.query(new URLSearchParams('q='+'x'.repeat(200))).q.length,120)});
@@ -18,3 +19,5 @@ test('command never retries an unknown write and handles malformed successes',as
 test('canonical work identity wins and unverified wallet addresses cannot claim work',()=>{const q=work.agentWorkQuery({id,walletAddress:'0x'+'a'.repeat(40),solanaAddress:'unverified'});assert.deepEqual(q,{$or:[{assignedAgentId:id},{$and:[{assignedAgentId:{$in:[null,'']}},{$or:[{assignedAgent:{$in:[id]}}]}]}]});const legacy=work.agentWorkQuery({id,solanaAddress:'VerifiedSolana',solanaAddressVerifiedAt:new Date(),walletAddress:'0x'+'a'.repeat(40),walletAddressVerifiedAt:new Date()});assert.ok(JSON.stringify(legacy).includes('VerifiedSolana'));assert.equal(legacy.$or[1].$and[1].$or.length,2)});
 test('work query strips unsupported states and bounds page/search',()=>{assert.deepEqual(work.workQuery(new URLSearchParams('page=no&status=No&q=%20Sage%20')),{page:1,status:'',q:'Sage'});assert.equal(work.workQuery(new URLSearchParams('page=100000')).page,10000)});
 test('payment mapping uses exact recorded payment token, not an assumed currency total',()=>{const t={_id:id,title:'Report',budget:'8 SOL',paidAmount:5,paymentChain:'solana',paymentTxSignature:'a'.repeat(88)};assert.equal(work.paymentRecord(t).amount,'8 SOL');assert.equal(work.paymentRecord(t).amountType,'budget');assert.equal(work.paymentRecord({...t,paymentToken:'USDC'}).amount,'5 USDC');assert.equal(work.paymentRecord({...t,paymentTxSignature:null}).paymentStatus,'unconfirmed');assert.equal(work.paymentRecord({...t,paymentChain:'robinhood',paymentTxSignature:'0x'+'a'.repeat(64)}).solscanUrl,null)});
+
+ test('owner profile exposes only valid token associations for the launch action',()=>{const token={platform:'pons',network:'robinhood',address:'0x'+'2'.repeat(40),symbol:'SAGE',transactionHash:'0x'+'a'.repeat(64)};assert.equal(m.readAgent({agent:{id,name:'Sage'}}).agentTokens.length,0);assert.deepEqual(m.readAgent({agent:{id,name:'Sage',agentTokens:[token]}}).agentTokens,[token]);assert.equal(m.readAgent({agent:{id,name:'Sage',agentTokens:[{...token,address:'bad'}]}}).agentTokens.length,0)});
