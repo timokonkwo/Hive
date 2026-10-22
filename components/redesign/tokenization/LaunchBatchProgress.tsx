@@ -26,13 +26,18 @@ export function LaunchBatchProgress({ session, busy, readOnly = false, onContinu
     <ol className={styles.batchList}>
       {session.targets.map(target => {
         const platform = platforms[target.terms.platform], token = target.token;
-        const pending = ['preparing', 'submitted', 'confirming'].includes(target.phase) || (target.phase === 'awaiting-signature' && target.terms.mode === 'managed' && !!session.approval && !session.paused);
+        const pending = ['submitted', 'confirming'].includes(target.phase) || (target.phase === 'preparing' && !session.paused)
+          || (target.phase === 'awaiting-signature' && target.terms.mode === 'managed' && !!session.approval && !session.paused);
         const failed = target.phase === 'failed' || target.phase === 'blocked';
+        let status = labels[target.phase];
+        if (target.phase === 'preparing') status = session.paused ? 'Ready to continue' : target.waitingForDeployer ? 'Waiting for Hive deployer…' : status;
+        if (target.phase === 'confirming' && target.awaitingFinality) status = 'Transaction confirmed · Finalizing…';
+        if (target.phase === 'awaiting-signature' && pending) status = 'Launching…';
         return <li key={target.terms.platform}>
           <div className={styles.batchIdentity}>
             {pending ? <Loader2 size={20} className={styles.spinner} aria-hidden="true" /> : token ? <Check size={20} aria-hidden="true" />
               : failed ? <TriangleAlert size={20} aria-hidden="true" /> : <Circle size={18} aria-hidden="true" />}
-            <div><strong>{platform.name}</strong><span role="status">{platform.chainName} · {target.phase === 'confirming' && target.awaitingFinality ? 'Transaction confirmed · Finalizing…' : pending && target.phase === 'awaiting-signature' ? 'Launching…' : labels[target.phase]}</span></div>
+            <div><strong>{platform.name}</strong><span role="status">{platform.chainName} · {status}</span></div>
           </div>
           {token && <div className={styles.batchLinks}><a href={tradeUrl(token)} target="_blank" rel="noopener noreferrer">Trade<ArrowUpRight size={14} aria-hidden="true" /></a>
             <a href={transactionUrl(token.network, token.transactionHash)} target="_blank" rel="noopener noreferrer">Transaction<ArrowUpRight size={14} aria-hidden="true" /></a></div>}

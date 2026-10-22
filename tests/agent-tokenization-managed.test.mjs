@@ -42,7 +42,7 @@ test('managed submission persistence, concurrency, fencing and recovery',{skip:!
   'node:crypto':crypto,viem,'./authorization':authorization,'./policy':testPolicy,'./journal':journal,
   './preparation':{},'./transaction':{...transactions,simulateLaunchCandidate:async()=>preparedFor().prediction},
   './snapshot':{readLaunchSnapshot:async()=>({expectedEconomics:hash,blockNumber:10n,blockHash:hash}),assertReviewedRelease(){}},
-  './store':store,'./managed-signer':signer,
+  './store':store,'./managed-signer':signer,'./worker':{},
  });
  const services={release:{reviewed:true},refreshPreview:async()=>preview};
  const client={getChainId:async()=>4663,getTransactionCount:async()=>4,getBalance:async()=>10n**18n,getCode:async()=> '0x',

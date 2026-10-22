@@ -26,7 +26,7 @@ async function request(url,init){f.calls.push({url,body:init?.body?JSON.parse(in
   if(body.action==='estimate'&&f.unfunded){delete f.session.estimate;delete f.session.approval;f.session.paused=true;current().error=`The Solana launch wallet needs more SOL for fees and account rent. Balance: 0.020920853 SOL. Fund ${sol}, then continue.`;}
   if(body.action==='estimate'&&!f.unfunded)for(const target of f.session.targets)delete target.error;
   if(body.action==='approve'){f.session.approval={digest:f.session.digest,expiresAt:new Date(Date.now()+86400000).toISOString(),limits:f.session.estimate.limits,reserved:{}};f.session.paused=false;f.session.editing=false;}
-  if(body.action==='advance'&&f.session.approval&&!f.session.paused){check();const t=current();if(t){if(t.phase==='failed'){delete f.session.approval;}else if(t.terms.mode==='managed'){t.phase='submitted';f.review=null;}else if(['queued','preparing'].includes(t.phase))prepare();}}
+  if(body.action==='advance'&&f.session.approval&&!f.session.paused){check();const t=current();if(t){if(t.phase==='failed'){delete f.session.approval;}else if(t.terms.mode==='managed'){if(t.terms.platform==='pons'&&f.deployerBusy){t.phase='preparing';t.waitingForDeployer=true;}else{t.phase='submitted';delete t.waitingForDeployer;}f.review=null;}else if(['queued','preparing'].includes(t.phase))prepare();}}
   if(body.action==='prepare')prepare();
   if(body.action==='confirm'){current().phase='submitted';f.review=null;if(f.timeout){f.timeout=false;return Response.json({error:'Response interrupted. Check status.'},{status:503});}}
   if(body.action==='check')check();

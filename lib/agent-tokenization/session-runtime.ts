@@ -4,7 +4,7 @@ import { createPublicClient, http } from 'viem';
 import { SessionStore } from './session-store';
 import { SessionConflict, continueSession, sessionComplete, nextTarget, transitionTarget, type LaunchSession, type TargetResult } from './session';
 import { SolanaLaunchRuntime } from './solana-runtime';
-import { LaunchStore, LaunchConflict } from './store';
+import { LaunchStore, LaunchConflict, ManagedDeployerBusy } from './store';
 import { runLaunchRecovery } from './worker';
 import type { LaunchPreview } from './types';
 import type { PlatformId } from './platforms';
@@ -29,10 +29,12 @@ export class SessionRuntime {
   private async update(session: LaunchSession, platform: PlatformId, result: TargetResult) {
     const target = session.targets.find(t => t.terms.platform === platform)!;
     if (session.paused && target.error && !result.error) result = { ...result, error: target.error };
-    if (target.phase === result.phase && (!result.intentId || target.intentId === result.intentId) && target.error === result.error
-      && target.transactionHash === result.transactionHash && !!target.awaitingFinality === !!result.awaitingFinality) return session;
+    if (target.phase === result.phase && (!result.intentId || target.intentId === result.intentId) && (target.error ?? undefined) === result.error
+      && (target.transactionHash ?? undefined) === result.transactionHash && !!target.awaitingFinality === !!result.awaitingFinality
+      && !!target.waitingForDeployer === !!result.waitingForDeployer) return session;
     if (target.phase === result.phase) return this.store.save(session, { ...session, revision: session.revision + 1,
-      targets: session.targets.map(t => t === target ? { ...t, ...result } : t) });
+      targets: session.targets.map(t => t === target ? { ...t, ...result, error: result.error, transactionHash: result.transactionHash,
+        awaitingFinality: result.awaitingFinality === true, waitingForDeployer: result.waitingForDeployer === true } : t) });
     return this.store.save(session, transitionTarget(session, platform, result));
   }
   async reconcile(session: LaunchSession) {
@@ -153,10 +155,17 @@ export class SessionRuntime {
       if (body.action === 'advance') {
         try { session = await this.advance(session, preview, assertHeld); }
         catch (error) {
-          // No blind retries after a signing/preparation error. Reconcile the journal before the next approval.
           session = await this.require(preview.agentId, body.id, preview.role);
-          const message = error instanceof SessionConflict || error instanceof LaunchConflict ? error.message : 'Launch interrupted. Review the remaining platforms to continue.';
           const target = nextTarget(session);
+          if (error instanceof ManagedDeployerBusy && approved(session) && target?.terms.platform === 'pons'
+            && target.terms.mode === 'managed' && target.phase === 'preparing' && !target.intentId) {
+            // No transaction exists for this target yet. Keep the exact approval
+            // and limits so UI polling and scheduled recovery can resume it.
+            session = await this.update(session, 'pons', { phase: 'preparing', waitingForDeployer: true });
+            return this.response(session);
+          }
+          // Signing/preparation failures still require review before another attempt.
+          const message = error instanceof SessionConflict || error instanceof LaunchConflict ? error.message : 'Launch interrupted. Review the remaining platforms to continue.';
           session = await this.store.save(session, { ...session, paused: true, approval: undefined, revision: session.revision + 1,
             targets: session.targets.map(t => t === target ? { ...t, error: message } : t) });
         }

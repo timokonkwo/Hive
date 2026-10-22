@@ -43,6 +43,10 @@ export interface LaunchIntent {
   cancellationEvidence?: { blockNumber: string; blockHash: Hex; consumedNonce: number };
 }
 export class LaunchConflict extends Error {}
+/** Another agent owns the signer reservation; this is a wait, not a failed launch. */
+export class ManagedDeployerBusy extends LaunchConflict {
+  constructor(readonly agentId: string) { super('Waiting for another Hive deployer launch to finish.'); }
+}
 const duplicate = (error: unknown) => !!error && typeof error === 'object' && 'code' in error && error.code === 11000;
 
 /** No TTL indexes: an exposed transaction must never expire out of recovery. */
@@ -79,7 +83,11 @@ export class LaunchStore {
             reviewDigest: authorization.digest, active: true });
           if (existing && (existing.mode || 'connected') === (authorization.mode || 'connected')) return existing; // Lost response/replayed proof resumes the same reservation.
         }
-        throw new LaunchConflict(authorization?.mode === 'managed' ? 'Hive deployer already has an unfinished launch. Finish or discard it first.' : 'This agent already has a launch. Resume it instead.');
+        if (authorization?.mode === 'managed') {
+          const pending = await this.intents.findOne({ chainId: PONS_CHAIN_ID, signer: intent.signer, managedPending: true });
+          if (pending && pending.agentId !== intent.agentId) throw new ManagedDeployerBusy(pending.agentId);
+        }
+        throw new LaunchConflict('This agent already has a launch. Resume it instead.');
       }
       throw error;
     }

@@ -117,6 +117,29 @@ try {
   assert.equal(await page.locator('dialog').evaluate(el=>el.scrollWidth<=el.clientWidth+1),true);
   await page.screenshot({path:'/tmp/hive-session-finality-390.png'});
 
+  // Deployer contention keeps the approved launch polling, including after reopening.
+  await page.goto(origin);
+  await page.evaluate(()=>fixture.deployerBusy=true);
+  await page.getByRole('button',{name:'Admin tokenize'}).click();
+  await page.getByRole('checkbox',{name:/Pons/}).check();
+  await page.getByRole('button',{name:'Continue',exact:true}).click();
+  await page.getByRole('button',{name:'Review launch',exact:true}).click();
+  await page.getByRole('button',{name:'Launch tokens',exact:true}).click();
+  await page.getByRole('status').filter({hasText:'Waiting for Hive deployer…'}).waitFor();
+  assert.equal(await page.getByRole('heading',{name:'Launching tokens',exact:true}).isVisible(),true);
+  assert.equal(await page.locator('dialog li svg.lucide-loader-circle').count(),1,'waiting has a spinner');
+  assert.equal(await page.getByRole('alert').count(),0);
+  await page.getByRole('button',{name:'Close token launch'}).click();
+  await page.getByRole('button',{name:'Admin tokenize'}).click();
+  await page.getByRole('status').filter({hasText:'Waiting for Hive deployer…'}).waitFor();
+  assert.equal(await page.getByRole('button',{name:'Continue',exact:true}).count(),0,'no repeat approval while queued');
+  assert.equal(await page.locator('dialog').evaluate(el=>el.scrollWidth<=el.clientWidth+1),true);
+  await page.screenshot({path:'/tmp/hive-session-deployer-wait-390.png'});
+  await page.evaluate(()=>fixture.deployerBusy=false);
+  await page.getByRole('heading',{name:'Launch complete'}).waitFor({timeout:45000});
+  assert.equal(await page.evaluate(()=>fixture.calls.filter(c=>c.body?.action==='approve').length),1);
+  assert.equal(await page.evaluate(()=>fixture.signs),0);
+
   // Insufficient SOL keeps the user on the overview without another approval loop.
   await page.setViewportSize({width:390,height:900});
   await page.goto(origin);

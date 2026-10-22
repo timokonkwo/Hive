@@ -7,7 +7,8 @@ import { packPrepared, unpackPrepared } from './journal';
 import { prepareVerifiedLaunch } from './preparation';
 import { prepareReviewedLaunch, simulateLaunchCandidate } from './transaction';
 import { readLaunchSnapshot, assertReviewedRelease, type ReviewedRelease } from './snapshot';
-import { LaunchConflict, LaunchStore, type LaunchIntent } from './store';
+import { LaunchConflict, LaunchStore, ManagedDeployerBusy, type LaunchIntent } from './store';
+import { runLaunchRecovery } from './worker';
 import { managedAccount, managedDeployerStatus, openSubmission, sealSubmission } from './managed-signer';
 import type { LaunchPreview } from './types';
 
@@ -42,9 +43,19 @@ export async function prepareManagedLaunch(db: Db, client: PublicClient, preview
   const review = launchReview(reviewedPreview, HIVE_LAUNCH_WALLET, choices);
   if (current?.active && current.mode !== 'managed') throw new LaunchConflict('Resume or cancel this agent’s connected-wallet launch first.');
   if (current?.active && current.reviewDigest !== review.digest) throw new LaunchConflict('Discard the saved review before changing launch settings.');
-  try { return await prepareVerifiedLaunch(db, client, reviewedPreview, {
+  const prepare = () => prepareVerifiedLaunch(db, client, reviewedPreview, {
     _id: current?.active ? current._id : randomUUID(), signer: HIVE_LAUNCH_WALLET, ...review,
-  }, services, 'managed'); } catch (error) {
+  }, services, 'managed');
+  try {
+    try { return await prepare(); }
+    catch (error) {
+      if (!(error instanceof ManagedDeployerBusy)) throw error;
+      // A different agent may have finalized since its last check. Recover its
+      // receipt through the normal leased journal; never discard or unlock it.
+      await runLaunchRecovery(db, client, { agentId: error.agentId, limit: 1, budgetMs: 8000 });
+      return await prepare();
+    }
+  } catch (error) {
     if (error instanceof Error && error.message === 'This wallet needs more ETH for the launch and network fee.') {
       throw new LaunchConflict('Hive deployer needs more ETH. Fund it or discard this review and use a connected wallet.');
     }

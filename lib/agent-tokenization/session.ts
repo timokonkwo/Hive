@@ -24,6 +24,7 @@ export interface SessionTarget {
   error?: string;
   transactionHash?: string;
   awaitingFinality?: boolean;
+  waitingForDeployer?: boolean;
   /** Freeze metadata for an intent; subsequent edits apply to unstarted targets. */
   metadata?: AgentTokenMetadata;
   replacementSetup?: boolean;
@@ -110,7 +111,7 @@ const transitions: Record<TargetPhase, readonly TargetPhase[]> = {
   confirming: ['awaiting-signature', 'confirmed', 'failed', 'blocked'],
   confirmed: [], failed: ['queued', 'skipped'], skipped: [], blocked: ['awaiting-signature', 'submitted', 'confirming', 'confirmed', 'failed'],
 };
-export interface TargetResult { phase: TargetPhase; intentId?: string; token?: AgentToken; error?: string; transactionHash?: string; awaitingFinality?: boolean }
+export interface TargetResult { phase: TargetPhase; intentId?: string; token?: AgentToken; error?: string; transactionHash?: string; awaitingFinality?: boolean; waitingForDeployer?: boolean }
 
 /** Internal adapter results only. HTTP callers must never supply a phase or token association. */
 export function transitionTarget(session: LaunchSession, platform: PlatformId, result: TargetResult): LaunchSession {
@@ -137,7 +138,7 @@ export function transitionTarget(session: LaunchSession, platform: PlatformId, r
       ...(result.phase === 'queued' && platform === 'pons' ? { intentId: undefined } : {}),
       ...(result.intentId ? { intentId: result.intentId } : {}), token,
       error: result.error?.slice(0, 240), transactionHash: result.transactionHash,
-      awaitingFinality: result.awaitingFinality === true }) };
+      awaitingFinality: result.awaitingFinality === true, waitingForDeployer: result.waitingForDeployer === true }) };
 }
 
 /** Failures require explicit continue; unknown/blocked transactions cannot be skipped. */
