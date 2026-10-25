@@ -6,11 +6,21 @@ import {join} from 'node:path';
 import {fileURLToPath} from 'node:url';
 import http from 'node:http';
 import assert from 'node:assert/strict';
+import { metadata, sessionPreview } from './modules.mjs';
 const {chromium}=await import(process.env.PLAYWRIGHT_MODULE||'playwright');
 const root=fileURLToPath(new URL('../../',import.meta.url));
 const dir=await mkdtemp(join(tmpdir(),'hive-pons-browser-'));
 let browser,server;
 try {
+  // Use the real server eligibility projection, including incomplete registrations.
+  Object.assign(process.env,{PONS_LAUNCH_ENABLED:'true',PONS_RECONCILIATION_ENABLED:'true',
+    AGENT_MULTI_PLATFORM_LAUNCHES_ENABLED:'true',AGENT_MULTI_PLATFORM_RECOVERY_ENABLED:'true',CRON_SECRET:'fixture',
+    TOKENIZATION_JOURNAL_KEY:'9'.repeat(64),CLOUDINARY_CLOUD_NAME:'fixture',CLOUDINARY_API_KEY:'fixture',CLOUDINARY_API_SECRET:'fixture',BAGS_AGENT_API_KEY:'fixture'});
+  const adminLaunchFixtures=await Promise.all(Array.from({length:41},async(_,index)=>{
+    const agent={name:`Agent ${index+1}`,bio:'Agent for admin launch regression.',status:[undefined,'pending','active','suspended'][index%4]};
+    const details=await sessionPreview.sessionPreview({collection:()=>({findOne:async()=>null})},agent,metadata.profilePreview((index+1).toString(16).padStart(24,'0'),agent,'admin'));
+    return {...details,deployers:{evm:{available:true,address:'0x31A9Fb923F1bcB2cEb1221dbdc06B94A6a749De2'},solana:{available:true,address:'8CrDTtkdDr54LsB9vQi1PZzVNmAA1KHkcts2EAK9W11z'}}};
+  }));
   await build({entryPoints:[root+'scripts/tokenization/session-browser-fixture.jsx'],bundle:true,external:['/redesign/fonts/*'],format:'iife',jsx:'automatic',outfile:dir+'/app.js',plugins:[{name:'fixture-boundaries',setup(b){
     b.onResolve({filter:/^@\//},args=>({path:root+args.path.slice(2)+'.ts'}));
     b.onResolve({filter:/^@privy-io\/react-auth(?:\/solana)?$|^next\/(image|link)$/},args=>({path:args.path,namespace:'fixture'}));
@@ -19,11 +29,33 @@ try {
       :`import {useSyncExternalStore} from '${root}node_modules/react/index.js';export function usePrivy(){return{connectWallet(){window.fixture.modalOpen=true;window.dispatchEvent(new Event('fixture-modal'))}}}export function useModalStatus(){return{isOpen:useSyncExternalStore(cb=>{window.addEventListener('fixture-modal',cb);return()=>window.removeEventListener('fixture-modal',cb)},()=>!!window.fixture.modalOpen)}}export function useWallets(){return{wallets:[window.fixture.wallet]}}`,resolveDir:root,loader:'js'}));
   }}]});
   const html=`<!doctype html><html lang="en"><head><title>Token launch fixture</title><meta name="viewport" content="width=device-width,initial-scale=1"><link rel="stylesheet" href="/app.css"><style>:root{--paper:#fafbf5;--ink:#182015;--muted:#5a6254;--rule:#d0d6c7;--accent:#ccff00;--accent-ink:#182015;--accent-text:#4a6200;--soft:#e9eddf}*{box-sizing:border-box}body{font-family:Arial,sans-serif;margin:0;padding:24px;background:var(--paper)}button,input,select{font:inherit}</style></head><body><div id="root"></div><script src="/app.js"></script></body></html>`;
-  server=http.createServer(async(req,res)=>{if(req.url==='/'){res.setHeader('Content-Type','text/html');res.end(html);}else if(['/app.js','/app.css'].includes(req.url)){res.setHeader('Content-Type',req.url.endsWith('.js')?'application/javascript':'text/css');res.end(await readFile(dir+req.url));}else if(/^\/redesign\/fonts\/manrope-(regular|medium|semibold)\.ttf$/.test(req.url)){res.setHeader('Content-Type','font/ttf');res.end(await readFile(root+'public'+req.url));}else{res.statusCode=404;res.end();}});
+  server=http.createServer(async(req,res)=>{if(req.url==='/'||req.url==='/?adminAgents'){res.setHeader('Content-Type','text/html');res.end(html.replace('<script src="/app.js">',`<script>window.adminLaunchFixtures=${JSON.stringify(adminLaunchFixtures)}</script><script src="/app.js">`));}else if(['/app.js','/app.css'].includes(req.url)){res.setHeader('Content-Type',req.url.endsWith('.js')?'application/javascript':'text/css');res.end(await readFile(dir+req.url));}else if(/^\/redesign\/fonts\/manrope-(regular|medium|semibold)\.ttf$/.test(req.url)){res.setHeader('Content-Type','font/ttf');res.end(await readFile(root+'public'+req.url));}else{res.statusCode=404;res.end();}});
   await new Promise((resolve,reject)=>{server.once('error',reject);server.listen(0,'127.0.0.1',resolve);});
   browser=await chromium.launch({headless:true,channel:'chrome'});
   const page=await browser.newPage(),errors=[];page.on('pageerror',error=>errors.push(error.message));
   const origin=`http://127.0.0.1:${server.address().port}`;
+  for(const width of [390,1280]) {
+    await page.setViewportSize({width,height:900});await page.goto(origin+'/?adminAgents');
+    for(const agentNumbers of [[1,2,3,4],[21,22,23,24],[41]]) {
+      for(const number of agentNumbers) {
+        const trigger=page.getByRole('row').filter({has:page.getByRole('link',{name:`Agent ${number}`,exact:true})}).getByRole('button',{name:'Tokenize',exact:true});
+        await trigger.click();
+        const boxes=page.getByRole('dialog').getByRole('checkbox');await boxes.first().waitFor();
+        assert.equal(await boxes.count(),3);
+        for(const box of await boxes.all()){assert.equal(await box.isEnabled(),true);await box.check();}
+        await page.getByRole('button',{name:'Continue',exact:true}).click();
+        await page.getByRole('heading',{name:`Agent ${number}`,exact:true}).waitFor();
+        assert.equal(await page.getByRole('button',{name:'Review launch',exact:true}).isEnabled(),true);
+        await page.getByRole('button',{name:'Edit agent details'}).click();
+        assert.equal(await page.getByLabel('Agent name',{exact:true}).inputValue(),`Agent ${number}`);
+        await page.getByRole('button',{name:'Close token launch'}).click();
+        assert.equal(await trigger.evaluate(el=>el===document.activeElement),true);
+      }
+      if(agentNumbers[0]!==41)await page.getByRole('button',{name:'Next',exact:true}).click();
+    }
+    assert.equal(await page.evaluate(()=>fixture.calls.some(call=>call.body)),false,'pagination never signs or submits');
+  }
+  console.log('PASS admin pages 1/2/3: all platforms selectable for legacy, pending, active and suspended records; correct editable review and focus at 390/1280px');
   for(const theme of ['light','dark'])for(const width of [320,390,768,1280]) {
     await page.setViewportSize({width,height:740});
     await page.goto(origin);

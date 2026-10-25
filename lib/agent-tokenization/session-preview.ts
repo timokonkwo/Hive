@@ -2,7 +2,7 @@ import type { Db } from 'mongodb';
 import type { LaunchPreview } from './types';
 import { agentTokenCatalog } from './catalog';
 import { platformIds, validSolanaAddress, tradeUrl } from './platforms';
-import { profileRevision } from './metadata';
+import { agentLaunchIssue, profileRevision } from './metadata';
 import { launchesEnabled } from './release';
 import { managedDeployerStatus } from './managed-signer';
 import { solanaDeployerStatus } from './solana-signer';
@@ -25,6 +25,7 @@ export function solanaLaunchesEnabled(platform: 'bags' | 'pump') {
 }
 export async function sessionPreview(db: Db, agent: Record<string, unknown>, preview: LaunchPreview) {
   const tokens = agentTokenCatalog(agent), wallets = verifiedLaunchWallets(agent);
+  const statusIssue = agentLaunchIssue(agent, preview.role);
   const record = await new SessionStore(db).current(preview.agentId);
   const legacy = await db.collection<{ _id: string; agentId: string; active: boolean; phase: string }>('pons_launch_intents').findOne({ agentId: preview.agentId, active: true, phase: { $ne: 'confirmed' } });
   return { preview, profileRevision: profileRevision(agent), wallets, tokens,
@@ -35,10 +36,10 @@ export async function sessionPreview(db: Db, agent: Record<string, unknown>, pre
       const legacyPending = platform === 'pons' && !!legacy && !record?.session.targets.some(t => t.intentId === legacy._id);
       const legacyBags = platform === 'bags' && (agent.tokenMintAddress || agent.isTokenized || ['launching', 'launched'].includes(String(agent.tokenLaunchStatus)));
       const enabled = platform === 'pons' ? launchesEnabled() : solanaLaunchesEnabled(platform);
-      return { platform, available: enabled && !legacyBags && agent.status === 'active',
+      return { platform, available: enabled && !legacyBags && !statusIssue,
         ...(legacyBags && validSolanaAddress(agent.tokenMintAddress) ? { existingUrl: tradeUrl({ platform: 'bags', network: 'solana', address: agent.tokenMintAddress as string }) } : {}),
         purchaseAvailable: platform !== 'pump' || validSolanaAddress(process.env.PUMP_LAUNCH_LOOKUP_TABLE), ...(token ? { token } : {}),
         ...(legacyPending ? { pending: true } : {}),
-        reason: legacyBags && !token ? 'Existing Bags launch' : !enabled ? 'Unavailable' : undefined };
+        reason: legacyBags && !token ? 'Existing Bags launch' : statusIssue || (!enabled ? 'Temporarily unavailable' : undefined) };
     }) };
 }

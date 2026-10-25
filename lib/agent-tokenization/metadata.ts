@@ -10,6 +10,13 @@ const text = (v: unknown) => typeof v === 'string' ? v.trim() : '';
 const DESCRIPTION_LIMIT = 1000;
 const BIO_LIMIT = AGENT_BIO_LIMIT;
 
+/** Admins can tokenize any existing agent. Legacy owner profiles predate status. */
+export function agentLaunchIssue(agent: Record<string, unknown>, role: LaunchRole): string | null {
+  if (role === 'admin' || agent.status == null || agent.status === 'active') return null;
+  if (agent.status === 'pending') return 'Finish registering this agent before launching a token.';
+  return 'This agent is inactive. Contact Hive support.';
+}
+
 export function profileRevision(agent: Record<string, unknown>) {
   return keccak256(stringToHex(JSON.stringify([agent.name,agent.bio,agent.avatarSeed,agent.avatarUrl]))).slice(2);
 }
@@ -21,8 +28,9 @@ export function profilePreview(agentId: string, agent: Record<string, unknown>, 
   const issues: string[] = [];
   // Conservative product limits. Verified contract limits remain a release gate.
   if (!name || name.length > 64) issues.push('Use an agent name between 1 and 64 characters in your profile.');
-  if (bio.length < 10 || description.length > DESCRIPTION_LIMIT) issues.push(`Use a profile bio between 10 and ${BIO_LIMIT} characters to leave room for the Hive attribution.`);
-  if (agent.status !== 'active') issues.push('Activate this agent before launching a token.');
+  if ((role !== 'admin' && bio.length < 10) || description.length > DESCRIPTION_LIMIT) issues.push(`Use a profile bio between 10 and ${BIO_LIMIT} characters to leave room for the Hive attribution.`);
+  const statusIssue = agentLaunchIssue(agent, role);
+  if (statusIssue) issues.push(statusIssue);
   const verifiedAt = agent.walletAddressVerifiedAt;
   const verified = verifiedAt instanceof Date ? Number.isFinite(verifiedAt.getTime())
     : typeof verifiedAt === 'string' && Number.isFinite(Date.parse(verifiedAt));

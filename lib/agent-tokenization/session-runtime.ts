@@ -13,7 +13,7 @@ import { withAgentProfileLease } from './profile-lease';
 import { approved, approveSession, estimateSession, reserveSpend, prepareSessionPons, confirmSessionPons } from './session-approval';
 import { editablePlatforms } from './session-edit';
 import { unpackPrepared } from './journal';
-import { profilePreview, profileRevision } from './metadata';
+import { agentLaunchIssue, profilePreview, profileRevision } from './metadata';
 import { broadcastManagedSubmission } from './managed';
 import { ponsClient } from './session-approval';
 
@@ -82,7 +82,9 @@ export class SessionRuntime {
       return session;
     }
     const agent = await this.db.collection('agents').findOne({ _id: new ObjectId(session.agentId) });
-    if (!agent || agent.status !== 'active') throw new SessionConflict('This agent is no longer available for launching.');
+    if (!agent) throw new SessionConflict('This agent no longer exists.');
+    const statusIssue = agentLaunchIssue(agent, session.role);
+    if (statusIssue) throw new SessionConflict(statusIssue);
     const platform = target.terms.platform;
     if (platform !== 'pons' && !solanaLaunchesEnabled(platform)) throw new SessionConflict('This platform is temporarily unavailable.');
     if (session.role === 'owner' && !session.walletPolicy) {
@@ -183,7 +185,9 @@ export class SessionRuntime {
       const platform = target.terms.platform;
       if (['prepare', 'retry', 'confirm'].includes(String(body.action))) {
         const agent = await this.db.collection('agents').findOne({ _id: new ObjectId(session.agentId) });
-        if (!agent || agent.status !== 'active') throw new SessionConflict('This agent is not available for new launches. Saved transactions can still be checked.');
+        if (!agent) throw new SessionConflict('This agent no longer exists. Saved transactions can still be checked.');
+        const statusIssue = agentLaunchIssue(agent, session.role);
+        if (statusIssue) throw new SessionConflict(statusIssue);
         if (session.role === 'owner' && !session.walletPolicy) {
           const wallets = verifiedLaunchWallets(agent);
           const selected = platform === 'pons' ? wallets.evm?.toLowerCase() : wallets.solana;

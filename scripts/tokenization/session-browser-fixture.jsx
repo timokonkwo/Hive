@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import { LaunchDialog } from '../../components/redesign/tokenization/LaunchDialog';
+import { AgentsPanel } from '../../components/redesign/admin/Records';
 import foundation from '../../components/redesign/foundation.module.css';
 import { parseUnits } from 'viem';
 const evm='0xc5496066af938bf19b0f78e2197262bf10af9fd0', managed='0x31A9Fb923F1bcB2cEb1221dbdc06B94A6a749De2';
@@ -18,6 +19,12 @@ const current=()=>f.session?.targets.find(t=>!['confirmed','skipped'].includes(t
 function prepare(){const t=current();if(t.terms.platform==='pons'){t.phase='preparing';return;}t.phase='awaiting-signature';f.review={id:'step-'+t.terms.platform,platform:t.terms.platform,stage:'launch',signer:t.terms.signer,mode:t.terms.mode,transaction:'AQ==',digest:'a'.repeat(64),maximumDebit:'5000000',networkFee:'5000',blockhash:sol,expiresAt:new Date(Date.now()+(f.expired?-1000:60000)).toISOString()};}
 function check(){const t=current();if(t&&['submitted','confirming'].includes(t.phase)){if(f.failed){t.phase='failed';t.error='Transaction failed.';f.session.paused=true;f.failed=false;}else{t.phase='confirmed';t.token={...token,platform:t.terms.platform,network:t.terms.platform==='pons'?'robinhood':'solana',address:t.terms.platform==='pons'?token.address:t.terms.platform==='bags'?sol:'CmKcjG6tvNy26z5CVd58mgPTs5RPzeJvmjGDvqXxpwLF',transactionHash:t.terms.platform==='pons'?token.transactionHash:'2'.repeat(88)};}}}
 async function request(url,init){f.calls.push({url,body:init?.body?JSON.parse(init.body):null});await new Promise(r=>setTimeout(r,40));const path=new URL(url,location.origin),body=init?.body?JSON.parse(init.body):{},role=path.searchParams.get('role'),route=path.pathname.split('/').at(-1);
+ if(location.search==='?adminAgents') {
+  if(init?.method && init.method!=='GET')throw Error('Pagination fixture must not submit a launch');
+  const details=window.adminLaunchFixtures.find(row=>row.preview.agentId===path.pathname.split('/')[3]);
+  if(!details)throw Error('Admin selected the wrong agent');
+  return Response.json(details);
+ }
  if(route==='session'){
   if(!body.action){const tokens=f.session?.targets.flatMap(t=>t.token?[t.token]:[])||[];return Response.json({preview:preview(role),profileRevision:'a'.repeat(64),tokens,wallets:{evm,solana:sol},deployers:{evm:{address:managed,available:true},solana:{address:sol,available:true}},readOnly:!!f.readOnly,options:f.options||['pons','bags','pump'].map(platform=>({platform,available:true,purchaseAvailable:true,token:tokens.find(t=>t.platform===platform)})),...result()});}
   if(body.action==='create'||body.action==='revise')f.session={id:body.id,agentId:id,role,metadata:{...metadata(),symbol:body.symbol},profileRevision:'a'.repeat(64),digest:'b'.repeat(64),revision:0,paused:false,createdAt:new Date().toISOString(),targets:body.choices.sort((a,b)=>['bags','pump','pons'].indexOf(a.platform)-['bags','pump','pons'].indexOf(b.platform)).map(terms=>({terms:{...terms,purchase:parseUnits(terms.purchase,terms.platform==='pons'?18:9).toString()},phase:'queued'}))};
@@ -43,4 +50,12 @@ async function request(url,init){f.calls.push({url,body:init?.body?JSON.parse(in
  throw Error('Unexpected fixture route '+route);
 }
 function App(){const[open,setOpen]=useState(false);return <div className={foundation.surface}><button onClick={()=>{f.role='admin';setOpen(true)}}>Admin tokenize</button><button onClick={()=>{f.role='owner';setOpen(true)}}>Owner tokenize</button>{open&&<LaunchDialog agentId={id} role={f.role} request={request} close={()=>setOpen(false)}/>}</div>}
-createRoot(document.getElementById('root')).render(<App/>);
+function AdminAgents(){const[page,setPage]=useState(1),[selected,setSelected]=useState(null);
+ const rows=window.adminLaunchFixtures.map(details=>({id:details.preview.agentId,name:details.preview.metadata.name,isVerified:false}));
+ const noop=()=>{};
+ return <div className={foundation.surface}><AgentsPanel agents={rows.slice((page-1)*20,page*20)} total={rows.length} loading={false}
+  search="" onSearch={noop} verified="all" onVerified={noop} page={page} onPage={setPage} sort="reputation" order="desc" onSort={noop}
+  editing={null} value="" onValue={noop} onEdit={noop} onSave={noop} onToggle={noop} onDelete={noop} onLaunch={setSelected}/>
+  {selected&&<LaunchDialog agentId={selected.id} role="admin" request={request} close={()=>setSelected(null)}/>}</div>;
+}
+createRoot(document.getElementById('root')).render(location.search==='?adminAgents'?<AdminAgents/>:<App/>);
