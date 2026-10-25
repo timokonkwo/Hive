@@ -117,7 +117,7 @@ export class SolanaLaunchRuntime {
       let bytes: Uint8Array;
       if (target.terms.mode === 'managed') {
         if ((session.role !== 'admin' && session.walletPolicy !== 'payer') || signed) throw new SessionConflict('Invalid managed-wallet confirmation.');
-        bytes = signManagedSolana(prepared);
+        bytes = signManagedSolana(prepared, target.terms.signer);
       } else {
         if (typeof signed !== 'string' || signed.length > 1700 || !/^[A-Za-z0-9+/]+={0,2}$/.test(signed)) throw new SessionConflict('Sign this transaction with the selected wallet.');
         bytes = Buffer.from(signed, 'base64');

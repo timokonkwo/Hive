@@ -5,6 +5,7 @@ import { HIVE_LAUNCH_WALLET, feeRecipient, normalizeSymbol, purchaseWei, validAd
 import { validSolanaAddress, profileUrl } from './platforms';
 
 export const HIVE_SOLANA_FEE_WALLET = '8CrDTtkdDr54LsB9vQi1PZzVNmAA1KHkcts2EAK9W11z';
+export const HIVE_SOLANA_LAUNCH_WALLET = 'CUswZXSaVjeK9Rk4vA2zVb5NdjQi1eBxsygWEG9n4oNL';
 export const BAGS_STANDARD_CONFIG = 'fa29606e-5e48-4c37-827f-4b03d58ee23d';
 export type TargetPhase = 'queued' | 'preparing' | 'awaiting-signature' | 'submitted' | 'confirming' | 'confirmed' | 'failed' | 'skipped' | 'blocked';
 export interface TargetTerms {
@@ -58,6 +59,8 @@ export function reviewSession(input: {
   choices: { platform: PlatformId; mode: LaunchMode; signer: string; purchase: string }[];
   verifiedOwnerEvm: string | null; verifiedOwnerSolana: string | null;
   walletPolicy?: 'payer' | 'verified';
+  /** Server-only replay of an existing session; never accepted from request bodies. */
+  managedSolanaSigner?: string;
   allowEmpty?: boolean;
 }, now = new Date()): LaunchSession {
   if (!/^[a-f0-9-]{36}$/.test(input.id) || !/^[a-f0-9]{24}$/.test(input.agentId)
@@ -77,7 +80,7 @@ export function reviewSession(input: {
     const evm = choice.platform === 'pons';
     if (!(evm ? validAddress(choice.signer) : validSolanaAddress(choice.signer))) throw new SessionConflict('Select a valid launch wallet.');
     const signer = evm ? choice.signer.toLowerCase() : choice.signer;
-    if (choice.mode === 'managed' && signer !== (evm ? HIVE_LAUNCH_WALLET.toLowerCase() : HIVE_SOLANA_FEE_WALLET)) {
+    if (choice.mode === 'managed' && signer !== (evm ? HIVE_LAUNCH_WALLET.toLowerCase() : input.managedSolanaSigner || HIVE_SOLANA_LAUNCH_WALLET)) {
       throw new SessionConflict('The Hive deployer changed. Refresh the launch review.');
     }
     const owner = evm ? input.verifiedOwnerEvm?.toLowerCase() : input.verifiedOwnerSolana;

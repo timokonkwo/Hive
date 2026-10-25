@@ -68,7 +68,7 @@ async function approvedBatch(db) {
   let session = await records.create(sessions.reviewSession({ id: crypto.randomUUID(), agentId, role: 'admin', metadata: preview.metadata,
     profileRevision: metadata.profileRevision(agent), verifiedOwnerEvm: null, verifiedOwnerSolana: null,
     choices: ['pump', 'pons'].map(platform => ({ platform, mode: 'managed', purchase: '0',
-      signer: platform === 'pons' ? policy.HIVE_LAUNCH_WALLET : sessions.HIVE_SOLANA_FEE_WALLET })) }));
+      signer: platform === 'pons' ? policy.HIVE_LAUNCH_WALLET : sessions.HIVE_SOLANA_LAUNCH_WALLET })) }));
   session = await records.save(session, sessions.transitionTarget(session, 'pump', { phase: 'preparing', intentId: 'saved-pump' }));
   session = await records.save(session, sessions.transitionTarget(session, 'pump', { phase: 'confirmed', token: { platform: 'pump', network: 'solana',
     address: sessions.HIVE_SOLANA_FEE_WALLET, symbol: 'RESEARCH', transactionHash: '2'.repeat(88), launchedAt: new Date().toISOString() } }));

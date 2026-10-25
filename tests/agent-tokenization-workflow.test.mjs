@@ -8,7 +8,7 @@ import { agent, agentId } from './helpers/tokenization-fixture.mjs';
 const preview = metadata.profilePreview(agentId, agent, 'admin');
 const review = (platforms = ['bags', 'pump']) => sessions.reviewSession({ id: randomUUID(), agentId, role: 'admin', metadata: preview.metadata,
   profileRevision: metadata.profileRevision(agent), verifiedOwnerEvm: null, verifiedOwnerSolana: null,
-  choices: platforms.map(platform => ({ platform, mode: 'managed', signer: platform === 'pons' ? policy.HIVE_LAUNCH_WALLET : sessions.HIVE_SOLANA_FEE_WALLET, purchase: '0' })) });
+  choices: platforms.map(platform => ({ platform, mode: 'managed', signer: platform === 'pons' ? policy.HIVE_LAUNCH_WALLET : sessions.HIVE_SOLANA_LAUNCH_WALLET, purchase: '0' })) });
 function approval(session) {
   return sessionApproval.approveSession({ ...session, estimate: { digest: 'quote', expiresAt: new Date(Date.now() + 60000).toISOString(), limits: { bags: '100', pump: '100' } } }, 'quote');
 }

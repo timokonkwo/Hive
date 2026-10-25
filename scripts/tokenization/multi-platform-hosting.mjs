@@ -10,7 +10,7 @@ const site=await request(`/sites/${siteId}`);
 if (site.name!=='hive-protocol' || site.custom_domain!=='uphive.xyz') throw Error('Unexpected site.');
 const rows=await request(`/accounts/${accountId}/env?site_id=${siteId}`);
 const mode=process.argv[2] || 'status';
-const names=['TOKENIZATION_JOURNAL_KEY','AGENT_MULTI_PLATFORM_LAUNCHES_ENABLED','AGENT_MULTI_PLATFORM_RECOVERY_ENABLED','HIVE_AGENT_LAUNCH_KEYPAIR','BAGS_AGENT_API_KEY','CRON_SECRET'];
+const names=['TOKENIZATION_JOURNAL_KEY','AGENT_MULTI_PLATFORM_LAUNCHES_ENABLED','AGENT_MULTI_PLATFORM_RECOVERY_ENABLED','HIVE_LAUNCH_KEYPAIR','HIVE_AGENT_LAUNCH_KEYPAIR','BAGS_AGENT_API_KEY','CRON_SECRET'];
 if(mode==='status') {
   console.log(JSON.stringify({site:site.name,publishedDeploy:site.published_deploy?.id,settings:names.map(key=>{
     const row=rows.find(r=>r.key===key);return {key,configured:!!production(row),secret:row?.is_secret,scopes:row?.scopes,localConfigured:!!process.env[key]};
@@ -19,7 +19,7 @@ if(mode==='status') {
   const current=rows.find(r=>r.key==='TOKENIZATION_JOURNAL_KEY');
   let journal=process.env.TOKENIZATION_JOURNAL_KEY;
   if(current && (!current.is_secret || !current.scopes.includes('functions') || !production(current))) throw Error('Review the existing hosted journal key settings; it will not be overwritten.');
-  for(const key of ['CRON_SECRET','HIVE_AGENT_LAUNCH_KEYPAIR','BAGS_AGENT_API_KEY','CLOUDINARY_CLOUD_NAME','CLOUDINARY_API_KEY','CLOUDINARY_API_SECRET']) {
+  for(const key of ['CRON_SECRET','HIVE_LAUNCH_KEYPAIR','HIVE_AGENT_LAUNCH_KEYPAIR','BAGS_AGENT_API_KEY','CLOUDINARY_CLOUD_NAME','CLOUDINARY_API_KEY','CLOUDINARY_API_SECRET']) {
     if(!production(rows.find(r=>r.key===key))) throw Error(`Missing production configuration: ${key}`);
   }
   if(!current) {

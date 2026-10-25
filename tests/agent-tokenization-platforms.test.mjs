@@ -104,7 +104,7 @@ test('SOL purchases are exact and reject rounding, exponents and negative values
 
 test('walletless owners can use Hive on every platform; purchases require their own payer', () => {
   const value = { ...input(), verifiedOwnerEvm: null, verifiedOwnerSolana: null,
-    choices: p.platformIds.map(platform => ({ platform, mode: 'managed', signer: platform === 'pons' ? '0x31A9Fb923F1bcB2cEb1221dbdc06B94A6a749De2' : s.HIVE_SOLANA_FEE_WALLET, purchase: '0' })) };
+    choices: p.platformIds.map(platform => ({ platform, mode: 'managed', signer: platform === 'pons' ? '0x31A9Fb923F1bcB2cEb1221dbdc06B94A6a749De2' : s.HIVE_SOLANA_LAUNCH_WALLET, purchase: '0' })) };
   const reviewed = s.reviewSession(value);
   assert.equal(reviewed.walletPolicy, 'payer');
   assert.equal(reviewed.targets.find(t => t.terms.platform === 'pons').terms.recipient, '0x4a7c1d6872c6B7D0AAC1ab2311F15b2D750A9B19');

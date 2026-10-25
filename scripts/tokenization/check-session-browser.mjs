@@ -19,7 +19,7 @@ try {
   const adminLaunchFixtures=await Promise.all(Array.from({length:41},async(_,index)=>{
     const agent={name:`Agent ${index+1}`,bio:'Agent for admin launch regression.',status:[undefined,'pending','active','suspended'][index%4]};
     const details=await sessionPreview.sessionPreview({collection:()=>({findOne:async()=>null})},agent,metadata.profilePreview((index+1).toString(16).padStart(24,'0'),agent,'admin'));
-    return {...details,deployers:{evm:{available:true,address:'0x31A9Fb923F1bcB2cEb1221dbdc06B94A6a749De2'},solana:{available:true,address:'8CrDTtkdDr54LsB9vQi1PZzVNmAA1KHkcts2EAK9W11z'}}};
+    return {...details,deployers:{evm:{available:true,address:'0x31A9Fb923F1bcB2cEb1221dbdc06B94A6a749De2'},solana:{available:true,address:'CUswZXSaVjeK9Rk4vA2zVb5NdjQi1eBxsygWEG9n4oNL'}}};
   }));
   await build({entryPoints:[root+'scripts/tokenization/session-browser-fixture.jsx'],bundle:true,external:['/redesign/fonts/*'],format:'iife',jsx:'automatic',outfile:dir+'/app.js',plugins:[{name:'fixture-boundaries',setup(b){
     b.onResolve({filter:/^@\//},args=>({path:root+args.path.slice(2)+'.ts'}));

@@ -20,6 +20,19 @@ test('Bags deployer earnings count aggregate vault once and reject inconsistent,
   const p=structuredClone(f.positions);change(p);assert.throws(()=>bagsFees.readDeployerFees(p,f.wallet));
  }
 });
+test('Bags deployer fees include old and new wallets under the existing claim journal',async()=>{
+ const calls=[];
+ const api={deployerFees:async wallet=>{calls.push(wallet);return {...structuredClone(f.positions),wallet};}};
+ const client=new bagsFees.HiveBagsDeployerFees(connection,api);
+ assert.equal(client.getWalletAddress(),sessions.HIVE_SOLANA_FEE_WALLET);
+ const positions=await client.getClaimablePositions();
+ assert.deepEqual(calls,[sessions.HIVE_SOLANA_FEE_WALLET,sessions.HIVE_SOLANA_LAUNCH_WALLET]);
+ assert.deepEqual(positions.map(p=>p.baseMint),calls);
+ assert.equal(positions.reduce((sum,p)=>sum+BigInt(p.totalClaimableLamportsUserShare),0n),35499592n);
+ await assert.rejects(client.prepareClaimTransactions(Keypair.generate().publicKey.toBase58()));
+ api.deployerFees=async()=>{throw Error('offline');};
+ await assert.rejects(client.getClaimablePositions(),/offline/);
+});
 test('current sponsored Bags sweep, vault withdrawal and native SOL unwrap validate against the pinned IDL',async()=>{
  await check(transaction());
  assert.ok(instructions().some(ix=>ix.programId.equals(TOKEN_PROGRAM_ID)));

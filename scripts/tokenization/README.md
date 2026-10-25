@@ -3,6 +3,19 @@
 These tools exercise the same ABI, quote, transaction and receipt modules used
 by the integration. They do not enable the app's launch button.
 
+## Solana deployer and fee wallet
+
+New managed Bags/pump.fun launches use `HIVE_LAUNCH_KEYPAIR`, which must resolve to
+`CUswZXSaVjeK9Rk4vA2zVb5NdjQi1eBxsygWEG9n4oNL`. Keep it secret and limited to
+production functions. Fund that address for launch fees and account rent.
+
+Keep `HIVE_AGENT_LAUNCH_KEYPAIR` for `8CrDTtkdDr54LsB9vQi1PZzVNmAA1KHkcts2EAK9W11z`:
+it still signs existing launch reviews and creator-fee collections. Saved reviews
+keep their original signer, and new reviews cannot select the retired managed
+deployer. Bags deployer fees aggregate both wallets in the existing claim row;
+each transaction is signed by its own wallet. Creator-fee routing and Pons are
+unchanged. The lookup-table maintenance script retains its original authority.
+
 ## Read current contracts
 
 ```sh

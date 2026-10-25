@@ -43,6 +43,7 @@ export async function POST(req: NextRequest, { params }: Params) {
         // Only an identical review can replay a request ID; never change the reservation.
         const same = reviewSession({ id: body.id, agentId: preview.agentId, role: preview.role, profileRevision: body.revision,
           metadata: { ...existing.metadata, symbol: body.symbol }, choices, walletPolicy: existing.walletPolicy || 'verified',
+          managedSolanaSigner: existing.targets.find(t => t.terms.platform !== 'pons' && t.terms.mode === 'managed')?.terms.signer,
           verifiedOwnerEvm: existing.targets.find(t => t.terms.platform === 'pons')?.terms.signer || null,
           verifiedOwnerSolana: existing.targets.find(t => t.terms.platform !== 'pons')?.terms.signer || null });
         if (same.digest !== existing.digest) throw new LaunchHttpError(409, 'This request ID belongs to another review.');

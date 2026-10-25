@@ -5,7 +5,7 @@ import type { ManagedFeeClient } from '../agent-fees';
 import feeIdl from './idl/bags-fee-share-v2.json';
 import { BagsLaunchApi, readBagsTransaction } from './bags';
 import { BAGS_FEE_PROGRAM } from './bags-fee-config';
-import { HIVE_SOLANA_FEE_WALLET, SessionConflict } from './session';
+import { HIVE_SOLANA_FEE_WALLET, HIVE_SOLANA_LAUNCH_WALLET, SessionConflict } from './session';
 import { validSolanaAddress } from './platforms';
 import { requiresSigner, SOLANA_MAINNET_GENESIS, verifySignedTransaction } from './solana-journal';
 import { signManagedSolana } from './solana-signer';
@@ -109,8 +109,8 @@ export async function validateDeployerClaim(connection: Connection, transaction:
 export class BagsDeployerFeeClient implements ManagedFeeClient {
   readonly source = 'bags-deployer' as const;
   private mints = new Set<string>();
-  constructor(readonly connection: Connection, private api = new BagsLaunchApi(process.env.BAGS_AGENT_API_KEY || '')) {}
-  getWalletAddress() { return HIVE_SOLANA_FEE_WALLET; }
+  constructor(readonly connection: Connection, private api = new BagsLaunchApi(process.env.BAGS_AGENT_API_KEY || ''), private wallet = HIVE_SOLANA_FEE_WALLET) {}
+  getWalletAddress() { return this.wallet; }
   async getClaimablePositions() {
     const fees = readDeployerFees(await this.api.deployerFees(this.getWalletAddress()), this.getWalletAddress());
     this.mints = fees.mints;
@@ -128,7 +128,7 @@ export class BagsDeployerFeeClient implements ManagedFeeClient {
     for (const row of transactions) {
       const { transaction, lifetime } = readBagsTransaction(row);
       if (!lifetime) fail();
-      await validateDeployerClaim(this.connection, transaction, this.mints);
+      await validateDeployerClaim(this.connection, transaction, this.mints, this.wallet);
       const [before, simulation, height] = await Promise.all([
         this.connection.getBalance(new PublicKey(id), 'confirmed'),
         this.connection.simulateTransaction(transaction, { sigVerify: false, commitment: 'confirmed', accounts: { encoding: 'base64', addresses: [id] } }),
@@ -142,8 +142,31 @@ export class BagsDeployerFeeClient implements ManagedFeeClient {
   }
   signTransaction(transaction: VersionedTransaction) {
     const original = VersionedTransaction.deserialize(transaction.serialize());
-    const signed = signManagedSolana(transaction);
+    const signed = signManagedSolana(transaction, this.wallet);
     verifySignedTransaction(original, signed);
     return signed;
+  }
+}
+
+/** Keep one fee row and the existing claim lease while collecting both deployers. */
+export class HiveBagsDeployerFees implements ManagedFeeClient {
+  readonly source = 'bags-deployer' as const;
+  private readonly clients: BagsDeployerFeeClient[];
+  constructor(readonly connection: Connection, api = new BagsLaunchApi(process.env.BAGS_AGENT_API_KEY || '')) {
+    this.clients = [HIVE_SOLANA_FEE_WALLET, HIVE_SOLANA_LAUNCH_WALLET].map(wallet => new BagsDeployerFeeClient(connection, api, wallet));
+  }
+  // Stable journal identity: all fee sources share the existing wallet-wide lease.
+  getWalletAddress() { return HIVE_SOLANA_FEE_WALLET; }
+  async getClaimablePositions() { return (await Promise.all(this.clients.map(client => client.getClaimablePositions()))).flat(); }
+  async prepareClaimTransactions(wallet: string) {
+    const client = this.clients.find(client => client.getWalletAddress() === wallet);
+    if (!client) return fail();
+    return client.prepareClaimTransactions(wallet);
+  }
+  signTransaction(transaction: VersionedTransaction) {
+    const signers = transaction.message.staticAccountKeys.slice(0, transaction.message.header.numRequiredSignatures).map(key => key.toBase58());
+    const clients = this.clients.filter(client => signers.includes(client.getWalletAddress()));
+    if (clients.length !== 1) return fail();
+    return clients[0].signTransaction(transaction);
   }
 }

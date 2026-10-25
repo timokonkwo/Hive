@@ -38,7 +38,7 @@ try {
   const reservation = JSON.parse(readFileSync(reservationPath, 'utf8'));
   if (reservation.phase !== 'ready') throw Error('The previous metadata response must be recovered.');
   const mint = reservation.mint;
-  const payer = sessions.HIVE_SOLANA_FEE_WALLET;
+  const payer = sessions.HIVE_SOLANA_LAUNCH_WALLET;
   const setup = await bagsLaunch.prepareBagsConfiguration(api, mint, payer);
   console.log(JSON.stringify({ needsCreation: setup.needsCreation, steps: setup.steps.length, authorityMatches: setup.authority === bagsValidation.bagsAuthority(mint).toBase58() }));
   writeFileSync('/tmp/hive-bags-prepared-setup.json', JSON.stringify({ mint, payer, config:setup.config, authority:setup.authority, steps:setup.steps.map(s=>({ transaction:Buffer.from(s.transaction.serialize()).toString('base64'), lifetime:s.lifetime })) }));

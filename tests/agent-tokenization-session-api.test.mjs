@@ -48,7 +48,7 @@ function harness() {
     return Object.assign(new Request(url, { ...(body ? { method: 'POST', body: JSON.stringify(body), headers: { 'content-type': 'application/json', origin } } : {}) }), { nextUrl: url });
   }
   const create = () => ({ action: 'create', id: randomUUID(), revision: metadata.profileRevision(state.agent), symbol: 'SAGE',
-    choices: [{ platform: 'pump', mode: 'managed', signer: sessions.HIVE_SOLANA_FEE_WALLET, purchase: '0' }] });
+    choices: [{ platform: 'pump', mode: 'managed', signer: sessions.HIVE_SOLANA_LAUNCH_WALLET, purchase: '0' }] });
   return { route, state, request, create };
 }
 test('session endpoints authorize before profile reads and reject foreign origins and caller-supplied receipt data', async () => {
@@ -89,6 +89,17 @@ test('session recovery cron is authenticated and independently disabled without 
   assert.deepEqual(await (await route.GET(request('Bearer fixture'))).json(), { enabled: false }); assert.equal(calls, 0);
   process.env.AGENT_MULTI_PLATFORM_RECOVERY_ENABLED = 'true';
   assert.deepEqual(await (await route.GET(request('Bearer fixture'))).json(), { enabled: true, checked: 0, errors: 0 }); assert.equal(calls, 1);
+});
+test('a saved review from the old Solana deployer replays without permitting new launches from it', async () => {
+  const h = harness(), body = h.create();
+  body.choices[0].signer = sessions.HIVE_SOLANA_FEE_WALLET;
+  h.state.session = sessions.reviewSession({ id: body.id, agentId, role: 'admin', metadata: { ...metadata.profilePreview(agentId, h.state.agent, 'admin').metadata, symbol: body.symbol },
+    profileRevision: body.revision, choices: body.choices, verifiedOwnerEvm: null, verifiedOwnerSolana: null,
+    managedSolanaSigner: sessions.HIVE_SOLANA_FEE_WALLET });
+  assert.equal((await h.route.POST(h.request(body), params)).status, 200);
+  assert.equal(h.state.creations, 0);
+  assert.equal((await h.route.POST(h.request({ ...body, id: randomUUID() }), params)).status, 409);
+  assert.equal((await h.route.POST(h.request({ ...body, managedSolanaSigner: sessions.HIVE_SOLANA_FEE_WALLET }), params)).status, 400);
 });
 test('verified Solana adapters require recovery, encryption and their provider configuration', t => {
   const values = { AGENT_MULTI_PLATFORM_LAUNCHES_ENABLED: 'true', AGENT_MULTI_PLATFORM_RECOVERY_ENABLED: 'true',

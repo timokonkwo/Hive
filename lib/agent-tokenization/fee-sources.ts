@@ -1,16 +1,16 @@
 import type { Db } from 'mongodb';
 import { claimableLamports, type AgentFeeClient } from '../agent-fees';
 import { createAgentBagsClient } from '../bags-agent';
-import { BagsDeployerFeeClient } from './bags-fees';
+import { HiveBagsDeployerFees } from './bags-fees';
 import { PumpFeeClient } from './pump-fees';
 import { launchConnection } from './solana-runtime';
-import { solanaDeployerStatus } from './solana-signer';
+import { solanaFeeWalletStatus } from './solana-signer';
 
 export type FeeSource = 'bags-creator' | 'bags-deployer' | 'pump';
 export function feeClient(db: Db, source: FeeSource): AgentFeeClient {
-  if (!solanaDeployerStatus().available) throw Error('Solana fee wallet is not configured.');
+  if (!solanaFeeWalletStatus().available) throw Error('Solana fee wallet is not configured.');
   if (source === 'pump') return new PumpFeeClient(db, launchConnection());
-  if (source === 'bags-deployer') return new BagsDeployerFeeClient(launchConnection());
+  if (source === 'bags-deployer') return new HiveBagsDeployerFees(launchConnection());
   const client = createAgentBagsClient();
   if (!client) throw Error('Bags fee collection is not configured.');
   return client;

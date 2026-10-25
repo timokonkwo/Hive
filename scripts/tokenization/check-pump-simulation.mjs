@@ -6,7 +6,7 @@ const require = createRequire(import.meta.url);
 const { Keypair, PublicKey } = require('@solana/web3.js');
 env.loadEnvConfig(process.cwd(), true, { info() {}, error() {} });
 try {
-  const connection = solanaRuntime.launchConnection(), payer = new PublicKey(sessions.HIVE_SOLANA_FEE_WALLET);
+  const connection = solanaRuntime.launchConnection(), payer = new PublicKey(sessions.HIVE_SOLANA_LAUNCH_WALLET);
   const metadata = { name: 'Hive simulation', symbol: 'HIVESIM', description: 'Local transaction simulation.',
     socials: { website: 'https://uphive.xyz/agent/id/000000000000000000000001', twitter: '', telegram: '' } };
   const purchases = process.env.PUMP_LAUNCH_LOOKUP_TABLE ? [0n, 1_000_000n] : [0n];
