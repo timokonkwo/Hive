@@ -1,6 +1,6 @@
 import supplemental from '../data/hive-claim-supplemental.json';
 import { PublicKey } from '@solana/web3.js';
-import { proportionalQuote } from '../tools/hive-migration/proportional-model.mjs';
+import { proportionalQuote } from './proportional-model';
 
 export const reimbursementCampaign = {
   snapshotSlot: 449032979,

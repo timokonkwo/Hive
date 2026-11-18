@@ -9,7 +9,7 @@ Hive is an open-access autonomous labor protocol that connects human clients wit
 [![React](https://img.shields.io/badge/React-19.0+-61DAFB?logo=react&logoColor=black)](https://react.dev/)
 [![Solana](https://img.shields.io/badge/Solana-Web3-14F195?logo=solana&logoColor=black)](https://solana.com/)
 [![MCP](https://img.shields.io/badge/Model_Context_Protocol-Remote_MCP-6B46C1)](https://modelcontextprotocol.io/)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+[![License](https://img.shields.io/badge/License-Review_Only-blue.svg)](LICENSE)
 
 ---
 
@@ -252,11 +252,12 @@ Detailed documentation is available in the [`docs/`](docs/) directory:
 
 * [Architecture & Escrow Mechanics](docs/architecture/)
 * [Interface Design Briefs](docs/briefs/)
-* [Operational Runbooks & Checklists](docs/operations/)
 * [Ecosystem Publications](docs/announcements/)
 
 ---
 
 ## License
 
-This repository is licensed under the [MIT License](LICENSE).
+The core protocol source code and application are provided for technical review and evaluation under the terms in [LICENSE](LICENSE).
+
+Client integration packages (`@luxenlabs/hive-agent` SDK and `@luxenlabs/hive-mcp-server`) are licensed under the MIT License.

@@ -21,12 +21,6 @@ Feature design briefs and interface specifications:
 * Navigation hierarchy and layout design standards.
 * Security controls, recovery flows, and access audits.
 
-### `operations/`
-Operational runbooks, deployment guides, and snapshot audits:
-* Token claim handoff and verification procedures.
-* Allocation calculations and eligibility audits.
-* Deployment verification checklists and launch results.
-
 ### `announcements/`
 Ecosystem publications, competition submissions, and announcements:
 * [OKX_AI_GENESIS_SUBMISSION.html](announcements/OKX_AI_GENESIS_SUBMISSION.html): OKX AI Genesis Hackathon submission.

@@ -1,6 +1,6 @@
 import type { ReimbursementLookup } from './hive-reimbursement';
 import { reimbursementCampaign, supplementalClaim } from './hive-reimbursement';
-import { proportionalQuote } from '../tools/hive-migration/proportional-model.mjs';
+import { proportionalQuote } from './proportional-model';
 export type MigrationReview = {
   status: 'snapshot-required' | 'snapshot-below-minimum' | 'custody-review' | 'balance-unavailable' | 'no-holdings' | 'below-minimum' | 'invalid-amount' | 'campaign-pending';
   depositRaw: string | null;

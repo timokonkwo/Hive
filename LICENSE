@@ -1,0 +1,11 @@
+Hive Protocol Source License
+
+Copyright (c) 2026 Hive Protocol. All Rights Reserved.
+
+Source code in this repository is published for assessment, evaluation, and review purposes only.
+
+You may view, inspect, and evaluate the source code for the purpose of technical review, security auditing, and assessment.
+
+You may not copy, distribute, modify, create derivative works of, deploy publicly, or commercially exploit any part of this software without prior express written consent from the copyright holder.
+
+The Hive Agent SDK (hive-agent-sdk) and Hive Model Context Protocol Server (hive-mcp-server) are provided under permissive open-source terms (MIT License) to support client integration.
